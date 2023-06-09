@@ -3,48 +3,48 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
 YTT302.py:4:1: YTT302 `sys.version` compared to string (python10), use `sys.version_info`
   |
-4 | from sys import version
-5 | 
-6 | version < "3"
+2 | from sys import version
+3 | 
+4 | version < "3"
   | ^^^^^^^ YTT302
-7 | sys.version < "3"
-8 | sys.version <= "3"
+5 | sys.version < "3"
+6 | sys.version <= "3"
   |
 
 YTT302.py:5:1: YTT302 `sys.version` compared to string (python10), use `sys.version_info`
   |
-5 | version < "3"
-6 | sys.version < "3"
+4 | version < "3"
+5 | sys.version < "3"
   | ^^^^^^^^^^^ YTT302
-7 | sys.version <= "3"
-8 | sys.version > "3"
+6 | sys.version <= "3"
+7 | sys.version > "3"
   |
 
 YTT302.py:6:1: YTT302 `sys.version` compared to string (python10), use `sys.version_info`
-   |
- 6 | version < "3"
- 7 | sys.version < "3"
- 8 | sys.version <= "3"
-   | ^^^^^^^^^^^ YTT302
- 9 | sys.version > "3"
-10 | sys.version >= "3"
-   |
+  |
+4 | version < "3"
+5 | sys.version < "3"
+6 | sys.version <= "3"
+  | ^^^^^^^^^^^ YTT302
+7 | sys.version > "3"
+8 | sys.version >= "3"
+  |
 
 YTT302.py:7:1: YTT302 `sys.version` compared to string (python10), use `sys.version_info`
-   |
- 7 | sys.version < "3"
- 8 | sys.version <= "3"
- 9 | sys.version > "3"
-   | ^^^^^^^^^^^ YTT302
-10 | sys.version >= "3"
-   |
+  |
+5 | sys.version < "3"
+6 | sys.version <= "3"
+7 | sys.version > "3"
+  | ^^^^^^^^^^^ YTT302
+8 | sys.version >= "3"
+  |
 
 YTT302.py:8:1: YTT302 `sys.version` compared to string (python10), use `sys.version_info`
-   |
- 8 | sys.version <= "3"
- 9 | sys.version > "3"
-10 | sys.version >= "3"
-   | ^^^^^^^^^^^ YTT302
-   |
+  |
+6 | sys.version <= "3"
+7 | sys.version > "3"
+8 | sys.version >= "3"
+  | ^^^^^^^^^^^ YTT302
+  |
 
 

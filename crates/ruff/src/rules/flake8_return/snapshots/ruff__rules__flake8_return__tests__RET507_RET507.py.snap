@@ -3,71 +3,71 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
 RET507.py:8:9: RET507 Unnecessary `elif` after `continue` statement
    |
- 8 |         if i < y:  # [no-else-continue]
- 9 |             continue
-10 |         elif i < w:
+ 6 |         if i < y:  # [no-else-continue]
+ 7 |             continue
+ 8 |         elif i < w:
    |         ^^^^ RET507
-11 |             continue
-12 |         else:
+ 9 |             continue
+10 |         else:
    |
 
 RET507.py:22:9: RET507 Unnecessary `elif` after `continue` statement
    |
-22 |                 b = 2
-23 |             continue
-24 |         elif z:
+20 |                 b = 2
+21 |             continue
+22 |         elif z:
    |         ^^^^ RET507
-25 |             c = 2
-26 |         else:
+23 |             c = 2
+24 |         else:
    |
 
 RET507.py:36:9: RET507 Unnecessary `else` after `continue` statement
    |
-36 |         if i < y:  # [no-else-continue]
-37 |             continue
-38 |         else:
+34 |         if i < y:  # [no-else-continue]
+35 |             continue
+36 |         else:
    |         ^^^^ RET507
-39 |             a = z
+37 |             a = z
    |
 
 RET507.py:47:13: RET507 Unnecessary `else` after `continue` statement
    |
-47 |                 b = 2
-48 |                 continue
-49 |             else:
+45 |                 b = 2
+46 |                 continue
+47 |             else:
    |             ^^^^ RET507
-50 |                 c = 3
-51 |                 continue
+48 |                 c = 3
+49 |                 continue
    |
 
 RET507.py:63:9: RET507 Unnecessary `else` after `continue` statement
    |
-63 |                 b = 2
-64 |             continue
-65 |         else:
+61 |                 b = 2
+62 |             continue
+63 |         else:
    |         ^^^^ RET507
-66 |             c = 3
-67 |         continue
+64 |             c = 3
+65 |         continue
    |
 
 RET507.py:74:13: RET507 Unnecessary `else` after `continue` statement
    |
-74 |                 a = 4
-75 |                 continue
-76 |             else:
+72 |                 a = 4
+73 |                 continue
+74 |             else:
    |             ^^^^ RET507
-77 |                 b = 2
-78 |         else:
+75 |                 b = 2
+76 |         else:
    |
 
 RET507.py:85:9: RET507 Unnecessary `else` after `continue` statement
    |
-85 |         if x:  # [no-else-continue]
-86 |             continue
-87 |         else:
+83 |         if x:  # [no-else-continue]
+84 |             continue
+85 |         else:
    |         ^^^^ RET507
-88 |             try:
-89 |                 return
+86 |             try:
+87 |                 return
    |
 
 

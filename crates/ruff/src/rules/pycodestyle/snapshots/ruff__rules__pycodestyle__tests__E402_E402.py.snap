@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E402.py:24:1: E402 Module level import not at top of file
    |
-24 | __some__magic = 1
-25 | 
-26 | import f
+22 | __some__magic = 1
+23 | 
+24 | import f
    | ^^^^^^^^ E402
    |
 

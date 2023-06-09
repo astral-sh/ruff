@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
 PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-14 | def test_error():
-15 |     assert something and something_else
+13 | def test_error():
+14 |     assert something and something_else
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-16 |     assert something and something_else and something_third
-17 |     assert something and not something_else
+15 |     assert something and something_else and something_third
+16 |     assert something and not something_else
    |
    = help: Break down assertion into multiple parts
 
@@ -24,12 +24,12 @@ PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-15 | def test_error():
-16 |     assert something and something_else
-17 |     assert something and something_else and something_third
+13 | def test_error():
+14 |     assert something and something_else
+15 |     assert something and something_else and something_third
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-18 |     assert something and not something_else
-19 |     assert something and (something_else or something_third)
+16 |     assert something and not something_else
+17 |     assert something and (something_else or something_third)
    |
    = help: Break down assertion into multiple parts
 
@@ -46,12 +46,12 @@ PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-16 |     assert something and something_else
-17 |     assert something and something_else and something_third
-18 |     assert something and not something_else
+14 |     assert something and something_else
+15 |     assert something and something_else and something_third
+16 |     assert something and not something_else
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-19 |     assert something and (something_else or something_third)
-20 |     assert not something and something_else
+17 |     assert something and (something_else or something_third)
+18 |     assert not something and something_else
    |
    = help: Break down assertion into multiple parts
 
@@ -68,12 +68,12 @@ PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-17 |     assert something and something_else and something_third
-18 |     assert something and not something_else
-19 |     assert something and (something_else or something_third)
+15 |     assert something and something_else and something_third
+16 |     assert something and not something_else
+17 |     assert something and (something_else or something_third)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-20 |     assert not something and something_else
-21 |     assert not (something or something_else)
+18 |     assert not something and something_else
+19 |     assert not (something or something_else)
    |
    = help: Break down assertion into multiple parts
 
@@ -90,12 +90,12 @@ PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-18 |     assert something and not something_else
-19 |     assert something and (something_else or something_third)
-20 |     assert not something and something_else
+16 |     assert something and not something_else
+17 |     assert something and (something_else or something_third)
+18 |     assert not something and something_else
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-21 |     assert not (something or something_else)
-22 |     assert not (something or something_else or something_third)
+19 |     assert not (something or something_else)
+20 |     assert not (something or something_else or something_third)
    |
    = help: Break down assertion into multiple parts
 
@@ -112,12 +112,12 @@ PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-19 |     assert something and (something_else or something_third)
-20 |     assert not something and something_else
-21 |     assert not (something or something_else)
+17 |     assert something and (something_else or something_third)
+18 |     assert not something and something_else
+19 |     assert not (something or something_else)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-22 |     assert not (something or something_else or something_third)
-23 |     assert something and something_else == """error
+20 |     assert not (something or something_else or something_third)
+21 |     assert something and something_else == """error
    |
    = help: Break down assertion into multiple parts
 
@@ -134,12 +134,12 @@ PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-20 |     assert not something and something_else
-21 |     assert not (something or something_else)
-22 |     assert not (something or something_else or something_third)
+18 |     assert not something and something_else
+19 |     assert not (something or something_else)
+20 |     assert not (something or something_else or something_third)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-23 |     assert something and something_else == """error
-24 |     message
+21 |     assert something and something_else == """error
+22 |     message
    |
    = help: Break down assertion into multiple parts
 
@@ -156,15 +156,15 @@ PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-21 |       assert not (something or something_else)
-22 |       assert not (something or something_else or something_third)
-23 |       assert something and something_else == """error
+19 |       assert not (something or something_else)
+20 |       assert not (something or something_else or something_third)
+21 |       assert something and something_else == """error
    |  _____^
-24 | |     message
-25 | |     """
+22 | |     message
+23 | |     """
    | |_______^ PT018
-26 |   
-27 |       # recursive case
+24 |   
+25 |       # recursive case
    |
    = help: Break down assertion into multiple parts
 
@@ -181,10 +181,10 @@ PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:26:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-26 |     # recursive case
-27 |     assert not (a or not (b or c))
+25 |     # recursive case
+26 |     assert not (a or not (b or c))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-28 |     assert not (a or not (b and c))
+27 |     assert not (a or not (b and c))
    |
    = help: Break down assertion into multiple parts
 
@@ -201,12 +201,12 @@ PT018.py:26:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:27:5: PT018 [*] Assertion should be broken down into multiple parts
    |
-27 |     # recursive case
-28 |     assert not (a or not (b or c))
-29 |     assert not (a or not (b and c))
+25 |     # recursive case
+26 |     assert not (a or not (b or c))
+27 |     assert not (a or not (b and c))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-30 | 
-31 |     # detected, but no autofix for messages
+28 | 
+29 |     # detected, but no autofix for messages
    |
    = help: Break down assertion into multiple parts
 
@@ -223,58 +223,58 @@ PT018.py:27:5: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:30:5: PT018 Assertion should be broken down into multiple parts
    |
-30 |     # detected, but no autofix for messages
-31 |     assert something and something_else, "error message"
+29 |     # detected, but no autofix for messages
+30 |     assert something and something_else, "error message"
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-32 |     assert not (something or something_else and something_third), "with message"
-33 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
+31 |     assert not (something or something_else and something_third), "with message"
+32 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
    |
    = help: Break down assertion into multiple parts
 
 PT018.py:31:5: PT018 Assertion should be broken down into multiple parts
    |
-31 |     # detected, but no autofix for messages
-32 |     assert something and something_else, "error message"
-33 |     assert not (something or something_else and something_third), "with message"
+29 |     # detected, but no autofix for messages
+30 |     assert something and something_else, "error message"
+31 |     assert not (something or something_else and something_third), "with message"
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-34 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
-35 |     assert not (something or something_else and something_third)
+32 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
+33 |     assert not (something or something_else and something_third)
    |
    = help: Break down assertion into multiple parts
 
 PT018.py:33:5: PT018 Assertion should be broken down into multiple parts
    |
-33 |     assert not (something or something_else and something_third), "with message"
-34 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
-35 |     assert not (something or something_else and something_third)
+31 |     assert not (something or something_else and something_third), "with message"
+32 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
+33 |     assert not (something or something_else and something_third)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-36 |     # detected, but no autofix for parenthesized conditions
-37 |     assert (
+34 |     # detected, but no autofix for parenthesized conditions
+35 |     assert (
    |
    = help: Break down assertion into multiple parts
 
 PT018.py:35:5: PT018 Assertion should be broken down into multiple parts
    |
-35 |       assert not (something or something_else and something_third)
-36 |       # detected, but no autofix for parenthesized conditions
-37 |       assert (
+33 |       assert not (something or something_else and something_third)
+34 |       # detected, but no autofix for parenthesized conditions
+35 |       assert (
    |  _____^
-38 | |         something
-39 | |         and something_else
-40 | |         == """error
-41 | | message
-42 | | """
-43 | |     )
+36 | |         something
+37 | |         and something_else
+38 | |         == """error
+39 | | message
+40 | | """
+41 | |     )
    | |_____^ PT018
    |
    = help: Break down assertion into multiple parts
 
 PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
    |
-45 | assert something  # OK
-46 | assert something and something_else  # Error
+44 | assert something  # OK
+45 | assert something and something_else  # Error
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-47 | assert something and something_else and something_third  # Error
+46 | assert something and something_else and something_third  # Error
    |
    = help: Break down assertion into multiple parts
 
@@ -289,9 +289,9 @@ PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
 
 PT018.py:46:1: PT018 [*] Assertion should be broken down into multiple parts
    |
-46 | assert something  # OK
-47 | assert something and something_else  # Error
-48 | assert something and something_else and something_third  # Error
+44 | assert something  # OK
+45 | assert something and something_else  # Error
+46 | assert something and something_else and something_third  # Error
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
    |
    = help: Break down assertion into multiple parts

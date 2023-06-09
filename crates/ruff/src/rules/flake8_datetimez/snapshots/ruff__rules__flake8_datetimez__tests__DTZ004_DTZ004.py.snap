@@ -3,18 +3,18 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 ---
 DTZ004.py:4:1: DTZ004 The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead
   |
-4 | # qualified
-5 | datetime.datetime.utcfromtimestamp(1234)
+3 | # qualified
+4 | datetime.datetime.utcfromtimestamp(1234)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
-6 | 
-7 | from datetime import datetime
+5 | 
+6 | from datetime import datetime
   |
 
 DTZ004.py:9:1: DTZ004 The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead
-   |
- 9 | # unqualified
-10 | datetime.utcfromtimestamp(1234)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
-   |
+  |
+8 | # unqualified
+9 | datetime.utcfromtimestamp(1234)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
+  |
 
 

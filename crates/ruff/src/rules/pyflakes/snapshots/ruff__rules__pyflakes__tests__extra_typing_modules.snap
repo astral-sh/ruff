@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 typing_modules.py:7:15: F821 Undefined name `Class`
   |
-7 | X = Union[Literal[False], Literal["db"]]
-8 | y = Optional["Class"]
+6 | X = Union[Literal[False], Literal["db"]]
+7 | y = Optional["Class"]
   |               ^^^^^ F821
   |
 

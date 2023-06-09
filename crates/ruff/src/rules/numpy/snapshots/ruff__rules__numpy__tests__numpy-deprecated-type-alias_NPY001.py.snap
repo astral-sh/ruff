@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/numpy/mod.rs
 ---
 NPY001.py:6:1: NPY001 [*] Type alias `np.bool` is deprecated, replace with builtin type
   |
-6 | # Error
-7 | npy.bool
+5 | # Error
+6 | npy.bool
   | ^^^^^^^^ NPY001
-8 | npy.int
+7 | npy.int
   |
   = help: Replace `np.bool` with builtin type
 
@@ -21,15 +21,15 @@ NPY001.py:6:1: NPY001 [*] Type alias `np.bool` is deprecated, replace with built
 9 9 | if dtype == np.object:
 
 NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
-   |
- 7 | # Error
- 8 | npy.bool
- 9 | npy.int
-   | ^^^^^^^ NPY001
-10 | 
-11 | if dtype == np.object:
-   |
-   = help: Replace `np.int` with builtin type
+  |
+5 | # Error
+6 | npy.bool
+7 | npy.int
+  | ^^^^^^^ NPY001
+8 | 
+9 | if dtype == np.object:
+  |
+  = help: Replace `np.int` with builtin type
 
 ℹ Suggested fix
 4 4 | 
@@ -43,11 +43,11 @@ NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builti
 
 NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
    |
- 9 | npy.int
-10 | 
-11 | if dtype == np.object:
+ 7 | npy.int
+ 8 | 
+ 9 | if dtype == np.object:
    |             ^^^^^^^^^ NPY001
-12 |     ...
+10 |     ...
    |
    = help: Replace `np.object` with builtin type
 
@@ -63,12 +63,12 @@ NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with bu
 
 NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
    |
-12 |     ...
-13 | 
-14 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.long])
+10 |     ...
+11 | 
+12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.long])
    |                                                                        ^^^^^^ NPY001
-15 | 
-16 | pdf = pd.DataFrame(
+13 | 
+14 | pdf = pd.DataFrame(
    |
    = help: Replace `np.int` with builtin type
 
@@ -84,12 +84,12 @@ NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with buil
 
 NPY001.py:12:80: NPY001 [*] Type alias `np.long` is deprecated, replace with builtin type
    |
-12 |     ...
-13 | 
-14 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.long])
+10 |     ...
+11 | 
+12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.long])
    |                                                                                ^^^^^^^ NPY001
-15 | 
-16 | pdf = pd.DataFrame(
+13 | 
+14 | pdf = pd.DataFrame(
    |
    = help: Replace `np.long` with builtin type
 
@@ -105,11 +105,11 @@ NPY001.py:12:80: NPY001 [*] Type alias `np.long` is deprecated, replace with bui
 
 NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
    |
-17 |     data=[[1, 2, 3]],
-18 |     columns=["a", "b", "c"],
-19 |     dtype=numpy.object,
+15 |     data=[[1, 2, 3]],
+16 |     columns=["a", "b", "c"],
+17 |     dtype=numpy.object,
    |           ^^^^^^^^^^^^ NPY001
-20 | )
+18 | )
    |
    = help: Replace `np.object` with builtin type
 
@@ -125,9 +125,9 @@ NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with b
 
 NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
    |
-20 | )
-21 | 
-22 | _ = arr.astype(np.int)
+18 | )
+19 | 
+20 | _ = arr.astype(np.int)
    |                ^^^^^^ NPY001
    |
    = help: Replace `np.int` with builtin type

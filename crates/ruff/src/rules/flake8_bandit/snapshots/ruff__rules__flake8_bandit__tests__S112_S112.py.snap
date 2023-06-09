@@ -3,46 +3,46 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
 S112.py:3:1: S112 `try`-`except`-`continue` detected, consider logging the exception
   |
-3 |   try:
-4 |       pass
-5 | / except Exception:
-6 | |     continue
+1 |   try:
+2 |       pass
+3 | / except Exception:
+4 | |     continue
   | |____________^ S112
-7 |   
-8 |   try:
+5 |   
+6 |   try:
   |
 
 S112.py:8:1: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
- 8 |   try:
- 9 |       pass
-10 | / except:
-11 | |     continue
+ 6 |   try:
+ 7 |       pass
+ 8 | / except:
+ 9 | |     continue
    | |____________^ S112
-12 |   
-13 |   try:
+10 |   
+11 |   try:
    |
 
 S112.py:13:1: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
-13 |   try:
-14 |       pass
-15 | / except (Exception,):
-16 | |     continue
+11 |   try:
+12 |       pass
+13 | / except (Exception,):
+14 | |     continue
    | |____________^ S112
-17 |   
-18 |   try:
+15 |   
+16 |   try:
    |
 
 S112.py:18:1: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
-18 |   try:
-19 |       pass
-20 | / except (Exception, ValueError):
-21 | |     continue
+16 |   try:
+17 |       pass
+18 | / except (Exception, ValueError):
+19 | |     continue
    | |____________^ S112
-22 |   
-23 |   try:
+20 |   
+21 |   try:
    |
 
 

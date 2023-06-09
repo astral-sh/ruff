@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 ---
 mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special method `__init__`
   |
-5 | # Error
-6 | class Foo:
-7 |     def __init__(self):
+3 | # Error
+4 | class Foo:
+5 |     def __init__(self):
   |         ^^^^^^^^ ANN204
-8 |         ...
+6 |         ...
   |
   = help: Add `None` return type
 
@@ -23,11 +23,11 @@ mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special m
 
 mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special method `__init__`
    |
-11 | # Error
-12 | class Foo:
-13 |     def __init__(self, foo):
+ 9 | # Error
+10 | class Foo:
+11 |     def __init__(self, foo):
    |         ^^^^^^^^ ANN204
-14 |         ...
+12 |         ...
    |
    = help: Add `None` return type
 
@@ -43,19 +43,19 @@ mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special 
 
 mypy_init_return.py:40:5: ANN202 Missing return type annotation for private function `__init__`
    |
-40 | # Error
-41 | def __init__(self, foo: int):
+39 | # Error
+40 | def __init__(self, foo: int):
    |     ^^^^^^^^ ANN202
-42 |     ...
+41 |     ...
    |
 
 mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special method `__init__`
    |
-47 | # of a vararg falsely indicated that the function has a typed argument.
-48 | class Foo:
-49 |     def __init__(self, *arg):
+45 | # of a vararg falsely indicated that the function has a typed argument.
+46 | class Foo:
+47 |     def __init__(self, *arg):
    |         ^^^^^^^^ ANN204
-50 |         ...
+48 |         ...
    |
    = help: Add `None` return type
 

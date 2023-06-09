@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F823.py:6:5: F823 Local variable `my_var` referenced before assignment
   |
-6 | def foo():
-7 |     my_var += 1
+5 | def foo():
+6 |     my_var += 1
   |     ^^^^^^ F823
   |
 

@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 W605_1.py:2:10: W605 [*] Invalid escape sequence: `\.`
   |
-2 | #: W605:1:10
-3 | regex = '\.png$'
+1 | #: W605:1:10
+2 | regex = '\.png$'
   |          ^^ W605
-4 | 
-5 | #: W605:2:1
+3 | 
+4 | #: W605:2:1
   |
   = help: Add backslash to escape sequence
 
@@ -21,11 +21,11 @@ W605_1.py:2:10: W605 [*] Invalid escape sequence: `\.`
 
 W605_1.py:6:1: W605 [*] Invalid escape sequence: `\.`
   |
-6 | #: W605:2:1
-7 | regex = '''
-8 | \.png$
+4 | #: W605:2:1
+5 | regex = '''
+6 | \.png$
   | ^^ W605
-9 | '''
+7 | '''
   |
   = help: Add backslash to escape sequence
 
@@ -41,11 +41,11 @@ W605_1.py:6:1: W605 [*] Invalid escape sequence: `\.`
 
 W605_1.py:11:6: W605 [*] Invalid escape sequence: `\_`
    |
-11 | #: W605:2:6
-12 | f(
-13 |     '\_'
+ 9 | #: W605:2:6
+10 | f(
+11 |     '\_'
    |      ^^ W605
-14 | )
+12 | )
    |
    = help: Add backslash to escape sequence
 
@@ -61,12 +61,12 @@ W605_1.py:11:6: W605 [*] Invalid escape sequence: `\_`
 
 W605_1.py:18:6: W605 [*] Invalid escape sequence: `\_`
    |
-18 | multi-line
-19 | literal
-20 | with \_ somewhere
+16 | multi-line
+17 | literal
+18 | with \_ somewhere
    |      ^^ W605
-21 | in the middle
-22 | """
+19 | in the middle
+20 | """
    |
    = help: Add backslash to escape sequence
 

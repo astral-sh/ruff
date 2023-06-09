@@ -3,50 +3,50 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E26.py:10:1: E265 Block comment should start with `# `
    |
-10 | x = y + 1  #:  Increment x
-11 | #: E265:1:1
-12 | #Block comment
+ 8 | x = y + 1  #:  Increment x
+ 9 | #: E265:1:1
+10 | #Block comment
    | ^^^^^^^^^^^^^^ E265
-13 | a = 1
-14 | #: E265:2:1
+11 | a = 1
+12 | #: E265:2:1
    |
 
 E26.py:14:1: E265 Block comment should start with `# `
    |
-14 | #: E265:2:1
-15 | m = 42
-16 | #! This is important
+12 | #: E265:2:1
+13 | m = 42
+14 | #! This is important
    | ^^^^^^^^^^^^^^^^^^^^ E265
-17 | mx = 42 - 42
-18 | #: E266:3:5 E266:6:5
+15 | mx = 42 - 42
+16 | #: E266:3:5 E266:6:5
    |
 
 E26.py:25:1: E265 Block comment should start with `# `
    |
-25 |     return
-26 | #: E265:1:1 E266:2:1
-27 | ##if DEBUG:
+23 |     return
+24 | #: E265:1:1 E266:2:1
+25 | ##if DEBUG:
    | ^^^^^^^^^^^ E265
-28 | ##    logging.error()
-29 | #: W291:1:42
+26 | ##    logging.error()
+27 | #: W291:1:42
    |
 
 E26.py:32:1: E265 Block comment should start with `# `
    |
-32 | #: Okay
-33 | #!/usr/bin/env python
+31 | #: Okay
+32 | #!/usr/bin/env python
    | ^^^^^^^^^^^^^^^^^^^^^ E265
-34 | 
-35 | pass  # an inline comment
+33 | 
+34 | pass  # an inline comment
    |
 
 E26.py:73:1: E265 Block comment should start with `# `
    |
-73 | # F   Means test is failing (F)
-74 | # EF  Means test is giving error and Failing
-75 | #!   Means test is segfaulting
+71 | # F   Means test is failing (F)
+72 | # EF  Means test is giving error and Failing
+73 | #!   Means test is segfaulting
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E265
-76 | # 8   Means test runs forever
+74 | # 8   Means test runs forever
    |
 
 

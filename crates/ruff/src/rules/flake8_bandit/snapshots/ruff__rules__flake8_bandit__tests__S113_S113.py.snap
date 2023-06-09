@@ -3,140 +3,140 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
 S113.py:3:1: S113 Probable use of requests call without timeout
   |
-3 | import requests
-4 | 
-5 | requests.get('https://gmail.com')
+1 | import requests
+2 | 
+3 | requests.get('https://gmail.com')
   | ^^^^^^^^^^^^ S113
-6 | requests.get('https://gmail.com', timeout=None)
-7 | requests.get('https://gmail.com', timeout=5)
+4 | requests.get('https://gmail.com', timeout=None)
+5 | requests.get('https://gmail.com', timeout=5)
   |
 
 S113.py:4:43: S113 Probable use of requests call with timeout set to `None`
   |
-4 | requests.get('https://gmail.com')
-5 | requests.get('https://gmail.com', timeout=None)
+3 | requests.get('https://gmail.com')
+4 | requests.get('https://gmail.com', timeout=None)
   |                                           ^^^^ S113
-6 | requests.get('https://gmail.com', timeout=5)
-7 | requests.post('https://gmail.com')
+5 | requests.get('https://gmail.com', timeout=5)
+6 | requests.post('https://gmail.com')
   |
 
 S113.py:6:1: S113 Probable use of requests call without timeout
-   |
- 6 | requests.get('https://gmail.com', timeout=None)
- 7 | requests.get('https://gmail.com', timeout=5)
- 8 | requests.post('https://gmail.com')
-   | ^^^^^^^^^^^^^ S113
- 9 | requests.post('https://gmail.com', timeout=None)
-10 | requests.post('https://gmail.com', timeout=5)
-   |
+  |
+4 | requests.get('https://gmail.com', timeout=None)
+5 | requests.get('https://gmail.com', timeout=5)
+6 | requests.post('https://gmail.com')
+  | ^^^^^^^^^^^^^ S113
+7 | requests.post('https://gmail.com', timeout=None)
+8 | requests.post('https://gmail.com', timeout=5)
+  |
 
 S113.py:7:44: S113 Probable use of requests call with timeout set to `None`
-   |
- 7 | requests.get('https://gmail.com', timeout=5)
- 8 | requests.post('https://gmail.com')
- 9 | requests.post('https://gmail.com', timeout=None)
-   |                                            ^^^^ S113
-10 | requests.post('https://gmail.com', timeout=5)
-11 | requests.put('https://gmail.com')
-   |
+  |
+5 | requests.get('https://gmail.com', timeout=5)
+6 | requests.post('https://gmail.com')
+7 | requests.post('https://gmail.com', timeout=None)
+  |                                            ^^^^ S113
+8 | requests.post('https://gmail.com', timeout=5)
+9 | requests.put('https://gmail.com')
+  |
 
 S113.py:9:1: S113 Probable use of requests call without timeout
    |
- 9 | requests.post('https://gmail.com', timeout=None)
-10 | requests.post('https://gmail.com', timeout=5)
-11 | requests.put('https://gmail.com')
+ 7 | requests.post('https://gmail.com', timeout=None)
+ 8 | requests.post('https://gmail.com', timeout=5)
+ 9 | requests.put('https://gmail.com')
    | ^^^^^^^^^^^^ S113
-12 | requests.put('https://gmail.com', timeout=None)
-13 | requests.put('https://gmail.com', timeout=5)
+10 | requests.put('https://gmail.com', timeout=None)
+11 | requests.put('https://gmail.com', timeout=5)
    |
 
 S113.py:10:43: S113 Probable use of requests call with timeout set to `None`
    |
-10 | requests.post('https://gmail.com', timeout=5)
-11 | requests.put('https://gmail.com')
-12 | requests.put('https://gmail.com', timeout=None)
+ 8 | requests.post('https://gmail.com', timeout=5)
+ 9 | requests.put('https://gmail.com')
+10 | requests.put('https://gmail.com', timeout=None)
    |                                           ^^^^ S113
-13 | requests.put('https://gmail.com', timeout=5)
-14 | requests.delete('https://gmail.com')
+11 | requests.put('https://gmail.com', timeout=5)
+12 | requests.delete('https://gmail.com')
    |
 
 S113.py:12:1: S113 Probable use of requests call without timeout
    |
-12 | requests.put('https://gmail.com', timeout=None)
-13 | requests.put('https://gmail.com', timeout=5)
-14 | requests.delete('https://gmail.com')
+10 | requests.put('https://gmail.com', timeout=None)
+11 | requests.put('https://gmail.com', timeout=5)
+12 | requests.delete('https://gmail.com')
    | ^^^^^^^^^^^^^^^ S113
-15 | requests.delete('https://gmail.com', timeout=None)
-16 | requests.delete('https://gmail.com', timeout=5)
+13 | requests.delete('https://gmail.com', timeout=None)
+14 | requests.delete('https://gmail.com', timeout=5)
    |
 
 S113.py:13:46: S113 Probable use of requests call with timeout set to `None`
    |
-13 | requests.put('https://gmail.com', timeout=5)
-14 | requests.delete('https://gmail.com')
-15 | requests.delete('https://gmail.com', timeout=None)
+11 | requests.put('https://gmail.com', timeout=5)
+12 | requests.delete('https://gmail.com')
+13 | requests.delete('https://gmail.com', timeout=None)
    |                                              ^^^^ S113
-16 | requests.delete('https://gmail.com', timeout=5)
-17 | requests.patch('https://gmail.com')
+14 | requests.delete('https://gmail.com', timeout=5)
+15 | requests.patch('https://gmail.com')
    |
 
 S113.py:15:1: S113 Probable use of requests call without timeout
    |
-15 | requests.delete('https://gmail.com', timeout=None)
-16 | requests.delete('https://gmail.com', timeout=5)
-17 | requests.patch('https://gmail.com')
+13 | requests.delete('https://gmail.com', timeout=None)
+14 | requests.delete('https://gmail.com', timeout=5)
+15 | requests.patch('https://gmail.com')
    | ^^^^^^^^^^^^^^ S113
-18 | requests.patch('https://gmail.com', timeout=None)
-19 | requests.patch('https://gmail.com', timeout=5)
+16 | requests.patch('https://gmail.com', timeout=None)
+17 | requests.patch('https://gmail.com', timeout=5)
    |
 
 S113.py:16:45: S113 Probable use of requests call with timeout set to `None`
    |
-16 | requests.delete('https://gmail.com', timeout=5)
-17 | requests.patch('https://gmail.com')
-18 | requests.patch('https://gmail.com', timeout=None)
+14 | requests.delete('https://gmail.com', timeout=5)
+15 | requests.patch('https://gmail.com')
+16 | requests.patch('https://gmail.com', timeout=None)
    |                                             ^^^^ S113
-19 | requests.patch('https://gmail.com', timeout=5)
-20 | requests.options('https://gmail.com')
+17 | requests.patch('https://gmail.com', timeout=5)
+18 | requests.options('https://gmail.com')
    |
 
 S113.py:18:1: S113 Probable use of requests call without timeout
    |
-18 | requests.patch('https://gmail.com', timeout=None)
-19 | requests.patch('https://gmail.com', timeout=5)
-20 | requests.options('https://gmail.com')
+16 | requests.patch('https://gmail.com', timeout=None)
+17 | requests.patch('https://gmail.com', timeout=5)
+18 | requests.options('https://gmail.com')
    | ^^^^^^^^^^^^^^^^ S113
-21 | requests.options('https://gmail.com', timeout=None)
-22 | requests.options('https://gmail.com', timeout=5)
+19 | requests.options('https://gmail.com', timeout=None)
+20 | requests.options('https://gmail.com', timeout=5)
    |
 
 S113.py:19:47: S113 Probable use of requests call with timeout set to `None`
    |
-19 | requests.patch('https://gmail.com', timeout=5)
-20 | requests.options('https://gmail.com')
-21 | requests.options('https://gmail.com', timeout=None)
+17 | requests.patch('https://gmail.com', timeout=5)
+18 | requests.options('https://gmail.com')
+19 | requests.options('https://gmail.com', timeout=None)
    |                                               ^^^^ S113
-22 | requests.options('https://gmail.com', timeout=5)
-23 | requests.head('https://gmail.com')
+20 | requests.options('https://gmail.com', timeout=5)
+21 | requests.head('https://gmail.com')
    |
 
 S113.py:21:1: S113 Probable use of requests call without timeout
    |
-21 | requests.options('https://gmail.com', timeout=None)
-22 | requests.options('https://gmail.com', timeout=5)
-23 | requests.head('https://gmail.com')
+19 | requests.options('https://gmail.com', timeout=None)
+20 | requests.options('https://gmail.com', timeout=5)
+21 | requests.head('https://gmail.com')
    | ^^^^^^^^^^^^^ S113
-24 | requests.head('https://gmail.com', timeout=None)
-25 | requests.head('https://gmail.com', timeout=5)
+22 | requests.head('https://gmail.com', timeout=None)
+23 | requests.head('https://gmail.com', timeout=5)
    |
 
 S113.py:22:44: S113 Probable use of requests call with timeout set to `None`
    |
-22 | requests.options('https://gmail.com', timeout=5)
-23 | requests.head('https://gmail.com')
-24 | requests.head('https://gmail.com', timeout=None)
+20 | requests.options('https://gmail.com', timeout=5)
+21 | requests.head('https://gmail.com')
+22 | requests.head('https://gmail.com', timeout=None)
    |                                            ^^^^ S113
-25 | requests.head('https://gmail.com', timeout=5)
+23 | requests.head('https://gmail.com', timeout=5)
    |
 
 

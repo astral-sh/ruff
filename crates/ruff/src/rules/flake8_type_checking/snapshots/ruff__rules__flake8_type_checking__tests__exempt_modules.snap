@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 ---
 exempt_modules.py:14:12: TCH002 [*] Move third-party import `flask` into a type-checking block
    |
-14 | def f():
-15 |     import flask
+13 | def f():
+14 |     import flask
    |            ^^^^^ TCH002
-16 | 
-17 |     x: flask
+15 | 
+16 |     x: flask
    |
    = help: Move into type-checking block
 

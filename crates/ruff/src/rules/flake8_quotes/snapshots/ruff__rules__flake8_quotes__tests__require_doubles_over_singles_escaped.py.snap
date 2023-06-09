@@ -19,11 +19,11 @@ singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
 
 singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
- 9 | this_should_raise = (
-10 |     "This is a"
-11 |     "\"string\""
+ 7 | this_should_raise = (
+ 8 |     "This is a"
+ 9 |     "\"string\""
    |     ^^^^^^^^^^^^ Q003
-12 | )
+10 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
 

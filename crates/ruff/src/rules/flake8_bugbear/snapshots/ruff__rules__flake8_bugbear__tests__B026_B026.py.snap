@@ -3,67 +3,67 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B026.py:16:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
-16 | foo("bar", baz="baz", bam="bam")
-17 | foo(bar="bar", baz="baz", bam="bam")
-18 | foo(bam="bam", *["bar", "baz"])
+14 | foo("bar", baz="baz", bam="bam")
+15 | foo(bar="bar", baz="baz", bam="bam")
+16 | foo(bam="bam", *["bar", "baz"])
    |                ^^^^^^^^^^^^^^^ B026
-19 | foo(bam="bam", *bar_baz)
-20 | foo(baz="baz", bam="bam", *["bar"])
+17 | foo(bam="bam", *bar_baz)
+18 | foo(baz="baz", bam="bam", *["bar"])
    |
 
 B026.py:17:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
-17 | foo(bar="bar", baz="baz", bam="bam")
-18 | foo(bam="bam", *["bar", "baz"])
-19 | foo(bam="bam", *bar_baz)
+15 | foo(bar="bar", baz="baz", bam="bam")
+16 | foo(bam="bam", *["bar", "baz"])
+17 | foo(bam="bam", *bar_baz)
    |                ^^^^^^^^ B026
-20 | foo(baz="baz", bam="bam", *["bar"])
-21 | foo(bar="bar", baz="baz", bam="bam", *[])
+18 | foo(baz="baz", bam="bam", *["bar"])
+19 | foo(bar="bar", baz="baz", bam="bam", *[])
    |
 
 B026.py:18:27: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
-18 | foo(bam="bam", *["bar", "baz"])
-19 | foo(bam="bam", *bar_baz)
-20 | foo(baz="baz", bam="bam", *["bar"])
+16 | foo(bam="bam", *["bar", "baz"])
+17 | foo(bam="bam", *bar_baz)
+18 | foo(baz="baz", bam="bam", *["bar"])
    |                           ^^^^^^^^ B026
-21 | foo(bar="bar", baz="baz", bam="bam", *[])
-22 | foo(bam="bam", *["bar"], *["baz"])
+19 | foo(bar="bar", baz="baz", bam="bam", *[])
+20 | foo(bam="bam", *["bar"], *["baz"])
    |
 
 B026.py:19:38: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
-19 | foo(bam="bam", *bar_baz)
-20 | foo(baz="baz", bam="bam", *["bar"])
-21 | foo(bar="bar", baz="baz", bam="bam", *[])
+17 | foo(bam="bam", *bar_baz)
+18 | foo(baz="baz", bam="bam", *["bar"])
+19 | foo(bar="bar", baz="baz", bam="bam", *[])
    |                                      ^^^ B026
-22 | foo(bam="bam", *["bar"], *["baz"])
-23 | foo(*["bar"], bam="bam", *["baz"])
+20 | foo(bam="bam", *["bar"], *["baz"])
+21 | foo(*["bar"], bam="bam", *["baz"])
    |
 
 B026.py:20:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
-20 | foo(baz="baz", bam="bam", *["bar"])
-21 | foo(bar="bar", baz="baz", bam="bam", *[])
-22 | foo(bam="bam", *["bar"], *["baz"])
+18 | foo(baz="baz", bam="bam", *["bar"])
+19 | foo(bar="bar", baz="baz", bam="bam", *[])
+20 | foo(bam="bam", *["bar"], *["baz"])
    |                ^^^^^^^^ B026
-23 | foo(*["bar"], bam="bam", *["baz"])
+21 | foo(*["bar"], bam="bam", *["baz"])
    |
 
 B026.py:20:26: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
-20 | foo(baz="baz", bam="bam", *["bar"])
-21 | foo(bar="bar", baz="baz", bam="bam", *[])
-22 | foo(bam="bam", *["bar"], *["baz"])
+18 | foo(baz="baz", bam="bam", *["bar"])
+19 | foo(bar="bar", baz="baz", bam="bam", *[])
+20 | foo(bam="bam", *["bar"], *["baz"])
    |                          ^^^^^^^^ B026
-23 | foo(*["bar"], bam="bam", *["baz"])
+21 | foo(*["bar"], bam="bam", *["baz"])
    |
 
 B026.py:21:26: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
-21 | foo(bar="bar", baz="baz", bam="bam", *[])
-22 | foo(bam="bam", *["bar"], *["baz"])
-23 | foo(*["bar"], bam="bam", *["baz"])
+19 | foo(bar="bar", baz="baz", bam="bam", *[])
+20 | foo(bam="bam", *["bar"], *["baz"])
+21 | foo(*["bar"], bam="bam", *["baz"])
    |                          ^^^^^^^^ B026
    |
 

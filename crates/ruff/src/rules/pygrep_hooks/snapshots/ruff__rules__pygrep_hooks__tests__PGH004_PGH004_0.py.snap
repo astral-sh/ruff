@@ -11,50 +11,50 @@ PGH004_0.py:1:8: PGH004 Use specific rule codes when using `noqa`
 
 PGH004_0.py:2:8: PGH004 Use specific rule codes when using `noqa`
   |
-2 | x = 1  # noqa
-3 | x = 1  # NOQA:F401,W203
+1 | x = 1  # noqa
+2 | x = 1  # NOQA:F401,W203
   |        ^^^^^^^^ PGH004
-4 | # noqa
-5 | # NOQA
+3 | # noqa
+4 | # NOQA
   |
 
 PGH004_0.py:3:1: PGH004 Use specific rule codes when using `noqa`
   |
-3 | x = 1  # noqa
-4 | x = 1  # NOQA:F401,W203
-5 | # noqa
+1 | x = 1  # noqa
+2 | x = 1  # NOQA:F401,W203
+3 | # noqa
   | ^^^^^^ PGH004
-6 | # NOQA
-7 | # noqa:F401
+4 | # NOQA
+5 | # noqa:F401
   |
 
 PGH004_0.py:4:1: PGH004 Use specific rule codes when using `noqa`
   |
-4 | x = 1  # NOQA:F401,W203
-5 | # noqa
-6 | # NOQA
+2 | x = 1  # NOQA:F401,W203
+3 | # noqa
+4 | # NOQA
   | ^^^^^^ PGH004
-7 | # noqa:F401
-8 | # noqa:F401,W203
+5 | # noqa:F401
+6 | # noqa:F401,W203
   |
 
 PGH004_0.py:5:1: PGH004 Use specific rule codes when using `noqa`
   |
-5 | # noqa
-6 | # NOQA
-7 | # noqa:F401
+3 | # noqa
+4 | # NOQA
+5 | # noqa:F401
   | ^^^^^^^^ PGH004
-8 | # noqa:F401,W203
+6 | # noqa:F401,W203
   |
 
 PGH004_0.py:6:1: PGH004 Use specific rule codes when using `noqa`
-   |
- 6 | # NOQA
- 7 | # noqa:F401
- 8 | # noqa:F401,W203
-   | ^^^^^^^^ PGH004
- 9 | 
-10 | x = 1
-   |
+  |
+4 | # NOQA
+5 | # noqa:F401
+6 | # noqa:F401,W203
+  | ^^^^^^^^ PGH004
+7 | 
+8 | x = 1
+  |
 
 

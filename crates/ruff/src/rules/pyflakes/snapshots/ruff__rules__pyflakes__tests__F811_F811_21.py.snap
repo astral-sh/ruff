@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F811_21.py:32:5: F811 Redefinition of unused `Sequence` from line 26
    |
-32 | from typing import (
-33 |     List,  # noqa: F811
-34 |     Sequence,
+30 | from typing import (
+31 |     List,  # noqa: F811
+32 |     Sequence,
    |     ^^^^^^^^ F811
-35 | )
+33 | )
    |
 
 

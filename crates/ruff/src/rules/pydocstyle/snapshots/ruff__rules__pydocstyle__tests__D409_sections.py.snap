@@ -3,16 +3,16 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 sections.py:108:5: D409 [*] Section underline should match the length of its name ("Returns")
     |
-108 |           "(Expected 7 dashes in section 'Returns', got 2)")
-109 |   def bad_underline_length():  # noqa: D416
-110 |       """Toggle the gizmo.
+106 |           "(Expected 7 dashes in section 'Returns', got 2)")
+107 |   def bad_underline_length():  # noqa: D416
+108 |       """Toggle the gizmo.
     |  _____^
-111 | | 
-112 | |     Returns
-113 | |     --
-114 | |     A value of some sort.
-115 | | 
-116 | |     """
+109 | | 
+110 | |     Returns
+111 | |     --
+112 | |     A value of some sort.
+113 | | 
+114 | |     """
     | |_______^ D409
     |
     = help: Adjust underline length to match "Returns"
@@ -29,24 +29,24 @@ sections.py:108:5: D409 [*] Section underline should match the length of its nam
 
 sections.py:216:5: D409 [*] Section underline should match the length of its name ("Returns")
     |
-216 |   @expect("D407: Missing dashed underline after section ('Raises')")
-217 |   def multiple_sections():  # noqa: D416
-218 |       """Toggle the gizmo.
+214 |   @expect("D407: Missing dashed underline after section ('Raises')")
+215 |   def multiple_sections():  # noqa: D416
+216 |       """Toggle the gizmo.
     |  _____^
-219 | | 
-220 | |     Short summary
-221 | |     -------------
-222 | | 
-223 | |     This is the function's description, which will also specify what it
-224 | |     returns.
-225 | | 
-226 | |     Returns
-227 | |     ------
-228 | |     Many many wonderful things.
-229 | |     Raises:
-230 | |     My attention.
-231 | | 
-232 | |     """
+217 | | 
+218 | |     Short summary
+219 | |     -------------
+220 | | 
+221 | |     This is the function's description, which will also specify what it
+222 | |     returns.
+223 | | 
+224 | |     Returns
+225 | |     ------
+226 | |     Many many wonderful things.
+227 | |     Raises:
+228 | |     My attention.
+229 | | 
+230 | |     """
     | |_______^ D409
     |
     = help: Adjust underline length to match "Returns"

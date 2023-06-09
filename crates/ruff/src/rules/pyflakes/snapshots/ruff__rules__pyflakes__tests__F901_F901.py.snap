@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
   |
-2 | def f() -> None:
-3 |     raise NotImplemented()
+1 | def f() -> None:
+2 |     raise NotImplemented()
   |           ^^^^^^^^^^^^^^ F901
   |
   = help: Use `raise NotImplementedError`
@@ -19,8 +19,8 @@ F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
 
 F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
   |
-6 | def g() -> None:
-7 |     raise NotImplemented
+5 | def g() -> None:
+6 |     raise NotImplemented
   |           ^^^^^^^^^^^^^^ F901
   |
   = help: Use `raise NotImplementedError`

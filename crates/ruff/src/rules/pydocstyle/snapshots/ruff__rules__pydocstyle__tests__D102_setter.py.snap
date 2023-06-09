@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 setter.py:16:9: D102 Missing docstring in public method
    |
-16 |     @foo
-17 |     def foo(self, value: str) -> None:
+15 |     @foo
+16 |     def foo(self, value: str) -> None:
    |         ^^^ D102
-18 |         pass
+17 |         pass
    |
 
 

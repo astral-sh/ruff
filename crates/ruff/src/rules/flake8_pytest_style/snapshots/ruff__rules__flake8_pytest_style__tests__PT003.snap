@@ -79,12 +79,12 @@ PT003.py:29:36: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
 
 PT003.py:37:31: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
-37 | # tests the general case as we use a helper function that should
-38 | # work for all cases.
-39 | @pytest.fixture("my_fixture", scope="function")
+35 | # tests the general case as we use a helper function that should
+36 | # work for all cases.
+37 | @pytest.fixture("my_fixture", scope="function")
    |                               ^^^^^^^^^^^^^^^^ PT003
-40 | def error_arg():
-41 |     ...
+38 | def error_arg():
+39 |     ...
    |
    = help: Remove implied `scope` argument
 
@@ -100,11 +100,11 @@ PT003.py:37:31: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
 
 PT003.py:43:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
-43 | @pytest.fixture(
-44 |     scope="function",
+42 | @pytest.fixture(
+43 |     scope="function",
    |     ^^^^^^^^^^^^^^^^ PT003
-45 |     name="my_fixture",
-46 | )
+44 |     name="my_fixture",
+45 | )
    |
    = help: Remove implied `scope` argument
 
@@ -119,12 +119,12 @@ PT003.py:43:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
 
 PT003.py:52:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
-52 | @pytest.fixture(
-53 |     name="my_fixture",
-54 |     scope="function",
+50 | @pytest.fixture(
+51 |     name="my_fixture",
+52 |     scope="function",
    |     ^^^^^^^^^^^^^^^^ PT003
-55 | )
-56 | def error_multiple_args():
+53 | )
+54 | def error_multiple_args():
    |
    = help: Remove implied `scope` argument
 
@@ -139,13 +139,13 @@ PT003.py:52:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
 
 PT003.py:66:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
-66 |       # another comment ,)
-67 |       
-68 |       scope=\
+64 |       # another comment ,)
+65 |       
+66 |       scope=\
    |  _____^
-69 | |         "function"  # some comment ),
+67 | |         "function"  # some comment ),
    | |__________________^ PT003
-70 |       ,
+68 |       ,
    |
    = help: Remove implied `scope` argument
 

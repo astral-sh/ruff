@@ -3,16 +3,16 @@ source: crates/ruff/src/rules/flake8_async/mod.rs
 ---
 ASYNC102.py:5:5: ASYNC102 Async functions should not call synchronous `os` methods
   |
-5 | async def foo():
-6 |     os.popen()
+4 | async def foo():
+5 |     os.popen()
   |     ^^^^^^^^ ASYNC102
   |
 
 ASYNC102.py:9:5: ASYNC102 Async functions should not call synchronous `os` methods
-   |
- 9 | async def foo():
-10 |     os.spawnl()
-   |     ^^^^^^^^^ ASYNC102
-   |
+  |
+8 | async def foo():
+9 |     os.spawnl()
+  |     ^^^^^^^^^ ASYNC102
+  |
 
 

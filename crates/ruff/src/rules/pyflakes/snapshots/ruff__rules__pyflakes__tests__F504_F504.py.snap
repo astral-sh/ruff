@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
   |
-3 | # Ruff has no way of knowing if the following are F505s
-4 | a = "wrong"
-5 | "%(a)s %(c)s" % {a: "?", "b": "!"}  # F504 ("b" not used)
+1 | # Ruff has no way of knowing if the following are F505s
+2 | a = "wrong"
+3 | "%(a)s %(c)s" % {a: "?", "b": "!"}  # F504 ("b" not used)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
-6 | 
-7 | hidden = {"a": "!"}
+4 | 
+5 | hidden = {"a": "!"}
   |
   = help: Remove extra named arguments: b
 
@@ -22,14 +22,14 @@ F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
 6 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 
 F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
-   |
- 8 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
- 9 | 
-10 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
-11 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
-   |
-   = help: Remove extra named arguments: b
+  |
+6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
+7 | 
+8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+  |
+  = help: Remove extra named arguments: b
 
 ℹ Fix
 5 5 | hidden = {"a": "!"}
@@ -43,11 +43,11 @@ F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
 
 F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
    |
- 9 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
-10 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+ 8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
+ 9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
-11 | 
-12 | '' % {'a''b' : ''}  # F504 ("ab" not used)
+10 | 
+11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
    |
    = help: Remove extra named arguments: b
 
@@ -62,9 +62,9 @@ F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
 
 F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
    |
-11 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
-12 | 
-13 | '' % {'a''b' : ''}  # F504 ("ab" not used)
+ 9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+10 | 
+11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
    | ^^^^^^^^^^^^^^^^^^ F504
    |
    = help: Remove extra named arguments: ab

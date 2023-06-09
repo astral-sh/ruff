@@ -3,42 +3,42 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E11.py:15:1: E116 Unexpected indentation (comment)
    |
-15 | #: E114 E116
-16 | mimetype = 'application/x-directory'
-17 |      # 'httpd/unix-directory'
+13 | #: E114 E116
+14 | mimetype = 'application/x-directory'
+15 |      # 'httpd/unix-directory'
    | ^^^^^ E116
-18 | create_date = False
-19 | #: E116 E116 E116
+16 | create_date = False
+17 | #: E116 E116 E116
    |
 
 E11.py:22:1: E116 Unexpected indentation (comment)
    |
-22 |         self.master.start()
-23 |         # try:
-24 |             # self.master.start()
+20 |         self.master.start()
+21 |         # try:
+22 |             # self.master.start()
    | ^^^^^^^^^^^^ E116
-25 |         # except MasterExit:
-26 |             # self.shutdown()
+23 |         # except MasterExit:
+24 |             # self.shutdown()
    |
 
 E11.py:24:1: E116 Unexpected indentation (comment)
    |
-24 |             # self.master.start()
-25 |         # except MasterExit:
-26 |             # self.shutdown()
+22 |             # self.master.start()
+23 |         # except MasterExit:
+24 |             # self.shutdown()
    | ^^^^^^^^^^^^ E116
-27 |         # finally:
-28 |             # sys.exit()
+25 |         # finally:
+26 |             # sys.exit()
    |
 
 E11.py:26:1: E116 Unexpected indentation (comment)
    |
-26 |             # self.shutdown()
-27 |         # finally:
-28 |             # sys.exit()
+24 |             # self.shutdown()
+25 |         # finally:
+26 |             # sys.exit()
    | ^^^^^^^^^^^^ E116
-29 | #: E115 E115 E115 E115 E115 E115
-30 | def start(self):
+27 | #: E115 E115 E115 E115 E115 E115
+28 | def start(self):
    |
 
 

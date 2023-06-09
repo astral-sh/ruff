@@ -3,32 +3,32 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E722.py:4:1: E722 Do not use bare `except`
   |
-4 | try:
-5 |     pass
-6 | except:
+2 | try:
+3 |     pass
+4 | except:
   | ^^^^^^ E722
-7 |     pass
-8 | #: E722
+5 |     pass
+6 | #: E722
   |
 
 E722.py:11:1: E722 Do not use bare `except`
    |
-11 | except Exception:
-12 |     pass
-13 | except:
+ 9 | except Exception:
+10 |     pass
+11 | except:
    | ^^^^^^ E722
-14 |     pass
-15 | #: E722
+12 |     pass
+13 | #: E722
    |
 
 E722.py:16:1: E722 Do not use bare `except`
    |
-16 | try:
-17 |     pass
-18 | except:
+14 | try:
+15 |     pass
+16 | except:
    | ^^^^^^ E722
-19 |     pass
-20 | #: Okay
+17 |     pass
+18 | #: Okay
    |
 
 

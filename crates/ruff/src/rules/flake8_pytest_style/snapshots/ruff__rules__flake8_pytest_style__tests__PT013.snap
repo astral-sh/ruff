@@ -3,27 +3,27 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
 PT013.py:11:1: PT013 Found incorrect import of pytest, use simple `import pytest` instead
    |
-11 | # Error
-12 | 
-13 | import pytest as other_name
+ 9 | # Error
+10 | 
+11 | import pytest as other_name
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT013
-14 | from pytest import fixture
-15 | from pytest import fixture as other_name
+12 | from pytest import fixture
+13 | from pytest import fixture as other_name
    |
 
 PT013.py:12:1: PT013 Found incorrect import of pytest, use simple `import pytest` instead
    |
-12 | import pytest as other_name
-13 | from pytest import fixture
+11 | import pytest as other_name
+12 | from pytest import fixture
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT013
-14 | from pytest import fixture as other_name
+13 | from pytest import fixture as other_name
    |
 
 PT013.py:13:1: PT013 Found incorrect import of pytest, use simple `import pytest` instead
    |
-13 | import pytest as other_name
-14 | from pytest import fixture
-15 | from pytest import fixture as other_name
+11 | import pytest as other_name
+12 | from pytest import fixture
+13 | from pytest import fixture as other_name
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT013
    |
 

@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 logging_too_few_args.py:3:1: PLE1206 Not enough arguments for `logging` format string
   |
-3 | import logging
-4 | 
-5 | logging.warning("Hello %s %s", "World!")  # [logging-too-few-args]
+1 | import logging
+2 | 
+3 | logging.warning("Hello %s %s", "World!")  # [logging-too-few-args]
   | ^^^^^^^^^^^^^^^ PLE1206
-6 | 
-7 | # do not handle calls with kwargs (like pylint)
+4 | 
+5 | # do not handle calls with kwargs (like pylint)
   |
 
 

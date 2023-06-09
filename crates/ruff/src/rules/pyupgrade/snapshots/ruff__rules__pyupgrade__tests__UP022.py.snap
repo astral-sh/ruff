@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP022.py:4:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
   |
-4 | import subprocess
-5 | 
-6 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+2 | import subprocess
+3 | 
+4 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP022
-7 | 
-8 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+5 | 
+6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   |
   = help: Replace with `capture_output` keyword argument
 
@@ -23,15 +23,15 @@ UP022.py:4:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `c
 7 7 | 
 
 UP022.py:6:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
-   |
- 6 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
- 7 | 
- 8 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP022
- 9 | 
-10 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
-   |
-   = help: Replace with `capture_output` keyword argument
+  |
+4 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+5 | 
+6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP022
+7 | 
+8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+  |
+  = help: Replace with `capture_output` keyword argument
 
 ℹ Suggested fix
 3 3 | 
@@ -45,12 +45,12 @@ UP022.py:6:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `c
 
 UP022.py:8:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
- 8 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
- 9 | 
-10 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+ 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+ 7 | 
+ 8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP022
-11 | 
-12 | output = subprocess.run(
+ 9 | 
+10 | output = subprocess.run(
    |
    = help: Replace with `capture_output` keyword argument
 
@@ -66,15 +66,15 @@ UP022.py:8:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `c
 
 UP022.py:10:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
-10 |   output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
-11 |   
-12 |   output = subprocess.run(
+ 8 |   output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+ 9 |   
+10 |   output = subprocess.run(
    |  __________^
-13 | |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
-14 | | )
+11 | |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
+12 | | )
    | |_^ UP022
-15 |   
-16 |   output = subprocess.run(
+13 |   
+14 |   output = subprocess.run(
    |
    = help: Replace with `capture_output` keyword argument
 
@@ -90,15 +90,15 @@ UP022.py:10:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `
 
 UP022.py:14:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
-14 |   )
-15 |   
-16 |   output = subprocess.run(
+12 |   )
+13 |   
+14 |   output = subprocess.run(
    |  __________^
-17 | |     ["foo"], stderr=subprocess.PIPE, check=True, stdout=subprocess.PIPE
-18 | | )
+15 | |     ["foo"], stderr=subprocess.PIPE, check=True, stdout=subprocess.PIPE
+16 | | )
    | |_^ UP022
-19 |   
-20 |   output = subprocess.run(
+17 |   
+18 |   output = subprocess.run(
    |
    = help: Replace with `capture_output` keyword argument
 
@@ -114,21 +114,21 @@ UP022.py:14:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `
 
 UP022.py:18:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
-18 |   )
-19 |   
-20 |   output = subprocess.run(
+16 |   )
+17 |   
+18 |   output = subprocess.run(
    |  __________^
-21 | |     ["foo"],
-22 | |     stdout=subprocess.PIPE,
-23 | |     check=True,
-24 | |     stderr=subprocess.PIPE,
-25 | |     text=True,
-26 | |     encoding="utf-8",
-27 | |     close_fds=True,
-28 | | )
+19 | |     ["foo"],
+20 | |     stdout=subprocess.PIPE,
+21 | |     check=True,
+22 | |     stderr=subprocess.PIPE,
+23 | |     text=True,
+24 | |     encoding="utf-8",
+25 | |     close_fds=True,
+26 | | )
    | |_^ UP022
-29 |   
-30 |   if output:
+27 |   
+28 |   if output:
    |
    = help: Replace with `capture_output` keyword argument
 
@@ -146,16 +146,16 @@ UP022.py:18:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `
 
 UP022.py:29:14: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
-29 |   if output:
-30 |       output = subprocess.run(
+28 |   if output:
+29 |       output = subprocess.run(
    |  ______________^
-31 | |         ["foo"],
-32 | |         stdout=subprocess.PIPE,
-33 | |         check=True,
-34 | |         stderr=subprocess.PIPE,
-35 | |         text=True,
-36 | |         encoding="utf-8",
-37 | |     )
+30 | |         ["foo"],
+31 | |         stdout=subprocess.PIPE,
+32 | |         check=True,
+33 | |         stderr=subprocess.PIPE,
+34 | |         text=True,
+35 | |         encoding="utf-8",
+36 | |     )
    | |_____^ UP022
    |
    = help: Replace with `capture_output` keyword argument

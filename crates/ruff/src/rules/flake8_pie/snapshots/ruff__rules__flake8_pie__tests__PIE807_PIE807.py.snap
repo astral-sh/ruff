@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 ---
 PIE807.py:3:44: PIE807 [*] Prefer `list` over useless lambda
   |
-3 | @dataclass
-4 | class Foo:
-5 |     foo: List[str] = field(default_factory=lambda: [])  # PIE807
+1 | @dataclass
+2 | class Foo:
+3 |     foo: List[str] = field(default_factory=lambda: [])  # PIE807
   |                                            ^^^^^^^^^^ PIE807
   |
   = help: Replace with `list`
@@ -21,8 +21,8 @@ PIE807.py:3:44: PIE807 [*] Prefer `list` over useless lambda
 
 PIE807.py:7:36: PIE807 [*] Prefer `list` over useless lambda
   |
-7 | class FooTable(BaseTable):
-8 |     bar = fields.ListField(default=lambda: [])  # PIE807
+6 | class FooTable(BaseTable):
+7 |     bar = fields.ListField(default=lambda: [])  # PIE807
   |                                    ^^^^^^^^^^ PIE807
   |
   = help: Replace with `list`
@@ -39,8 +39,8 @@ PIE807.py:7:36: PIE807 [*] Prefer `list` over useless lambda
 
 PIE807.py:11:28: PIE807 [*] Prefer `list` over useless lambda
    |
-11 | class FooTable(BaseTable):
-12 |     bar = fields.ListField(lambda: [])  # PIE807
+10 | class FooTable(BaseTable):
+11 |     bar = fields.ListField(lambda: [])  # PIE807
    |                            ^^^^^^^^^^ PIE807
    |
    = help: Replace with `list`

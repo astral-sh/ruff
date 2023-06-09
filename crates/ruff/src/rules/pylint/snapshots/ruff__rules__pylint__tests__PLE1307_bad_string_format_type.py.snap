@@ -3,109 +3,109 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 bad_string_format_type.py:2:7: PLE1307 Format type does not match argument type
   |
-2 | # Errors
-3 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
+1 | # Errors
+2 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-4 | 
-5 | "foo %e bar %s" % ("1", 2)
+3 | 
+4 | "foo %e bar %s" % ("1", 2)
   |
 
 bad_string_format_type.py:4:1: PLE1307 Format type does not match argument type
   |
-4 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
-5 | 
-6 | "foo %e bar %s" % ("1", 2)
+2 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
+3 | 
+4 | "foo %e bar %s" % ("1", 2)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-7 | 
-8 | "%d" % "1"
+5 | 
+6 | "%d" % "1"
   |
 
 bad_string_format_type.py:6:1: PLE1307 Format type does not match argument type
-   |
- 6 | "foo %e bar %s" % ("1", 2)
- 7 | 
- 8 | "%d" % "1"
-   | ^^^^^^^^^^ PLE1307
- 9 | "%o" % "1"
-10 | "%(key)d" % {"key": "1"}
-   |
+  |
+4 | "foo %e bar %s" % ("1", 2)
+5 | 
+6 | "%d" % "1"
+  | ^^^^^^^^^^ PLE1307
+7 | "%o" % "1"
+8 | "%(key)d" % {"key": "1"}
+  |
 
 bad_string_format_type.py:7:1: PLE1307 Format type does not match argument type
-   |
- 7 | "%d" % "1"
- 8 | "%o" % "1"
-   | ^^^^^^^^^^ PLE1307
- 9 | "%(key)d" % {"key": "1"}
-10 | "%x" % 1.1
-   |
+  |
+6 | "%d" % "1"
+7 | "%o" % "1"
+  | ^^^^^^^^^^ PLE1307
+8 | "%(key)d" % {"key": "1"}
+9 | "%x" % 1.1
+  |
 
 bad_string_format_type.py:8:1: PLE1307 Format type does not match argument type
    |
- 8 | "%d" % "1"
- 9 | "%o" % "1"
-10 | "%(key)d" % {"key": "1"}
+ 6 | "%d" % "1"
+ 7 | "%o" % "1"
+ 8 | "%(key)d" % {"key": "1"}
    | ^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-11 | "%x" % 1.1
-12 | "%(key)x" % {"key": 1.1}
+ 9 | "%x" % 1.1
+10 | "%(key)x" % {"key": 1.1}
    |
 
 bad_string_format_type.py:9:1: PLE1307 Format type does not match argument type
    |
- 9 | "%o" % "1"
-10 | "%(key)d" % {"key": "1"}
-11 | "%x" % 1.1
+ 7 | "%o" % "1"
+ 8 | "%(key)d" % {"key": "1"}
+ 9 | "%x" % 1.1
    | ^^^^^^^^^^ PLE1307
-12 | "%(key)x" % {"key": 1.1}
-13 | "%d" % []
+10 | "%(key)x" % {"key": 1.1}
+11 | "%d" % []
    |
 
 bad_string_format_type.py:10:1: PLE1307 Format type does not match argument type
    |
-10 | "%(key)d" % {"key": "1"}
-11 | "%x" % 1.1
-12 | "%(key)x" % {"key": 1.1}
+ 8 | "%(key)d" % {"key": "1"}
+ 9 | "%x" % 1.1
+10 | "%(key)x" % {"key": 1.1}
    | ^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-13 | "%d" % []
-14 | "%d" % ([],)
+11 | "%d" % []
+12 | "%d" % ([],)
    |
 
 bad_string_format_type.py:12:1: PLE1307 Format type does not match argument type
    |
-12 | "%(key)x" % {"key": 1.1}
-13 | "%d" % []
-14 | "%d" % ([],)
+10 | "%(key)x" % {"key": 1.1}
+11 | "%d" % []
+12 | "%d" % ([],)
    | ^^^^^^^^^^^^ PLE1307
-15 | "%(key)d" % {"key": []}
-16 | print("%d" % ("%s" % ("nested",),))
+13 | "%(key)d" % {"key": []}
+14 | print("%d" % ("%s" % ("nested",),))
    |
 
 bad_string_format_type.py:13:1: PLE1307 Format type does not match argument type
    |
-13 | "%d" % []
-14 | "%d" % ([],)
-15 | "%(key)d" % {"key": []}
+11 | "%d" % []
+12 | "%d" % ([],)
+13 | "%(key)d" % {"key": []}
    | ^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-16 | print("%d" % ("%s" % ("nested",),))
-17 | "%d" % ((1, 2, 3),)
+14 | print("%d" % ("%s" % ("nested",),))
+15 | "%d" % ((1, 2, 3),)
    |
 
 bad_string_format_type.py:14:7: PLE1307 Format type does not match argument type
    |
-14 | "%d" % ([],)
-15 | "%(key)d" % {"key": []}
-16 | print("%d" % ("%s" % ("nested",),))
+12 | "%d" % ([],)
+13 | "%(key)d" % {"key": []}
+14 | print("%d" % ("%s" % ("nested",),))
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
-17 | "%d" % ((1, 2, 3),)
+15 | "%d" % ((1, 2, 3),)
    |
 
 bad_string_format_type.py:15:1: PLE1307 Format type does not match argument type
    |
-15 | "%(key)d" % {"key": []}
-16 | print("%d" % ("%s" % ("nested",),))
-17 | "%d" % ((1, 2, 3),)
+13 | "%(key)d" % {"key": []}
+14 | print("%d" % ("%s" % ("nested",),))
+15 | "%d" % ((1, 2, 3),)
    | ^^^^^^^^^^^^^^^^^^^ PLE1307
-18 | 
-19 | # False negatives
+16 | 
+17 | # False negatives
    |
 
 
