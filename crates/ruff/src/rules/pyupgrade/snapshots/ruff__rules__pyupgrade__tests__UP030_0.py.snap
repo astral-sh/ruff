@@ -183,7 +183,7 @@ UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
 24 | "\N{snowman} {0}".format(1)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
 25 | 
-26 | '{' '0}'.format(1)
+26 | print(
    |
    = help: Remove explicit positional indices
 
@@ -194,25 +194,36 @@ UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
 22    |-"\N{snowman} {0}".format(1)
    22 |+"\N{snowman} {}".format(1)
 23 23 | 
-24 24 | '{' '0}'.format(1)
-25 25 | 
+24 24 | print(
+25 25 |     'foo{0}'
 
-UP030_0.py:24:1: UP030 Use implicit references for positional format fields
+UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
    |
-24 | "\N{snowman} {0}".format(1)
-25 | 
-26 | '{' '0}'.format(1)
-   | ^^^^^^^^^^^^^^^^^^ UP030
-27 | 
-28 | # These will not change because we are waiting for libcst to fix this issue:
+25 |   print(
+26 |       'foo{0}'
+   |  _____^
+27 | |     'bar{1}'.format(1, 2)
+   | |_________________________^ UP030
+28 |   )
    |
    = help: Remove explicit positional indices
 
-UP030_0.py:29:5: UP030 Use implicit references for positional format fields
+ℹ Suggested fix
+22 22 | "\N{snowman} {0}".format(1)
+23 23 | 
+24 24 | print(
+25    |-    'foo{0}'
+26    |-    'bar{1}'.format(1, 2)
+   25 |+    'foo{}'
+   26 |+    'bar{}'.format(1, 2)
+27 27 | )
+28 28 | 
+29 29 | print(
+
+UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
    |
-29 |   # https://github.com/Instagram/LibCST/issues/846
 30 |   print(
-31 |       'foo{0}'
+31 |       'foo{0}'  # ohai\n"
    |  _____^
 32 | |     'bar{1}'.format(1, 2)
    | |_________________________^ UP030
@@ -220,14 +231,24 @@ UP030_0.py:29:5: UP030 Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-UP030_0.py:34:5: UP030 Use implicit references for positional format fields
+ℹ Suggested fix
+27 27 | )
+28 28 | 
+29 29 | print(
+30    |-    'foo{0}'  # ohai\n"
+31    |-    'bar{1}'.format(1, 2)
+   30 |+    'foo{}'  # ohai\n"
+   31 |+    'bar{}'.format(1, 2)
+32 32 | )
+33 33 | 
+34 34 | '{' '0}'.format(1)
+
+UP030_0.py:34:1: UP030 Use implicit references for positional format fields
    |
-34 |   print(
-35 |       'foo{0}'  # ohai\n"
-   |  _____^
-36 | |     'bar{1}'.format(1, 2)
-   | |_________________________^ UP030
-37 |   )
+34 | )
+35 | 
+36 | '{' '0}'.format(1)
+   | ^^^^^^^^^^^^^^^^^^ UP030
    |
    = help: Remove explicit positional indices
 
