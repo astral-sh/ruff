@@ -35,6 +35,31 @@ fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
         .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
 }
 
+/// ## What it does
+/// Checks for nested `if` statements that can be collapsed into a single `if`
+/// statement.
+///
+/// ## Why is this bad?
+/// Nesting `if` statements leads to deeper indentation and makes code harder to
+/// read. Instead, combine the conditions into a single `if` statement with an
+/// `and` operator.
+///
+/// ## Example
+/// ```python
+/// if foo:
+///     if bar:
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if foo and bar:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
+/// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[violation]
 pub struct CollapsibleIf;
 
@@ -51,6 +76,28 @@ impl Violation for CollapsibleIf {
     }
 }
 
+/// ## What it does
+/// Checks for `if` statements that can be replaced with `bool`.
+///
+/// ## Why is this bad?
+/// `if` statements that return `True` for a truthy condition and `False` for
+/// a falsey condition can be replaced with boolean casts.
+///
+/// ## Example
+/// ```python
+/// if foo:
+///     return True
+/// else:
+///     return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// return bool(foo)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct NeedlessBool {
     condition: String,
@@ -101,6 +148,28 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
     }
 }
 
+/// ## What it does
+/// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
+///
+/// ## Why is this bad?
+/// `if`-`else`-blocks that assign a value to a variable in both branches can
+/// be expressed more concisely by using a ternary operator.
+///
+/// ## Example
+/// ```python
+/// if foo:
+///     bar = x
+/// else:
+///     bar = y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar = x if foo else y
+/// ```
+///
+/// ## References
+/// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
     contents: String,
@@ -151,6 +220,30 @@ impl Violation for IfWithSameArms {
     }
 }
 
+/// ## What it does
+/// Checks for `if` statements that can be replaced with `dict.get` calls.
+///
+/// ## Why is this bad?
+/// `dict.get()` calls can be used to replace `if` statements that assign a
+/// value to a variable in both branches, falling back to a default value if
+/// the key is not found. When possible, using `dict.get` is more concise and
+/// more idiomatic.
+///
+/// ## Example
+/// ```python
+/// if "bar" in foo:
+///     value = foo["bar"]
+/// else:
+///     value = 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// value = foo.get("bar", 0)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[violation]
 pub struct IfElseBlockInsteadOfDictGet {
     contents: String,
