@@ -273,6 +273,30 @@ impl Notebook {
     }
 
     /// Build and return the [`JupyterIndex`].
+    ///
+    /// # Notes
+    ///
+    /// Empty cells don't have any newlines, but there's a single visible line
+    /// in the UI. That single line needs to be accounted for.
+    ///
+    /// In case of [`SourceValue::StringArray`], newlines are part of the strings.
+    /// So, to get the actual count of lines, we need to check for any trailing
+    /// newline for the last line.
+    ///
+    /// For example, consider the following cell:
+    /// ```python
+    /// [
+    ///    "import os\n",
+    ///    "import sys\n",
+    /// ]
+    /// ```
+    ///
+    /// Here, the array suggests that there are two lines, but the actual number
+    /// of lines visible in the UI is three. The same goes for [`SourceValue::String`]
+    /// where we need to check for the trailing newline.
+    ///
+    /// The index building is expensive as it needs to go through the content of
+    /// every valid code cell.
     fn build_index(&self) -> JupyterIndex {
         let mut row_to_cell = vec![0];
         let mut row_to_row_in_cell = vec![0];
@@ -280,8 +304,6 @@ impl Notebook {
         for &pos in &self.valid_code_cells {
             match &self.raw.cells[pos as usize].source {
                 SourceValue::String(string) => {
-                    // Empty cell is a special case because it doesn't have any
-                    // newlines. So, we need to add the row number manually.
                     let empty_cell = usize::from(string.is_empty());
                     let line_count = u32::try_from(
                         NewlineWithTrailingNewline::from(string).count() + empty_cell,
@@ -291,21 +313,7 @@ impl Notebook {
                     row_to_row_in_cell.extend(1..=line_count);
                 }
                 SourceValue::StringArray(string_array) => {
-                    // Empty cell is a special case because it doesn't have any
-                    // newlines. So, we need to add the row number manually.
                     let empty_cell = usize::from(string_array.is_empty());
-                    // Trailing newlines for each line are part of the string itself.
-                    // So, to count the actual number of visible lines, we need to
-                    // check for any trailing newline for the last line.
-                    //
-                    // ```python
-                    // [
-                    //     "import os\n",
-                    //     "import sys\n",
-                    // ]
-                    // ```
-                    //
-                    // Here, the array suggests 2 lines but there are 3 visible lines.
                     let trailing_newline =
                         usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
                     let line_count =
