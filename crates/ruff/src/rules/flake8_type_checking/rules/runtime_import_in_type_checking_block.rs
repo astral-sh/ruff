@@ -89,8 +89,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
             && binding.references().any(|reference_id| {
                 checker
                     .semantic_model()
-                    .references
-                    .resolve(reference_id)
+                    .reference(reference_id)
                     .context()
                     .is_runtime()
             })
@@ -204,8 +203,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         .map(|Import { reference_id, .. }| {
             checker
                 .semantic_model()
-                .references
-                .resolve(*reference_id)
+                .reference(*reference_id)
                 .range()
                 .start()
         })
