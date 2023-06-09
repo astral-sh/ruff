@@ -32,7 +32,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// from collections import namedtuple
 ///
 ///
-/// class Foo(namedtuple("foo", ["str", "int"]):
+/// class Foo(namedtuple("foo", ["str", "int"])):
 ///     pass
 /// ```
 ///
@@ -41,7 +41,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// from collections import namedtuple
 ///
 ///
-/// class Foo(namedtuple("foo", ["str", "int"]):
+/// class Foo(namedtuple("foo", ["str", "int"])):
 ///     __slots__ = ()
 /// ```
 ///
