@@ -1,19 +1,17 @@
 use anyhow::{bail, Ok, Result};
-use libcst_native::{DictElement, Expression};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Excepthandler, Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::str::raw_contents;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_call_mut, match_dict, match_expression};
 
 /// Generate a [`Edit`] to remove unused keys from format dict.
 pub(crate) fn remove_unused_format_arguments_from_dict(
-    unused_arguments: &[&str],
+    unused_arguments: &[usize],
     stmt: &Expr,
     locator: &Locator,
     stylist: &Stylist,
@@ -22,11 +20,12 @@ pub(crate) fn remove_unused_format_arguments_from_dict(
     let mut tree = match_expression(module_text)?;
     let dict = match_dict(&mut tree)?;
 
-    dict.elements.retain(|e| {
-        !matches!(e, DictElement::Simple {
-            key: Expression::SimpleString(name),
-            ..
-        } if raw_contents(name.value).map_or(false, |name| unused_arguments.contains(&name)))
+    // Remove the elements at the given indexes.
+    let mut index = 0;
+    dict.elements.retain(|_| {
+        let is_unused = unused_arguments.contains(&index);
+        index += 1;
+        !is_unused
     });
 
     Ok(Edit::range_replacement(
@@ -37,7 +36,7 @@ pub(crate) fn remove_unused_format_arguments_from_dict(
 
 /// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
 pub(crate) fn remove_unused_keyword_arguments_from_format_call(
-    unused_arguments: &[&str],
+    unused_arguments: &[usize],
     location: TextRange,
     locator: &Locator,
     stylist: &Stylist,
@@ -46,8 +45,17 @@ pub(crate) fn remove_unused_keyword_arguments_from_format_call(
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
 
-    call.args
-        .retain(|e| !matches!(&e.keyword, Some(kw) if unused_arguments.contains(&kw.value)));
+    // Remove the keyword arguments at the given indexes.
+    let mut index = 0;
+    call.args.retain(|arg| {
+        if arg.keyword.is_none() {
+            return true;
+        }
+
+        let is_unused = unused_arguments.contains(&index);
+        index += 1;
+        !is_unused
+    });
 
     Ok(Edit::range_replacement(
         tree.codegen_stylist(stylist),

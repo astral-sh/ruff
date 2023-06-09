@@ -38,20 +38,42 @@ F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
 8   |-"%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
   8 |+"%(a)s" % {"a": 1, }  # F504 ("b" not used)
 9 9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+10 10 | 
+11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
 
 F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
    |
  9 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
 10 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+11 | 
+12 | '' % {'a''b' : ''}  # F504 ("ab" not used)
    |
    = help: Remove extra named arguments: b
 
 ℹ Fix
-6 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
-7 7 | 
-8 8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
-9   |-"%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
-  9 |+"%(a)s" % {'a': 1, }  # F504 ("b" not used)
+6  6  | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
+7  7  | 
+8  8  | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
+9     |-"%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+   9  |+"%(a)s" % {'a': 1, }  # F504 ("b" not used)
+10 10 | 
+11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
+
+F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
+   |
+11 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+12 | 
+13 | '' % {'a''b' : ''}  # F504 ("ab" not used)
+   | ^^^^^^^^^^^^^^^^^^ F504
+   |
+   = help: Remove extra named arguments: ab
+
+ℹ Fix
+8  8  | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
+9  9  | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+10 10 | 
+11    |-'' % {'a''b' : ''}  # F504 ("ab" not used)
+   11 |+'' % {}  # F504 ("ab" not used)
 
 
