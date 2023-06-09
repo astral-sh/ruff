@@ -65,9 +65,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 [
                     // An expanded group always needs parentheses
                     &text("("),
-                    hard_line_break(),
                     block_indent(&ExprSequence::new(elts)),
-                    hard_line_break(),
                     &text(")"),
                 ]
             )?;
