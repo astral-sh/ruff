@@ -137,7 +137,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  
  
  def f(
-@@ -49,10 +49,8 @@
+@@ -49,10 +49,11 @@
      element = 0  # type: int
      another_element = 1  # type: float
      another_element_with_long_name = 2  # type: int
@@ -146,11 +146,14 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    )  # type: int
 -    an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
 +    another_really_really_long_element_with_a_unnecessarily_long_name_to_describe_what_it_does_enterprise_style = 3  # type: int
-+    an_element_with_a_long_value = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2  # type: bool
++    an_element_with_a_long_value = (
++        NOT_IMPLEMENTED_call()
++        or NOT_IMPLEMENTED_call() and NOT_IMPLEMENTED_call()
++    )  # type: bool
  
      tup = (
          another_element,
-@@ -84,35 +82,22 @@
+@@ -84,35 +85,22 @@
  
  
  def func(
@@ -255,7 +258,10 @@ def f(
     another_element = 1  # type: float
     another_element_with_long_name = 2  # type: int
     another_really_really_long_element_with_a_unnecessarily_long_name_to_describe_what_it_does_enterprise_style = 3  # type: int
-    an_element_with_a_long_value = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2  # type: bool
+    an_element_with_a_long_value = (
+        NOT_IMPLEMENTED_call()
+        or NOT_IMPLEMENTED_call() and NOT_IMPLEMENTED_call()
+    )  # type: bool
 
     tup = (
         another_element,

@@ -1,13 +1,12 @@
 use crate::comments::{trailing_comments, Comments};
+use crate::expression::binary_like::{can_break_expr, BinaryLike, FormatBinaryLike};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parenthesize,
 };
 use crate::expression::Parentheses;
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_formatter::{
-    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
-};
+use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AstNode;
 use rustpython_parser::ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
@@ -75,84 +74,15 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
             }
 
             BinaryLayout::ExpandLeft => {
-                let left = left.format().memoized();
-                let right = right.format().memoized();
-                write!(
-                    f,
-                    [best_fitting![
-                        // Everything on a single line
-                        format_args![left, space(), op.format(), space(), right],
-                        // Break the left over multiple lines, keep the right flat
-                        format_args![
-                            group(&left).should_expand(true),
-                            space(),
-                            op.format(),
-                            space(),
-                            right
-                        ],
-                        // The content doesn't fit, indent the content and break before the operator.
-                        format_args![
-                            text("("),
-                            block_indent(&format_args![
-                                left,
-                                hard_line_break(),
-                                op.format(),
-                                space(),
-                                right
-                            ]),
-                            text(")")
-                        ]
-                    ]
-                    .with_mode(BestFittingMode::AllLines)]
-                )
+                FormatBinaryLike::expand_left(BinaryLike::BinaryExpression(item)).fmt(f)
             }
 
             BinaryLayout::ExpandRight => {
-                let left_group = f.group_id("BinaryLeft");
-
-                write!(
-                    f,
-                    [
-                        // Wrap the left in a group and gives it an id. The printer first breaks the
-                        // right side if `right` contains any line break because the printer breaks
-                        // sequences of groups from right to left.
-                        // Indents the left side if the group breaks.
-                        group(&format_args![
-                            if_group_breaks(&text("(")),
-                            indent_if_group_breaks(
-                                &format_args![
-                                    soft_line_break(),
-                                    left.format(),
-                                    soft_line_break_or_space(),
-                                    op.format(),
-                                    space()
-                                ],
-                                left_group
-                            )
-                        ])
-                        .with_group_id(Some(left_group)),
-                        // Wrap the right in a group and indents its content but only if the left side breaks
-                        group(&indent_if_group_breaks(&right.format(), left_group)),
-                        // If the left side breaks, insert a hard line break to finish the indent and close the open paren.
-                        if_group_breaks(&format_args![hard_line_break(), text(")")])
-                            .with_group_id(Some(left_group))
-                    ]
-                )
+                FormatBinaryLike::expand_right(BinaryLike::BinaryExpression(item)).fmt(f)
             }
 
             BinaryLayout::ExpandRightThenLeft => {
-                // The formatter expands group-sequences from right to left, and expands both if
-                // there isn't enough space when expanding only one of them.
-                write!(
-                    f,
-                    [
-                        group(&left.format()),
-                        space(),
-                        op.format(),
-                        space(),
-                        group(&right.format())
-                    ]
-                )
+                FormatBinaryLike::expand_right_then_left(BinaryLike::BinaryExpression(item)).fmt(f)
             }
         }
     }
@@ -295,38 +225,11 @@ enum BinaryLayout {
 
 impl BinaryLayout {
     fn from(expr: &ExprBinOp) -> Self {
-        match (can_break(&expr.left), can_break(&expr.right)) {
+        match (can_break_expr(&expr.left), can_break_expr(&expr.right)) {
             (false, false) => Self::Default,
             (true, false) => Self::ExpandLeft,
             (false, true) => Self::ExpandRight,
             (true, true) => Self::ExpandRightThenLeft,
         }
-    }
-}
-
-fn can_break(expr: &Expr) -> bool {
-    use ruff_python_ast::prelude::*;
-
-    match expr {
-        Expr::Tuple(ExprTuple {
-            elts: expressions, ..
-        })
-        | Expr::List(ExprList {
-            elts: expressions, ..
-        })
-        | Expr::Set(ExprSet {
-            elts: expressions, ..
-        })
-        | Expr::Dict(ExprDict {
-            values: expressions,
-            ..
-        }) => !expressions.is_empty(),
-        Expr::Call(ExprCall { args, keywords, .. }) => !(args.is_empty() && keywords.is_empty()),
-        Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::GeneratorExp(_) => true,
-        Expr::UnaryOp(ExprUnaryOp { operand, .. }) => match operand.as_ref() {
-            Expr::BinOp(_) => true,
-            _ => can_break(operand.as_ref()),
-        },
-        _ => false,
     }
 }

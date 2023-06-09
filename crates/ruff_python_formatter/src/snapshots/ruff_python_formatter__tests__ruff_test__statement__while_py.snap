@@ -61,12 +61,14 @@ while (
 else:
     ...
 
-while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:  # comment
+while NOT_IMPLEMENTED_call() and anotherCondition or aThirdCondition:  # comment
     NOT_IMPLEMENTED_call()
 
 
 while (
-    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2  # trailing third condition
+    NOT_IMPLEMENTED_call()  # trailing some condition
+    and anotherCondition
+    or aThirdCondition  # trailing third condition
 ):  # comment
     NOT_IMPLEMENTED_call()
 ```
