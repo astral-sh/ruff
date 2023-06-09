@@ -783,6 +783,7 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the context is in an f-string.
     pub const fn in_f_string(&self) -> bool {
         self.flags.contains(SemanticModelFlags::F_STRING)
+            || self.flags.contains(SemanticModelFlags::NESTED_F_STRING)
     }
 
     /// Return `true` if the context is in a nested f-string.

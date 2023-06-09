@@ -7,13 +7,13 @@ use libcst_native::{
     RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
-use ruff_text_size::{TextRange, TextSize};
-
-use crate::autofix::codemods::CodegenStylist;
-use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::Ranged;
 
+use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::source_code::{Locator, Stylist};
+
+use crate::autofix::codemods::CodegenStylist;
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
@@ -87,7 +87,7 @@ pub(crate) fn fix_unnecessary_generator_set(
     let content = tree.codegen_stylist(stylist);
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(content, checker, expr.range()),
+        formatted_expression(content, expr.range(), checker),
         expr.range(),
     ))
 }
@@ -129,10 +129,8 @@ pub(crate) fn fix_unnecessary_generator_dict(
         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
-    let content = tree.codegen_stylist(stylist);
-
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(content, checker, expr.range()),
+        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -167,7 +165,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     }));
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(tree.codegen_stylist(stylist), checker, expr.range()),
+        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -211,7 +209,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     }));
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(tree.codegen_stylist(stylist), checker, expr.range()),
+        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -298,7 +296,7 @@ pub(crate) fn fix_unnecessary_literal_set(
     }
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(tree.codegen_stylist(stylist), checker, expr.range()),
+        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -364,7 +362,7 @@ pub(crate) fn fix_unnecessary_literal_dict(
     }));
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(tree.codegen_stylist(stylist), checker, expr.range()),
+        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -374,6 +372,12 @@ pub(crate) fn fix_unnecessary_collection_call(
     checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    enum Collection {
+        Tuple,
+        List,
+        Dict,
+    }
+
     let locator = checker.locator;
     let stylist = checker.stylist;
 
@@ -382,21 +386,26 @@ pub(crate) fn fix_unnecessary_collection_call(
     let mut tree = match_expression(module_text)?;
     let call = match_call(&tree)?;
     let name = match_name(&call.func)?;
-    let mut wrap_in_spaces = false;
+    let collection = match name.value {
+        "tuple" => Collection::Tuple,
+        "list" => Collection::List,
+        "dict" => Collection::Dict,
+        _ => bail!("Expected 'tuple', 'list', or 'dict'"),
+    };
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
     // below.
     let mut arena: Vec<String> = vec![];
 
-    match name.value {
-        "tuple" => {
+    match collection {
+        Collection::Tuple => {
             tree = Expression::Tuple(Box::new(Tuple {
                 elements: vec![],
                 lpar: vec![LeftParen::default()],
                 rpar: vec![RightParen::default()],
             }));
         }
-        "list" => {
+        Collection::List => {
             tree = Expression::List(Box::new(List {
                 elements: vec![],
                 lbracket: LeftSquareBracket::default(),
@@ -405,11 +414,7 @@ pub(crate) fn fix_unnecessary_collection_call(
                 rpar: vec![],
             }));
         }
-        "dict" => {
-            let in_f_string = checker.semantic_model().in_f_string();
-            if in_f_string {
-                wrap_in_spaces = true;
-            }
+        Collection::Dict => {
             if call.args.is_empty() {
                 tree = Expression::Dict(Box::new(Dict {
                     elements: vec![],
@@ -472,60 +477,53 @@ pub(crate) fn fix_unnecessary_collection_call(
                 }));
             }
         }
-        _ => {
-            bail!("Expected function name to be one of: 'tuple', 'list', 'dict'");
-        }
     };
 
-    let code = if wrap_in_spaces {
-        wrap_code_in_spaces(tree.codegen_stylist(stylist), checker, expr.range())
-    } else {
-        tree.codegen_stylist(stylist)
-    };
-
-    Ok(Edit::range_replacement(code, expr.range()))
+    Ok(Edit::range_replacement(
+        if matches!(collection, Collection::Dict) {
+            formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker)
+        } else {
+            tree.codegen_stylist(stylist)
+        },
+        expr.range(),
+    ))
 }
 
-/// Adds spaces around the code generated from `state` if `wrap_in_spaces` is true.
-fn wrap_code_in_spaces(code: String, checker: &Checker, expr_range: TextRange) -> String {
-    if checker.semantic_model().in_f_string() {
-        let str = checker.locator.contents().chars().collect_vec();
+/// Re-formats the given expression for use within a formatted string.
+///
+/// For example, when converting a `dict` call to a dictionary literal within
+/// a formatted string, we might naively generate the following code:
+///
+/// ```python
+/// f"{{'a': 1, 'b': 2}}"
+/// ```
+///
+/// However, this is a syntax error under the f-string grammar. As such,
+/// this method will pad the start and end of an expression as needed to
+/// avoid producing invalid syntax.
+fn formatted_expression(content: String, range: TextRange, checker: &Checker) -> String {
+    if !checker.semantic_model().in_f_string() {
+        return content;
+    }
 
-        // find the braces that delimit the f-string token
-        let mut si: usize = expr_range.start().into();
-        while str[si] != '{' {
-            si -= 1;
-        }
-        let si = TextSize::try_from(si).unwrap();
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let prefix = checker.locator.up_to(range.start());
+    let left_pad = matches!(prefix.chars().rev().next(), Some('{'));
 
-        let mut ei: usize = expr_range.end().into();
-        while str[ei] != '}' {
-            ei += 1;
-        }
-        let ei = TextSize::try_from(ei).unwrap();
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let suffix = checker.locator.after(range.end());
+    let right_pad = matches!(suffix.chars().next(), Some('}'));
 
-        let mut buf = String::with_capacity(code.len() + 2);
-
-        // check if left padding is required
-        // this is true when between the opening brace of the f-string and the start of the
-        // current expression there are no characters
-        let one = TextSize::from(1u32);
-        if si + one == expr_range.start() {
-            buf.push(' ');
-        }
-
-        buf.push_str(&code);
-
-        // check if right padding is required
-        // this is true when between the end of the current expression and the closing
-        // brace of the f-string there are no characters
-        if expr_range.end() == ei {
-            buf.push(' ');
-        }
-
-        buf
+    if left_pad && right_pad {
+        format!(" {content} ")
+    } else if left_pad {
+        format!(" {content}")
+    } else if right_pad {
+        format!("{content} ")
     } else {
-        code
+        content
     }
 }
 
