@@ -2,14 +2,14 @@
 source: crates/ruff/src/rules/perflint/mod.rs
 ---
 W8102.py:7:26: W8102 [*] When using only the values of a dict use the `values()` method
-   |
- 7 | }
- 8 | 
- 9 | for _, value in some_dict.items():  # W8102
-   |                          ^^^^^^ W8102
-10 |     print(value)
-   |
-   = help: Replace `.items()` with `.values()`.
+  |
+5 | }
+6 | 
+7 | for _, value in some_dict.items():  # W8102
+  |                          ^^^^^^ W8102
+8 |     print(value)
+  |
+  = help: Replace `.items()` with `.values()`.
 
 ℹ Fix
 4 4 |     "c": 44
