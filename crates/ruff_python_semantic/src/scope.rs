@@ -20,6 +20,8 @@ pub struct Scope<'a> {
     star_imports: Vec<StarImportation<'a>>,
     /// A map from bound name to binding ID.
     bindings: FxHashMap<&'a str, BindingId>,
+    /// A map from binding ID to bound name.
+    binding_name: FxHashMap<BindingId, &'a str>,
     /// A map from binding ID to binding ID that it shadows.
     shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
     /// A list of all names that have been deleted in this scope.
@@ -37,6 +39,7 @@ impl<'a> Scope<'a> {
             parent: None,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
+            binding_name: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
             deleted_symbols: Vec::default(),
             globals_id: None,
@@ -50,6 +53,7 @@ impl<'a> Scope<'a> {
             parent: Some(parent),
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
+            binding_name: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
             deleted_symbols: Vec::default(),
             globals_id: None,
@@ -62,8 +66,14 @@ impl<'a> Scope<'a> {
         self.bindings.get(name).copied()
     }
 
+    /// Returns the name bound to the given [id](BindingId).
+    pub fn get_name(&self, id: BindingId) -> Option<&'a str> {
+        self.binding_name.get(&id).copied()
+    }
+
     /// Adds a new binding with the given name to this scope.
     pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
+        self.binding_name.insert(id, name);
         if let Some(shadowed) = self.bindings.insert(name, id) {
             self.shadowed_bindings.insert(id, shadowed);
             Some(shadowed)

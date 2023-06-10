@@ -1,0 +1,54 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+---
+F401_18.py:7:8: F401 [*] `multiprocessing.connection` imported but unused
+  |
+5 | multiprocessing = None
+6 | 
+7 | import multiprocessing.connection
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ F401
+8 | import multiprocessing.pool
+9 | import multiprocessing.queues
+  |
+  = help: Remove unused import: `multiprocessing.connection`
+
+ℹ Fix
+4 4 | # imports. It should only detect imports, not any other kind of binding.
+5 5 | multiprocessing = None
+6 6 | 
+7   |-import multiprocessing.connection
+8 7 | import multiprocessing.pool
+9 8 | import multiprocessing.queues
+
+F401_18.py:8:8: F401 [*] `multiprocessing.pool` imported but unused
+  |
+7 | import multiprocessing.connection
+8 | import multiprocessing.pool
+  |        ^^^^^^^^^^^^^^^^^^^^ F401
+9 | import multiprocessing.queues
+  |
+  = help: Remove unused import: `multiprocessing.pool`
+
+ℹ Fix
+5 5 | multiprocessing = None
+6 6 | 
+7 7 | import multiprocessing.connection
+8   |-import multiprocessing.pool
+9 8 | import multiprocessing.queues
+
+F401_18.py:9:8: F401 [*] `multiprocessing.queues` imported but unused
+  |
+7 | import multiprocessing.connection
+8 | import multiprocessing.pool
+9 | import multiprocessing.queues
+  |        ^^^^^^^^^^^^^^^^^^^^^^ F401
+  |
+  = help: Remove unused import: `multiprocessing.queues`
+
+ℹ Fix
+6 6 | 
+7 7 | import multiprocessing.connection
+8 8 | import multiprocessing.pool
+9   |-import multiprocessing.queues
+
+
