@@ -104,40 +104,51 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<Import>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
-        let binding = &checker.semantic_model().bindings[binding_id];
+        let top_binding = &checker.semantic_model().bindings[binding_id];
 
-        if binding.is_used() || binding.is_explicit_export() {
+        if top_binding.is_used() || top_binding.is_explicit_export() {
             continue;
         }
 
-        let Some(qualified_name) = binding.qualified_name() else {
-            continue;
-        };
-
-        let Some(stmt_id) = binding.source else {
-            continue;
-        };
-
-        let import = Import {
-            qualified_name,
-            trimmed_range: binding.trimmed_range(checker.semantic_model(), checker.locator),
-            parent_range: binding.parent_range(checker.semantic_model()),
-        };
-
-        if checker.rule_is_ignored(Rule::UnusedImport, import.trimmed_range.start())
-            || import.parent_range.map_or(false, |parent_range| {
-                checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
-            })
-        {
-            ignored
-                .entry((stmt_id, binding.exceptions))
-                .or_default()
-                .push(import);
+        let bindings = if let Some(module_name) = top_binding.module_name() {
+            scope
+                .bindings_for_name(module_name)
+                .map(|binding_id| &checker.semantic_model().bindings[binding_id])
+                .collect::<Vec<_>>()
         } else {
-            unused
-                .entry((stmt_id, binding.exceptions))
-                .or_default()
-                .push(import);
+            vec![top_binding]
+        };
+
+        for binding in bindings {
+            let Some(qualified_name) = binding.qualified_name() else {
+                break;
+            };
+
+            let Some(stmt_id) = binding.source else {
+                break;
+            };
+
+            let import = Import {
+                qualified_name,
+                trimmed_range: binding.trimmed_range(checker.semantic_model(), checker.locator),
+                parent_range: binding.parent_range(checker.semantic_model()),
+            };
+
+            if checker.rule_is_ignored(Rule::UnusedImport, import.trimmed_range.start())
+                || import.parent_range.map_or(false, |parent_range| {
+                    checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
+                })
+            {
+                ignored
+                    .entry((stmt_id, binding.exceptions))
+                    .or_default()
+                    .push(import);
+            } else {
+                unused
+                    .entry((stmt_id, binding.exceptions))
+                    .or_default()
+                    .push(import);
+            }
         }
     }
 
