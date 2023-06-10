@@ -10,7 +10,7 @@ RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is t
   |
   = help: Remove explicit `return None`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | def x(y):
 2 2 |     if not y:
 3 3 |         return
@@ -29,7 +29,7 @@ RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is 
    |
    = help: Remove explicit `return None`
 
-ℹ Suggested fix
+ℹ Fix
 11 11 | 
 12 12 |     def get(self, key: str) -> None:
 13 13 |         print(f"{key} not found")

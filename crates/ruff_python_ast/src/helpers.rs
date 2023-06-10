@@ -1202,10 +1202,8 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
 }
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    let Stmt::If(ast::StmtIf { body, orelse, .. } )= stmt else {
-        return None;
-    };
+pub fn elif_else_range(stmt: &ast::StmtIf, locator: &Locator) -> Option<TextRange> {
+    let ast::StmtIf { body, orelse, .. } = stmt;
 
     let start = body.last().expect("Expected body to be non-empty").end();
 
@@ -1619,7 +1617,7 @@ mod tests {
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_ast::Suite;
+    use rustpython_ast::{Stmt, Suite};
     use rustpython_parser::ast::Cmpop;
     use rustpython_parser::Parse;
 
@@ -1819,6 +1817,7 @@ elif b:
         .trim_start();
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
+        let stmt = Stmt::as_if_stmt(stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
@@ -1833,6 +1832,7 @@ else:
         .trim_start();
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
+        let stmt = Stmt::as_if_stmt(stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
