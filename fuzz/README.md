@@ -12,6 +12,8 @@ To use the fuzzers provided in this directory, start by invoking:
 
 This will install [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) and optionally download a
 [dataset](https://zenodo.org/record/3628784) which improves the efficacy of the testing.
+**This step is necessary for initialising the corpus directory, as all fuzzers share a common
+corpus.**
 The dataset may take several hours to download and clean, so if you're just looking to try out the
 fuzzers, skip the dataset download, though be warned that some features simply cannot be tested
 without it (very unlikely for the fuzzer to generate valid python code from "thin air").
@@ -22,6 +24,8 @@ Once you have initialised the fuzzers, you can then execute any fuzzer with:
 cargo fuzz run -s none name_of_fuzzer -- -timeout=1
 ```
 
+**Users using Apple M1 devices must use a nightly compiler and omit the `-s none` portion of this
+command, as this architecture does not support fuzzing without a sanitizer.**
 You can view the names of the available fuzzers with `cargo fuzz list`.
 For specific details about how each fuzzer works, please read this document in its entirety.
 
