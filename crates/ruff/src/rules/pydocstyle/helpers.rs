@@ -9,7 +9,7 @@ use ruff_python_semantic::model::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
 /// Return the index of the first logical line in a string.
-pub(crate) fn logical_line(content: &str) -> Option<usize> {
+pub(super) fn logical_line(content: &str) -> Option<usize> {
     // Find the first logical line.
     let mut logical_line = None;
     for (i, line) in content.universal_newlines().enumerate() {
@@ -28,10 +28,15 @@ pub(crate) fn logical_line(content: &str) -> Option<usize> {
 
 /// Normalize a word by removing all non-alphanumeric characters
 /// and converting it to lowercase.
-pub(crate) fn normalize_word(first_word: &str) -> String {
+pub(super) fn normalize_word(first_word: &str) -> String {
     first_word
         .replace(|c: char| !c.is_alphanumeric(), "")
         .to_lowercase()
+}
+
+/// Return true if a line ends with an odd number of backslashes (i.e., ends with an escape).
+pub(super) fn ends_with_backslash(line: &str) -> bool {
+    line.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 
 /// Check decorator list to see if function should be ignored.
@@ -62,11 +67,6 @@ pub(crate) fn should_ignore_definition(
         }
     }
     false
-}
-
-/// Return true if a line ends with an odd number of backslashes (i.e., ends with an escape).
-pub(crate) fn ends_with_backslash(line: &str) -> bool {
-    line.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 
 /// Check if a docstring should be ignored.
