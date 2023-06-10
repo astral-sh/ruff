@@ -4,7 +4,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
-use ruff_python_whitespace::UniversalNewlineIterator;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -1031,7 +1031,7 @@ pub fn trailing_lines_end(stmt: &Stmt, locator: &Locator) -> TextSize {
     let rest = &locator.contents()[usize::from(line_end)..];
 
     UniversalNewlineIterator::with_offset(rest, line_end)
-        .take_while(|line| line.trim().is_empty())
+        .take_while(|line| line.trim_whitespace().is_empty())
         .last()
         .map_or(line_end, |l| l.full_end())
 }

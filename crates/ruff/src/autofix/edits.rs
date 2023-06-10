@@ -7,7 +7,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::NewlineWithTrailingNewline;
+use ruff_python_whitespace::{is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace};
 
 use crate::autofix::codemods;
 
@@ -242,7 +242,7 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<TextSize> {
     let contents = locator.after(stmt.end());
 
     for line in NewlineWithTrailingNewline::from(contents) {
-        let trimmed = line.trim_start();
+        let trimmed = line.trim_whitespace_start();
 
         if trimmed.starts_with(';') {
             let colon_offset = line.text_len() - trimmed.text_len();
@@ -262,7 +262,7 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
 
     let contents = &locator.contents()[usize::from(start_location)..];
     for line in NewlineWithTrailingNewline::from(contents) {
-        let trimmed = line.trim();
+        let trimmed = line.trim_whitespace();
         // Skip past any continuations.
         if trimmed.starts_with('\\') {
             continue;
@@ -276,7 +276,7 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
             } else {
                 // Otherwise, find the start of the next statement. (Or, anything that isn't
                 // whitespace.)
-                let relative_offset = line.find(|c: char| !c.is_whitespace()).unwrap();
+                let relative_offset = line.find(|c: char| !is_python_whitespace(c)).unwrap();
                 line.start() + TextSize::try_from(relative_offset).unwrap()
             };
     }

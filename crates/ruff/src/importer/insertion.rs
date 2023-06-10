@@ -8,7 +8,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_whitespace::UniversalNewlineIterator;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator};
 use ruff_textwrap::indent;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,7 +69,7 @@ impl<'a> Insertion<'a> {
 
         // Skip over commented lines.
         for line in UniversalNewlineIterator::with_offset(locator.after(location), location) {
-            if line.trim_start().starts_with('#') {
+            if line.trim_whitespace_start().starts_with('#') {
                 location = line.full_end();
             } else {
                 break;
