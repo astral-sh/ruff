@@ -1,3 +1,6 @@
+use std::ops::Add;
+
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -9,6 +12,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::model::SemanticModel;
 
+use crate::autofix::edits;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
@@ -161,11 +165,15 @@ pub struct UnnecessaryAssign {
     name: String,
 }
 
-impl Violation for UnnecessaryAssign {
+impl AlwaysAutofixableViolation for UnnecessaryAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryAssign { name } = self;
         format!("Unnecessary assignment to `{name}` before `return` statement")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove unnecessary assignment".to_string()
     }
 }
 
@@ -504,9 +512,9 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
 
 /// RET504
 fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
-    for (stmt_assign, stmt_return) in &stack.assignment_return {
+    for (assign, return_, stmt) in &stack.assignment_return {
         // Identify, e.g., `return x`.
-        let Some(value) = stmt_return.value.as_ref() else {
+        let Some(value) = return_.value.as_ref() else {
             continue;
         };
 
@@ -515,11 +523,11 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
         };
 
         // Identify, e.g., `x = 1`.
-        if stmt_assign.targets.len() > 1 {
+        if assign.targets.len() > 1 {
             continue;
         }
 
-        let Some(target) = stmt_assign.targets.first() else {
+        let Some(target) = assign.targets.first() else {
             continue;
         };
 
@@ -535,12 +543,59 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             UnnecessaryAssign {
                 name: assigned_id.to_string(),
             },
             value.range(),
-        ));
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.try_set_fix(|| {
+                // Delete the `return` statement. There's no need to treat this as an isolated
+                // edit, since we're editing the preceding statement, so no conflicting edit would
+                // be allowed to remove that preceding statement.
+                let delete_return = edits::delete_stmt(
+                    stmt,
+                    None,
+                    checker.locator,
+                    checker.indexer,
+                    checker.stylist,
+                );
+
+                // Replace the `x = 1` statement with `return 1`.
+                let content = checker.locator.slice(assign.range());
+                let equals_index = content
+                    .find('=')
+                    .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
+                let after_equals = equals_index + 1;
+
+                let replace_assign = Edit::range_replacement(
+                    // If necessary, add whitespace after the `return` keyword.
+                    // Ex) Convert `x=y` to `return y` (instead of `returny`).
+                    if content[after_equals..]
+                        .chars()
+                        .next()
+                        .map_or(false, char::is_alphabetic)
+                    {
+                        "return ".to_string()
+                    } else {
+                        "return".to_string()
+                    },
+                    // Replace from the start of the assignment statement to the end of the equals
+                    // sign.
+                    TextRange::new(
+                        assign.range().start(),
+                        assign
+                            .range()
+                            .start()
+                            .add(TextSize::try_from(after_equals)?),
+                    ),
+                );
+
+                Ok(Fix::suggested_edits(replace_assign, [delete_return]))
+            });
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
 

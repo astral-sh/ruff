@@ -17,7 +17,9 @@ pub(crate) struct Stack<'a> {
     /// Whether the current function is a generator.
     pub(crate) is_generator: bool,
     /// The `assignment`-to-`return` statement pairs in the current function.
-    pub(crate) assignment_return: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn)>,
+    /// TODO(charlie): Remove the extra [`Stmt`] here, which is necessary to support statement
+    /// removal for the `return` statement.
+    pub(crate) assignment_return: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn, &'a Stmt)>,
 }
 
 #[derive(Default)]
@@ -92,7 +94,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         Stmt::Assign(stmt_assign) => {
                             self.stack
                                 .assignment_return
-                                .push((stmt_assign, stmt_return));
+                                .push((stmt_assign, stmt_return, stmt));
                         }
                         // Example:
                         // ```python
@@ -106,7 +108,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                             if let Some(stmt_assign) = body.last().and_then(Stmt::as_assign_stmt) {
                                 self.stack
                                     .assignment_return
-                                    .push((stmt_assign, stmt_return));
+                                    .push((stmt_assign, stmt_return, stmt));
                             }
                         }
                         _ => {}

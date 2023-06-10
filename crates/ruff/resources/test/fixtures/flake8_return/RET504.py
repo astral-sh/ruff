@@ -79,7 +79,7 @@ def x():
     return a
 
 
-# ignore unpacking
+# Ignore unpacking
 def x():
     b, a = [1, 2]
     return a
@@ -109,7 +109,8 @@ def x():
 
 # Considered OK, since functions can have side effects.
 def x():
-    b, a = 1, 2
+    a = 1
+    b = 2
     print(b)
     return a
 
@@ -317,7 +318,7 @@ def mixed_class_assignment(x):
 def foo():
     with open("foo.txt", "r") as f:
         x = f.read()
-    return x
+    return x  # RET504
 
 
 def foo():
@@ -332,3 +333,27 @@ def foo():
         x = f.read()
     print(x)
     return x
+
+
+# Autofix cases
+def foo():
+    a = 1
+    b=a
+    return b  # RET504
+
+
+def foo():
+    a = 1
+    b =a
+    return b  # RET504
+
+
+def foo():
+    a = 1
+    b= a
+    return b  # RET504
+
+
+def foo():
+    a = 1  # Comment
+    return a
