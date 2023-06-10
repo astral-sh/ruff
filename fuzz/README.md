@@ -78,6 +78,8 @@ itself, each harness is briefly described below.
 
 This fuzz harness does not perform any "smart" testing of Ruff; it merely checks that the parsing
 and unparsing of a particular input (what would normally be a source code file) does not crash.
+It also attempts to verify that the locations of tokens and errors identified do not fall in the
+middle of a UTF-8 code point, which may cause downstream panics.
 While this is unlikely to find any issues on its own, it executes very quickly and covers a large
 and diverse code region that may speed up the generation of inputs and therefore make a more
 valuable corpus quickly.
