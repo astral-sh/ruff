@@ -302,26 +302,26 @@ impl Notebook {
         let mut row_to_row_in_cell = vec![0];
 
         for &pos in &self.valid_code_cells {
-            match &self.raw.cells[pos as usize].source {
+            let line_count = match &self.raw.cells[pos as usize].source {
                 SourceValue::String(string) => {
-                    let empty_cell = usize::from(string.is_empty());
-                    let line_count = u32::try_from(
-                        NewlineWithTrailingNewline::from(string).count() + empty_cell,
-                    )
-                    .unwrap();
-                    row_to_cell.extend(iter::repeat(pos + 1).take(line_count as usize));
-                    row_to_row_in_cell.extend(1..=line_count);
+                    if string.is_empty() {
+                        1
+                    } else {
+                        u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap()
+                    }
                 }
                 SourceValue::StringArray(string_array) => {
-                    let empty_cell = usize::from(string_array.is_empty());
-                    let trailing_newline =
-                        usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
-                    let line_count =
-                        u32::try_from(string_array.len() + trailing_newline + empty_cell).unwrap();
-                    row_to_cell.extend(iter::repeat(pos + 1).take(line_count as usize));
-                    row_to_row_in_cell.extend(1..=line_count);
+                    if string_array.is_empty() {
+                        1
+                    } else {
+                        let trailing_newline =
+                            usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
+                        u32::try_from(string_array.len() + trailing_newline).unwrap()
+                    }
                 }
-            }
+            };
+            row_to_cell.extend(iter::repeat(pos + 1).take(line_count as usize));
+            row_to_row_in_cell.extend(1..=line_count);
         }
 
         JupyterIndex {
