@@ -1,8 +1,7 @@
 use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Cmpop, Expr};
+use rustpython_parser::ast::{Cmpop, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,22 +9,6 @@ use ruff_python_ast::helpers;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum IsCmpop {
-    Is,
-    IsNot,
-}
-
-impl From<&Cmpop> for IsCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Is => IsCmpop::Is,
-            Cmpop::IsNot => IsCmpop::IsNot,
-            _ => panic!("Expected Cmpop::Is | Cmpop::IsNot"),
-        }
-    }
-}
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against constant literals, like
@@ -92,16 +75,16 @@ pub(crate) fn invalid_literal_comparison(
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
-    location: TextRange,
+    expr: &Expr,
 ) {
-    let located = Lazy::new(|| helpers::locate_cmpops(checker.locator.slice(location)));
+    let located = Lazy::new(|| helpers::locate_cmpops(expr, checker.locator));
     let mut left = left;
     for (index, (op, right)) in izip!(ops, comparators).enumerate() {
         if matches!(op, Cmpop::Is | Cmpop::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
         {
-            let mut diagnostic = Diagnostic::new(IsLiteral { cmpop: op.into() }, location);
+            let mut diagnostic = Diagnostic::new(IsLiteral { cmpop: op.into() }, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(located_op.op, *op);
@@ -116,7 +99,7 @@ pub(crate) fn invalid_literal_comparison(
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             content,
-                            located_op.range + location.start(),
+                            located_op.range + expr.start(),
                         )));
                     }
                 } else {
@@ -126,5 +109,21 @@ pub(crate) fn invalid_literal_comparison(
             checker.diagnostics.push(diagnostic);
         }
         left = right;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum IsCmpop {
+    Is,
+    IsNot,
+}
+
+impl From<&Cmpop> for IsCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Is => IsCmpop::Is,
+            Cmpop::IsNot => IsCmpop::IsNot,
+            _ => panic!("Expected Cmpop::Is | Cmpop::IsNot"),
+        }
     }
 }
