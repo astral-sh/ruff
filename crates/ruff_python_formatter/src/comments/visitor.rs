@@ -9,7 +9,7 @@ use ruff_python_ast::source_code::{CommentRanges, Locator};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_ast::whitespace::is_python_whitespace;
+use ruff_python_whitespace::is_python_whitespace;
 use ruff_text_size::TextRange;
 use std::iter::Peekable;
 

@@ -5,11 +5,11 @@ use memchr::{memchr2, memrchr2};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 /// Extension trait for [`str`] that provides a [`UniversalNewlineIterator`].
-pub trait StrExt {
+pub trait UniversalNewlines {
     fn universal_newlines(&self) -> UniversalNewlineIterator<'_>;
 }
 
-impl StrExt for str {
+impl UniversalNewlines for str {
     fn universal_newlines(&self) -> UniversalNewlineIterator<'_> {
         UniversalNewlineIterator::from(self)
     }
@@ -22,7 +22,7 @@ impl StrExt for str {
 ///
 /// ```rust
 /// # use ruff_text_size::TextSize;
-/// # use ruff_newlines::{Line, UniversalNewlineIterator};
+/// # use ruff_python_whitespace::{Line, UniversalNewlineIterator};
 /// let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
 ///
 /// assert_eq!(lines.next_back(), Some(Line::new("bop", TextSize::from(14))));

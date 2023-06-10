@@ -4,7 +4,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
-use ruff_newlines::UniversalNewlineIterator;
+use ruff_python_whitespace::UniversalNewlineIterator;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{

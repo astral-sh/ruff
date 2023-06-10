@@ -1,10 +1,10 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::comments::CommentTextPosition;
 use crate::trivia::{SimpleTokenizer, TokenKind};
-use ruff_newlines::StrExt;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
+use ruff_python_whitespace::UniversalNewlines;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 use std::cmp::Ordering;
