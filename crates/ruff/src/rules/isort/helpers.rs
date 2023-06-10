@@ -8,7 +8,7 @@ use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub(crate) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
+pub(super) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice(stmt.range());
     let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
@@ -36,7 +36,7 @@ pub(crate) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
 }
 
 /// Return `true` if a [`Stmt`] is preceded by a "comment break"
-pub(crate) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
+pub(super) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     // Starting from the `Stmt` (`def f(): pass`), we want to detect patterns like
     // this:
     //

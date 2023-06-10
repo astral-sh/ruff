@@ -6,7 +6,7 @@ use ruff_python_whitespace::UniversalNewlines;
 
 /// Return `true` if a function's return statement include at least one
 /// non-`None` value.
-pub(crate) fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
+pub(super) fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
     returns.iter().any(|(_, expr)| {
         expr.map(|expr| {
             !matches!(
@@ -25,7 +25,7 @@ pub(crate) fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
 ///
 /// This method assumes that the statement is the last statement in its body; specifically, that
 /// the statement isn't followed by a semicolon, followed by a multi-line statement.
-pub(crate) fn end_of_last_statement(stmt: &Stmt, locator: &Locator) -> TextSize {
+pub(super) fn end_of_last_statement(stmt: &Stmt, locator: &Locator) -> TextSize {
     // End-of-file, so just return the end of the statement.
     if stmt.end() == locator.text_len() {
         stmt.end()
