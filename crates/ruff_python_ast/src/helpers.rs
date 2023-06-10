@@ -5,7 +5,6 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -14,6 +13,8 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
+
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator};
 
 use crate::call_path::CallPath;
 use crate::source_code::{Indexer, Locator};
@@ -1673,11 +1674,10 @@ y = 2
     #[test]
     fn extract_identifier_range() -> Result<()> {
         let contents = "def f(): pass".trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(4), TextSize::from(5))
         );
 
@@ -1687,29 +1687,26 @@ def \
   pass
 "#
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(8), TextSize::from(9))
         );
 
         let contents = "class Class(): pass".trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
         let contents = "class Class: pass".trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
@@ -1719,20 +1716,18 @@ class Class():
   pass
 "#
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(19), TextSize::from(24))
         );
 
         let contents = r#"x = y + 1"#.trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(0), TextSize::from(9))
         );
 
@@ -1785,10 +1780,9 @@ else:
     pass
 "#
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
-        let range = else_range(stmt, &locator).unwrap();
+        let range = else_range(&stmt, &locator).unwrap();
         assert_eq!(&contents[range], "else");
         assert_eq!(
             range,
@@ -1817,9 +1811,8 @@ else:
 elif b:
     ...
 ";
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
-        let stmt = Stmt::as_if_stmt(stmt).unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
@@ -1830,9 +1823,8 @@ elif b:
 else:
     ...
 ";
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
-        let stmt = Stmt::as_if_stmt(stmt).unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
