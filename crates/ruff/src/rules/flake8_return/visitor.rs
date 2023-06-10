@@ -17,7 +17,7 @@ pub(crate) struct Stack<'a> {
     /// Whether the current function is a generator.
     pub(crate) is_generator: bool,
     /// The `assignment`-to-`return` statement pairs in the current function.
-    pub(crate) assignments: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn)>,
+    pub(crate) assignment_return: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn)>,
 }
 
 #[derive(Default)]
@@ -81,8 +81,36 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
             Stmt::Return(stmt_return) => {
                 // If the `return` statement is preceded by an `assignment` statement, then the
                 // `assignment` statement may be redundant.
-                if let Some(stmt_assign) = self.sibling.and_then(Stmt::as_assign_stmt) {
-                    self.stack.assignments.push((stmt_assign, stmt_return));
+                if let Some(sibling) = self.sibling {
+                    match sibling {
+                        // Example:
+                        // ```python
+                        // def foo():
+                        //     x = 1
+                        //     return x
+                        // ```
+                        Stmt::Assign(stmt_assign) => {
+                            self.stack
+                                .assignment_return
+                                .push((stmt_assign, stmt_return));
+                        }
+                        // Example:
+                        // ```python
+                        // def foo():
+                        //     with open("foo.txt", "r") as f:
+                        //         x = f.read()
+                        //     return x
+                        // ```
+                        Stmt::With(ast::StmtWith { body, .. })
+                        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+                            if let Some(stmt_assign) = body.last().and_then(Stmt::as_assign_stmt) {
+                                self.stack
+                                    .assignment_return
+                                    .push((stmt_assign, stmt_return));
+                            }
+                        }
+                        _ => {}
+                    }
                 }
 
                 self.stack.returns.push(stmt_return);

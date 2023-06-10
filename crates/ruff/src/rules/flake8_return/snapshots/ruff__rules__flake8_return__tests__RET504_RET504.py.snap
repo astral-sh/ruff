@@ -41,4 +41,12 @@ RET504.py:268:12: RET504 Unnecessary assignment to `val` before `return` stateme
     |            ^^^ RET504
     |
 
+RET504.py:320:12: RET504 Unnecessary assignment to `x` before `return` statement
+    |
+318 |     with open("foo.txt", "r") as f:
+319 |         x = f.read()
+320 |     return x
+    |            ^ RET504
+    |
+
 

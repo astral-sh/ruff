@@ -504,7 +504,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
 
 /// RET504
 fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
-    for (stmt_assign, stmt_return) in &stack.assignments {
+    for (stmt_assign, stmt_return) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = stmt_return.value.as_ref() else {
             continue;
