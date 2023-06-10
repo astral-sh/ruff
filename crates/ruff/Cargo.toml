@@ -17,7 +17,7 @@ name = "ruff"
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
 ruff_macros = { path = "../ruff_macros" }
-ruff_newlines = { path = "../ruff_newlines" }
+ruff_python_whitespace = { path = "../ruff_python_whitespace" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }

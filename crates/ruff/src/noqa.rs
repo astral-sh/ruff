@@ -11,8 +11,8 @@ use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_newlines::LineEnding;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_whitespace::LineEnding;
 
 use crate::codes::NoqaCode;
 use crate::registry::{AsRule, Rule, RuleSet};
@@ -514,8 +514,8 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use ruff_diagnostics::Diagnostic;
-    use ruff_newlines::LineEnding;
     use ruff_python_ast::source_code::Locator;
+    use ruff_python_whitespace::LineEnding;
 
     use crate::noqa::{add_noqa_inner, NoqaMapping, NOQA_LINE_REGEX};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;

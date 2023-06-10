@@ -8,7 +8,7 @@ use rustpython_parser::ast::{
     Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
 };
 
-use ruff_newlines::LineEnding;
+use ruff_python_whitespace::LineEnding;
 
 use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
@@ -1459,7 +1459,7 @@ mod tests {
     use rustpython_ast::Suite;
     use rustpython_parser::Parse;
 
-    use ruff_newlines::LineEnding;
+    use ruff_python_whitespace::LineEnding;
 
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;

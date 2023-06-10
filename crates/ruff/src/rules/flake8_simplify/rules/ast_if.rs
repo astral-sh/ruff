@@ -5,12 +5,12 @@ use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, S
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::StrExt;
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
 use ruff_python_semantic::model::SemanticModel;
+use ruff_python_whitespace::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;

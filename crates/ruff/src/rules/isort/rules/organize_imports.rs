@@ -6,12 +6,11 @@ use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::StrExt;
 use ruff_python_ast::helpers::{
     followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::whitespace::leading_space;
+use ruff_python_whitespace::{leading_indentation, UniversalNewlines};
 use ruff_textwrap::indent;
 
 use crate::line_width::LineWidth;
@@ -89,7 +88,7 @@ pub(crate) fn organize_imports(
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
-    let indentation = leading_space(indentation);
+    let indentation = leading_indentation(indentation);
 
     let range = extract_range(&block.imports);
 
