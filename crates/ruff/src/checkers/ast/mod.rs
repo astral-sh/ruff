@@ -3329,13 +3329,7 @@ where
                 }
 
                 if self.enabled(Rule::IsLiteral) {
-                    pyflakes::rules::invalid_literal_comparison(
-                        self,
-                        left,
-                        ops,
-                        comparators,
-                        expr.range(),
-                    );
+                    pyflakes::rules::invalid_literal_comparison(self, left, ops, comparators, expr);
                 }
 
                 if self.enabled(Rule::TypeComparison) {
