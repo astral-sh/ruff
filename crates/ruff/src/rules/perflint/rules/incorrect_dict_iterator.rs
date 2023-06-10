@@ -48,215 +48,172 @@ impl AlwaysAutofixableViolation for IncorrectDictIterator {
     }
 }
 
-fn is_not_ignored_tuple_or_name(expr: &Expr) -> bool {
+fn is_ignored_tuple_or_name(expr: &Expr) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = expr {
-        return id != "_";
+        return id == "_";
     }
-
     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr {
-        for el in elts {
-            if let Expr::Name(ast::ExprName { id, .. }) = el {
-                // If one of the items of the tuple is not ignored, we consider the whole tuple
-                // as unignored
-                if id != "_" {
-                    return true;
-                }
-                continue;
-            }
-            if let Expr::Tuple(_) = el {
-                return is_not_ignored_tuple_or_name(el);
-            }
-        }
+        return elts.iter().all(is_ignored_tuple_or_name);
     }
     false
 }
 
 /// W8102
 pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
-    if let Expr::Call(ast::ExprCall { func, args, .. }) = iter {
-        let Expr::Attribute(ast::ExprAttribute { attr, value, ..  }) = func.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, args, .. }) = iter else {
+        return;
+    };
+
+    let Expr::Attribute(ast::ExprAttribute { attr, value, ..  }) = func.as_ref() else {
             return;
         };
-        if attr != "items" {
-            return;
-        }
-        if !args.is_empty() {
-            return;
-        }
-        if let Expr::Tuple(ast::ExprTuple {
-            elts,
-            range: tup_range,
-            ..
-        }) = target
-        {
-            if elts.len() != 2 {
-                return;
-            }
 
-            match &elts[0] {
-                Expr::Name(ast::ExprName { id, range, .. }) => {
-                    if id == "_" {
-                        let mut diagnostic = Diagnostic::new(
-                            IncorrectDictIterator {
-                                subset: "values".to_string(),
-                            },
-                            *range,
-                        );
-                        if let Expr::Name(ast::ExprName {
-                            range: dict_range, ..
-                        }) = value.as_ref()
-                        {
-                            if checker.patch(diagnostic.kind.rule()) {
-                                let mut fix_val: &str = "";
-                                if let Expr::Name(ast::ExprName { id, .. }) = &elts[1] {
-                                    fix_val = id.as_str();
-                                }
-                                if let Expr::Tuple(ast::ExprTuple {
-                                    range: val_range, ..
-                                }) = &elts[1]
-                                {
-                                    fix_val = checker.locator.slice(*val_range);
-                                }
-                                diagnostic.set_fix(Fix::automatic_edits(
-                                    Edit::range_replacement(
-                                        ".values".to_string(),
-                                        TextRange::new(dict_range.end(), func.range().end()),
-                                    ),
-                                    [Edit::range_replacement(fix_val.to_string(), *tup_range)],
-                                ));
-                            }
-                            checker.diagnostics.push(diagnostic);
-                            return;
+    if attr != "items" {
+        return;
+    }
+    if !args.is_empty() {
+        return;
+    }
+    let Expr::Name(ast::ExprName { range: dict_range, .. }) = value.as_ref() else {
+        return;
+    };
+
+    let method_range = TextRange::new(dict_range.end(), func.range().end());
+
+    let Expr::Tuple(ast::ExprTuple {
+        elts,
+        range: tuple_range,
+        ..
+    }) = target
+    else {
+        return
+    };
+    if elts.len() != 2 {
+        return;
+    }
+    match &elts[0] {
+        Expr::Name(ast::ExprName { id, .. }) => {
+            if id == "_" {
+                let mut diagnostic = Diagnostic::new(
+                    IncorrectDictIterator {
+                        subset: "values".to_string(),
+                    },
+                    method_range,
+                );
+
+                {
+                    if checker.patch(diagnostic.kind.rule()) {
+                        let mut fix_val: &str = "";
+                        if let Expr::Name(ast::ExprName { id, .. }) = &elts[1] {
+                            fix_val = id.as_str();
                         }
-                    }
-                }
-                Expr::Tuple(ast::ExprTuple {
-                    elts: sub_elts,
-                    range,
-                    ..
-                }) => {
-                    if sub_elts
-                        .iter()
-                        .map(is_not_ignored_tuple_or_name)
-                        .all(|x| !x)
-                    {
-                        let mut diagnostic = Diagnostic::new(
-                            IncorrectDictIterator {
-                                subset: "values".to_string(),
-                            },
-                            *range,
-                        );
-                        if let Expr::Name(ast::ExprName {
-                            range: dict_range, ..
-                        }) = value.as_ref()
+                        if let Expr::Tuple(ast::ExprTuple {
+                            range: val_range, ..
+                        }) = &elts[1]
                         {
-                            if checker.patch(diagnostic.kind.rule()) {
-                                let mut fix_val: &str = "";
-                                if let Expr::Name(ast::ExprName { id, .. }) = &elts[1] {
-                                    fix_val = id.as_str();
-                                }
-                                if let Expr::Tuple(ast::ExprTuple {
-                                    range: val_range, ..
-                                }) = &elts[1]
-                                {
-                                    fix_val = checker.locator.slice(*val_range);
-                                }
-                                diagnostic.set_fix(Fix::automatic_edits(
-                                    Edit::range_replacement(
-                                        ".values".to_string(),
-                                        TextRange::new(dict_range.end(), func.range().end()),
-                                    ),
-                                    [Edit::range_replacement(fix_val.to_string(), *tup_range)],
-                                ));
-                            }
-                            checker.diagnostics.push(diagnostic);
-                            return;
+                            fix_val = checker.locator.slice(*val_range);
                         }
+                        diagnostic.set_fix(Fix::automatic_edits(
+                            Edit::range_replacement(".values".to_string(), method_range),
+                            [Edit::range_replacement(fix_val.to_string(), *tuple_range)],
+                        ));
                     }
+                    checker.diagnostics.push(diagnostic);
+                    return;
                 }
-                _ => (),
-            }
-            match &elts[1] {
-                Expr::Name(ast::ExprName { id, range, .. }) => {
-                    if id == "_" {
-                        let mut diagnostic = Diagnostic::new(
-                            IncorrectDictIterator {
-                                subset: "keys".to_string(),
-                            },
-                            *range,
-                        );
-                        if let Expr::Name(ast::ExprName {
-                            range: dict_range, ..
-                        }) = value.as_ref()
-                        {
-                            if checker.patch(diagnostic.kind.rule()) {
-                                let mut fix_val: &str = "";
-                                if let Expr::Name(ast::ExprName { id, .. }) = &elts[0] {
-                                    fix_val = id.as_str();
-                                }
-                                if let Expr::Tuple(ast::ExprTuple {
-                                    range: val_range, ..
-                                }) = &elts[0]
-                                {
-                                    fix_val = checker.locator.slice(*val_range);
-                                }
-                                diagnostic.set_fix(Fix::automatic_edits(
-                                    Edit::range_replacement(
-                                        ".keys".to_string(),
-                                        TextRange::new(dict_range.end(), func.range().end()),
-                                    ),
-                                    [Edit::range_replacement(fix_val.to_string(), *tup_range)],
-                                ));
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                }
-                Expr::Tuple(ast::ExprTuple {
-                    elts: sub_elts,
-                    range,
-                    ..
-                }) => {
-                    if sub_elts
-                        .iter()
-                        .map(is_not_ignored_tuple_or_name)
-                        .all(|x| !x)
-                    {
-                        let mut diagnostic = Diagnostic::new(
-                            IncorrectDictIterator {
-                                subset: "keys".to_string(),
-                            },
-                            *range,
-                        );
-                        if let Expr::Name(ast::ExprName {
-                            range: dict_range, ..
-                        }) = value.as_ref()
-                        {
-                            if checker.patch(diagnostic.kind.rule()) {
-                                let mut fix_val: &str = "";
-                                if let Expr::Name(ast::ExprName { id, .. }) = &elts[0] {
-                                    fix_val = id.as_str();
-                                }
-                                if let Expr::Tuple(ast::ExprTuple {
-                                    range: val_range, ..
-                                }) = &elts[0]
-                                {
-                                    fix_val = checker.locator.slice(*val_range);
-                                }
-                                diagnostic.set_fix(Fix::automatic_edits(
-                                    Edit::range_replacement(
-                                        ".keys".to_string(),
-                                        TextRange::new(dict_range.end(), func.range().end()),
-                                    ),
-                                    [Edit::range_replacement(fix_val.to_string(), *tup_range)],
-                                ));
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                }
-                _ => (),
             }
         }
+        Expr::Tuple(ast::ExprTuple { elts: sub_elts, .. }) => {
+            if sub_elts.iter().all(is_ignored_tuple_or_name) {
+                let mut diagnostic = Diagnostic::new(
+                    IncorrectDictIterator {
+                        subset: "values".to_string(),
+                    },
+                    method_range,
+                );
+                {
+                    if checker.patch(diagnostic.kind.rule()) {
+                        let mut fix_val: &str = "";
+                        if let Expr::Name(ast::ExprName { id, .. }) = &elts[1] {
+                            fix_val = id.as_str();
+                        }
+                        if let Expr::Tuple(ast::ExprTuple {
+                            range: val_range, ..
+                        }) = &elts[1]
+                        {
+                            fix_val = checker.locator.slice(*val_range);
+                        }
+                        diagnostic.set_fix(Fix::automatic_edits(
+                            Edit::range_replacement(".values".to_string(), method_range),
+                            [Edit::range_replacement(fix_val.to_string(), *tuple_range)],
+                        ));
+                    }
+                    checker.diagnostics.push(diagnostic);
+                    return;
+                }
+            }
+        }
+        _ => (),
+    }
+    match &elts[1] {
+        Expr::Name(ast::ExprName { id, .. }) => {
+            if id == "_" {
+                let mut diagnostic = Diagnostic::new(
+                    IncorrectDictIterator {
+                        subset: "keys".to_string(),
+                    },
+                    method_range,
+                );
+                {
+                    if checker.patch(diagnostic.kind.rule()) {
+                        let mut fix_val: &str = "";
+                        if let Expr::Name(ast::ExprName { id, .. }) = &elts[0] {
+                            fix_val = id.as_str();
+                        }
+                        if let Expr::Tuple(ast::ExprTuple {
+                            range: val_range, ..
+                        }) = &elts[0]
+                        {
+                            fix_val = checker.locator.slice(*val_range);
+                        }
+                        diagnostic.set_fix(Fix::automatic_edits(
+                            Edit::range_replacement(".keys".to_string(), method_range),
+                            [Edit::range_replacement(fix_val.to_string(), *tuple_range)],
+                        ));
+                    }
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+        }
+        Expr::Tuple(ast::ExprTuple { elts: sub_elts, .. }) => {
+            if sub_elts.iter().all(is_ignored_tuple_or_name) {
+                let mut diagnostic = Diagnostic::new(
+                    IncorrectDictIterator {
+                        subset: "keys".to_string(),
+                    },
+                    method_range,
+                );
+                {
+                    if checker.patch(diagnostic.kind.rule()) {
+                        let mut fix_val: &str = "";
+                        if let Expr::Name(ast::ExprName { id, .. }) = &elts[0] {
+                            fix_val = id.as_str();
+                        }
+                        if let Expr::Tuple(ast::ExprTuple {
+                            range: val_range, ..
+                        }) = &elts[0]
+                        {
+                            fix_val = checker.locator.slice(*val_range);
+                        }
+                        diagnostic.set_fix(Fix::automatic_edits(
+                            Edit::range_replacement(".keys".to_string(), method_range),
+                            [Edit::range_replacement(fix_val.to_string(), *tuple_range)],
+                        ));
+                    }
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+        }
+        _ => (),
     }
 }
