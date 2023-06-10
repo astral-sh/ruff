@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
-RET504.py:6:12: RET504 Unnecessary variable assignment before `return` statement
+RET504.py:6:12: RET504 Unnecessary assignment to `a` before `return` statement
   |
 4 | def x():
 5 |     a = 1
@@ -9,7 +9,23 @@ RET504.py:6:12: RET504 Unnecessary variable assignment before `return` statement
   |            ^ RET504
   |
 
-RET504.py:250:12: RET504 Unnecessary variable assignment before `return` statement
+RET504.py:23:12: RET504 Unnecessary assignment to `formatted` before `return` statement
+   |
+21 |     # clean up after any blank components
+22 |     formatted = formatted.replace("()", "").replace("  ", " ").strip()
+23 |     return formatted
+   |            ^^^^^^^^^ RET504
+   |
+
+RET504.py:245:12: RET504 Unnecessary assignment to `queryset` before `return` statement
+    |
+243 |     queryset = Model.filter(a=1)
+244 |     queryset = queryset.filter(c=3)
+245 |     return queryset
+    |            ^^^^^^^^ RET504
+    |
+
+RET504.py:250:12: RET504 Unnecessary assignment to `queryset` before `return` statement
     |
 248 | def get_queryset():
 249 |     queryset = Model.filter(a=1)
@@ -17,7 +33,7 @@ RET504.py:250:12: RET504 Unnecessary variable assignment before `return` stateme
     |            ^^^^^^^^ RET504
     |
 
-RET504.py:268:12: RET504 Unnecessary variable assignment before `return` statement
+RET504.py:268:12: RET504 Unnecessary assignment to `val` before `return` statement
     |
 266 |         return val
 267 |     val = 1
