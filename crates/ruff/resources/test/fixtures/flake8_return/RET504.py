@@ -276,20 +276,25 @@ def str_to_bool(val):
 
 # Mixed assignments
 def function_assignment(x):
-    def f(): ...
+    def f():
+        ...
 
     return f
 
 
 def class_assignment(x):
-    class Foo: ...
+    class Foo:
+        ...
 
     return Foo
 
 
 def mixed_function_assignment(x):
     if x:
-        def f(): ...
+
+        def f():
+            ...
+
     else:
         f = 42
 
@@ -298,8 +303,32 @@ def mixed_function_assignment(x):
 
 def mixed_class_assignment(x):
     if x:
-        class Foo: ...
+
+        class Foo:
+            ...
+
     else:
         Foo = 42
 
     return Foo
+
+
+# `with` statements
+def foo():
+    with open("foo.txt", "r") as f:
+        x = f.read()
+    return x
+
+
+def foo():
+    with open("foo.txt", "r") as f:
+        x = f.read()
+        print(x)
+    return x
+
+
+def foo():
+    with open("foo.txt", "r") as f:
+        x = f.read()
+    print(x)
+    return x
