@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::source_code::Locator;
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
 
 use crate::rules::isort::types::TrailingComma;
 
@@ -63,7 +63,7 @@ pub(super) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     //   def f(): pass
     let mut seen_blank = false;
     for line in locator.up_to(stmt.start()).universal_newlines().rev() {
-        let line = line.trim();
+        let line = line.trim_whitespace();
         if seen_blank {
             if line.starts_with('#') {
                 return true;

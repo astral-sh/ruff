@@ -25,6 +25,7 @@ pub(crate) use missing_whitespace_around_operator::{
     MissingWhitespaceAroundBitwiseOrShiftOperator, MissingWhitespaceAroundModuloOperator,
     MissingWhitespaceAroundOperator,
 };
+use ruff_python_whitespace::is_python_whitespace;
 pub(crate) use space_around_operator::{
     space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
     TabAfterOperator, TabBeforeOperator,
@@ -378,7 +379,7 @@ impl Whitespace {
                 len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
                 break;
-            } else if c.is_whitespace() {
+            } else if is_python_whitespace(c) {
                 count += 1;
                 len += c.text_len();
             } else {
@@ -409,7 +410,7 @@ impl Whitespace {
             } else if matches!(c, '\n' | '\r') {
                 // Indent
                 return (Self::None, TextSize::default());
-            } else if c.is_whitespace() {
+            } else if is_python_whitespace(c) {
                 count += 1;
                 len += c.text_len();
             } else {

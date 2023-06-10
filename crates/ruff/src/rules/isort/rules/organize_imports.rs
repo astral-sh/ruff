@@ -10,7 +10,7 @@ use ruff_python_ast::helpers::{
     followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::{leading_indentation, UniversalNewlines};
+use ruff_python_whitespace::{leading_indentation, PythonWhitespace, UniversalNewlines};
 use ruff_textwrap::indent;
 
 use crate::line_width::LineWidth;
@@ -72,7 +72,9 @@ fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
     val1.universal_newlines()
         .zip_longest(val2.universal_newlines())
         .all(|pair| match pair {
-            EitherOrBoth::Both(line1, line2) => line1.trim_start() == line2.trim_start(),
+            EitherOrBoth::Both(line1, line2) => {
+                line1.trim_whitespace_start() == line2.trim_whitespace_start()
+            }
             _ => false,
         })
 }

@@ -4,7 +4,7 @@ use rustpython_parser::ast::Ranged;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_whitespace::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -133,10 +133,9 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
             .locator
             .slice(TextRange::new(docstring.end(), stmt.end()));
 
-        let all_blank_after = after
-            .universal_newlines()
-            .skip(1)
-            .all(|line| line.trim().is_empty() || line.trim_start().starts_with('#'));
+        let all_blank_after = after.universal_newlines().skip(1).all(|line| {
+            line.trim_whitespace().is_empty() || line.trim_whitespace_start().starts_with('#')
+        });
         if all_blank_after {
             return;
         }
