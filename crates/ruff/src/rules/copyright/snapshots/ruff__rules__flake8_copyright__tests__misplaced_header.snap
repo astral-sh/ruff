@@ -1,0 +1,12 @@
+---
+source: crates/ruff/src/rules/flake8_copyright/mod.rs
+---
+misplaced_header.py:1:1: CPY001 Missing copyright notice
+  |
+1 | import os
+  |  CPY001
+2 | 
+3 | # Copyright (c) 2023 ruff
+  |
+
+

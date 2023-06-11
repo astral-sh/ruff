@@ -15,7 +15,7 @@ ignore = [
   "D",     # pydocstyle
   "PL",    # pylint
   "S",     # bandit
-  "CPY80", # flake8-copyright
+  "CPY",   # copyright
   "G",     # flake8-logging
   "T",     # flake8-print
   "FBT",   # flake8-boolean-trap

@@ -80,10 +80,10 @@ pub enum Linter {
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
+    /// Copyright-related rules
+    #[prefix = "CPY"]
+    Copyright,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
-    #[prefix = "CPY80"]
-    Flake8Copyright,
-    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
     #[prefix = "C4"]
     Flake8Comprehensions,
     /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
@@ -270,7 +270,7 @@ impl Rule {
             | Rule::ShebangLeadingWhitespace
             | Rule::TrailingWhitespace
             | Rule::TabIndentation
-            | Rule::HeaderLacksCopyright
+            | Rule::MissingCopyrightNotice
             | Rule::BlankLineWithWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring

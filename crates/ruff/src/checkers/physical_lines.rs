@@ -8,7 +8,7 @@ use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_whitespace::UniversalNewlines;
 
 use crate::registry::Rule;
-use crate::rules::flake8_copyright::rules::copyright_header_absent;
+use crate::rules::copyright::rules::missing_copyright_notice;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
@@ -50,7 +50,7 @@ pub(crate) fn check_physical_lines(
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
-    let enforce_copyright_header = settings.rules.enabled(Rule::HeaderLacksCopyright);
+    let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
 
     let fix_unnecessary_coding_comment = settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace = settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
@@ -174,8 +174,8 @@ pub(crate) fn check_physical_lines(
         }
     }
 
-    if enforce_copyright_header {
-        if let Some(diagnostic) = copyright_header_absent(locator, settings) {
+    if enforce_copyright_notice {
+        if let Some(diagnostic) = missing_copyright_notice(locator, settings) {
             diagnostics.push(diagnostic);
         }
     }
