@@ -11,12 +11,12 @@ too_many_branches_params.py:6:5: PLR0912 Too many branches (2 > 1)
 
 too_many_branches_params.py:15:9: PLR0912 Too many branches (2 > 1)
    |
-15 |         return
-16 | 
-17 |     def i(x):
+13 |         return
+14 | 
+15 |     def i(x):
    |         ^ PLR0912
-18 |         if x:
-19 |             pass
+16 |         if x:
+17 |             pass
    |
 
 

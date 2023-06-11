@@ -4,18 +4,18 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: StmtPass,
-        range: 12..16,
-        source: `pass`,
+        kind: StmtExpr,
+        range: 29..42,
+        source: `print("test")`,
     }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
+        "leading": [
             SourceComment {
                 text: "# Test",
                 position: OwnLine,
                 formatted: false,
             },
         ],
+        "dangling": [],
+        "trailing": [],
     },
 }

@@ -10,8 +10,8 @@ F821_11.py:18:28: F821 Undefined name `os`
 
 F821_11.py:23:14: F821 Undefined name `Baz`
    |
-23 | f(Callable[["Bar"], None])
-24 | f(Callable[["Baz"], None])
+22 | f(Callable[["Bar"], None])
+23 | f(Callable[["Baz"], None])
    |              ^^^ F821
    |
 

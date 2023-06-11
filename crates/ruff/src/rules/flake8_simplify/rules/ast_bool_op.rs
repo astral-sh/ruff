@@ -70,6 +70,28 @@ impl Violation for DuplicateIsinstanceCall {
     }
 }
 
+/// ## What it does
+/// Checks for boolean expressions that contain multiple equality comparisons
+/// to the same value.
+///
+/// ## Why is this bad?
+/// To check if an object is equal to any one of multiple values, it's more
+/// concise to use the `in` operator with a tuple of values.
+///
+/// ## Example
+/// ```python
+/// if foo == x or foo == y:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if foo in (x, y):
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[violation]
 pub struct CompareWithTuple {
     replacement: String,
@@ -88,6 +110,21 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
     }
 }
 
+/// ## What it does
+/// Checks for `and` expressions that include both an expression and its
+/// negation.
+///
+/// ## Why is this bad?
+/// An `and` expression that includes both an expression and its negation will
+/// always evaluate to `False`.
+///
+/// ## Example
+/// ```python
+/// x and not x
+/// ```
+///
+/// ## References
+/// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[violation]
 pub struct ExprAndNotExpr {
     name: String,
@@ -105,6 +142,21 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
     }
 }
 
+/// ## What it does
+/// Checks for `or` expressions that include both an expression and its
+/// negation.
+///
+/// ## Why is this bad?
+/// An `or` expression that includes both an expression and its negation will
+/// always evaluate to `True`.
+///
+/// ## Example
+/// ```python
+/// x and not x
+/// ```
+///
+/// ## References
+/// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[violation]
 pub struct ExprOrNotExpr {
     name: String,

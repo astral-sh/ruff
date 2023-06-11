@@ -1,9 +1,8 @@
 use anyhow::{bail, Result};
 use libcst_native::{
-    Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FormattedString,
-    FormattedStringContent, FormattedStringExpression, FunctionDef, GeneratorExp, If, Import,
-    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, Name,
-    SmallStatement, Statement, Suite, Tuple, With,
+    Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FunctionDef,
+    GeneratorExp, If, Import, ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda,
+    ListComp, Module, Name, SmallStatement, Statement, Suite, Tuple, With,
 };
 
 pub(crate) fn match_module(module_text: &str) -> Result<Module> {
@@ -106,28 +105,6 @@ pub(crate) fn match_attribute<'a, 'b>(
         Ok(attribute)
     } else {
         bail!("Expected Expression::Attribute")
-    }
-}
-
-pub(crate) fn match_formatted_string<'a, 'b>(
-    expression: &'a mut Expression<'b>,
-) -> Result<&'a mut FormattedString<'b>> {
-    if let Expression::FormattedString(formatted_string) = expression {
-        Ok(formatted_string)
-    } else {
-        bail!("Expected Expression::FormattedString")
-    }
-}
-
-pub(crate) fn match_formatted_string_expression<'a, 'b>(
-    formatted_string_content: &'a mut FormattedStringContent<'b>,
-) -> Result<&'a mut FormattedStringExpression<'b>> {
-    if let FormattedStringContent::Expression(formatted_string_expression) =
-        formatted_string_content
-    {
-        Ok(formatted_string_expression)
-    } else {
-        bail!("Expected FormattedStringContent::Expression")
     }
 }
 

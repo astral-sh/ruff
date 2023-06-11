@@ -18,11 +18,11 @@ SIM101.py:1:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
 
 SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   |
-4 |     pass
-5 | 
-6 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
+2 |     pass
+3 | 
+4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-7 |     pass
+5 |     pass
   |
   = help: Merge `isinstance` calls for `a`
 
@@ -37,14 +37,14 @@ SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
 7 7 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 
 SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
-   |
- 7 |     pass
- 8 | 
- 9 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-10 |     pass
-   |
-   = help: Merge `isinstance` calls for `a`
+  |
+5 |     pass
+6 | 
+7 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+8 |     pass
+  |
+  = help: Merge `isinstance` calls for `a`
 
 ℹ Suggested fix
 4 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
@@ -58,11 +58,11 @@ SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
 
 SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
-10 |     pass
-11 | 
-12 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
+ 8 |     pass
+ 9 | 
+10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-13 |     pass
+11 |     pass
    |
    = help: Merge `isinstance` calls for `a`
 
@@ -78,11 +78,11 @@ SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 
 SIM101.py:13:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
-13 |     pass
-14 | 
-15 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
+11 |     pass
+12 | 
+13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-16 |     pass
+14 |     pass
    |
    = help: Merge `isinstance` calls for `a`
 
@@ -98,11 +98,11 @@ SIM101.py:13:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 
 SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
-16 |     pass
-17 | 
-18 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
+14 |     pass
+15 | 
+16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-19 |     pass
+17 |     pass
    |
    = help: Merge `isinstance` calls for `a`
 
@@ -118,11 +118,11 @@ SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 
 SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
    |
-19 |     pass
-20 | 
-21 | if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
+17 |     pass
+18 | 
+19 | if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-22 |     pass
+20 |     pass
    |
    = help: Merge `isinstance` calls
 
@@ -138,11 +138,11 @@ SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge int
 
 SIM101.py:22:4: SIM101 Multiple `isinstance` calls for expression, merge into a single call
    |
-22 |     pass
-23 | 
-24 | if isinstance(a(), int) or isinstance(a(), float):  # SIM101
+20 |     pass
+21 | 
+22 | if isinstance(a(), int) or isinstance(a(), float):  # SIM101
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-25 |     pass
+23 |     pass
    |
    = help: Merge `isinstance` calls
 

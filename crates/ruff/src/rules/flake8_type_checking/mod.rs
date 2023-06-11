@@ -282,6 +282,48 @@ mod tests {
     "#,
         "import_from_type_checking_block"
     )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        from pandas import (
+            DataFrame,  # DataFrame
+            Series,  # Series
+        )
+
+        def f(x: DataFrame, y: Series):
+            pass
+    "#,
+        "multiple_members"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        import os, sys
+
+        def f(x: os, y: sys):
+            pass
+    "#,
+        "multiple_modules_same_type"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        import os, pandas
+
+        def f(x: os, y: pandas):
+            pass
+    "#,
+        "multiple_modules_different_types"
+    )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,

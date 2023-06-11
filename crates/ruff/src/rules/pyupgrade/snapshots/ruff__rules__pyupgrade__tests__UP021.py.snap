@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
-6 | from subprocess import run as anothername
-7 | 
-8 | subprocess.run(["foo"], universal_newlines=True, check=True)
+4 | from subprocess import run as anothername
+5 | 
+6 | subprocess.run(["foo"], universal_newlines=True, check=True)
   |                         ^^^^^^^^^^^^^^^^^^ UP021
-9 | somename.run(["foo"], universal_newlines=True)
+7 | somename.run(["foo"], universal_newlines=True)
   |
   = help: Replace with `text` keyword argument
 
@@ -22,14 +22,14 @@ UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
 9 9 | run(["foo"], universal_newlines=True, check=False)
 
 UP021.py:7:23: UP021 [*] `universal_newlines` is deprecated, use `text`
-   |
- 7 | subprocess.run(["foo"], universal_newlines=True, check=True)
- 8 | somename.run(["foo"], universal_newlines=True)
-   |                       ^^^^^^^^^^^^^^^^^^ UP021
- 9 | 
-10 | run(["foo"], universal_newlines=True, check=False)
-   |
-   = help: Replace with `text` keyword argument
+  |
+6 | subprocess.run(["foo"], universal_newlines=True, check=True)
+7 | somename.run(["foo"], universal_newlines=True)
+  |                       ^^^^^^^^^^^^^^^^^^ UP021
+8 | 
+9 | run(["foo"], universal_newlines=True, check=False)
+  |
+  = help: Replace with `text` keyword argument
 
 ℹ Suggested fix
 4 4 | from subprocess import run as anothername
@@ -43,11 +43,11 @@ UP021.py:7:23: UP021 [*] `universal_newlines` is deprecated, use `text`
 
 UP021.py:9:14: UP021 [*] `universal_newlines` is deprecated, use `text`
    |
- 9 | somename.run(["foo"], universal_newlines=True)
-10 | 
-11 | run(["foo"], universal_newlines=True, check=False)
+ 7 | somename.run(["foo"], universal_newlines=True)
+ 8 | 
+ 9 | run(["foo"], universal_newlines=True, check=False)
    |              ^^^^^^^^^^^^^^^^^^ UP021
-12 | anothername(["foo"], universal_newlines=True)
+10 | anothername(["foo"], universal_newlines=True)
    |
    = help: Replace with `text` keyword argument
 
@@ -63,11 +63,11 @@ UP021.py:9:14: UP021 [*] `universal_newlines` is deprecated, use `text`
 
 UP021.py:10:22: UP021 [*] `universal_newlines` is deprecated, use `text`
    |
-10 | run(["foo"], universal_newlines=True, check=False)
-11 | anothername(["foo"], universal_newlines=True)
+ 9 | run(["foo"], universal_newlines=True, check=False)
+10 | anothername(["foo"], universal_newlines=True)
    |                      ^^^^^^^^^^^^^^^^^^ UP021
-12 | 
-13 | subprocess.run(["foo"], check=True)
+11 | 
+12 | subprocess.run(["foo"], check=True)
    |
    = help: Replace with `text` keyword argument
 

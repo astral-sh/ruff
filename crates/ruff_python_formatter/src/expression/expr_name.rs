@@ -1,3 +1,7 @@
+use crate::comments::Comments;
+use crate::expression::parentheses::{
+    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatContext};
@@ -19,6 +23,17 @@ impl FormatNodeRule<ExprName> for FormatExprName {
         );
 
         write!(f, [source_text_slice(*range, ContainsNewlines::No)])
+    }
+}
+
+impl NeedsParentheses for ExprName {
+    fn needs_parentheses(
+        &self,
+        parenthesize: Parenthesize,
+        source: &str,
+        comments: &Comments,
+    ) -> Parentheses {
+        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
     }
 }
 

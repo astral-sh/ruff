@@ -1,19 +1,38 @@
 use anyhow::Result;
-
 use log::error;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
 
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
+use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for key-existence checks against `dict.keys()` calls.
+///
+/// ## Why is this bad?
+/// When checking for the existence of a key in a given dictionary, using
+/// `key in dict` is more readable and efficient than `key in dict.keys()`,
+/// while having the same semantics.
+///
+/// ## Example
+/// ```python
+/// key in foo.keys()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// key in foo
+/// ```
+///
+/// ## References
+/// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[violation]
 pub struct InDictKeys {
     key: String,
@@ -86,8 +105,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
         range,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             value_content,
             right.range(),
         )));

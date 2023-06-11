@@ -3,80 +3,80 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 global_statement.py:17:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
-17 | def fix_constant(value):
-18 |     """All this is ok, but try not to use `global` ;)"""
-19 |     global CONSTANT  # [global-statement]
+15 | def fix_constant(value):
+16 |     """All this is ok, but try not to use `global` ;)"""
+17 |     global CONSTANT  # [global-statement]
    |     ^^^^^^^^^^^^^^^ PLW0603
-20 |     print(CONSTANT)
-21 |     CONSTANT = value
+18 |     print(CONSTANT)
+19 |     CONSTANT = value
    |
 
 global_statement.py:24:5: PLW0603 Using the global statement to update `sys` is discouraged
    |
-24 | def global_with_import():
-25 |     """Should only warn for global-statement when using `Import` node"""
-26 |     global sys  # [global-statement]
+22 | def global_with_import():
+23 |     """Should only warn for global-statement when using `Import` node"""
+24 |     global sys  # [global-statement]
    |     ^^^^^^^^^^ PLW0603
-27 |     import sys
+25 |     import sys
    |
 
 global_statement.py:30:5: PLW0603 Using the global statement to update `namedtuple` is discouraged
    |
-30 | def global_with_import_from():
-31 |     """Should only warn for global-statement when using `ImportFrom` node"""
-32 |     global namedtuple  # [global-statement]
+28 | def global_with_import_from():
+29 |     """Should only warn for global-statement when using `ImportFrom` node"""
+30 |     global namedtuple  # [global-statement]
    |     ^^^^^^^^^^^^^^^^^ PLW0603
-33 |     from collections import namedtuple
+31 |     from collections import namedtuple
    |
 
 global_statement.py:36:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
-36 | def global_del():
-37 |     """Deleting the global name prevents `global-variable-not-assigned`"""
-38 |     global CONSTANT  # [global-statement]
+34 | def global_del():
+35 |     """Deleting the global name prevents `global-variable-not-assigned`"""
+36 |     global CONSTANT  # [global-statement]
    |     ^^^^^^^^^^^^^^^ PLW0603
-39 |     print(CONSTANT)
-40 |     del CONSTANT
+37 |     print(CONSTANT)
+38 |     del CONSTANT
    |
 
 global_statement.py:43:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
-43 | def global_operator_assign():
-44 |     """Operator assigns should only throw a global statement error"""
-45 |     global CONSTANT  # [global-statement]
+41 | def global_operator_assign():
+42 |     """Operator assigns should only throw a global statement error"""
+43 |     global CONSTANT  # [global-statement]
    |     ^^^^^^^^^^^^^^^ PLW0603
-46 |     print(CONSTANT)
-47 |     CONSTANT += 1
+44 |     print(CONSTANT)
+45 |     CONSTANT += 1
    |
 
 global_statement.py:50:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
-50 | def global_function_assign():
-51 |     """Function assigns should only throw a global statement error"""
-52 |     global CONSTANT  # [global-statement]
+48 | def global_function_assign():
+49 |     """Function assigns should only throw a global statement error"""
+50 |     global CONSTANT  # [global-statement]
    |     ^^^^^^^^^^^^^^^ PLW0603
-53 | 
-54 |     def CONSTANT():
+51 | 
+52 |     def CONSTANT():
    |
 
 global_statement.py:60:5: PLW0603 Using the global statement to update `FUNC` is discouraged
    |
-60 | def override_func():
-61 |     """Overriding a function should only throw a global statement error"""
-62 |     global FUNC  # [global-statement]
+58 | def override_func():
+59 |     """Overriding a function should only throw a global statement error"""
+60 |     global FUNC  # [global-statement]
    |     ^^^^^^^^^^^ PLW0603
-63 | 
-64 |     def FUNC():
+61 | 
+62 |     def FUNC():
    |
 
 global_statement.py:70:5: PLW0603 Using the global statement to update `CLASS` is discouraged
    |
-70 | def override_class():
-71 |     """Overriding a class should only throw a global statement error"""
-72 |     global CLASS  # [global-statement]
+68 | def override_class():
+69 |     """Overriding a class should only throw a global statement error"""
+70 |     global CLASS  # [global-statement]
    |     ^^^^^^^^^^^^ PLW0603
-73 | 
-74 |     class CLASS:
+71 | 
+72 |     class CLASS:
    |
 
 

@@ -3,13 +3,13 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
 RET503.py:20:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-20 |   # if/elif/else
-21 |   def x(y):
-22 |       if not y:
+18 |   # if/elif/else
+19 |   def x(y):
+20 |       if not y:
    |  _____^
-23 | |         return 1
+21 | |         return 1
    | |________________^ RET503
-24 |       # error
+22 |       # error
    |
    = help: Add explicit `return` statement
 
@@ -24,12 +24,12 @@ RET503.py:20:5: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:27:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-27 | def x(y):
-28 |     if not y:
-29 |         print()  # error
+25 | def x(y):
+26 |     if not y:
+27 |         print()  # error
    |         ^^^^^^^ RET503
-30 |     else:
-31 |         return 2
+28 |     else:
+29 |         return 2
    |
    = help: Add explicit `return` statement
 
@@ -44,9 +44,9 @@ RET503.py:27:9: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:36:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-36 |         return 1
-37 | 
-38 |     print()  # error
+34 |         return 1
+35 | 
+36 |     print()  # error
    |     ^^^^^^^ RET503
    |
    = help: Add explicit `return` statement
@@ -62,14 +62,14 @@ RET503.py:36:5: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:41:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-41 |   # for
-42 |   def x(y):
-43 |       for i in range(10):
+39 |   # for
+40 |   def x(y):
+41 |       for i in range(10):
    |  _____^
-44 | |         if i > 10:
-45 | |             return i
+42 | |         if i > 10:
+43 | |             return i
    | |____________________^ RET503
-46 |       # error
+44 |       # error
    |
    = help: Add explicit `return` statement
 
@@ -84,9 +84,9 @@ RET503.py:41:5: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:52:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-52 |             return i
-53 |     else:
-54 |         print()  # error
+50 |             return i
+51 |     else:
+52 |         print()  # error
    |         ^^^^^^^ RET503
    |
    = help: Add explicit `return` statement
@@ -102,9 +102,9 @@ RET503.py:52:9: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:59:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-59 |     if x > 0:
-60 |         return False
-61 |     no_such_function()  # error
+57 |     if x > 0:
+58 |         return False
+59 |     no_such_function()  # error
    |     ^^^^^^^^^^^^^^^^^^ RET503
    |
    = help: Add explicit `return` statement
@@ -120,9 +120,9 @@ RET503.py:59:5: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:66:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-66 |     if x > 0:
-67 |         return False
-68 |     print("", end="")  # error
+64 |     if x > 0:
+65 |         return False
+66 |     print("", end="")  # error
    |     ^^^^^^^^^^^^^^^^^ RET503
    |
    = help: Add explicit `return` statement
@@ -138,13 +138,13 @@ RET503.py:66:5: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:82:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
-82 |   # last line in while loop
-83 |   def x(y):
-84 |       while i > 0:
+80 |   # last line in while loop
+81 |   def x(y):
+82 |       while i > 0:
    |  _____^
-85 | |         if y > 0:
-86 | |             return 1
-87 | |         y += 1
+83 | |         if y > 0:
+84 | |             return 1
+85 | |         y += 1
    | |______________^ RET503
    |
    = help: Add explicit `return` statement
@@ -160,13 +160,13 @@ RET503.py:82:5: RET503 [*] Missing explicit `return` at the end of function able
 
 RET503.py:113:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-113 |   # return value within loop
-114 |   def bar1(x, y, z):
-115 |       for i in x:
+111 |   # return value within loop
+112 |   def bar1(x, y, z):
+113 |       for i in x:
     |  _____^
-116 | |         if i > y:
-117 | |             break
-118 | |         return z
+114 | |         if i > y:
+115 | |             break
+116 | |         return z
     | |________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -182,15 +182,15 @@ RET503.py:113:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:120:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-120 |   def bar3(x, y, z):
-121 |       for i in x:
+119 |   def bar3(x, y, z):
+120 |       for i in x:
     |  _____^
-122 | |         if i > y:
-123 | |             if z:
-124 | |                 break
-125 | |         else:
-126 | |             return z
-127 | |         return None
+121 | |         if i > y:
+122 | |             if z:
+123 | |                 break
+124 | |         else:
+125 | |             return z
+126 | |         return None
     | |___________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -206,12 +206,12 @@ RET503.py:120:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:130:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-130 |   def bar1(x, y, z):
-131 |       for i in x:
+129 |   def bar1(x, y, z):
+130 |       for i in x:
     |  _____^
-132 | |         if i < y:
-133 | |             continue
-134 | |         return z
+131 | |         if i < y:
+132 | |             continue
+133 | |         return z
     | |________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -227,15 +227,15 @@ RET503.py:130:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:137:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-137 |   def bar3(x, y, z):
-138 |       for i in x:
+136 |   def bar3(x, y, z):
+137 |       for i in x:
     |  _____^
-139 | |         if i < y:
-140 | |             if z:
-141 | |                 continue
-142 | |         else:
-143 | |             return z
-144 | |         return None
+138 | |         if i < y:
+139 | |             if z:
+140 | |                 continue
+141 | |         else:
+142 | |             return z
+143 | |         return None
     | |___________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -251,11 +251,11 @@ RET503.py:137:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:274:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-274 |           return False
-275 |   
-276 |       for value in values:
+272 |           return False
+273 |   
+274 |       for value in values:
     |  _____^
-277 | |         print(value)
+275 | |         print(value)
     | |____________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -271,9 +271,9 @@ RET503.py:274:5: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:291:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-291 |             return 1
-292 |         case 1:
-293 |             print()  # error
+289 |             return 1
+290 |         case 1:
+291 |             print()  # error
     |             ^^^^^^^ RET503
     |
     = help: Add explicit `return` statement
@@ -289,11 +289,11 @@ RET503.py:291:13: RET503 [*] Missing explicit `return` at the end of function ab
 
 RET503.py:300:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-300 |   def end_of_statement():
-301 |       def example():
-302 |           if True:
+298 |   def end_of_statement():
+299 |       def example():
+300 |           if True:
     |  _________^
-303 | |             return ""
+301 | |             return ""
     | |_____________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -309,10 +309,10 @@ RET503.py:300:9: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:305:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-305 |       def example():
-306 |           if True:
+304 |       def example():
+305 |           if True:
     |  _________^
-307 | |             return ""
+306 | |             return ""
     | |_____________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -328,10 +328,10 @@ RET503.py:305:9: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:310:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-310 |       def example():
-311 |           if True:
+309 |       def example():
+310 |           if True:
     |  _________^
-312 | |             return ""  # type: ignore
+311 | |             return ""  # type: ignore
     | |_____________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -347,10 +347,10 @@ RET503.py:310:9: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:315:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-315 |       def example():
-316 |           if True:
+314 |       def example():
+315 |           if True:
     |  _________^
-317 | |             return ""  ;
+316 | |             return ""  ;
     | |_____________________^ RET503
     |
     = help: Add explicit `return` statement
@@ -366,12 +366,12 @@ RET503.py:315:9: RET503 [*] Missing explicit `return` at the end of function abl
 
 RET503.py:320:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-320 |       def example():
-321 |           if True:
+319 |       def example():
+320 |           if True:
     |  _________^
-322 | |             return "" \
+321 | |             return "" \
     | |_____________________^ RET503
-323 |                   ;  # type: ignore
+322 |                   ;  # type: ignore
     |
     = help: Add explicit `return` statement
 

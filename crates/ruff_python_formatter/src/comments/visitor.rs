@@ -9,7 +9,7 @@ use ruff_python_ast::source_code::{CommentRanges, Locator};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_ast::whitespace::is_python_whitespace;
+use ruff_python_whitespace::is_python_whitespace;
 use ruff_text_size::TextRange;
 use std::iter::Peekable;
 
@@ -81,18 +81,20 @@ impl<'a> CommentsVisitor<'a> {
         self.preceding_node = None;
         self.parents.push(node);
 
-        // Try to skip the subtree if
-        // * there are no comments
-        // * if the next comment comes after this node (meaning, this nodes subtree contains no comments)
+        if self.can_skip(node_range.end()) {
+            TraversalSignal::Skip
+        } else {
+            TraversalSignal::Traverse
+        }
+    }
+
+    // Try to skip the subtree if
+    // * there are no comments
+    // * if the next comment comes after this node (meaning, this nodes subtree contains no comments)
+    fn can_skip(&mut self, node_end: TextSize) -> bool {
         self.comment_ranges
             .peek()
-            .map_or(TraversalSignal::Skip, |next_comment| {
-                if node.range().contains(next_comment.start()) {
-                    TraversalSignal::Traverse
-                } else {
-                    TraversalSignal::Skip
-                }
-            })
+            .map_or(true, |next_comment| next_comment.start() >= node_end)
     }
 
     fn finish_node<N>(&mut self, node: N)
@@ -151,6 +153,26 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(module);
     }
 
+    fn visit_body(&mut self, body: &'ast [Stmt]) {
+        match body {
+            [] => {
+                // no-op
+            }
+            [only] => self.visit_stmt(only),
+            [first, .., last] => {
+                if self.can_skip(last.end()) {
+                    // Skip traversing the body when there's no comment between the first and last statement.
+                    // It is still necessary to visit the first statement to process all comments between
+                    // the previous node and the first statement.
+                    self.visit_stmt(first);
+                    self.preceding_node = Some(last.into());
+                } else {
+                    walk_body(self, body);
+                }
+            }
+        }
+    }
+
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         if self.start_node(stmt).is_traverse() {
             walk_stmt(self, stmt);
@@ -163,6 +185,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_expr(self, expr);
         }
         self.finish_node(expr);
+    }
+
+    fn visit_decorator(&mut self, decorator: &'ast Decorator) {
+        if self.start_node(decorator).is_traverse() {
+            walk_decorator(self, decorator);
+        }
+        self.finish_node(decorator);
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
@@ -413,12 +442,7 @@ impl<'a> DecoratedComment<'a> {
 
 impl From<DecoratedComment<'_>> for SourceComment {
     fn from(decorated: DecoratedComment) -> Self {
-        Self {
-            slice: decorated.slice,
-            position: decorated.text_position,
-            #[cfg(debug_assertions)]
-            formatted: std::cell::Cell::new(false),
-        }
+        Self::new(decorated.slice, decorated.text_position)
     }
 }
 

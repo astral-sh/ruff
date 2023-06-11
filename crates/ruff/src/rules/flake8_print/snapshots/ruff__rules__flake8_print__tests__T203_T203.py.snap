@@ -3,22 +3,22 @@ source: crates/ruff/src/rules/flake8_print/mod.rs
 ---
 T203.py:3:1: T203 `pprint` found
   |
-3 | from pprint import pprint
-4 | 
-5 | pprint("Hello, world!")  # T203
+1 | from pprint import pprint
+2 | 
+3 | pprint("Hello, world!")  # T203
   | ^^^^^^ T203
-6 | 
-7 | import pprint
+4 | 
+5 | import pprint
   |
 
 T203.py:7:1: T203 `pprint` found
-   |
- 7 | import pprint
- 8 | 
- 9 | pprint.pprint("Hello, world!")  # T203
-   | ^^^^^^^^^^^^^ T203
-10 | 
-11 | pprint.pformat("Hello, world!")
-   |
+  |
+5 | import pprint
+6 | 
+7 | pprint.pprint("Hello, world!")  # T203
+  | ^^^^^^^^^^^^^ T203
+8 | 
+9 | pprint.pformat("Hello, world!")
+  |
 
 

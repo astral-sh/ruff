@@ -3,21 +3,21 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B028.py:8:1: B028 No explicit `stacklevel` keyword argument found
    |
- 8 | """
- 9 | 
-10 | warnings.warn(DeprecationWarning("test"))
+ 6 | """
+ 7 | 
+ 8 | warnings.warn(DeprecationWarning("test"))
    | ^^^^^^^^^^^^^ B028
-11 | warnings.warn(DeprecationWarning("test"), source=None)
-12 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
+ 9 | warnings.warn(DeprecationWarning("test"), source=None)
+10 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
    |
 
 B028.py:9:1: B028 No explicit `stacklevel` keyword argument found
    |
- 9 | warnings.warn(DeprecationWarning("test"))
-10 | warnings.warn(DeprecationWarning("test"), source=None)
+ 8 | warnings.warn(DeprecationWarning("test"))
+ 9 | warnings.warn(DeprecationWarning("test"), source=None)
    | ^^^^^^^^^^^^^ B028
-11 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
-12 | warnings.warn(DeprecationWarning("test"), stacklevel=1)
+10 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
+11 | warnings.warn(DeprecationWarning("test"), stacklevel=1)
    |
 
 

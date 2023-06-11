@@ -3,19 +3,19 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP036_3.py:3:1: UP036 [*] Version block is outdated for minimum Python version
    |
- 3 |   import sys
- 4 |   
- 5 | / if            sys.version_info < (3,0):
- 6 | |     print("py2")
- 7 | |     for item in range(10):
- 8 | |         print(f"PY2-{item}")
- 9 | | else                                :
-10 | |     print("py3")
-11 | |     for item in range(10):
-12 | |         print(f"PY3-{item}")
+ 1 |   import sys
+ 2 |   
+ 3 | / if            sys.version_info < (3,0):
+ 4 | |     print("py2")
+ 5 | |     for item in range(10):
+ 6 | |         print(f"PY2-{item}")
+ 7 | | else                                :
+ 8 | |     print("py3")
+ 9 | |     for item in range(10):
+10 | |         print(f"PY3-{item}")
    | |____________________________^ UP036
-13 |   
-14 |   if False:
+11 |   
+12 |   if False:
    |
    = help: Remove outdated version block
 
@@ -39,16 +39,16 @@ UP036_3.py:3:1: UP036 [*] Version block is outdated for minimum Python version
 
 UP036_3.py:13:5: UP036 [*] Version block is outdated for minimum Python version
    |
-13 |   if False:
-14 |       if            sys.version_info < (3,0):
+12 |   if False:
+13 |       if            sys.version_info < (3,0):
    |  _____^
-15 | |         print("py2")
-16 | |         for item in range(10):
-17 | |             print(f"PY2-{item}")
-18 | |     else                                :
-19 | |         print("py3")
-20 | |         for item in range(10):
-21 | |             print(f"PY3-{item}")
+14 | |         print("py2")
+15 | |         for item in range(10):
+16 | |             print(f"PY2-{item}")
+17 | |     else                                :
+18 | |         print("py3")
+19 | |         for item in range(10):
+20 | |             print(f"PY3-{item}")
    | |________________________________^ UP036
    |
    = help: Remove outdated version block

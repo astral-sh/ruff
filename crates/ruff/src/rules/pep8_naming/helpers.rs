@@ -4,11 +4,11 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 use ruff_python_semantic::model::SemanticModel;
 use ruff_python_stdlib::str::{is_lower, is_upper};
 
-pub(crate) fn is_camelcase(name: &str) -> bool {
+pub(super) fn is_camelcase(name: &str) -> bool {
     !is_lower(name) && !is_upper(name) && !name.contains('_')
 }
 
-pub(crate) fn is_mixed_case(name: &str) -> bool {
+pub(super) fn is_mixed_case(name: &str) -> bool {
     !is_lower(name)
         && name
             .strip_prefix('_')
@@ -18,11 +18,11 @@ pub(crate) fn is_mixed_case(name: &str) -> bool {
             .map_or_else(|| false, char::is_lowercase)
 }
 
-pub(crate) fn is_acronym(name: &str, asname: &str) -> bool {
+pub(super) fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
 }
 
-pub(crate) fn is_named_tuple_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
+pub(super) fn is_named_tuple_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -37,7 +37,7 @@ pub(crate) fn is_named_tuple_assignment(model: &SemanticModel, stmt: &Stmt) -> b
     })
 }
 
-pub(crate) fn is_typed_dict_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
+pub(super) fn is_typed_dict_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -49,7 +49,7 @@ pub(crate) fn is_typed_dict_assignment(model: &SemanticModel, stmt: &Stmt) -> bo
     })
 }
 
-pub(crate) fn is_type_var_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
+pub(super) fn is_type_var_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -62,7 +62,7 @@ pub(crate) fn is_type_var_assignment(model: &SemanticModel, stmt: &Stmt) -> bool
     })
 }
 
-pub(crate) fn is_typed_dict_class(model: &SemanticModel, bases: &[Expr]) -> bool {
+pub(super) fn is_typed_dict_class(model: &SemanticModel, bases: &[Expr]) -> bool {
     bases
         .iter()
         .any(|base| model.match_typing_expr(base, "TypedDict"))

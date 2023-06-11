@@ -10,15 +10,15 @@ fib.py:1:8: F401 `os` imported but unused
   = help: Remove unused import: `os`
 
 fib.py:6:5: F841 Local variable `x` is assigned to but never used
-   |
- 6 | def fibonacci(n):
- 7 |     """Compute the nth number in the Fibonacci sequence."""
- 8 |     x = 1
-   |     ^ F841
- 9 |     if n == 0:
-10 |         return 0
-   |
-   = help: Remove assignment to unused variable `x`
+  |
+4 | def fibonacci(n):
+5 |     """Compute the nth number in the Fibonacci sequence."""
+6 |     x = 1
+  |     ^ F841
+7 |     if n == 0:
+8 |         return 0
+  |
+  = help: Remove assignment to unused variable `x`
 
 undef.py:1:4: F821 Undefined name `a`
   |

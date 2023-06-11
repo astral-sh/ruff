@@ -437,12 +437,13 @@ pub struct Options {
             target-version = "py37"
         "#
     )]
-    /// The Python version to target, e.g., when considering automatic code
-    /// upgrades, like rewriting type annotations.
+    /// The minimum Python version to target, e.g., when considering automatic
+    /// code upgrades, like rewriting type annotations.
     ///
-    /// If omitted, the target version will be inferred from the
-    /// `project.requires-python` field in the relevant `pyproject.toml`
-    /// (e.g., `requires-python = ">=3.8"`), if present.
+    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
+    /// target version will be inferred from its `project.requires-python`
+    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
+    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
     pub target_version: Option<PythonVersion>,
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,

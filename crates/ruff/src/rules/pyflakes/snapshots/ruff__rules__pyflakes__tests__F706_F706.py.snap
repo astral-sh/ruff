@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F706.py:6:5: F706 `return` statement outside of a function/method
   |
-6 | class Foo:
-7 |     return 2
+5 | class Foo:
+6 |     return 2
   |     ^^^^^^^^ F706
   |
 

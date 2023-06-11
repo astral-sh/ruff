@@ -3,98 +3,98 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 ---
 override_default.py:3:1: ICN001 `altair` should be imported as `alt`
   |
-3 | import math  # not checked
-4 | 
-5 | import altair  # unconventional
+1 | import math  # not checked
+2 | 
+3 | import altair  # unconventional
   | ^^^^^^^^^^^^^ ICN001
-6 | import matplotlib.pyplot  # unconventional
-7 | import numpy  # unconventional
+4 | import matplotlib.pyplot  # unconventional
+5 | import numpy  # unconventional
   |
 
 override_default.py:4:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
   |
-4 | import altair  # unconventional
-5 | import matplotlib.pyplot  # unconventional
+3 | import altair  # unconventional
+4 | import matplotlib.pyplot  # unconventional
   | ^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-6 | import numpy  # unconventional
-7 | import pandas  # unconventional
+5 | import numpy  # unconventional
+6 | import pandas  # unconventional
   |
 
 override_default.py:5:1: ICN001 `numpy` should be imported as `nmp`
   |
-5 | import altair  # unconventional
-6 | import matplotlib.pyplot  # unconventional
-7 | import numpy  # unconventional
+3 | import altair  # unconventional
+4 | import matplotlib.pyplot  # unconventional
+5 | import numpy  # unconventional
   | ^^^^^^^^^^^^ ICN001
-8 | import pandas  # unconventional
-9 | import seaborn  # unconventional
+6 | import pandas  # unconventional
+7 | import seaborn  # unconventional
   |
 
 override_default.py:6:1: ICN001 `pandas` should be imported as `pd`
   |
-6 | import matplotlib.pyplot  # unconventional
-7 | import numpy  # unconventional
-8 | import pandas  # unconventional
+4 | import matplotlib.pyplot  # unconventional
+5 | import numpy  # unconventional
+6 | import pandas  # unconventional
   | ^^^^^^^^^^^^^ ICN001
-9 | import seaborn  # unconventional
+7 | import seaborn  # unconventional
   |
 
 override_default.py:7:1: ICN001 `seaborn` should be imported as `sns`
-   |
- 7 | import numpy  # unconventional
- 8 | import pandas  # unconventional
- 9 | import seaborn  # unconventional
-   | ^^^^^^^^^^^^^^ ICN001
-10 | 
-11 | import altair as altr  # unconventional
-   |
+  |
+5 | import numpy  # unconventional
+6 | import pandas  # unconventional
+7 | import seaborn  # unconventional
+  | ^^^^^^^^^^^^^^ ICN001
+8 | 
+9 | import altair as altr  # unconventional
+  |
 
 override_default.py:9:1: ICN001 `altair` should be imported as `alt`
    |
- 9 | import seaborn  # unconventional
-10 | 
-11 | import altair as altr  # unconventional
+ 7 | import seaborn  # unconventional
+ 8 | 
+ 9 | import altair as altr  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^ ICN001
-12 | import matplotlib.pyplot as plot  # unconventional
-13 | import numpy as np  # unconventional
+10 | import matplotlib.pyplot as plot  # unconventional
+11 | import numpy as np  # unconventional
    |
 
 override_default.py:10:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
-10 | import altair as altr  # unconventional
-11 | import matplotlib.pyplot as plot  # unconventional
+ 9 | import altair as altr  # unconventional
+10 | import matplotlib.pyplot as plot  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-12 | import numpy as np  # unconventional
-13 | import pandas as pdas  # unconventional
+11 | import numpy as np  # unconventional
+12 | import pandas as pdas  # unconventional
    |
 
 override_default.py:11:1: ICN001 `numpy` should be imported as `nmp`
    |
-11 | import altair as altr  # unconventional
-12 | import matplotlib.pyplot as plot  # unconventional
-13 | import numpy as np  # unconventional
+ 9 | import altair as altr  # unconventional
+10 | import matplotlib.pyplot as plot  # unconventional
+11 | import numpy as np  # unconventional
    | ^^^^^^^^^^^^^^^^^^ ICN001
-14 | import pandas as pdas  # unconventional
-15 | import seaborn as sbrn  # unconventional
+12 | import pandas as pdas  # unconventional
+13 | import seaborn as sbrn  # unconventional
    |
 
 override_default.py:12:1: ICN001 `pandas` should be imported as `pd`
    |
-12 | import matplotlib.pyplot as plot  # unconventional
-13 | import numpy as np  # unconventional
-14 | import pandas as pdas  # unconventional
+10 | import matplotlib.pyplot as plot  # unconventional
+11 | import numpy as np  # unconventional
+12 | import pandas as pdas  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^ ICN001
-15 | import seaborn as sbrn  # unconventional
+13 | import seaborn as sbrn  # unconventional
    |
 
 override_default.py:13:1: ICN001 `seaborn` should be imported as `sns`
    |
-13 | import numpy as np  # unconventional
-14 | import pandas as pdas  # unconventional
-15 | import seaborn as sbrn  # unconventional
+11 | import numpy as np  # unconventional
+12 | import pandas as pdas  # unconventional
+13 | import seaborn as sbrn  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^ ICN001
-16 | 
-17 | import altair as alt  # conventional
+14 | 
+15 | import altair as alt  # conventional
    |
 
 

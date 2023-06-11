@@ -3,42 +3,42 @@ source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 ---
 FBT.py:12:31: FBT002 Boolean default value in function definition
    |
-12 |     posorkw_nonvalued_boolhint: bool,
-13 |     posorkw_nonvalued_boolstrhint: "bool",
-14 |     posorkw_boolvalued_nohint=True,
+10 |     posorkw_nonvalued_boolhint: bool,
+11 |     posorkw_nonvalued_boolstrhint: "bool",
+12 |     posorkw_boolvalued_nohint=True,
    |                               ^^^^ FBT002
-15 |     posorkw_boolvalued_nonboolhint: int = True,
-16 |     posorkw_boolvalued_boolhint: bool = True,
+13 |     posorkw_boolvalued_nonboolhint: int = True,
+14 |     posorkw_boolvalued_boolhint: bool = True,
    |
 
 FBT.py:13:43: FBT002 Boolean default value in function definition
    |
-13 |     posorkw_nonvalued_boolstrhint: "bool",
-14 |     posorkw_boolvalued_nohint=True,
-15 |     posorkw_boolvalued_nonboolhint: int = True,
+11 |     posorkw_nonvalued_boolstrhint: "bool",
+12 |     posorkw_boolvalued_nohint=True,
+13 |     posorkw_boolvalued_nonboolhint: int = True,
    |                                           ^^^^ FBT002
-16 |     posorkw_boolvalued_boolhint: bool = True,
-17 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+14 |     posorkw_boolvalued_boolhint: bool = True,
+15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
    |
 
 FBT.py:14:41: FBT002 Boolean default value in function definition
    |
-14 |     posorkw_boolvalued_nohint=True,
-15 |     posorkw_boolvalued_nonboolhint: int = True,
-16 |     posorkw_boolvalued_boolhint: bool = True,
+12 |     posorkw_boolvalued_nohint=True,
+13 |     posorkw_boolvalued_nonboolhint: int = True,
+14 |     posorkw_boolvalued_boolhint: bool = True,
    |                                         ^^^^ FBT002
-17 |     posorkw_boolvalued_boolstrhint: "bool" = True,
-18 |     posorkw_nonboolvalued_nohint=1,
+15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+16 |     posorkw_nonboolvalued_nohint=1,
    |
 
 FBT.py:15:46: FBT002 Boolean default value in function definition
    |
-15 |     posorkw_boolvalued_nonboolhint: int = True,
-16 |     posorkw_boolvalued_boolhint: bool = True,
-17 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+13 |     posorkw_boolvalued_nonboolhint: int = True,
+14 |     posorkw_boolvalued_boolhint: bool = True,
+15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
    |                                              ^^^^ FBT002
-18 |     posorkw_nonboolvalued_nohint=1,
-19 |     posorkw_nonboolvalued_nonboolhint: int = 2,
+16 |     posorkw_nonboolvalued_nohint=1,
+17 |     posorkw_nonboolvalued_nonboolhint: int = 2,
    |
 
 

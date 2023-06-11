@@ -19,12 +19,12 @@ SIM210.py:1:5: SIM210 [*] Use `bool(b)` instead of `True if b else False`
 
 SIM210.py:3:5: SIM210 [*] Use `bool(b != c)` instead of `True if b != c else False`
   |
-3 | a = True if b else False  # SIM210
-4 | 
-5 | a = True if b != c else False  # SIM210
+1 | a = True if b else False  # SIM210
+2 | 
+3 | a = True if b != c else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM210
-6 | 
-7 | a = True if b + c else False  # SIM210
+4 | 
+5 | a = True if b + c else False  # SIM210
   |
   = help: Replace with `not b != c
 
@@ -39,12 +39,12 @@ SIM210.py:3:5: SIM210 [*] Use `bool(b != c)` instead of `True if b != c else Fal
 
 SIM210.py:5:5: SIM210 [*] Use `bool(b + c)` instead of `True if b + c else False`
   |
-5 | a = True if b != c else False  # SIM210
-6 | 
-7 | a = True if b + c else False  # SIM210
+3 | a = True if b != c else False  # SIM210
+4 | 
+5 | a = True if b + c else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^^^^^ SIM210
-8 | 
-9 | a = False if b else True  # OK
+6 | 
+7 | a = False if b else True  # OK
   |
   = help: Replace with `not b + c
 
@@ -60,9 +60,9 @@ SIM210.py:5:5: SIM210 [*] Use `bool(b + c)` instead of `True if b + c else False
 
 SIM210.py:15:9: SIM210 Use `bool(b)` instead of `True if b else False`
    |
-15 |         return False
-16 | 
-17 |     a = True if b else False
+13 |         return False
+14 | 
+15 |     a = True if b else False
    |         ^^^^^^^^^^^^^^^^^^^^ SIM210
    |
    = help: Replace with `not b

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Decorator, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -244,10 +244,10 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-pub(crate) fn is_dataclass(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
+pub(crate) fn is_dataclass(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
     decorator_list.iter().any(|decorator| {
         model
-            .resolve_call_path(map_callable(decorator))
+            .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["dataclasses", "dataclass"]
             })

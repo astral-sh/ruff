@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F842.py:2:5: F842 Local variable `name` is annotated but never used
   |
-2 | def f():
-3 |     name: str
+1 | def f():
+2 |     name: str
   |     ^^^^ F842
-4 |     age: int
+3 |     age: int
   |
 
 F842.py:3:5: F842 Local variable `age` is annotated but never used
   |
-3 | def f():
-4 |     name: str
-5 |     age: int
+1 | def f():
+2 |     name: str
+3 |     age: int
   |     ^^^ F842
   |
 

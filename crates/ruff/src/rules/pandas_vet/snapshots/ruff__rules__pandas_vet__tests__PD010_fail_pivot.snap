@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pandas_vet/mod.rs
 ---
 <filename>:4:9: PD010 `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality
   |
-4 | import pandas as pd
-5 | x = pd.DataFrame()
-6 | table = pd.pivot(
+2 | import pandas as pd
+3 | x = pd.DataFrame()
+4 | table = pd.pivot(
   |         ^^^^^^^^ PD010
-7 |     x,
-8 |     index="foo",
+5 |     x,
+6 |     index="foo",
   |
 
 

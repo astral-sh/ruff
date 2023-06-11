@@ -386,7 +386,9 @@ pub struct StringDotFormatExtraNamedArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
+impl Violation for StringDotFormatExtraNamedArguments {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatExtraNamedArguments { missing } = self;
@@ -394,10 +396,10 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
         format!("`.format` call has unused named argument(s): {message}")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let StringDotFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
-        format!("Remove extra named arguments: {message}")
+        Some(format!("Remove extra named arguments: {message}"))
     }
 }
 
@@ -572,13 +574,15 @@ pub(crate) fn percent_format_extra_named_arguments(
     let Expr::Dict(ast::ExprDict { keys, .. }) = &right else {
         return;
     };
+    // If any of the keys are spread, abort.
     if keys.iter().any(Option::is_none) {
-        return; // contains **x splat
+        return;
     }
 
-    let missing: Vec<&str> = keys
+    let missing: Vec<(usize, &str)> = keys
         .iter()
-        .filter_map(|k| match k {
+        .enumerate()
+        .filter_map(|(index, key)| match key {
             Some(Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
@@ -586,7 +590,7 @@ pub(crate) fn percent_format_extra_named_arguments(
                 if summary.keywords.contains(value) {
                     None
                 } else {
-                    Some(value.as_str())
+                    Some((index, value.as_str()))
                 }
             }
             _ => None,
@@ -597,16 +601,19 @@ pub(crate) fn percent_format_extra_named_arguments(
         return;
     }
 
+    let names: Vec<String> = missing
+        .iter()
+        .map(|(_, name)| (*name).to_string())
+        .collect();
     let mut diagnostic = Diagnostic::new(
-        PercentFormatExtraNamedArguments {
-            missing: missing.iter().map(|&arg| arg.to_string()).collect(),
-        },
+        PercentFormatExtraNamedArguments { missing: names },
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
+        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_format_arguments_from_dict(
-                &missing,
+                &indexes,
                 right,
                 checker.locator,
                 checker.stylist,
@@ -740,21 +747,22 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     keywords: &[Keyword],
     location: TextRange,
 ) {
+    // If there are any **kwargs, abort.
     if has_star_star_kwargs(keywords) {
         return;
     }
 
-    let keywords = keywords.iter().filter_map(|k| {
-        let Keyword { arg, .. } = &k;
-        arg.as_ref()
-    });
+    let keywords = keywords
+        .iter()
+        .filter_map(|Keyword { arg, .. }| arg.as_ref());
 
-    let missing: Vec<&str> = keywords
-        .filter_map(|arg| {
-            if summary.keywords.contains(arg.as_ref()) {
+    let missing: Vec<(usize, &str)> = keywords
+        .enumerate()
+        .filter_map(|(index, keyword)| {
+            if summary.keywords.contains(keyword.as_ref()) {
                 None
             } else {
-                Some(arg.as_str())
+                Some((index, keyword.as_str()))
             }
         })
         .collect();
@@ -763,16 +771,19 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
+    let names: Vec<String> = missing
+        .iter()
+        .map(|(_, name)| (*name).to_string())
+        .collect();
     let mut diagnostic = Diagnostic::new(
-        StringDotFormatExtraNamedArguments {
-            missing: missing.iter().map(|&arg| arg.to_string()).collect(),
-        },
+        StringDotFormatExtraNamedArguments { missing: names },
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
+        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_keyword_arguments_from_format_call(
-                &missing,
+                &indexes,
                 location,
                 checker.locator,
                 checker.stylist,

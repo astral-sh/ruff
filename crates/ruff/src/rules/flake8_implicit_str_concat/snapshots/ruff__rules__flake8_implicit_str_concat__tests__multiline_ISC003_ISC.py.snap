@@ -3,42 +3,42 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 ---
 ISC.py:3:5: ISC003 Explicitly concatenated string should be implicitly concatenated
   |
-3 | _ = "a" "b" "c"
-4 | 
-5 | _ = "abc" + "def"
+1 | _ = "a" "b" "c"
+2 | 
+3 | _ = "abc" + "def"
   |     ^^^^^^^^^^^^^ ISC003
-6 | 
-7 | _ = "abc" \
+4 | 
+5 | _ = "abc" \
   |
 
 ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
- 9 |   _ = (
-10 |     "abc" +
+ 8 |   _ = (
+ 9 |     "abc" +
    |  ___^
-11 | |   "def"
+10 | |   "def"
    | |_______^ ISC003
-12 |   )
+11 |   )
    |
 
 ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
-14 |   _ = (
-15 |     f"abc" +
+13 |   _ = (
+14 |     f"abc" +
    |  ___^
-16 | |   "def"
+15 | |   "def"
    | |_______^ ISC003
-17 |   )
+16 |   )
    |
 
 ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
-19 |   _ = (
-20 |     b"abc" +
+18 |   _ = (
+19 |     b"abc" +
    |  ___^
-21 | |   b"def"
+20 | |   b"def"
    | |________^ ISC003
-22 |   )
+21 |   )
    |
 
 

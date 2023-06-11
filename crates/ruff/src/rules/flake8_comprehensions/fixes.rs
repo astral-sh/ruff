@@ -7,15 +7,19 @@ use libcst_native::{
     RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::Ranged;
 
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
-use crate::cst::matchers::{
-    match_arg, match_call, match_call_mut, match_expression, match_generator_exp, match_lambda,
-    match_list_comp, match_name, match_tuple,
+use crate::autofix::codemods::CodegenStylist;
+use crate::{
+    checkers::ast::Checker,
+    cst::matchers::{
+        match_arg, match_call, match_call_mut, match_expression, match_generator_exp, match_lambda,
+        match_list_comp, match_name, match_tuple,
+    },
 };
 
 /// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
@@ -53,11 +57,12 @@ pub(crate) fn fix_unnecessary_generator_list(
 
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
 pub(crate) fn fix_unnecessary_generator_set(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
-    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -79,25 +84,23 @@ pub(crate) fn fix_unnecessary_generator_set(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut content = tree.codegen_stylist(stylist);
+    let content = tree.codegen_stylist(stylist);
 
-    // If the expression is embedded in an f-string, surround it with spaces to avoid
-    // syntax errors.
-    if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
-        content = format!(" {content} ");
-    }
-
-    Ok(Edit::range_replacement(content, expr.range()))
+    Ok(Edit::range_replacement(
+        pad_expression(content, expr.range(), checker),
+        expr.range(),
+    ))
 }
 
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_generator_dict(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
-    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
@@ -126,23 +129,19 @@ pub(crate) fn fix_unnecessary_generator_dict(
         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
-    let mut content = tree.codegen_stylist(stylist);
-
-    // If the expression is embedded in an f-string, surround it with spaces to avoid
-    // syntax errors.
-    if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
-        content = format!(" {content} ");
-    }
-
-    Ok(Edit::range_replacement(content, expr.range()))
+    Ok(Edit::range_replacement(
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
+        expr.range(),
+    ))
 }
 
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
 pub(crate) fn fix_unnecessary_list_comprehension_set(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
     let module_text = locator.slice(expr.range());
@@ -166,7 +165,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     }));
 
     Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -174,10 +173,12 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
 /// (C404) Convert `dict([(i, i) for i in range(3)])` to `{i: i for i in
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_list_comprehension_dict(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
@@ -188,16 +189,15 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     let tuple = match_tuple(&list_comp.elt)?;
 
     let [Element::Simple {
-            value: key,
-            comma: Some(comma),
+            value: key, ..
         }, Element::Simple { value, .. }] = &tuple.elements[..] else { bail!("Expected tuple with two elements"); };
 
     tree = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
         value: Box::new(value.clone()),
         for_in: list_comp.for_in.clone(),
-        whitespace_before_colon: comma.whitespace_before.clone(),
-        whitespace_after_colon: comma.whitespace_after.clone(),
+        whitespace_before_colon: ParenthesizableWhitespace::default(),
+        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
         lbrace: LeftCurlyBrace {
             whitespace_after: call.whitespace_before_args.clone(),
         },
@@ -209,7 +209,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     }));
 
     Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -259,10 +259,12 @@ fn drop_trailing_comma<'a>(
 
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
 pub(crate) fn fix_unnecessary_literal_set(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -294,17 +296,19 @@ pub(crate) fn fix_unnecessary_literal_set(
     }
 
     Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
 
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
 pub(crate) fn fix_unnecessary_literal_dict(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -358,36 +362,50 @@ pub(crate) fn fix_unnecessary_literal_dict(
     }));
 
     Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
 
 /// (C408)
 pub(crate) fn fix_unnecessary_collection_call(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    enum Collection {
+        Tuple,
+        List,
+        Dict,
+    }
+
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
+    let call = match_call(&tree)?;
     let name = match_name(&call.func)?;
+    let collection = match name.value {
+        "tuple" => Collection::Tuple,
+        "list" => Collection::List,
+        "dict" => Collection::Dict,
+        _ => bail!("Expected 'tuple', 'list', or 'dict'"),
+    };
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
     // below.
     let mut arena: Vec<String> = vec![];
 
-    match name.value {
-        "tuple" => {
+    match collection {
+        Collection::Tuple => {
             tree = Expression::Tuple(Box::new(Tuple {
                 elements: vec![],
                 lpar: vec![LeftParen::default()],
                 rpar: vec![RightParen::default()],
             }));
         }
-        "list" => {
+        Collection::List => {
             tree = Expression::List(Box::new(List {
                 elements: vec![],
                 lbracket: LeftSquareBracket::default(),
@@ -396,7 +414,7 @@ pub(crate) fn fix_unnecessary_collection_call(
                 rpar: vec![],
             }));
         }
-        "dict" => {
+        Collection::Dict => {
             if call.args.is_empty() {
                 tree = Expression::Dict(Box::new(Dict {
                     elements: vec![],
@@ -406,16 +424,18 @@ pub(crate) fn fix_unnecessary_collection_call(
                     rpar: vec![],
                 }));
             } else {
+                let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+
                 // Quote each argument.
                 for arg in &call.args {
                     let quoted = format!(
                         "{}{}{}",
-                        stylist.quote(),
+                        quote,
                         arg.keyword
                             .as_ref()
                             .expect("Expected dictionary argument to be kwarg")
                             .value,
-                        stylist.quote(),
+                        quote,
                     );
                     arena.push(quoted);
                 }
@@ -457,15 +477,54 @@ pub(crate) fn fix_unnecessary_collection_call(
                 }));
             }
         }
-        _ => {
-            bail!("Expected function name to be one of: 'tuple', 'list', 'dict'");
-        }
     };
 
     Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
+        if matches!(collection, Collection::Dict) {
+            pad_expression(tree.codegen_stylist(stylist), expr.range(), checker)
+        } else {
+            tree.codegen_stylist(stylist)
+        },
         expr.range(),
     ))
+}
+
+/// Re-formats the given expression for use within a formatted string.
+///
+/// For example, when converting a `dict` call to a dictionary literal within
+/// a formatted string, we might naively generate the following code:
+///
+/// ```python
+/// f"{{'a': 1, 'b': 2}}"
+/// ```
+///
+/// However, this is a syntax error under the f-string grammar. As such,
+/// this method will pad the start and end of an expression as needed to
+/// avoid producing invalid syntax.
+fn pad_expression(content: String, range: TextRange, checker: &Checker) -> String {
+    if !checker.semantic_model().in_f_string() {
+        return content;
+    }
+
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let prefix = checker.locator.up_to(range.start());
+    let left_pad = matches!(prefix.chars().rev().next(), Some('{'));
+
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let suffix = checker.locator.after(range.end());
+    let right_pad = matches!(suffix.chars().next(), Some('}'));
+
+    if left_pad && right_pad {
+        format!(" {content} ")
+    } else if left_pad {
+        format!(" {content}")
+    } else if right_pad {
+        format!("{content} ")
+    } else {
+        content
+    }
 }
 
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`

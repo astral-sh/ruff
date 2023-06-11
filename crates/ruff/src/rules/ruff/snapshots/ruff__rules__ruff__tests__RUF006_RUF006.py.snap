@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/ruff/mod.rs
 ---
 RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_task`
   |
-6 | # Error
-7 | def f():
-8 |     asyncio.create_task(coordinator.ws_connect())  # Error
+4 | # Error
+5 | def f():
+6 |     asyncio.create_task(coordinator.ws_connect())  # Error
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
   |
 
 RUF006.py:11:5: RUF006 Store a reference to the return value of `asyncio.ensure_future`
    |
-11 | # Error
-12 | def f():
-13 |     asyncio.ensure_future(coordinator.ws_connect())  # Error
+ 9 | # Error
+10 | def f():
+11 |     asyncio.ensure_future(coordinator.ws_connect())  # Error
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
    |
 

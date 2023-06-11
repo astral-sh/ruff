@@ -24,15 +24,15 @@ docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quote
 
 docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quotes preferred
    |
-14 |       class params \t not a docstring
-15 |   ''')):
-16 |       '''
+12 |       class params \t not a docstring
+13 |   ''')):
+14 |       '''
    |  _____^
-17 | |     Single quotes multiline class docstring
-18 | |     '''
+15 | |     Single quotes multiline class docstring
+16 | |     '''
    | |_______^ Q002
-19 |   
-20 |       '''
+17 |   
+18 |       '''
    |
    = help: Replace single quotes docstring with double quotes
 
@@ -51,15 +51,15 @@ docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quot
 
 docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quotes preferred
    |
-26 |           definitely not a docstring''',
-27 |           val=l[Cls():3]):
-28 |           '''
+24 |           definitely not a docstring''',
+25 |           val=l[Cls():3]):
+26 |           '''
    |  _________^
-29 | |         Single quotes multiline function docstring
-30 | |         '''
+27 | |         Single quotes multiline function docstring
+28 | |         '''
    | |___________^ Q002
-31 |   
-32 |           some_expression = 'hello world'
+29 |   
+30 |           some_expression = 'hello world'
    |
    = help: Replace single quotes docstring with double quotes
 

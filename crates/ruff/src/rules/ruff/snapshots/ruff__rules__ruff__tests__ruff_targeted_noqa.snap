@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/ruff/mod.rs
 ---
 ruff_targeted_noqa.py:8:5: F841 [*] Local variable `x` is assigned to but never used
   |
-8 | def f():
-9 |     x = 1
+7 | def f():
+8 |     x = 1
   |     ^ F841
   |
   = help: Remove assignment to unused variable `x`

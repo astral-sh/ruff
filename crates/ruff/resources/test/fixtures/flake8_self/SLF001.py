@@ -53,6 +53,9 @@ class Foo(metaclass=BazMeta):
     def __really_private_func(self, arg):
         super().__really_private_func(arg)
 
+    def __eq__(self, other):
+        return self._private_thing == other._private_thing
+
 
 foo = Foo()
 

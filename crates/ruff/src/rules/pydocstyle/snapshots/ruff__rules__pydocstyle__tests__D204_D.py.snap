@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:181:5: D204 [*] 1 blank line required after class docstring
     |
-181 | class TrailingSpace:
-182 | 
-183 |     """TrailingSpace."""
+179 | class TrailingSpace:
+180 | 
+181 |     """TrailingSpace."""
     |     ^^^^^^^^^^^^^^^^^^^^ D204
-184 |     pass
+182 |     pass
     |
     = help: Insert 1 blank line after class docstring
 
@@ -22,10 +22,10 @@ D.py:181:5: D204 [*] 1 blank line required after class docstring
 
 D.py:192:5: D204 [*] 1 blank line required after class docstring
     |
-192 | class LeadingAndTrailingSpaceMissing:
-193 |     """Leading and trailing space missing."""
+191 | class LeadingAndTrailingSpaceMissing:
+192 |     """Leading and trailing space missing."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D204
-194 |     pass
+193 |     pass
     |
     = help: Insert 1 blank line after class docstring
 

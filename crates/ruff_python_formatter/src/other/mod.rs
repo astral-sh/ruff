@@ -2,6 +2,7 @@ pub(crate) mod alias;
 pub(crate) mod arg;
 pub(crate) mod arguments;
 pub(crate) mod comprehension;
+pub(crate) mod decorator;
 pub(crate) mod excepthandler_except_handler;
 pub(crate) mod keyword;
 pub(crate) mod match_case;

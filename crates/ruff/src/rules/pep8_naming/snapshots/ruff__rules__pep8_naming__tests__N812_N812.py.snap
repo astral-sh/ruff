@@ -11,17 +11,17 @@ N812.py:1:8: N812 Lowercase `lowercase` imported as non-lowercase `Lower`
 
 N812.py:2:17: N812 Lowercase `lowercase` imported as non-lowercase `Lowercase`
   |
-2 | import modl.lowercase as Lower
-3 | from mod import lowercase as Lowercase
+1 | import modl.lowercase as Lower
+2 | from mod import lowercase as Lowercase
   |                 ^^^^^^^^^^^^^^^^^^^^^^ N812
-4 | from mod import another_lowercase as AnotherLowercase
+3 | from mod import another_lowercase as AnotherLowercase
   |
 
 N812.py:3:17: N812 Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`
   |
-3 | import modl.lowercase as Lower
-4 | from mod import lowercase as Lowercase
-5 | from mod import another_lowercase as AnotherLowercase
+1 | import modl.lowercase as Lower
+2 | from mod import lowercase as Lowercase
+3 | from mod import another_lowercase as AnotherLowercase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N812
   |
 

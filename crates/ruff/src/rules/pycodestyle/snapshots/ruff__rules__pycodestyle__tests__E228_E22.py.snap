@@ -3,31 +3,31 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E22.py:131:6: E228 Missing whitespace around modulo operator
     |
-131 | c = b^a
-132 | #: E228
-133 | a = b%c
+129 | c = b^a
+130 | #: E228
+131 | a = b%c
     |      ^ E228
-134 | #: E228
-135 | msg = fmt%(errno, errmsg)
+132 | #: E228
+133 | msg = fmt%(errno, errmsg)
     |
 
 E22.py:133:10: E228 Missing whitespace around modulo operator
     |
-133 | a = b%c
-134 | #: E228
-135 | msg = fmt%(errno, errmsg)
+131 | a = b%c
+132 | #: E228
+133 | msg = fmt%(errno, errmsg)
     |          ^ E228
-136 | #: E228
-137 | msg = "Error %d occurred"%errno
+134 | #: E228
+135 | msg = "Error %d occurred"%errno
     |
 
 E22.py:135:26: E228 Missing whitespace around modulo operator
     |
-135 | msg = fmt%(errno, errmsg)
-136 | #: E228
-137 | msg = "Error %d occurred"%errno
+133 | msg = fmt%(errno, errmsg)
+134 | #: E228
+135 | msg = "Error %d occurred"%errno
     |                          ^ E228
-138 | #:
+136 | #:
     |
 
 

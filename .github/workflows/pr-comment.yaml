@@ -2,8 +2,8 @@ name: PR Check Comment
 
 on:
   workflow_run:
-    workflows: [CI, Benchmark]
-    types: [completed]
+    workflows: [ CI, Benchmark ]
+    types: [ completed ]
   workflow_dispatch:
     inputs:
       workflow_run_id:

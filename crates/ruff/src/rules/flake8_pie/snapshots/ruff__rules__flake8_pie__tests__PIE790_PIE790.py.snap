@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 ---
 PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
   |
-4 |     """buzz"""
-5 | 
-6 |     pass
+2 |     """buzz"""
+3 | 
+4 |     pass
   |     ^^^^ PIE790
   |
   = help: Remove unnecessary `pass`
@@ -20,13 +20,13 @@ PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
 7 6 | if foo:
 
 PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
-   |
- 9 | if foo:
-10 |     """foo"""
-11 |     pass
-   |     ^^^^ PIE790
-   |
-   = help: Remove unnecessary `pass`
+  |
+7 | if foo:
+8 |     """foo"""
+9 |     pass
+  |     ^^^^ PIE790
+  |
+  = help: Remove unnecessary `pass`
 
 ℹ Fix
 6  6  | 
@@ -39,9 +39,9 @@ PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
    |
-14 | def multi_statement() -> None:
-15 |     """This is a function."""
-16 |     pass; print("hello")
+12 | def multi_statement() -> None:
+13 |     """This is a function."""
+14 |     pass; print("hello")
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -58,9 +58,9 @@ PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
    |
-21 | else:
-22 |     """bar"""
-23 |     pass
+19 | else:
+20 |     """bar"""
+21 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -76,9 +76,9 @@ PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
    |
-28 | else:
-29 |     """bar"""
-30 |     pass
+26 | else:
+27 |     """bar"""
+28 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -94,9 +94,9 @@ PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
    |
-35 | else:
-36 |     """bar"""
-37 |     pass
+33 | else:
+34 |     """bar"""
+35 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -112,9 +112,9 @@ PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
    |
-42 | else:
-43 |     """bar"""
-44 |     pass
+40 | else:
+41 |     """bar"""
+42 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -130,9 +130,9 @@ PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
    |
-50 |     """
-51 | 
-52 |     pass
+48 |     """
+49 | 
+50 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -148,9 +148,9 @@ PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
    |
-58 |     """
-59 | 
-60 |     pass
+56 |     """
+57 | 
+58 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -166,12 +166,12 @@ PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
    |
-65 |     buzz
-66 |     """
-67 |     pass
+63 |     buzz
+64 |     """
+65 |     pass
    |     ^^^^ PIE790
-68 | except ValueError:
-69 |     pass
+66 | except ValueError:
+67 |     pass
    |
    = help: Remove unnecessary `pass`
 
@@ -186,9 +186,9 @@ PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
    |
-74 | except ValueError:
-75 |     """bar"""
-76 |     pass
+72 | except ValueError:
+73 |     """bar"""
+74 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -204,12 +204,12 @@ PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
    |
-79 | for _ in range(10):
-80 |     """buzz"""
-81 |     pass
+77 | for _ in range(10):
+78 |     """buzz"""
+79 |     pass
    |     ^^^^ PIE790
-82 | 
-83 | async for _ in range(10):
+80 | 
+81 | async for _ in range(10):
    |
    = help: Remove unnecessary `pass`
 
@@ -224,12 +224,12 @@ PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
    |
-83 | async for _ in range(10):
-84 |     """buzz"""
-85 |     pass
+81 | async for _ in range(10):
+82 |     """buzz"""
+83 |     pass
    |     ^^^^ PIE790
-86 | 
-87 | while cond:
+84 | 
+85 | while cond:
    |
    = help: Remove unnecessary `pass`
 
@@ -244,9 +244,9 @@ PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
    |
-87 | while cond:
-88 |     """buzz"""
-89 |     pass
+85 | while cond:
+86 |     """buzz"""
+87 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -262,12 +262,12 @@ PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
    |
-92 | with bar:
-93 |     """buzz"""
-94 |     pass
+90 | with bar:
+91 |     """buzz"""
+92 |     pass
    |     ^^^^ PIE790
-95 | 
-96 | async with bar:
+93 | 
+94 | async with bar:
    |
    = help: Remove unnecessary `pass`
 
@@ -282,9 +282,9 @@ PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
    |
-96 | async with bar:
-97 |     """buzz"""
-98 |     pass
+94 | async with bar:
+95 |     """buzz"""
+96 |     pass
    |     ^^^^ PIE790
    |
    = help: Remove unnecessary `pass`
@@ -300,9 +300,9 @@ PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
 
 PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
     |
-101 | def foo() -> None:
-102 |     """buzz"""
-103 |     pass  # bar
+ 99 | def foo() -> None:
+100 |     """buzz"""
+101 |     pass  # bar
     |     ^^^^ PIE790
     |
     = help: Remove unnecessary `pass`

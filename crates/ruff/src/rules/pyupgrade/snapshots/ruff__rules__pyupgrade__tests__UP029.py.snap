@@ -18,11 +18,11 @@ UP029.py:1:1: UP029 [*] Unnecessary builtin import: `*`
 
 UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
   |
-2 | from builtins import *
-3 | from builtins import ascii, bytes, compile
+1 | from builtins import *
+2 | from builtins import ascii, bytes, compile
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP029
-4 | from builtins import str as _str
-5 | from six.moves import filter, zip, zip_longest
+3 | from builtins import str as _str
+4 | from six.moves import filter, zip, zip_longest
   |
   = help: Remove unnecessary builtin import
 
@@ -36,12 +36,12 @@ UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
 
 UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
   |
-4 | from builtins import ascii, bytes, compile
-5 | from builtins import str as _str
-6 | from six.moves import filter, zip, zip_longest
+2 | from builtins import ascii, bytes, compile
+3 | from builtins import str as _str
+4 | from six.moves import filter, zip, zip_longest
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP029
-7 | from io import open
-8 | import io
+5 | from io import open
+6 | import io
   |
   = help: Remove unnecessary builtin import
 
@@ -57,12 +57,12 @@ UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
 
 UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
   |
-5 | from builtins import str as _str
-6 | from six.moves import filter, zip, zip_longest
-7 | from io import open
+3 | from builtins import str as _str
+4 | from six.moves import filter, zip, zip_longest
+5 | from io import open
   | ^^^^^^^^^^^^^^^^^^^ UP029
-8 | import io
-9 | import six
+6 | import io
+7 | import six
   |
   = help: Remove unnecessary builtin import
 

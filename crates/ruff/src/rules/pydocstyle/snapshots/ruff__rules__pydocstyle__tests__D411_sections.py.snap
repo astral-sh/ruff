@@ -3,21 +3,21 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 sections.py:76:5: D411 [*] Missing blank line before section ("Yields")
    |
-76 |   @expect("D414: Section has no content ('Yields')")
-77 |   def consecutive_sections():  # noqa: D416
-78 |       """Toggle the gizmo.
+74 |   @expect("D414: Section has no content ('Yields')")
+75 |   def consecutive_sections():  # noqa: D416
+76 |       """Toggle the gizmo.
    |  _____^
-79 | | 
-80 | |     Returns
-81 | |     -------
-82 | |     Yields
-83 | |     ------
-84 | | 
-85 | |     Raises
-86 | |     ------
-87 | |     Questions.
-88 | | 
-89 | |     """
+77 | | 
+78 | |     Returns
+79 | |     -------
+80 | |     Yields
+81 | |     ------
+82 | | 
+83 | |     Raises
+84 | |     ------
+85 | |     Questions.
+86 | | 
+87 | |     """
    | |_______^ D411
    |
    = help: Add blank line before "Yields"
@@ -33,17 +33,17 @@ sections.py:76:5: D411 [*] Missing blank line before section ("Yields")
 
 sections.py:131:5: D411 [*] Missing blank line before section ("Returns")
     |
-131 |   @expect("D411: Missing blank line before section ('Returns')")
-132 |   def no_blank_line_before_section():  # noqa: D416
-133 |       """Toggle the gizmo.
+129 |   @expect("D411: Missing blank line before section ('Returns')")
+130 |   def no_blank_line_before_section():  # noqa: D416
+131 |       """Toggle the gizmo.
     |  _____^
-134 | | 
-135 | |     The function's description.
-136 | |     Returns
-137 | |     -------
-138 | |     A value of some sort.
-139 | | 
-140 | |     """
+132 | | 
+133 | |     The function's description.
+134 | |     Returns
+135 | |     -------
+136 | |     A value of some sort.
+137 | | 
+138 | |     """
     | |_______^ D411
     |
     = help: Add blank line before "Returns"
@@ -59,24 +59,24 @@ sections.py:131:5: D411 [*] Missing blank line before section ("Returns")
 
 sections.py:216:5: D411 [*] Missing blank line before section ("Raises")
     |
-216 |   @expect("D407: Missing dashed underline after section ('Raises')")
-217 |   def multiple_sections():  # noqa: D416
-218 |       """Toggle the gizmo.
+214 |   @expect("D407: Missing dashed underline after section ('Raises')")
+215 |   def multiple_sections():  # noqa: D416
+216 |       """Toggle the gizmo.
     |  _____^
-219 | | 
-220 | |     Short summary
-221 | |     -------------
-222 | | 
-223 | |     This is the function's description, which will also specify what it
-224 | |     returns.
-225 | | 
-226 | |     Returns
-227 | |     ------
-228 | |     Many many wonderful things.
-229 | |     Raises:
-230 | |     My attention.
-231 | | 
-232 | |     """
+217 | | 
+218 | |     Short summary
+219 | |     -------------
+220 | | 
+221 | |     This is the function's description, which will also specify what it
+222 | |     returns.
+223 | | 
+224 | |     Returns
+225 | |     ------
+226 | |     Many many wonderful things.
+227 | |     Raises:
+228 | |     My attention.
+229 | | 
+230 | |     """
     | |_______^ D411
     |
     = help: Add blank line before "Raises"

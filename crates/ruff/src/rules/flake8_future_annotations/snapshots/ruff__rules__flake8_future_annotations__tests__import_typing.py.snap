@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_future_annotations/mod.rs
 ---
 import_typing.py:5:13: FA100 Missing `from __future__ import annotations`, but uses `typing.List`
   |
-5 | def main() -> None:
-6 |     a_list: typing.List[str] = []
+4 | def main() -> None:
+5 |     a_list: typing.List[str] = []
   |             ^^^^^^^^^^^ FA100
-7 |     a_list.append("hello")
+6 |     a_list.append("hello")
   |
 
 

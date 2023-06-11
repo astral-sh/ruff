@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F401_10.py:6:16: F401 `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
-   |
- 6 | def module_not_found_error():
- 7 |     try:
- 8 |         import orjson
-   |                ^^^^^^ F401
- 9 | 
-10 |         return True
-   |
-   = help: Remove unused import: `orjson`
+  |
+4 | def module_not_found_error():
+5 |     try:
+6 |         import orjson
+  |                ^^^^^^ F401
+7 | 
+8 |         return True
+  |
+  = help: Remove unused import: `orjson`
 
 F401_10.py:15:16: F401 `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
    |
-15 | def import_error():
-16 |     try:
-17 |         import orjson
+13 | def import_error():
+14 |     try:
+15 |         import orjson
    |                ^^^^^^ F401
-18 | 
-19 |         return True
+16 | 
+17 |         return True
    |
    = help: Remove unused import: `orjson`
 

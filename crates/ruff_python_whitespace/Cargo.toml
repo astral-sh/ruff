@@ -1,5 +1,5 @@
 [package]
-name = "ruff_newlines"
+name = "ruff_python_whitespace"
 version = "0.0.0"
 publish = false
 edition = { workspace = true }

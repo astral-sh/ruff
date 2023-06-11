@@ -21,7 +21,7 @@ Ruff welcomes contributions in the form of Pull Requests.
 For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
-creating an [**issue**](https://github.com/charliermarsh/ruff/issues) outlining your proposed
+creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed
 change. You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with
 the community.
 
@@ -30,7 +30,7 @@ If you're looking for a place to start, we recommend implementing a new lint rul
 pattern-match against the examples in the existing codebase. Many lint rules are inspired by
 existing Python plugins, which can be used as a reference implementation.
 
-As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
+As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/astral-sh/ruff/issues/848)
 plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi)
 for guidance.
 
@@ -258,7 +258,7 @@ python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
 
 You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
 downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
-as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/charliermarsh/ruff/blob/main/scripts/Dockerfile.ecosystem).
+as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/astral-sh/ruff/blob/main/scripts/Dockerfile.ecosystem).
 Note that this check will take a while to run.
 
 ## Benchmarks

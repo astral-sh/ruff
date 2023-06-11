@@ -33,6 +33,7 @@ pub mod flake8_raise;
 pub mod flake8_return;
 pub mod flake8_self;
 pub mod flake8_simplify;
+pub mod flake8_slots;
 pub mod flake8_tidy_imports;
 pub mod flake8_todos;
 pub mod flake8_type_checking;

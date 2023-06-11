@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:400:5: D103 Missing docstring in public function
     |
-400 | @expect("D103: Missing docstring in public function")
-401 | def oneliner_d102(): return
+399 | @expect("D103: Missing docstring in public function")
+400 | def oneliner_d102(): return
     |     ^^^^^^^^^^^^^ D103
     |
 

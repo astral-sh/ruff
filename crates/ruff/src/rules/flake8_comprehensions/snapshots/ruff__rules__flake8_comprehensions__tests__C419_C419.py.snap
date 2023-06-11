@@ -19,11 +19,11 @@ C419.py:1:5: C419 [*] Unnecessary list comprehension.
 
 C419.py:2:5: C419 [*] Unnecessary list comprehension.
   |
-2 | any([x.id for x in bar])
-3 | all([x.id for x in bar])
+1 | any([x.id for x in bar])
+2 | all([x.id for x in bar])
   |     ^^^^^^^^^^^^^^^^^^^ C419
-4 | any(  # first comment
-5 |     [x.id for x in bar],  # second comment
+3 | any(  # first comment
+4 |     [x.id for x in bar],  # second comment
   |
   = help: Remove unnecessary list comprehension
 
@@ -37,12 +37,12 @@ C419.py:2:5: C419 [*] Unnecessary list comprehension.
 
 C419.py:4:5: C419 [*] Unnecessary list comprehension.
   |
-4 | all([x.id for x in bar])
-5 | any(  # first comment
-6 |     [x.id for x in bar],  # second comment
+2 | all([x.id for x in bar])
+3 | any(  # first comment
+4 |     [x.id for x in bar],  # second comment
   |     ^^^^^^^^^^^^^^^^^^^ C419
-7 | )  # third comment
-8 | all(  # first comment
+5 | )  # third comment
+6 | all(  # first comment
   |
   = help: Remove unnecessary list comprehension
 
@@ -57,15 +57,15 @@ C419.py:4:5: C419 [*] Unnecessary list comprehension.
 7 7 |     [x.id for x in bar],  # second comment
 
 C419.py:7:5: C419 [*] Unnecessary list comprehension.
-   |
- 7 | )  # third comment
- 8 | all(  # first comment
- 9 |     [x.id for x in bar],  # second comment
-   |     ^^^^^^^^^^^^^^^^^^^ C419
-10 | )  # third comment
-11 | any({x.id for x in bar})
-   |
-   = help: Remove unnecessary list comprehension
+  |
+5 | )  # third comment
+6 | all(  # first comment
+7 |     [x.id for x in bar],  # second comment
+  |     ^^^^^^^^^^^^^^^^^^^ C419
+8 | )  # third comment
+9 | any({x.id for x in bar})
+  |
+  = help: Remove unnecessary list comprehension
 
 ℹ Suggested fix
 4 4 |     [x.id for x in bar],  # second comment
@@ -79,29 +79,29 @@ C419.py:7:5: C419 [*] Unnecessary list comprehension.
 
 C419.py:9:5: C419 Unnecessary list comprehension.
    |
- 9 |     [x.id for x in bar],  # second comment
-10 | )  # third comment
-11 | any({x.id for x in bar})
+ 7 |     [x.id for x in bar],  # second comment
+ 8 | )  # third comment
+ 9 | any({x.id for x in bar})
    |     ^^^^^^^^^^^^^^^^^^^ C419
-12 | 
-13 | # OK
+10 | 
+11 | # OK
    |
    = help: Remove unnecessary list comprehension
 
 C419.py:24:5: C419 [*] Unnecessary list comprehension.
    |
-24 |   # Special comment handling
-25 |   any(
-26 |       [  # lbracket comment
+22 |   # Special comment handling
+23 |   any(
+24 |       [  # lbracket comment
    |  _____^
-27 | |         # second line comment
-28 | |         i.bit_count()
-29 | |         # random middle comment
-30 | |         for i in range(5)  # rbracket comment
-31 | |     ]  # rpar comment
+25 | |         # second line comment
+26 | |         i.bit_count()
+27 | |         # random middle comment
+28 | |         for i in range(5)  # rbracket comment
+29 | |     ]  # rpar comment
    | |_____^ C419
-32 |       # trailing comment
-33 |   )
+30 |       # trailing comment
+31 |   )
    |
    = help: Remove unnecessary list comprehension
 
@@ -125,15 +125,15 @@ C419.py:24:5: C419 [*] Unnecessary list comprehension.
 
 C419.py:35:5: C419 [*] Unnecessary list comprehension.
    |
-35 |   # Weird case where the function call, opening bracket, and comment are all
-36 |   # on the same line.
-37 |   any([  # lbracket comment
+33 |   # Weird case where the function call, opening bracket, and comment are all
+34 |   # on the same line.
+35 |   any([  # lbracket comment
    |  _____^
-38 | |         # second line comment
-39 | |         i.bit_count() for i in range(5)  # rbracket comment
-40 | |     ]  # rpar comment
+36 | |         # second line comment
+37 | |         i.bit_count() for i in range(5)  # rbracket comment
+38 | |     ]  # rpar comment
    | |_____^ C419
-41 |   )
+39 |   )
    |
    = help: Remove unnecessary list comprehension
 

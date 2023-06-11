@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
+use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
@@ -143,6 +144,19 @@ impl<'a> Binding<'a> {
             _ => self.range,
         }
     }
+
+    /// Returns the range of the binding's parent.
+    pub fn parent_range(&self, semantic_model: &SemanticModel) -> Option<TextRange> {
+        self.source
+            .map(|node_id| semantic_model.stmts[node_id])
+            .and_then(|parent| {
+                if parent.is_import_from_stmt() {
+                    Some(parent.range())
+                } else {
+                    None
+                }
+            })
+    }
 }
 
 bitflags! {
@@ -215,23 +229,7 @@ pub struct StarImportation<'a> {
     pub module: Option<&'a str>,
 }
 
-// Pyflakes defines the following binding hierarchy (via inheritance):
-//   Binding
-//    ExportBinding
-//    Annotation
-//    Argument
-//    Assignment
-//      NamedExprAssignment
-//    Definition
-//      FunctionDefinition
-//      ClassDefinition
-//      Builtin
-//      Importation
-//        SubmoduleImportation
-//        ImportationFrom
-//        FutureImportation
-
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
     pub names: Vec<&'a str>,
@@ -240,7 +238,7 @@ pub struct Export<'a> {
 /// A binding for an `import`, keyed on the name to which the import is bound.
 /// Ex) `import foo` would be keyed on "foo".
 /// Ex) `import foo as bar` would be keyed on "bar".
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Importation<'a> {
     /// The full name of the module being imported.
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
@@ -251,7 +249,7 @@ pub struct Importation<'a> {
 /// A binding for a member imported from a module, keyed on the name to which the member is bound.
 /// Ex) `from foo import bar` would be keyed on "bar".
 /// Ex) `from foo import bar as baz` would be keyed on "baz".
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct FromImportation {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
@@ -261,30 +259,113 @@ pub struct FromImportation {
 
 /// A binding for a submodule imported from a module, keyed on the name of the parent module.
 /// Ex) `import foo.bar` would be keyed on "foo".
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct SubmoduleImportation<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
     pub qualified_name: &'a str,
 }
 
-#[derive(Clone, Debug, is_macro::Is)]
+#[derive(Debug, Clone, is_macro::Is)]
 pub enum BindingKind<'a> {
+    /// A binding for an annotated assignment without a value, like `x` in:
+    /// ```python
+    /// x: int
+    /// ```
     Annotation,
+
+    /// A binding for a function argument, like `x` in:
+    /// ```python
+    /// def foo(x: int):
+    ///     ...
+    /// ```
     Argument,
-    Assignment,
+
+    /// A binding for a named expression assignment, like `x` in:
+    /// ```python
+    /// if (x := 1):
+    ///     ...
+    /// ```
     NamedExprAssignment,
-    Binding,
+
+    /// A binding for a unpacking-based assignment, like `x` in:
+    /// ```python
+    /// x, y = (1, 2)
+    /// ```
+    UnpackedAssignment,
+
+    /// A binding for a "standard" assignment, like `x` in:
+    /// ```python
+    /// x = 1
+    /// ```
+    Assignment,
+
+    /// A binding for a for-loop variable, like `x` in:
+    /// ```python
+    /// for x in range(10):
+    ///     ...
+    /// ```
     LoopVar,
+
+    /// A binding for a global variable, like `x` in:
+    /// ```python
+    /// def foo():
+    ///     global x
+    /// ```
     Global,
+
+    /// A binding for a nonlocal variable, like `x` in:
+    /// ```python
+    /// def foo():
+    ///     nonlocal x
+    /// ```
     Nonlocal,
+
+    /// A binding for a builtin, like `print` or `bool`.
     Builtin,
+
+    /// A binding for a class, like `Foo` in:
+    /// ```python
+    /// class Foo:
+    ///     ...
+    /// ```
     ClassDefinition,
+
+    /// A binding for a function, like `foo` in:
+    /// ```python
+    /// def foo():
+    ///     ...
+    /// ```
     FunctionDefinition,
+
+    /// A binding for an `__all__` export, like `__all__` in:
+    /// ```python
+    /// __all__ = ["foo", "bar"]
+    /// ```
     Export(Export<'a>),
+
+    /// A binding for a `__future__` import, like:
+    /// ```python
+    /// from __future__ import annotations
+    /// ```
     FutureImportation,
+
+    /// A binding for a straight `import`, like `foo` in:
+    /// ```python
+    /// import foo
+    /// ```
     Importation(Importation<'a>),
+
+    /// A binding for a member imported from a module, like `bar` in:
+    /// ```python
+    /// from foo import bar
+    /// ```
     FromImportation(FromImportation),
+
+    /// A binding for a submodule imported from a module, like `bar` in:
+    /// ```python
+    /// import foo.bar
+    /// ```
     SubmoduleImportation(SubmoduleImportation<'a>),
 }
 

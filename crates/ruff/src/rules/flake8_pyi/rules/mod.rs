@@ -11,6 +11,9 @@ pub(crate) use ellipsis_in_non_empty_class_body::{
 pub(crate) use iter_method_return_iterable::{
     iter_method_return_iterable, IterMethodReturnIterable,
 };
+pub(crate) use no_return_argument_annotation::{
+    no_return_argument_annotation, NoReturnArgumentAnnotationInStub,
+};
 pub(crate) use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub(crate) use non_self_return_type::{non_self_return_type, NonSelfReturnType};
 pub(crate) use numeric_literal_too_long::{numeric_literal_too_long, NumericLiteralTooLong};
@@ -47,6 +50,7 @@ mod docstring_in_stubs;
 mod duplicate_union_member;
 mod ellipsis_in_non_empty_class_body;
 mod iter_method_return_iterable;
+mod no_return_argument_annotation;
 mod non_empty_stub_body;
 mod non_self_return_type;
 mod numeric_literal_too_long;

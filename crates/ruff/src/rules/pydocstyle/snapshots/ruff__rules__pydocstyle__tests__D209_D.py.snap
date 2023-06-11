@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
     |
-281 |   @expect('D213: Multi-line docstring summary should start at the second line')
-282 |   def asdfljdf24():
-283 |       """Summary.
+279 |   @expect('D213: Multi-line docstring summary should start at the second line')
+280 |   def asdfljdf24():
+281 |       """Summary.
     |  _____^
-284 | | 
-285 | |     Description."""
+282 | | 
+283 | |     Description."""
     | |___________________^ D209
     |
     = help: Move closing quotes to new line
@@ -26,12 +26,12 @@ D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate
 
 D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
     |
-588 |   @expect('D213: Multi-line docstring summary should start at the second line')
-589 |   def asdfljdjgf24():
-590 |       """Summary.
+586 |   @expect('D213: Multi-line docstring summary should start at the second line')
+587 |   def asdfljdjgf24():
+588 |       """Summary.
     |  _____^
-591 | | 
-592 | |     Description.  """
+589 | | 
+590 | |     Description.  """
     | |_____________________^ D209
     |
     = help: Move closing quotes to new line

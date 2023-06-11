@@ -4,8 +4,8 @@ use ruff_text_size::TextSize;
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_newlines::StrExt;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_whitespace::UniversalNewlines;
 
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::copyright_header_absent;

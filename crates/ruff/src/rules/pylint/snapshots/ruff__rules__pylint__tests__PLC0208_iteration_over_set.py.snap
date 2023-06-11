@@ -3,69 +3,51 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 iteration_over_set.py:3:13: PLC0208 Use a sequence type instead of a `set` when iterating over values
   |
-3 | # Errors
-4 | 
-5 | for item in {"apples", "lemons", "water"}:  # flags in-line set literals
+1 | # Errors
+2 | 
+3 | for item in {"apples", "lemons", "water"}:  # flags in-line set literals
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0208
-6 |     print(f"I like {item}.")
+4 |     print(f"I like {item}.")
   |
 
-iteration_over_set.py:6:13: PLC0208 Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:6:28: PLC0208 Use a sequence type instead of a `set` when iterating over values
   |
-6 |     print(f"I like {item}.")
+4 |     print(f"I like {item}.")
+5 | 
+6 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
+  |                            ^^^^^^^^^ PLC0208
 7 | 
-8 | for item in set(("apples", "lemons", "water")):  # flags set() calls
-  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0208
-9 |     print(f"I like {item}.")
+8 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
   |
 
-iteration_over_set.py:9:15: PLC0208 Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:8:27: PLC0208 Use a sequence type instead of a `set` when iterating over values
    |
- 9 |     print(f"I like {item}.")
-10 | 
-11 | for number in {i for i in range(10)}:  # flags set comprehensions
-   |               ^^^^^^^^^^^^^^^^^^^^^^ PLC0208
-12 |     print(number)
-   |
-
-iteration_over_set.py:12:28: PLC0208 Use a sequence type instead of a `set` when iterating over values
-   |
-12 |     print(number)
-13 | 
-14 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
-   |                            ^^^^^^^^^ PLC0208
-15 | 
-16 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
-   |
-
-iteration_over_set.py:14:27: PLC0208 Use a sequence type instead of a `set` when iterating over values
-   |
-14 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
-15 | 
-16 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
+ 6 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
+ 7 | 
+ 8 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
    |                           ^^^^^^^^^ PLC0208
-17 | 
-18 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+ 9 | 
+10 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
    |
 
-iteration_over_set.py:16:36: PLC0208 Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:10:36: PLC0208 Use a sequence type instead of a `set` when iterating over values
    |
-16 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
-17 | 
-18 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+ 8 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
+ 9 | 
+10 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
    |                                    ^^^^^^^^^ PLC0208
-19 | 
-20 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
+11 | 
+12 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
    |
 
-iteration_over_set.py:18:27: PLC0208 Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:12:27: PLC0208 Use a sequence type instead of a `set` when iterating over values
    |
-18 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
-19 | 
-20 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
+10 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+11 | 
+12 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
    |                           ^^^^^^^^^ PLC0208
-21 | 
-22 | # Non-errors
+13 | 
+14 | # Non-errors
    |
 
 

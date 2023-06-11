@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 sys_exit_alias_8.py:5:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
-5 | def main():
-6 |     exit(0)
+4 | def main():
+5 |     exit(0)
   |     ^^^^ PLR1722
   |
   = help: Replace `exit` with `sys.exit()`
