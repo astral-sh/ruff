@@ -9,6 +9,7 @@ use rayon::prelude::*;
 use ruff::linter::add_noqa_to_path;
 use ruff::resolver::PyprojectConfig;
 use ruff::{packaging, resolver, warn_user_once};
+use ruff_python_stdlib::path::is_project_toml;
 
 use crate::args::Overrides;
 
@@ -46,6 +47,9 @@ pub(crate) fn add_noqa(
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
+            if is_project_toml(path) {
+                return None;
+            }
             let package = path
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
