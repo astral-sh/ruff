@@ -1,118 +1,67 @@
-use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Expr, Identifier, Ranged, Stmt};
+use rustc_hash::FxHashSet;
+use rustpython_parser::ast::{self, Expr, Identifier, Stmt};
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 #[derive(Default)]
 pub(crate) struct Stack<'a> {
-    pub(crate) returns: Vec<(&'a Stmt, Option<&'a Expr>)>,
-    pub(crate) yields: Vec<&'a Expr>,
-    pub(crate) elses: Vec<&'a Stmt>,
-    pub(crate) elifs: Vec<&'a Stmt>,
-    /// The names that are assigned to in the current scope (e.g., anything on the left-hand side of
-    /// an assignment).
-    pub(crate) assigned_names: FxHashSet<&'a str>,
-    /// The names that are declared in the current scope, and the ranges of those declarations
-    /// (e.g., assignments, but also function and class definitions).
-    pub(crate) declarations: FxHashMap<&'a str, Vec<TextSize>>,
-    pub(crate) references: FxHashMap<&'a str, Vec<TextSize>>,
+    /// The `return` statements in the current function.
+    pub(crate) returns: Vec<&'a ast::StmtReturn>,
+    /// The `else` statements in the current function.
+    pub(crate) elses: Vec<&'a ast::StmtIf>,
+    /// The `elif` statements in the current function.
+    pub(crate) elifs: Vec<&'a ast::StmtIf>,
+    /// The non-local variables in the current function.
     pub(crate) non_locals: FxHashSet<&'a str>,
-    pub(crate) loops: Vec<TextRange>,
-    pub(crate) tries: Vec<TextRange>,
+    /// Whether the current function is a generator.
+    pub(crate) is_generator: bool,
+    /// The `assignment`-to-`return` statement pairs in the current function.
+    /// TODO(charlie): Remove the extra [`Stmt`] here, which is necessary to support statement
+    /// removal for the `return` statement.
+    pub(crate) assignment_return: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn, &'a Stmt)>,
 }
 
 #[derive(Default)]
 pub(crate) struct ReturnVisitor<'a> {
+    /// The current stack of nodes.
     pub(crate) stack: Stack<'a>,
+    /// The preceding sibling of the current node.
+    sibling: Option<&'a Stmt>,
+    /// The parent nodes of the current node.
     parents: Vec<&'a Stmt>,
-}
-
-impl<'a> ReturnVisitor<'a> {
-    fn visit_assign_target(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                for elt in elts {
-                    self.visit_assign_target(elt);
-                }
-                return;
-            }
-            Expr::Name(ast::ExprName { id, .. }) => {
-                self.stack.assigned_names.insert(id.as_str());
-                self.stack
-                    .declarations
-                    .entry(id)
-                    .or_insert_with(Vec::new)
-                    .push(expr.start());
-                return;
-            }
-            Expr::Attribute(_) => {
-                // Attribute assignments are often side-effects (e.g., `self.property = value`),
-                // so we conservatively treat them as references to every known
-                // variable.
-                for name in self.stack.declarations.keys() {
-                    self.stack
-                        .references
-                        .entry(name)
-                        .or_insert_with(Vec::new)
-                        .push(expr.start());
-                }
-            }
-            _ => {}
-        }
-        visitor::walk_expr(self, expr);
-    }
 }
 
 impl<'a> Visitor<'a> for ReturnVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Global(ast::StmtGlobal { names, range: _ })
-            | Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                self.stack
-                    .non_locals
-                    .extend(names.iter().map(Identifier::as_str));
-            }
-            Stmt::ClassDef(ast::StmtClassDef {
-                decorator_list,
-                name,
-                ..
-            }) => {
-                // Mark a declaration.
-                self.stack
-                    .declarations
-                    .entry(name.as_str())
-                    .or_insert_with(Vec::new)
-                    .push(stmt.start());
-
-                // Don't recurse into the body, but visit the decorators, etc.
+            Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. }) => {
+                // Visit the decorators, etc.
+                self.sibling = Some(stmt);
+                self.parents.push(stmt);
                 for decorator in decorator_list {
                     visitor::walk_decorator(self, decorator);
                 }
+                self.parents.pop();
+
+                // But don't recurse into the body.
+                return;
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                name,
                 args,
                 decorator_list,
                 returns,
                 ..
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                name,
                 args,
                 decorator_list,
                 returns,
                 ..
             }) => {
-                // Mark a declaration.
-                self.stack
-                    .declarations
-                    .entry(name.as_str())
-                    .or_insert_with(Vec::new)
-                    .push(stmt.start());
-
-                // Don't recurse into the body, but visit the decorators, etc.
+                // Visit the decorators, etc.
+                self.sibling = Some(stmt);
+                self.parents.push(stmt);
                 for decorator in decorator_list {
                     visitor::walk_decorator(self, decorator);
                 }
@@ -120,17 +69,55 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     visitor::walk_expr(self, returns);
                 }
                 visitor::walk_arguments(self, args);
-            }
-            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
-                self.stack
-                    .returns
-                    .push((stmt, value.as_ref().map(|expr| &**expr)));
-
-                self.parents.push(stmt);
-                visitor::walk_stmt(self, stmt);
                 self.parents.pop();
+
+                // But don't recurse into the body.
+                return;
             }
-            Stmt::If(ast::StmtIf { orelse, .. }) => {
+            Stmt::Global(ast::StmtGlobal { names, range: _ })
+            | Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+                self.stack
+                    .non_locals
+                    .extend(names.iter().map(Identifier::as_str));
+            }
+            Stmt::Return(stmt_return) => {
+                // If the `return` statement is preceded by an `assignment` statement, then the
+                // `assignment` statement may be redundant.
+                if let Some(sibling) = self.sibling {
+                    match sibling {
+                        // Example:
+                        // ```python
+                        // def foo():
+                        //     x = 1
+                        //     return x
+                        // ```
+                        Stmt::Assign(stmt_assign) => {
+                            self.stack
+                                .assignment_return
+                                .push((stmt_assign, stmt_return, stmt));
+                        }
+                        // Example:
+                        // ```python
+                        // def foo():
+                        //     with open("foo.txt", "r") as f:
+                        //         x = f.read()
+                        //     return x
+                        // ```
+                        Stmt::With(ast::StmtWith { body, .. })
+                        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+                            if let Some(stmt_assign) = body.last().and_then(Stmt::as_assign_stmt) {
+                                self.stack
+                                    .assignment_return
+                                    .push((stmt_assign, stmt_return, stmt));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                self.stack.returns.push(stmt_return);
+            }
+            Stmt::If(stmt_if) => {
                 let is_elif_arm = self.parents.iter().any(|parent| {
                     if let Stmt::If(ast::StmtIf { orelse, .. }) = parent {
                         orelse.len() == 1 && &orelse[0] == stmt
@@ -141,88 +128,40 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
 
                 if !is_elif_arm {
                     let has_elif =
-                        orelse.len() == 1 && matches!(orelse.first().unwrap(), Stmt::If(_));
-                    let has_else = !orelse.is_empty();
+                        stmt_if.orelse.len() == 1 && stmt_if.orelse.first().unwrap().is_if_stmt();
+                    let has_else = !stmt_if.orelse.is_empty();
 
                     if has_elif {
                         // `stmt` is an `if` block followed by an `elif` clause.
-                        self.stack.elifs.push(stmt);
+                        self.stack.elifs.push(stmt_if);
                     } else if has_else {
                         // `stmt` is an `if` block followed by an `else` clause.
-                        self.stack.elses.push(stmt);
+                        self.stack.elses.push(stmt_if);
                     }
                 }
-
-                self.parents.push(stmt);
-                visitor::walk_stmt(self, stmt);
-                self.parents.pop();
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                    self.stack
-                        .references
-                        .entry(id)
-                        .or_insert_with(Vec::new)
-                        .push(value.start());
-                }
-
-                visitor::walk_expr(self, value);
-
-                if let Some(target) = targets.first() {
-                    // Skip unpacking assignments, like `x, y = my_object`.
-                    if target.is_tuple_expr() && !value.is_tuple_expr() {
-                        return;
-                    }
-
-                    self.visit_assign_target(target);
-                }
-            }
-            Stmt::For(_) | Stmt::AsyncFor(_) | Stmt::While(_) => {
-                self.stack.loops.push(stmt.range());
-
-                self.parents.push(stmt);
-                visitor::walk_stmt(self, stmt);
-                self.parents.pop();
-            }
-            Stmt::Try(_) | Stmt::TryStar(_) => {
-                self.stack.tries.push(stmt.range());
-
-                self.parents.push(stmt);
-                visitor::walk_stmt(self, stmt);
-                self.parents.pop();
-            }
-            _ => {
-                self.parents.push(stmt);
-                visitor::walk_stmt(self, stmt);
-                self.parents.pop();
-            }
+            _ => {}
         }
+
+        self.sibling = Some(stmt);
+        self.parents.push(stmt);
+        visitor::walk_stmt(self, stmt);
+        self.parents.pop();
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Call(_) => {
-                // Arbitrary function calls can have side effects, so we conservatively treat
-                // every function call as a reference to every known variable.
-                for name in self.stack.declarations.keys() {
-                    self.stack
-                        .references
-                        .entry(name)
-                        .or_insert_with(Vec::new)
-                        .push(expr.start());
-                }
-            }
-            Expr::Name(ast::ExprName { id, .. }) => {
-                self.stack
-                    .references
-                    .entry(id)
-                    .or_insert_with(Vec::new)
-                    .push(expr.start());
-            }
             Expr::YieldFrom(_) | Expr::Yield(_) => {
-                self.stack.yields.push(expr);
+                self.stack.is_generator = true;
             }
             _ => visitor::walk_expr(self, expr),
         }
+    }
+
+    fn visit_body(&mut self, body: &'a [Stmt]) {
+        let sibling = self.sibling;
+        self.sibling = None;
+        visitor::walk_body(self, body);
+        self.sibling = sibling;
     }
 }

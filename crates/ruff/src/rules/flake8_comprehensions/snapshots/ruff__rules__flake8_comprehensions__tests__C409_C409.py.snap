@@ -19,11 +19,11 @@ C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
 
 C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
   |
-2 | t1 = tuple([])
-3 | t2 = tuple([1, 2])
+1 | t1 = tuple([])
+2 | t2 = tuple([1, 2])
   |      ^^^^^^^^^^^^^ C409
-4 | t3 = tuple((1, 2))
-5 | t4 = tuple([
+3 | t3 = tuple((1, 2))
+4 | t4 = tuple([
   |
   = help: Rewrite as a `tuple` literal
 
@@ -37,12 +37,12 @@ C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
 
 C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
   |
-3 | t1 = tuple([])
-4 | t2 = tuple([1, 2])
-5 | t3 = tuple((1, 2))
+1 | t1 = tuple([])
+2 | t2 = tuple([1, 2])
+3 | t3 = tuple((1, 2))
   |      ^^^^^^^^^^^^^ C409
-6 | t4 = tuple([
-7 |     1,
+4 | t4 = tuple([
+5 |     1,
   |
   = help: Remove outer `tuple` call
 
@@ -56,19 +56,19 @@ C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
 6 6 |     2
 
 C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
-   |
- 4 |   t2 = tuple([1, 2])
- 5 |   t3 = tuple((1, 2))
- 6 |   t4 = tuple([
-   |  ______^
- 7 | |     1,
- 8 | |     2
- 9 | | ])
-   | |__^ C409
-10 |   t5 = tuple(
-11 |       (1, 2)
-   |
-   = help: Rewrite as a `tuple` literal
+  |
+2 |   t2 = tuple([1, 2])
+3 |   t3 = tuple((1, 2))
+4 |   t4 = tuple([
+  |  ______^
+5 | |     1,
+6 | |     2
+7 | | ])
+  | |__^ C409
+8 |   t5 = tuple(
+9 |       (1, 2)
+  |
+  = help: Rewrite as a `tuple` literal
 
 ℹ Suggested fix
 1 1 | t1 = tuple([])
@@ -86,12 +86,12 @@ C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
 
 C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
    |
- 8 |       2
- 9 |   ])
-10 |   t5 = tuple(
+ 6 |       2
+ 7 |   ])
+ 8 |   t5 = tuple(
    |  ______^
-11 | |     (1, 2)
-12 | | )
+ 9 | |     (1, 2)
+10 | | )
    | |_^ C409
    |
    = help: Remove outer `tuple` call

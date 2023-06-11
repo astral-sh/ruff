@@ -4,7 +4,7 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use ruff_newlines::{find_newline, LineEnding};
+use ruff_python_whitespace::{find_newline, LineEnding};
 use rustpython_literal::escape::Quote as StrQuote;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
@@ -166,7 +166,7 @@ mod tests {
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
 
-    use ruff_newlines::{find_newline, LineEnding};
+    use ruff_python_whitespace::{find_newline, LineEnding};
 
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::{Locator, Stylist};

@@ -17,6 +17,10 @@ pub(crate) use mutable_defaults_in_class_fields::{
 pub(crate) use pairwise_over_zipped::{pairwise_over_zipped, PairwiseOverZipped};
 pub(crate) use unused_noqa::{UnusedCodes, UnusedNOQA};
 
+pub(crate) use static_key_dict_comprehension::{
+    static_key_dict_comprehension, StaticKeyDictComprehension,
+};
+
 mod ambiguous_unicode_character;
 mod asyncio_dangling_task;
 mod collection_literal_concatenation;
@@ -25,6 +29,7 @@ mod explicit_f_string_type_conversion;
 mod invalid_pyproject_toml;
 mod mutable_defaults_in_class_fields;
 mod pairwise_over_zipped;
+mod static_key_dict_comprehension;
 mod unused_noqa;
 
 #[derive(Clone, Copy)]

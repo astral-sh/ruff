@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F50x.py:4:1: F509 `%`-format string has unsupported format character `j`
   |
-4 | '%s %(foo)s' % {'foo': 'bar'}  # F506
-5 | '%(foo)s %s' % {'foo': 'bar'}  # F506
-6 | '%j' % (1,)  # F509
+2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
+3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+4 | '%j' % (1,)  # F509
   | ^^^^^^^^^^^ F509
-7 | '%s %s' % (1,)  # F507
-8 | '%s %s' % (1, 2, 3)  # F507
+5 | '%s %s' % (1,)  # F507
+6 | '%s %s' % (1, 2, 3)  # F507
   |
 
 

@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |
-15 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
-16 | #foo = 'hi'
-17 | b = ''
+13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
+14 | #foo = 'hi'
+15 | b = ''
    |       PLE2510
-18 | 
-19 | b_ok = '\\b'
+16 | 
+17 | b_ok = '\\b'
    |
    = help: Replace with escape sequence
 

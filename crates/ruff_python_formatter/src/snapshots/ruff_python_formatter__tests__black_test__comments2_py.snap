@@ -227,7 +227,7 @@ instruction()#comment with bad spacing
  ]
  
  not_shareables = [
-@@ -37,51 +33,24 @@
+@@ -37,50 +33,51 @@
      # builtin types and objects
      type,
      object,
@@ -249,29 +249,42 @@ instruction()#comment with bad spacing
  
 -if "PYTHON" in os.environ:
 -    add_compiler(compiler_from_env())
--else:
--    # for compiler in compilers.values():
--    # add_compiler(compiler)
++if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++    NOT_IMPLEMENTED_call()
+ else:
+     # for compiler in compilers.values():
+     # add_compiler(compiler)
 -    add_compiler(compilers[(7.0, 32)])
--    # add_compiler(compilers[(7.1, 64)])
-+NOT_YET_IMPLEMENTED_StmtIf
++    NOT_IMPLEMENTED_call()
+     # add_compiler(compilers[(7.1, 64)])
  
  
  # Comment before function.
  def inline_comments_in_brackets_ruin_everything():
--    if typedargslist:
+     if typedargslist:
 -        parameters.children = [children[0], body, children[-1]]  # (1  # )1
 -        parameters.children = [
 -            children[0],
--            body,
++        parameters.NOT_IMPLEMENTED_attr = [
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (1
++            body,
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )1
++        ]
++        parameters.NOT_IMPLEMENTED_attr = [
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+             body,
 -            children[-1],  # type: ignore
--        ]
--    else:
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: ignore
+         ]
+     else:
 -        parameters.children = [
 -            parameters.children[0],  # (2 what if this was actually long
--            body,
++        parameters.NOT_IMPLEMENTED_attr = [
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (2 what if this was actually long
+             body,
 -            parameters.children[-1],  # )2
--        ]
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )2
+         ]
 -        parameters.children = [parameters.what_if_this_was_actually_long.children[0], body, parameters.children[-1]]  # type: ignore
 -    if (
 -        self._proc is not None
@@ -281,13 +294,16 @@ instruction()#comment with bad spacing
 -        # transport hasn't been notified yet?
 -        and self._proc.poll() is None
 -    ):
--        pass
-+    NOT_YET_IMPLEMENTED_StmtIf
-+    NOT_YET_IMPLEMENTED_StmtIf
++        parameters.NOT_IMPLEMENTED_attr = [
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
++            body,
++            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
++        ]  # type: ignore
++    if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+         pass
      # no newline before or after
      short = [
-         # one
-@@ -91,75 +60,26 @@
+@@ -91,75 +88,29 @@
      ]
  
      # no newline after
@@ -339,11 +355,11 @@ instruction()#comment with bad spacing
 +    lcomp2 = [i for i in []]
 +    lcomp3 = [i for i in []]
      while True:
--        if False:
+         if False:
 -            continue
--
--            # and round and round we go
-+        NOT_YET_IMPLEMENTED_StmtIf
++            NOT_YET_IMPLEMENTED_StmtContinue
+ 
+             # and round and round we go
          # and round and round we go
  
      # let's return
@@ -372,7 +388,7 @@ instruction()#comment with bad spacing
  
  
  #######################
-@@ -167,7 +87,7 @@
+@@ -167,7 +118,7 @@
  #######################
  
  
@@ -432,13 +448,41 @@ not_shareables = [
     NOT_IMPLEMENTED_call(),
 ]
 
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    NOT_IMPLEMENTED_call()
+else:
+    # for compiler in compilers.values():
+    # add_compiler(compiler)
+    NOT_IMPLEMENTED_call()
+    # add_compiler(compilers[(7.1, 64)])
 
 
 # Comment before function.
 def inline_comments_in_brackets_ruin_everything():
-    NOT_YET_IMPLEMENTED_StmtIf
-    NOT_YET_IMPLEMENTED_StmtIf
+    if typedargslist:
+        parameters.NOT_IMPLEMENTED_attr = [
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (1
+            body,
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )1
+        ]
+        parameters.NOT_IMPLEMENTED_attr = [
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+            body,
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: ignore
+        ]
+    else:
+        parameters.NOT_IMPLEMENTED_attr = [
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (2 what if this was actually long
+            body,
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )2
+        ]
+        parameters.NOT_IMPLEMENTED_attr = [
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+            body,
+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+        ]  # type: ignore
+    if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+        pass
     # no newline before or after
     short = [
         # one
@@ -457,7 +501,10 @@ def inline_comments_in_brackets_ruin_everything():
     lcomp2 = [i for i in []]
     lcomp3 = [i for i in []]
     while True:
-        NOT_YET_IMPLEMENTED_StmtIf
+        if False:
+            NOT_YET_IMPLEMENTED_StmtContinue
+
+            # and round and round we go
         # and round and round we go
 
     # let's return

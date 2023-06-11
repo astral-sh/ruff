@@ -11,77 +11,77 @@ T100.py:1:1: T100 Trace found: `breakpoint` used
 
 T100.py:3:1: T100 Import for `pdb` found
   |
-3 | breakpoint()
-4 | 
-5 | import pdb
+1 | breakpoint()
+2 | 
+3 | import pdb
   | ^^^^^^^^^^ T100
-6 | import builtins
-7 | from builtins import breakpoint
+4 | import builtins
+5 | from builtins import breakpoint
   |
 
 T100.py:5:1: T100 Import for `builtins.breakpoint` found
   |
-5 | import pdb
-6 | import builtins
-7 | from builtins import breakpoint
+3 | import pdb
+4 | import builtins
+5 | from builtins import breakpoint
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
-8 | from pdb import set_trace as st
-9 | from celery.contrib.rdb import set_trace
+6 | from pdb import set_trace as st
+7 | from celery.contrib.rdb import set_trace
   |
 
 T100.py:6:1: T100 Import for `pdb.set_trace` found
-   |
- 6 | import builtins
- 7 | from builtins import breakpoint
- 8 | from pdb import set_trace as st
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
- 9 | from celery.contrib.rdb import set_trace
-10 | from celery.contrib import rdb
-   |
+  |
+4 | import builtins
+5 | from builtins import breakpoint
+6 | from pdb import set_trace as st
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+7 | from celery.contrib.rdb import set_trace
+8 | from celery.contrib import rdb
+  |
 
 T100.py:7:1: T100 Import for `celery.contrib.rdb.set_trace` found
-   |
- 7 | from builtins import breakpoint
- 8 | from pdb import set_trace as st
- 9 | from celery.contrib.rdb import set_trace
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
-10 | from celery.contrib import rdb
-11 | import celery.contrib.rdb
-   |
+  |
+5 | from builtins import breakpoint
+6 | from pdb import set_trace as st
+7 | from celery.contrib.rdb import set_trace
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+8 | from celery.contrib import rdb
+9 | import celery.contrib.rdb
+  |
 
 T100.py:9:1: T100 Import for `celery.contrib.rdb` found
    |
- 9 | from celery.contrib.rdb import set_trace
-10 | from celery.contrib import rdb
-11 | import celery.contrib.rdb
+ 7 | from celery.contrib.rdb import set_trace
+ 8 | from celery.contrib import rdb
+ 9 | import celery.contrib.rdb
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ T100
-12 | 
-13 | breakpoint()
+10 | 
+11 | breakpoint()
    |
 
 T100.py:11:1: T100 Trace found: `builtins.breakpoint` used
    |
-11 | import celery.contrib.rdb
-12 | 
-13 | breakpoint()
+ 9 | import celery.contrib.rdb
+10 | 
+11 | breakpoint()
    | ^^^^^^^^^^^^ T100
-14 | st()
-15 | set_trace()
+12 | st()
+13 | set_trace()
    |
 
 T100.py:12:1: T100 Trace found: `pdb.set_trace` used
    |
-12 | breakpoint()
-13 | st()
+11 | breakpoint()
+12 | st()
    | ^^^^ T100
-14 | set_trace()
+13 | set_trace()
    |
 
 T100.py:13:1: T100 Trace found: `celery.contrib.rdb.set_trace` used
    |
-13 | breakpoint()
-14 | st()
-15 | set_trace()
+11 | breakpoint()
+12 | st()
+13 | set_trace()
    | ^^^^^^^^^^^ T100
    |
 

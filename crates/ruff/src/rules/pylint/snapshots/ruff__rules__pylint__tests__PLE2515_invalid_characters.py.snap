@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 invalid_characters.py:34:13: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
-34 | nul_ok = '\0'
-35 | 
-36 | zwsp = 'zero​width'
+32 | nul_ok = '\0'
+33 | 
+34 | zwsp = 'zero​width'
    |              PLE2515
-37 | 
-38 | zwsp_ok = '\u200b'
+35 | 
+36 | zwsp_ok = '\u200b'
    |
    = help: Replace with escape sequence
 
@@ -24,11 +24,11 @@ invalid_characters.py:34:13: PLE2515 [*] Invalid unescaped character zero-width-
 
 invalid_characters.py:38:36: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
-38 | zwsp_ok = '\u200b'
-39 | 
-40 | zwsp_after_multibyte_character = "ಫ​"
+36 | zwsp_ok = '\u200b'
+37 | 
+38 | zwsp_after_multibyte_character = "ಫ​"
    |                                     PLE2515
-41 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+39 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |
    = help: Replace with escape sequence
 
@@ -42,8 +42,8 @@ invalid_characters.py:38:36: PLE2515 [*] Invalid unescaped character zero-width-
 
 invalid_characters.py:39:60: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
-39 | zwsp_after_multibyte_character = "ಫ​"
-40 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+38 | zwsp_after_multibyte_character = "ಫ​"
+39 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |                                                         PLE2515
    |
    = help: Replace with escape sequence
@@ -57,8 +57,8 @@ invalid_characters.py:39:60: PLE2515 [*] Invalid unescaped character zero-width-
 
 invalid_characters.py:39:61: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
-39 | zwsp_after_multibyte_character = "ಫ​"
-40 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+38 | zwsp_after_multibyte_character = "ಫ​"
+39 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |                                                         PLE2515
    |
    = help: Replace with escape sequence

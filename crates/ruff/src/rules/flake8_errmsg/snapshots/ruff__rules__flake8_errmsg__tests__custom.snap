@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/flake8_errmsg/mod.rs
 ---
 EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variable first
   |
-5 | def f_a():
-6 |     raise RuntimeError("This is an example exception")
+4 | def f_a():
+5 |     raise RuntimeError("This is an example exception")
   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
   |
   = help: Assign to variable; remove string literal
@@ -22,9 +22,9 @@ EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variabl
 
 EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
    |
-18 | def f_b():
-19 |     example = "example"
-20 |     raise RuntimeError(f"This is an {example} exception")
+16 | def f_b():
+17 |     example = "example"
+18 |     raise RuntimeError(f"This is an {example} exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
    |
    = help: Assign to variable; remove f-string literal
@@ -42,8 +42,8 @@ EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to var
 
 EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
-22 | def f_c():
-23 |     raise RuntimeError("This is an {example} exception".format(example="example"))
+21 | def f_c():
+22 |     raise RuntimeError("This is an {example} exception".format(example="example"))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103
    |
    = help: Assign to variable; remove `.format()` string
@@ -61,18 +61,18 @@ EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 
 EM.py:32:24: EM101 Exception must not use a string literal, assign to variable first
    |
-32 | def f_unfixable():
-33 |     msg = "hello"
-34 |     raise RuntimeError("This is an example exception")
+30 | def f_unfixable():
+31 |     msg = "hello"
+32 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
 
 EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
-39 |         msg = "hello"
-40 | 
-41 |     raise RuntimeError("This is an example exception")
+37 |         msg = "hello"
+38 | 
+39 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
@@ -90,20 +90,20 @@ EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variab
 
 EM.py:46:28: EM101 Exception must not use a string literal, assign to variable first
    |
-46 |     def nested():
-47 |         raise RuntimeError("This is an example exception")
+45 |     def nested():
+46 |         raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
 
 EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variable first
    |
-51 | def f_fix_indentation_check(foo):
-52 |     if foo:
-53 |         raise RuntimeError("This is an example exception")
+49 | def f_fix_indentation_check(foo):
+50 |     if foo:
+51 |         raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
-54 |     else:
-55 |         if foo == "foo":
+52 |     else:
+53 |         if foo == "foo":
    |
    = help: Assign to variable; remove string literal
 
@@ -120,11 +120,11 @@ EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variab
 
 EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to variable first
    |
-54 |     else:
-55 |         if foo == "foo":
-56 |             raise RuntimeError(f"This is an exception: {foo}")
+52 |     else:
+53 |         if foo == "foo":
+54 |             raise RuntimeError(f"This is an exception: {foo}")
    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
-57 |     raise RuntimeError("This is an exception: {}".format(foo))
+55 |     raise RuntimeError("This is an exception: {}".format(foo))
    |
    = help: Assign to variable; remove f-string literal
 
@@ -141,9 +141,9 @@ EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to var
 
 EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
-55 |         if foo == "foo":
-56 |             raise RuntimeError(f"This is an exception: {foo}")
-57 |     raise RuntimeError("This is an exception: {}".format(foo))
+53 |         if foo == "foo":
+54 |             raise RuntimeError(f"This is an exception: {foo}")
+55 |     raise RuntimeError("This is an exception: {}".format(foo))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103
    |
    = help: Assign to variable; remove `.format()` string
@@ -161,18 +161,18 @@ EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 
 EM.py:59:28: EM101 Exception must not use a string literal, assign to variable first
    |
-59 | # Report these, but don't fix them
-60 | if foo: raise RuntimeError("This is an example exception")
+58 | # Report these, but don't fix them
+59 | if foo: raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
-61 | if foo: x = 1; raise RuntimeError("This is an example exception")
+60 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |
    = help: Assign to variable; remove string literal
 
 EM.py:60:35: EM101 Exception must not use a string literal, assign to variable first
    |
-60 | # Report these, but don't fix them
-61 | if foo: raise RuntimeError("This is an example exception")
-62 | if foo: x = 1; raise RuntimeError("This is an example exception")
+58 | # Report these, but don't fix them
+59 | if foo: raise RuntimeError("This is an example exception")
+60 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal

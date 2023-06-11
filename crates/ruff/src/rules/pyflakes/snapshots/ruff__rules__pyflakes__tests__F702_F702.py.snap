@@ -3,26 +3,26 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F702.py:4:5: F702 `continue` not properly in loop
   |
+2 |     continue
+3 | else:
 4 |     continue
-5 | else:
-6 |     continue
   |     ^^^^^^^^ F702
-7 | 
-8 | i = 0
+5 | 
+6 | i = 0
   |
 
 F702.py:16:5: F702 `continue` not properly in loop
    |
-16 |         continue
-17 | 
-18 |     continue
+14 |         continue
+15 | 
+16 |     continue
    |     ^^^^^^^^ F702
    |
 
 F702.py:20:5: F702 `continue` not properly in loop
    |
-20 | class Foo:
-21 |     continue
+19 | class Foo:
+20 |     continue
    |     ^^^^^^^^ F702
    |
 

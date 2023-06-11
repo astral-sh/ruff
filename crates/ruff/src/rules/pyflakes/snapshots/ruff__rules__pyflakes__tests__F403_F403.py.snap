@@ -10,11 +10,11 @@ F403.py:1:1: F403 `from F634 import *` used; unable to detect undefined names
 
 F403.py:2:1: F403 `from F634 import *` used; unable to detect undefined names
   |
-2 | from F634 import *
-3 | from F634 import *  # noqa: E501
+1 | from F634 import *
+2 | from F634 import *  # noqa: E501
   | ^^^^^^^^^^^^^^^^^^ F403
-4 | 
-5 | from F634 import *  # noqa
+3 | 
+4 | from F634 import *  # noqa
   |
 
 

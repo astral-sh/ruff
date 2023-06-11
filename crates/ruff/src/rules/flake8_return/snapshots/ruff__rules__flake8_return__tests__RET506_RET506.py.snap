@@ -3,72 +3,72 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
 RET506.py:8:5: RET506 Unnecessary `elif` after `raise` statement
    |
- 8 |         a = 1
- 9 |         raise Exception(y)
-10 |     elif z:
+ 6 |         a = 1
+ 7 |         raise Exception(y)
+ 8 |     elif z:
    |     ^^^^ RET506
-11 |         b = 2
-12 |         raise Exception(w)
+ 9 |         b = 2
+10 |         raise Exception(w)
    |
 
 RET506.py:23:5: RET506 Unnecessary `elif` after `raise` statement
    |
-23 |             b = 2
-24 |         raise Exception(x)
-25 |     elif z:
+21 |             b = 2
+22 |         raise Exception(x)
+23 |     elif z:
    |     ^^^^ RET506
-26 |         raise Exception(y)
-27 |     else:
+24 |         raise Exception(y)
+25 |     else:
    |
 
 RET506.py:34:5: RET506 Unnecessary `else` after `raise` statement
    |
-34 |         a = 1
-35 |         raise Exception(y)
-36 |     else:
+32 |         a = 1
+33 |         raise Exception(y)
+34 |     else:
    |     ^^^^ RET506
-37 |         b = 2
-38 |         raise Exception(z)
+35 |         b = 2
+36 |         raise Exception(z)
    |
 
 RET506.py:45:9: RET506 Unnecessary `else` after `raise` statement
    |
-45 |             b = 2
-46 |             raise Exception(y)
-47 |         else:
+43 |             b = 2
+44 |             raise Exception(y)
+45 |         else:
    |         ^^^^ RET506
-48 |             c = 3
-49 |             raise Exception(x)
+46 |             c = 3
+47 |             raise Exception(x)
    |
 
 RET506.py:60:5: RET506 Unnecessary `else` after `raise` statement
    |
-60 |             b = 2
-61 |         raise Exception(x)
-62 |     else:
+58 |             b = 2
+59 |         raise Exception(x)
+60 |     else:
    |     ^^^^ RET506
-63 |         c = 3
-64 |     raise Exception(y)
+61 |         c = 3
+62 |     raise Exception(y)
    |
 
 RET506.py:70:9: RET506 Unnecessary `else` after `raise` statement
    |
-70 |             a = 4
-71 |             raise Exception(x)
-72 |         else:
+68 |             a = 4
+69 |             raise Exception(x)
+70 |         else:
    |         ^^^^ RET506
-73 |             b = 2
-74 |     else:
+71 |             b = 2
+72 |     else:
    |
 
 RET506.py:80:5: RET506 Unnecessary `else` after `raise` statement
    |
-80 |     if x:  # [no-else-raise]
-81 |         raise Exception(True)
-82 |     else:
+78 |     if x:  # [no-else-raise]
+79 |         raise Exception(True)
+80 |     else:
    |     ^^^^ RET506
-83 |         try:
-84 |             raise Exception(False)
+81 |         try:
+82 |             raise Exception(False)
    |
 
 

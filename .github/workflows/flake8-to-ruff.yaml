@@ -66,7 +66,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        target: [x64, x86]
+        target: [ x64, x86 ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64, i686]
+        target: [ x86_64, i686 ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [aarch64, armv7, s390x, ppc64le, ppc64]
+        target: [ aarch64, armv7, s390x, ppc64le, ppc64 ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4

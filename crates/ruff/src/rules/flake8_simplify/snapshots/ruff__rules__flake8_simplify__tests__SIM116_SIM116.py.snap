@@ -3,107 +3,107 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
 SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
- 5 |   # SIM116
- 6 | / if a == "foo":
- 7 | |     return "bar"
- 8 | | elif a == "bar":
- 9 | |     return "baz"
-10 | | elif a == "boo":
-11 | |     return "ooh"
-12 | | else:
-13 | |     return 42
+ 4 |   # SIM116
+ 5 | / if a == "foo":
+ 6 | |     return "bar"
+ 7 | | elif a == "bar":
+ 8 | |     return "baz"
+ 9 | | elif a == "boo":
+10 | |     return "ooh"
+11 | | else:
+12 | |     return 42
    | |_____________^ SIM116
-14 |   
-15 |   # SIM116
+13 |   
+14 |   # SIM116
    |
 
 SIM116.py:15:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
-15 |   # SIM116
-16 | / if a == 1:
-17 | |     return (1, 2, 3)
-18 | | elif a == 2:
-19 | |     return (4, 5, 6)
-20 | | elif a == 3:
-21 | |     return (7, 8, 9)
-22 | | else:
-23 | |     return (10, 11, 12)
+14 |   # SIM116
+15 | / if a == 1:
+16 | |     return (1, 2, 3)
+17 | | elif a == 2:
+18 | |     return (4, 5, 6)
+19 | | elif a == 3:
+20 | |     return (7, 8, 9)
+21 | | else:
+22 | |     return (10, 11, 12)
    | |_______________________^ SIM116
-24 |   
-25 |   # SIM116
+23 |   
+24 |   # SIM116
    |
 
 SIM116.py:25:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
-25 |   # SIM116
-26 | / if a == 1:
-27 | |     return (1, 2, 3)
-28 | | elif a == 2:
-29 | |     return (4, 5, 6)
-30 | | elif a == 3:
-31 | |     return (7, 8, 9)
+24 |   # SIM116
+25 | / if a == 1:
+26 | |     return (1, 2, 3)
+27 | | elif a == 2:
+28 | |     return (4, 5, 6)
+29 | | elif a == 3:
+30 | |     return (7, 8, 9)
    | |____________________^ SIM116
-32 |   
-33 |   # SIM116
+31 |   
+32 |   # SIM116
    |
 
 SIM116.py:33:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
-33 |   # SIM116
-34 | / if a == "hello 'sir'":
-35 | |     return (1, 2, 3)
-36 | | elif a == 'goodbye "mam"':
-37 | |     return (4, 5, 6)
-38 | | elif a == """Fairwell 'mister'""":
-39 | |     return (7, 8, 9)
-40 | | else:
-41 | |     return (10, 11, 12)
+32 |   # SIM116
+33 | / if a == "hello 'sir'":
+34 | |     return (1, 2, 3)
+35 | | elif a == 'goodbye "mam"':
+36 | |     return (4, 5, 6)
+37 | | elif a == """Fairwell 'mister'""":
+38 | |     return (7, 8, 9)
+39 | | else:
+40 | |     return (10, 11, 12)
    | |_______________________^ SIM116
-42 |   
-43 |   # SIM116
+41 |   
+42 |   # SIM116
    |
 
 SIM116.py:43:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
-43 |   # SIM116
-44 | / if a == b"one":
-45 | |     return 1
-46 | | elif a == b"two":
-47 | |     return 2
-48 | | elif a == b"three":
-49 | |     return 3
+42 |   # SIM116
+43 | / if a == b"one":
+44 | |     return 1
+45 | | elif a == b"two":
+46 | |     return 2
+47 | | elif a == b"three":
+48 | |     return 3
    | |____________^ SIM116
-50 |   
-51 |   # SIM116
+49 |   
+50 |   # SIM116
    |
 
 SIM116.py:51:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
-51 |   # SIM116
-52 | / if a == "hello 'sir'":
-53 | |     return ("hello'", 'hi"', 3)
-54 | | elif a == 'goodbye "mam"':
-55 | |     return (4, 5, 6)
-56 | | elif a == """Fairwell 'mister'""":
-57 | |     return (7, 8, 9)
-58 | | else:
-59 | |     return (10, 11, 12)
+50 |   # SIM116
+51 | / if a == "hello 'sir'":
+52 | |     return ("hello'", 'hi"', 3)
+53 | | elif a == 'goodbye "mam"':
+54 | |     return (4, 5, 6)
+55 | | elif a == """Fairwell 'mister'""":
+56 | |     return (7, 8, 9)
+57 | | else:
+58 | |     return (10, 11, 12)
    | |_______________________^ SIM116
-60 |   
-61 |   # OK
+59 |   
+60 |   # OK
    |
 
 SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
-79 |   # SIM116
-80 | / if func_name == "create":
-81 | |     return "A"
-82 | | elif func_name == "modify":
-83 | |     return "M"
-84 | | elif func_name == "remove":
-85 | |     return "D"
-86 | | elif func_name == "move":
-87 | |     return "MV"
+78 |   # SIM116
+79 | / if func_name == "create":
+80 | |     return "A"
+81 | | elif func_name == "modify":
+82 | |     return "M"
+83 | | elif func_name == "remove":
+84 | |     return "D"
+85 | | elif func_name == "move":
+86 | |     return "MV"
    | |_______________^ SIM116
    |
 

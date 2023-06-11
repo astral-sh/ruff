@@ -74,9 +74,7 @@ pub(crate) fn unnecessary_literal_set(
     );
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_literal_set(checker.locator, checker.stylist, expr)
-        });
+        diagnostic.try_set_fix_from_edit(|| fixes::fix_unnecessary_literal_set(checker, expr));
     }
     checker.diagnostics.push(diagnostic);
 }

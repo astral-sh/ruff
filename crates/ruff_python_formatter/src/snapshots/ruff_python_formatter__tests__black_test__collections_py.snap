@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,99 +1,46 @@
+@@ -1,99 +1,52 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -186,14 +186,16 @@ if True:
 +division_result_tuple = (1, 2)
 +NOT_IMPLEMENTED_call()
  
--if True:
+ if True:
 -    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
 -        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
 -        | {pylons.controllers.WSGIController}
 -    )
-+NOT_YET_IMPLEMENTED_StmtIf
++    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
++        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
++    }
  
--if True:
+ if True:
 -    ec2client.get_waiter("instance_stopped").wait(
 -        InstanceIds=[instance.id],
 -        WaiterConfig={
@@ -212,7 +214,9 @@ if True:
 -            "Delay": 5,
 -        },
 -    )
-+NOT_YET_IMPLEMENTED_StmtIf
++    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
@@ -261,9 +265,15 @@ NOT_YET_IMPLEMENTED_StmtFor
 division_result_tuple = (1, 2)
 NOT_IMPLEMENTED_call()
 
-NOT_YET_IMPLEMENTED_StmtIf
+if True:
+    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
+        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
+    }
 
-NOT_YET_IMPLEMENTED_StmtIf
+if True:
+    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

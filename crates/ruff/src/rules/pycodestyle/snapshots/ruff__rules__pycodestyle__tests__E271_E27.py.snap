@@ -3,92 +3,92 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E27.py:4:9: E271 Multiple spaces after keyword
   |
-4 | True and False
-5 | #: E271
-6 | True and  False
+2 | True and False
+3 | #: E271
+4 | True and  False
   |         ^^ E271
-7 | #: E272
-8 | True  and False
+5 | #: E272
+6 | True  and False
   |
 
 E27.py:6:5: E271 Multiple spaces after keyword
-   |
- 6 | True and  False
- 7 | #: E272
- 8 | True  and False
-   |     ^^ E271
- 9 | #: E271
-10 | if   1:
-   |
+  |
+4 | True and  False
+5 | #: E272
+6 | True  and False
+  |     ^^ E271
+7 | #: E271
+8 | if   1:
+  |
 
 E27.py:8:3: E271 Multiple spaces after keyword
    |
- 8 | True  and False
- 9 | #: E271
-10 | if   1:
+ 6 | True  and False
+ 7 | #: E271
+ 8 | if   1:
    |   ^^^ E271
-11 | #: E273
-12 | True and        False
+ 9 | #: E273
+10 | True and        False
    |
 
 E27.py:14:6: E271 Multiple spaces after keyword
    |
-14 | True        and False
-15 | #: E271
-16 | a and  b
+12 | True        and False
+13 | #: E271
+14 | a and  b
    |      ^^ E271
-17 | #: E271
-18 | 1 and  b
+15 | #: E271
+16 | 1 and  b
    |
 
 E27.py:16:6: E271 Multiple spaces after keyword
    |
-16 | a and  b
-17 | #: E271
-18 | 1 and  b
+14 | a and  b
+15 | #: E271
+16 | 1 and  b
    |      ^^ E271
-19 | #: E271
-20 | a and  2
+17 | #: E271
+18 | a and  2
    |
 
 E27.py:18:6: E271 Multiple spaces after keyword
    |
-18 | 1 and  b
-19 | #: E271
-20 | a and  2
+16 | 1 and  b
+17 | #: E271
+18 | a and  2
    |      ^^ E271
-21 | #: E271 E272
-22 | 1  and  b
+19 | #: E271 E272
+20 | 1  and  b
    |
 
 E27.py:20:7: E271 Multiple spaces after keyword
    |
-20 | a and  2
-21 | #: E271 E272
-22 | 1  and  b
+18 | a and  2
+19 | #: E271 E272
+20 | 1  and  b
    |       ^^ E271
-23 | #: E271 E272
-24 | a  and  2
+21 | #: E271 E272
+22 | a  and  2
    |
 
 E27.py:22:7: E271 Multiple spaces after keyword
    |
-22 | 1  and  b
-23 | #: E271 E272
-24 | a  and  2
+20 | 1  and  b
+21 | #: E271 E272
+22 | a  and  2
    |       ^^ E271
-25 | #: E272
-26 | this  and False
+23 | #: E272
+24 | this  and False
    |
 
 E27.py:35:14: E271 Multiple spaces after keyword
    |
-35 | from v import c, d
-36 | #: E271
-37 | from w import  (e, f)
+33 | from v import c, d
+34 | #: E271
+35 | from w import  (e, f)
    |              ^^ E271
-38 | #: E275
-39 | from w import(e, f)
+36 | #: E275
+37 | from w import(e, f)
    |
 
 

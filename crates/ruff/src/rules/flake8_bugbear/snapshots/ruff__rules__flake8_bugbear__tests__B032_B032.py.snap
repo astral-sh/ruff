@@ -3,76 +3,76 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B032.py:9:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
- 9 | dct = {"a": 1}
-10 | 
-11 | dct["b"]: 2
+ 7 | dct = {"a": 1}
+ 8 | 
+ 9 | dct["b"]: 2
    | ^^^^^^^^^^^ B032
-12 | dct.b: 2
+10 | dct.b: 2
    |
 
 B032.py:10:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
-10 | dct["b"]: 2
-11 | dct.b: 2
+ 9 | dct["b"]: 2
+10 | dct.b: 2
    | ^^^^^^^^ B032
-12 | 
-13 | dct["b"]: "test"
+11 | 
+12 | dct["b"]: "test"
    |
 
 B032.py:12:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
-12 | dct.b: 2
-13 | 
-14 | dct["b"]: "test"
+10 | dct.b: 2
+11 | 
+12 | dct["b"]: "test"
    | ^^^^^^^^^^^^^^^^ B032
-15 | dct.b: "test"
+13 | dct.b: "test"
    |
 
 B032.py:13:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
-13 | dct["b"]: "test"
-14 | dct.b: "test"
+12 | dct["b"]: "test"
+13 | dct.b: "test"
    | ^^^^^^^^^^^^^ B032
-15 | 
-16 | test = "test"
+14 | 
+15 | test = "test"
    |
 
 B032.py:16:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
-16 | test = "test"
-17 | dct["b"]: test
+15 | test = "test"
+16 | dct["b"]: test
    | ^^^^^^^^^^^^^^ B032
-18 | dct["b"]: test.lower()
-19 | dct.b: test
+17 | dct["b"]: test.lower()
+18 | dct.b: test
    |
 
 B032.py:17:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
-17 | test = "test"
-18 | dct["b"]: test
-19 | dct["b"]: test.lower()
+15 | test = "test"
+16 | dct["b"]: test
+17 | dct["b"]: test.lower()
    | ^^^^^^^^^^^^^^^^^^^^^^ B032
-20 | dct.b: test
-21 | dct.b: test.lower()
+18 | dct.b: test
+19 | dct.b: test.lower()
    |
 
 B032.py:18:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
-18 | dct["b"]: test
-19 | dct["b"]: test.lower()
-20 | dct.b: test
+16 | dct["b"]: test
+17 | dct["b"]: test.lower()
+18 | dct.b: test
    | ^^^^^^^^^^^ B032
-21 | dct.b: test.lower()
+19 | dct.b: test.lower()
    |
 
 B032.py:19:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
-19 | dct["b"]: test.lower()
-20 | dct.b: test
-21 | dct.b: test.lower()
+17 | dct["b"]: test.lower()
+18 | dct.b: test
+19 | dct.b: test.lower()
    | ^^^^^^^^^^^^^^^^^^^ B032
-22 | 
-23 | # Do not flag below
+20 | 
+21 | # Do not flag below
    |
 
 

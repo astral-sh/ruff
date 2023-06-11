@@ -21,22 +21,31 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,8 +1 @@
--if True:
--    if True:
--        if True:
+@@ -1,8 +1,7 @@
+ if True:
+     if True:
+         if True:
 -            return _(
 -                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweas "
 -                + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
 -                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
 -            ) % {"reported_username": reported_username, "report_reason": report_reason}
-+NOT_YET_IMPLEMENTED_StmtIf
++            return (
++                NOT_IMPLEMENTED_call()
++                % {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++            )
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtIf
+if True:
+    if True:
+        if True:
+            return (
+                NOT_IMPLEMENTED_call()
+                % {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+            )
 ```
 
 ## Black Output

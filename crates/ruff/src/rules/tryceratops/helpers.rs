@@ -6,13 +6,13 @@ use ruff_python_semantic::analyze::logging;
 use ruff_python_semantic::model::SemanticModel;
 
 /// Collect `logging`-like calls from an AST.
-pub(crate) struct LoggerCandidateVisitor<'a, 'b> {
+pub(super) struct LoggerCandidateVisitor<'a, 'b> {
     semantic_model: &'a SemanticModel<'b>,
-    pub(crate) calls: Vec<&'b ast::ExprCall>,
+    pub(super) calls: Vec<&'b ast::ExprCall>,
 }
 
 impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
-    pub(crate) fn new(semantic_model: &'a SemanticModel<'b>) -> Self {
+    pub(super) fn new(semantic_model: &'a SemanticModel<'b>) -> Self {
         LoggerCandidateVisitor {
             semantic_model,
             calls: Vec::new(),

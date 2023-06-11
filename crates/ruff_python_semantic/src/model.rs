@@ -20,7 +20,7 @@ use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::globals::{Globals, GlobalsArena};
 use crate::node::{NodeId, Nodes};
-use crate::reference::References;
+use crate::reference::{Reference, ReferenceId, References};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
@@ -43,7 +43,7 @@ pub struct SemanticModel<'a> {
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
     // Stack of all references created in any scope, at any point in execution.
-    pub references: References,
+    references: References,
     // Arena of global bindings.
     globals: GlobalsArena<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
@@ -152,14 +152,11 @@ impl<'a> SemanticModel<'a> {
             .map(|binding_id| &self.bindings[binding_id])
     }
 
-    /// Return the [`Binding`] that the given [`BindingId`] shadows, if any.
+    /// Return the [`BindingId`] that the given [`BindingId`] shadows, if any.
     ///
     /// Note that this will only return bindings that are shadowed by a binding in a parent scope.
-    pub fn shadowed_binding(&self, binding_id: BindingId) -> Option<&Binding> {
-        self.shadowed_bindings
-            .get(&binding_id)
-            .copied()
-            .map(|id| &self.bindings[id])
+    pub fn shadowed_binding(&self, binding_id: BindingId) -> Option<BindingId> {
+        self.shadowed_bindings.get(&binding_id).copied()
     }
 
     /// Return `true` if `member` is bound as a builtin.
@@ -174,8 +171,8 @@ impl<'a> SemanticModel<'a> {
             .map_or(true, |binding| binding.kind.is_builtin())
     }
 
-    /// Resolve a reference to the given symbol.
-    pub fn resolve_reference(&mut self, symbol: &str, range: TextRange) -> ResolvedReference {
+    /// Resolve a read reference to `symbol` at `range`.
+    pub fn resolve_read(&mut self, symbol: &str, range: TextRange) -> ResolvedRead {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
@@ -193,7 +190,7 @@ impl<'a> SemanticModel<'a> {
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
-                return ResolvedReference::Resolved(binding_id);
+                return ResolvedRead::Resolved(binding_id);
             }
         }
 
@@ -210,7 +207,7 @@ impl<'a> SemanticModel<'a> {
                 //         print(__class__)
                 // ```
                 if seen_function && matches!(symbol, "__class__") {
-                    return ResolvedReference::ImplicitGlobal;
+                    return ResolvedRead::ImplicitGlobal;
                 }
                 if index > 0 {
                     continue;
@@ -243,7 +240,7 @@ impl<'a> SemanticModel<'a> {
                     continue;
                 }
 
-                return ResolvedReference::Resolved(binding_id);
+                return ResolvedRead::Resolved(binding_id);
             }
 
             // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
@@ -263,7 +260,7 @@ impl<'a> SemanticModel<'a> {
             // ```
             if index == 0 && scope.kind.is_class() {
                 if matches!(symbol, "__module__" | "__qualname__") {
-                    return ResolvedReference::ImplicitGlobal;
+                    return ResolvedRead::ImplicitGlobal;
                 }
             }
 
@@ -272,9 +269,9 @@ impl<'a> SemanticModel<'a> {
         }
 
         if import_starred {
-            ResolvedReference::StarImport
+            ResolvedRead::StarImport
         } else {
-            ResolvedReference::NotFound
+            ResolvedRead::NotFound
         }
     }
 
@@ -673,6 +670,11 @@ impl<'a> SemanticModel<'a> {
         self.bindings[binding_id].references.push(reference_id);
     }
 
+    /// Resolve a [`ReferenceId`].
+    pub fn reference(&self, reference_id: ReferenceId) -> &Reference {
+        self.references.resolve(reference_id)
+    }
+
     /// Return the [`ExecutionContext`] of the current scope.
     pub const fn execution_context(&self) -> ExecutionContext {
         if self.in_type_checking_block()
@@ -783,6 +785,7 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the context is in an f-string.
     pub const fn in_f_string(&self) -> bool {
         self.flags.contains(SemanticModelFlags::F_STRING)
+            || self.flags.contains(SemanticModelFlags::NESTED_F_STRING)
     }
 
     /// Return `true` if the context is in a nested f-string.
@@ -1018,16 +1021,16 @@ pub struct Snapshot {
 }
 
 #[derive(Debug)]
-pub enum ResolvedReference {
-    /// The reference is resolved to a specific binding.
+pub enum ResolvedRead {
+    /// The read reference is resolved to a specific binding.
     Resolved(BindingId),
-    /// The reference is resolved to a context-specific, implicit global (e.g., `__class__` within
-    /// a class scope).
+    /// The read reference is resolved to a context-specific, implicit global (e.g., `__class__`
+    /// within a class scope).
     ImplicitGlobal,
-    /// The reference is unresolved, but at least one of the containing scopes contains a star
+    /// The read reference is unresolved, but at least one of the containing scopes contains a star
     /// import.
     StarImport,
-    /// The reference is definitively unresolved.
+    /// The read reference is definitively unresolved.
     NotFound,
 }
 

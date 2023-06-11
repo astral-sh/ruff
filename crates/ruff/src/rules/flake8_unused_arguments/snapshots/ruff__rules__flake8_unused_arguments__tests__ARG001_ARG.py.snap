@@ -3,20 +3,20 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
 ARG.py:9:7: ARG001 Unused function argument: `self`
    |
- 9 | # Unused arguments on functions.
-10 | ###
-11 | def f(self, x):
+ 7 | # Unused arguments on functions.
+ 8 | ###
+ 9 | def f(self, x):
    |       ^^^^ ARG001
-12 |     print("Hello, world!")
+10 |     print("Hello, world!")
    |
 
 ARG.py:9:13: ARG001 Unused function argument: `x`
    |
- 9 | # Unused arguments on functions.
-10 | ###
-11 | def f(self, x):
+ 7 | # Unused arguments on functions.
+ 8 | ###
+ 9 | def f(self, x):
    |             ^ ARG001
-12 |     print("Hello, world!")
+10 |     print("Hello, world!")
    |
 
 ARG.py:13:7: ARG001 Unused function argument: `cls`

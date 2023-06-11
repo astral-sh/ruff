@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
    |
-10 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
-11 | #: E703:1:13
-12 | import shlex;
+ 8 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
+ 9 | #: E703:1:13
+10 | import shlex;
    |             ^ E703
-13 | #: E702:1:9 E703:1:23
-14 | del a[:]; a.append(42);
+11 | #: E702:1:9 E703:1:23
+12 | del a[:]; a.append(42);
    |
    = help: Remove unnecessary semicolon
 
@@ -24,12 +24,12 @@ E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
 
 E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
    |
-12 | import shlex;
-13 | #: E702:1:9 E703:1:23
-14 | del a[:]; a.append(42);
+10 | import shlex;
+11 | #: E702:1:9 E703:1:23
+12 | del a[:]; a.append(42);
    |                       ^ E703
-15 | #: E704:1:1
-16 | def f(x): return 2
+13 | #: E704:1:1
+14 | def f(x): return 2
    |
    = help: Remove unnecessary semicolon
 
@@ -45,12 +45,12 @@ E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
 
 E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
    |
-25 |     def f(x): return 2*x
-26 | #: E704:1:8 E702:1:11 E703:1:14
-27 | if True: x; y;
+23 |     def f(x): return 2*x
+24 | #: E704:1:8 E702:1:11 E703:1:14
+25 | if True: x; y;
    |              ^ E703
-28 | #: E701:1:8
-29 | if True: lambda a: b
+26 | #: E701:1:8
+27 | if True: lambda a: b
    |
    = help: Remove unnecessary semicolon
 

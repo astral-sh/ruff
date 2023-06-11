@@ -10,10 +10,10 @@ N803.py:1:16: N803 Argument name `A` should be lowercase
 
 N803.py:6:28: N803 Argument name `A` should be lowercase
   |
-6 | class Class:
-7 |     def method(self, _, a, A):
+5 | class Class:
+6 |     def method(self, _, a, A):
   |                            ^ N803
-8 |         return _, a, A
+7 |         return _, a, A
   |
 
 

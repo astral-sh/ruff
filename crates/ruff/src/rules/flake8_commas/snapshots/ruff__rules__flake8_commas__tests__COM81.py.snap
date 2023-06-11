@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 ---
 COM81.py:4:18: COM812 [*] Trailing comma missing
   |
-4 | bad_function_call(
-5 |     param1='test',
-6 |     param2='test'
+2 | bad_function_call(
+3 |     param1='test',
+4 |     param2='test'
   |                   COM812
-7 | )
-8 | # ==> bad_list.py <==
+5 | )
+6 | # ==> bad_list.py <==
   |
   = help: Add trailing comma
 
@@ -24,11 +24,11 @@ COM81.py:4:18: COM812 [*] Trailing comma missing
 
 COM81.py:10:6: COM812 [*] Trailing comma missing
    |
-10 |     1,
-11 |     2,
-12 |     3
+ 8 |     1,
+ 9 |     2,
+10 |     3
    |       COM812
-13 | ]
+11 | ]
    |
    = help: Add trailing comma
 
@@ -44,12 +44,12 @@ COM81.py:10:6: COM812 [*] Trailing comma missing
 
 COM81.py:16:6: COM812 [*] Trailing comma missing
    |
-16 |     1,
-17 |     2,
-18 |     3
+14 |     1,
+15 |     2,
+16 |     3
    |       COM812
-19 |     # still needs a comma!
-20 | ]
+17 |     # still needs a comma!
+18 | ]
    |
    = help: Add trailing comma
 
@@ -65,9 +65,9 @@ COM81.py:16:6: COM812 [*] Trailing comma missing
 
 COM81.py:23:6: COM812 [*] Trailing comma missing
    |
-23 |     1,
-24 |     2,
-25 |     3
+21 |     1,
+22 |     2,
+23 |     3
    |       COM812
    |
    = help: Add trailing comma
@@ -84,78 +84,78 @@ COM81.py:23:6: COM812 [*] Trailing comma missing
 
 COM81.py:36:8: COM818 Trailing comma on bare tuple prohibited
    |
-36 | foo = (1,)
-37 | 
-38 | foo = 1,
+34 | foo = (1,)
+35 | 
+36 | foo = 1,
    |        ^ COM818
-39 | 
-40 | bar = 1; foo = bar,
+37 | 
+38 | bar = 1; foo = bar,
    |
 
 COM81.py:38:19: COM818 Trailing comma on bare tuple prohibited
    |
-38 | foo = 1,
-39 | 
-40 | bar = 1; foo = bar,
+36 | foo = 1,
+37 | 
+38 | bar = 1; foo = bar,
    |                   ^ COM818
-41 | 
-42 | foo = (
+39 | 
+40 | foo = (
    |
 
 COM81.py:45:8: COM818 Trailing comma on bare tuple prohibited
    |
-45 | )
-46 | 
-47 | foo = 3, 
+43 | )
+44 | 
+45 | foo = 3, 
    |        ^ COM818
-48 | 
-49 | class A(object):
+46 | 
+47 | class A(object):
    |
 
 COM81.py:49:10: COM818 Trailing comma on bare tuple prohibited
    |
-49 | class A(object):
-50 |  foo = 3
-51 |  bar = 10,
+47 | class A(object):
+48 |  foo = 3
+49 |  bar = 10,
    |          ^ COM818
-52 |  foo_bar = 2
+50 |  foo_bar = 2
    |
 
 COM81.py:56:32: COM818 Trailing comma on bare tuple prohibited
    |
-56 | from foo import bar, baz
-57 | 
-58 | group_by = function_call('arg'),
+54 | from foo import bar, baz
+55 | 
+56 | group_by = function_call('arg'),
    |                                ^ COM818
-59 | 
-60 | group_by = ('foobar' * 3),
+57 | 
+58 | group_by = ('foobar' * 3),
    |
 
 COM81.py:58:26: COM818 Trailing comma on bare tuple prohibited
    |
-58 | group_by = function_call('arg'),
-59 | 
-60 | group_by = ('foobar' * 3),
+56 | group_by = function_call('arg'),
+57 | 
+58 | group_by = ('foobar' * 3),
    |                          ^ COM818
-61 | 
-62 | def foo():
+59 | 
+60 | def foo():
    |
 
 COM81.py:61:17: COM818 Trailing comma on bare tuple prohibited
    |
-61 | def foo():
-62 |     return False,
+60 | def foo():
+61 |     return False,
    |                 ^ COM818
-63 | 
-64 | # ==> callable_before_parenth_form.py <==
+62 | 
+63 | # ==> callable_before_parenth_form.py <==
    |
 
 COM81.py:70:8: COM812 [*] Trailing comma missing
    |
-70 | {'foo': foo}['foo'](
-71 |     bar
+69 | {'foo': foo}['foo'](
+70 |     bar
    |         COM812
-72 | )
+71 | )
    |
    = help: Add trailing comma
 
@@ -171,10 +171,10 @@ COM81.py:70:8: COM812 [*] Trailing comma missing
 
 COM81.py:78:8: COM812 [*] Trailing comma missing
    |
-78 | (foo)(
-79 |     bar
+77 | (foo)(
+78 |     bar
    |         COM812
-80 | )
+79 | )
    |
    = help: Add trailing comma
 
@@ -190,10 +190,10 @@ COM81.py:78:8: COM812 [*] Trailing comma missing
 
 COM81.py:86:8: COM812 [*] Trailing comma missing
    |
-86 | [foo][0](
-87 |     bar
+85 | [foo][0](
+86 |     bar
    |         COM812
-88 | )
+87 | )
    |
    = help: Add trailing comma
 
@@ -209,11 +209,11 @@ COM81.py:86:8: COM812 [*] Trailing comma missing
 
 COM81.py:152:6: COM812 [*] Trailing comma missing
     |
-152 | # ==> keyword_before_parenth_form/base_bad.py <==
-153 | from x import (
-154 |     y
+150 | # ==> keyword_before_parenth_form/base_bad.py <==
+151 | from x import (
+152 |     y
     |       COM812
-155 | )
+153 | )
     |
     = help: Add trailing comma
 
@@ -229,11 +229,11 @@ COM81.py:152:6: COM812 [*] Trailing comma missing
 
 COM81.py:158:11: COM812 [*] Trailing comma missing
     |
-158 |     SyntaxWarning,
-159 |     ThrownHere,
-160 |     Anyway
+156 |     SyntaxWarning,
+157 |     ThrownHere,
+158 |     Anyway
     |            COM812
-161 | )
+159 | )
     |
     = help: Add trailing comma
 
@@ -249,12 +249,12 @@ COM81.py:158:11: COM812 [*] Trailing comma missing
 
 COM81.py:293:15: COM812 [*] Trailing comma missing
     |
-293 | # ==> multiline_bad_dict.py <==
-294 | multiline_bad_dict = {
-295 |     "bad": 123
+291 | # ==> multiline_bad_dict.py <==
+292 | multiline_bad_dict = {
+293 |     "bad": 123
     |                COM812
-296 | }
-297 | # ==> multiline_bad_function_def.py <==
+294 | }
+295 | # ==> multiline_bad_function_def.py <==
     |
     = help: Add trailing comma
 
@@ -270,12 +270,12 @@ COM81.py:293:15: COM812 [*] Trailing comma missing
 
 COM81.py:304:14: COM812 [*] Trailing comma missing
     |
-304 | def func_bad(
-305 |         a = 3,
-306 |         b = 2
+302 | def func_bad(
+303 |         a = 3,
+304 |         b = 2
     |               COM812
-307 |     ):
-308 |     pass
+305 |     ):
+306 |     pass
     |
     = help: Add trailing comma
 
@@ -291,12 +291,12 @@ COM81.py:304:14: COM812 [*] Trailing comma missing
 
 COM81.py:310:14: COM812 [*] Trailing comma missing
     |
-310 | # ==> multiline_bad_function_one_param.py <==
-311 | def func(
-312 |         a = 3
+308 | # ==> multiline_bad_function_one_param.py <==
+309 | def func(
+310 |         a = 3
     |               COM812
-313 |     ):
-314 |     pass
+311 |     ):
+312 |     pass
     |
     = help: Add trailing comma
 
@@ -312,10 +312,10 @@ COM81.py:310:14: COM812 [*] Trailing comma missing
 
 COM81.py:316:10: COM812 [*] Trailing comma missing
     |
-316 | func(
-317 |     a = 3
+315 | func(
+316 |     a = 3
     |           COM812
-318 | )
+317 | )
     |
     = help: Add trailing comma
 
@@ -331,11 +331,11 @@ COM81.py:316:10: COM812 [*] Trailing comma missing
 
 COM81.py:322:15: COM812 [*] Trailing comma missing
     |
-322 | multiline_bad_or_dict = {
-323 |     "good": True or False,
-324 |     "bad": 123
+320 | multiline_bad_or_dict = {
+321 |     "good": True or False,
+322 |     "bad": 123
     |                COM812
-325 | }
+323 | }
     |
     = help: Add trailing comma
 
@@ -351,11 +351,11 @@ COM81.py:322:15: COM812 [*] Trailing comma missing
 
 COM81.py:368:15: COM812 [*] Trailing comma missing
     |
-368 | multiline_index_access[
-369 |     "probably fine",
-370 |     "not good"
+366 | multiline_index_access[
+367 |     "probably fine",
+368 |     "not good"
     |                COM812
-371 | ]
+369 | ]
     |
     = help: Add trailing comma
 
@@ -371,11 +371,11 @@ COM81.py:368:15: COM812 [*] Trailing comma missing
 
 COM81.py:375:15: COM812 [*] Trailing comma missing
     |
-375 |     "fine",
-376 |     :
-377 |     "not good"
+373 |     "fine",
+374 |     :
+375 |     "not good"
     |                COM812
-378 | ]
+376 | ]
     |
     = help: Add trailing comma
 
@@ -391,11 +391,11 @@ COM81.py:375:15: COM812 [*] Trailing comma missing
 
 COM81.py:404:15: COM812 [*] Trailing comma missing
     |
-404 |     "fine"
-405 |     :
-406 |     "not fine"
+402 |     "fine"
+403 |     :
+404 |     "not fine"
     |                COM812
-407 | ]
+405 | ]
     |
     = help: Add trailing comma
 
@@ -411,11 +411,11 @@ COM81.py:404:15: COM812 [*] Trailing comma missing
 
 COM81.py:432:15: COM812 [*] Trailing comma missing
     |
-432 |     :
-433 |     "fine",
-434 |     "not fine"
+430 |     :
+431 |     "fine",
+432 |     "not fine"
     |                COM812
-435 | ]
+433 | ]
     |
     = help: Add trailing comma
 
@@ -431,11 +431,11 @@ COM81.py:432:15: COM812 [*] Trailing comma missing
 
 COM81.py:485:21: COM819 [*] Trailing comma prohibited
     |
-485 | # ==> prohibited.py <==
-486 | foo = ['a', 'b', 'c',]
+484 | # ==> prohibited.py <==
+485 | foo = ['a', 'b', 'c',]
     |                     ^ COM819
-487 | 
-488 | bar = { a: b,}
+486 | 
+487 | bar = { a: b,}
     |
     = help: Remove trailing comma
 
@@ -451,12 +451,12 @@ COM81.py:485:21: COM819 [*] Trailing comma prohibited
 
 COM81.py:487:13: COM819 [*] Trailing comma prohibited
     |
-487 | foo = ['a', 'b', 'c',]
-488 | 
-489 | bar = { a: b,}
+485 | foo = ['a', 'b', 'c',]
+486 | 
+487 | bar = { a: b,}
     |             ^ COM819
-490 | 
-491 | def bah(ham, spam,):
+488 | 
+489 | def bah(ham, spam,):
     |
     = help: Remove trailing comma
 
@@ -472,11 +472,11 @@ COM81.py:487:13: COM819 [*] Trailing comma prohibited
 
 COM81.py:489:18: COM819 [*] Trailing comma prohibited
     |
-489 | bar = { a: b,}
-490 | 
-491 | def bah(ham, spam,):
+487 | bar = { a: b,}
+488 | 
+489 | def bah(ham, spam,):
     |                  ^ COM819
-492 |     pass
+490 |     pass
     |
     = help: Remove trailing comma
 
@@ -492,12 +492,12 @@ COM81.py:489:18: COM819 [*] Trailing comma prohibited
 
 COM81.py:494:6: COM819 [*] Trailing comma prohibited
     |
-494 | (0,)
-495 | 
-496 | (0, 1,)
+492 | (0,)
+493 | 
+494 | (0, 1,)
     |      ^ COM819
-497 | 
-498 | foo = ['a', 'b', 'c', ]
+495 | 
+496 | foo = ['a', 'b', 'c', ]
     |
     = help: Remove trailing comma
 
@@ -513,12 +513,12 @@ COM81.py:494:6: COM819 [*] Trailing comma prohibited
 
 COM81.py:496:21: COM819 [*] Trailing comma prohibited
     |
-496 | (0, 1,)
-497 | 
-498 | foo = ['a', 'b', 'c', ]
+494 | (0, 1,)
+495 | 
+496 | foo = ['a', 'b', 'c', ]
     |                     ^ COM819
-499 | 
-500 | bar = { a: b, }
+497 | 
+498 | bar = { a: b, }
     |
     = help: Remove trailing comma
 
@@ -534,12 +534,12 @@ COM81.py:496:21: COM819 [*] Trailing comma prohibited
 
 COM81.py:498:13: COM819 [*] Trailing comma prohibited
     |
-498 | foo = ['a', 'b', 'c', ]
-499 | 
-500 | bar = { a: b, }
+496 | foo = ['a', 'b', 'c', ]
+497 | 
+498 | bar = { a: b, }
     |             ^ COM819
-501 | 
-502 | def bah(ham, spam, ):
+499 | 
+500 | def bah(ham, spam, ):
     |
     = help: Remove trailing comma
 
@@ -555,11 +555,11 @@ COM81.py:498:13: COM819 [*] Trailing comma prohibited
 
 COM81.py:500:18: COM819 [*] Trailing comma prohibited
     |
-500 | bar = { a: b, }
-501 | 
-502 | def bah(ham, spam, ):
+498 | bar = { a: b, }
+499 | 
+500 | def bah(ham, spam, ):
     |                  ^ COM819
-503 |     pass
+501 |     pass
     |
     = help: Remove trailing comma
 
@@ -575,12 +575,12 @@ COM81.py:500:18: COM819 [*] Trailing comma prohibited
 
 COM81.py:505:6: COM819 [*] Trailing comma prohibited
     |
-505 | (0, )
-506 | 
-507 | (0, 1, )
+503 | (0, )
+504 | 
+505 | (0, 1, )
     |      ^ COM819
-508 | 
-509 | image[:, :, 0]
+506 | 
+507 | image[:, :, 0]
     |
     = help: Remove trailing comma
 
@@ -596,12 +596,12 @@ COM81.py:505:6: COM819 [*] Trailing comma prohibited
 
 COM81.py:511:10: COM819 [*] Trailing comma prohibited
     |
-511 | image[:,]
-512 | 
-513 | image[:,:,]
+509 | image[:,]
+510 | 
+511 | image[:,:,]
     |          ^ COM819
-514 | 
-515 | lambda x, :
+512 | 
+513 | lambda x, :
     |
     = help: Remove trailing comma
 
@@ -617,12 +617,12 @@ COM81.py:511:10: COM819 [*] Trailing comma prohibited
 
 COM81.py:513:9: COM819 [*] Trailing comma prohibited
     |
-513 | image[:,:,]
-514 | 
-515 | lambda x, :
+511 | image[:,:,]
+512 | 
+513 | lambda x, :
     |         ^ COM819
-516 | 
-517 | # ==> unpack.py <==
+514 | 
+515 | # ==> unpack.py <==
     |
     = help: Remove trailing comma
 
@@ -638,12 +638,12 @@ COM81.py:513:9: COM819 [*] Trailing comma prohibited
 
 COM81.py:519:13: COM812 [*] Trailing comma missing
     |
-519 |     foo,
-520 |     bar,
-521 |     **kwargs
+517 |     foo,
+518 |     bar,
+519 |     **kwargs
     |              COM812
-522 | ):
-523 |     pass
+520 | ):
+521 |     pass
     |
     = help: Add trailing comma
 
@@ -659,12 +659,12 @@ COM81.py:519:13: COM812 [*] Trailing comma missing
 
 COM81.py:526:10: COM812 [*] Trailing comma missing
     |
-526 |     foo,
-527 |     bar,
-528 |     *args
+524 |     foo,
+525 |     bar,
+526 |     *args
     |           COM812
-529 | ):
-530 |     pass
+527 | ):
+528 |     pass
     |
     = help: Add trailing comma
 
@@ -680,12 +680,12 @@ COM81.py:526:10: COM812 [*] Trailing comma missing
 
 COM81.py:534:16: COM812 [*] Trailing comma missing
     |
-534 |     bar,
-535 |     *args,
-536 |     extra_kwarg
+532 |     bar,
+533 |     *args,
+534 |     extra_kwarg
     |                 COM812
-537 |     ):
-538 |     pass
+535 |     ):
+536 |     pass
     |
     = help: Add trailing comma
 
@@ -701,11 +701,11 @@ COM81.py:534:16: COM812 [*] Trailing comma missing
 
 COM81.py:541:13: COM812 [*] Trailing comma missing
     |
-541 |     foo,
-542 |     bar,
-543 |     **kwargs
+539 |     foo,
+540 |     bar,
+541 |     **kwargs
     |              COM812
-544 | )
+542 | )
     |
     = help: Add trailing comma
 
@@ -721,11 +721,11 @@ COM81.py:541:13: COM812 [*] Trailing comma missing
 
 COM81.py:547:24: COM812 [*] Trailing comma missing
     |
-547 |     foo,
-548 |     bar,
-549 |     **not_called_kwargs
+545 |     foo,
+546 |     bar,
+547 |     **not_called_kwargs
     |                         COM812
-550 | )
+548 | )
     |
     = help: Add trailing comma
 
@@ -741,12 +741,12 @@ COM81.py:547:24: COM812 [*] Trailing comma missing
 
 COM81.py:554:15: COM812 [*] Trailing comma missing
     |
-554 |     spam,
-555 |     *args,
-556 |     kwarg_only
+552 |     spam,
+553 |     *args,
+554 |     kwarg_only
     |                COM812
-557 |     ):
-558 |     pass
+555 |     ):
+556 |     pass
     |
     = help: Add trailing comma
 
@@ -762,10 +762,10 @@ COM81.py:554:15: COM812 [*] Trailing comma missing
 
 COM81.py:561:13: COM812 [*] Trailing comma missing
     |
-561 | foo(
-562 |     **kwargs
+560 | foo(
+561 |     **kwargs
     |              COM812
-563 | )
+562 | )
     |
     = help: Add trailing comma
 
@@ -781,10 +781,10 @@ COM81.py:561:13: COM812 [*] Trailing comma missing
 
 COM81.py:565:13: COM812 [*] Trailing comma missing
     |
-565 | {
-566 |     **kwargs
+564 | {
+565 |     **kwargs
     |              COM812
-567 | }
+566 | }
     |
     = help: Add trailing comma
 
@@ -800,10 +800,10 @@ COM81.py:565:13: COM812 [*] Trailing comma missing
 
 COM81.py:573:10: COM812 [*] Trailing comma missing
     |
-573 | {
-574 |     *args
+572 | {
+573 |     *args
     |           COM812
-575 | }
+574 | }
     |
     = help: Add trailing comma
 
@@ -819,10 +819,10 @@ COM81.py:573:10: COM812 [*] Trailing comma missing
 
 COM81.py:577:10: COM812 [*] Trailing comma missing
     |
-577 | [
-578 |     *args
+576 | [
+577 |     *args
     |           COM812
-579 | ]
+578 | ]
     |
     = help: Add trailing comma
 
@@ -838,12 +838,12 @@ COM81.py:577:10: COM812 [*] Trailing comma missing
 
 COM81.py:583:10: COM812 [*] Trailing comma missing
     |
-583 |     ham,
-584 |     spam,
-585 |     *args
+581 |     ham,
+582 |     spam,
+583 |     *args
     |           COM812
-586 |     ):
-587 |     pass
+584 |     ):
+585 |     pass
     |
     = help: Add trailing comma
 
@@ -859,12 +859,12 @@ COM81.py:583:10: COM812 [*] Trailing comma missing
 
 COM81.py:590:13: COM812 [*] Trailing comma missing
     |
-590 |     ham,
-591 |     spam,
-592 |     **kwargs
+588 |     ham,
+589 |     spam,
+590 |     **kwargs
     |              COM812
-593 |     ):
-594 |     pass
+591 |     ):
+592 |     pass
     |
     = help: Add trailing comma
 
@@ -880,12 +880,12 @@ COM81.py:590:13: COM812 [*] Trailing comma missing
 
 COM81.py:598:15: COM812 [*] Trailing comma missing
     |
-598 |     spam,
-599 |     *args,
-600 |     kwarg_only
+596 |     spam,
+597 |     *args,
+598 |     kwarg_only
     |                COM812
-601 |     ):
-602 |     pass
+599 |     ):
+600 |     pass
     |
     = help: Add trailing comma
 
@@ -901,11 +901,11 @@ COM81.py:598:15: COM812 [*] Trailing comma missing
 
 COM81.py:627:20: COM812 [*] Trailing comma missing
     |
-627 |     foo,
-628 |     bar,
-629 |     **{'ham': spam}
+625 |     foo,
+626 |     bar,
+627 |     **{'ham': spam}
     |                     COM812
-630 | )
+628 | )
     |
     = help: Add trailing comma
 
@@ -921,11 +921,11 @@ COM81.py:627:20: COM812 [*] Trailing comma missing
 
 COM81.py:632:42: COM812 [*] Trailing comma missing
     |
-632 | # Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
-633 | the_first_one = next(
-634 |     (i for i in range(10) if i // 2 == 0)  # COM812 fix should include the final bracket
+630 | # Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
+631 | the_first_one = next(
+632 |     (i for i in range(10) if i // 2 == 0)  # COM812 fix should include the final bracket
     |                                           COM812
-635 | )
+633 | )
     |
     = help: Add trailing comma
 

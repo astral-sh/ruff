@@ -209,7 +209,7 @@ fn remove_conversion_flag(
     let mut expression = match_expression(&parenthesized_content)?;
 
     // Replace the formatted call expression at `index` with a conversion flag.
-    let mut formatted_string_expression = match_part(index, &mut expression)?;
+    let formatted_string_expression = match_part(index, &mut expression)?;
     formatted_string_expression.conversion = None;
 
     // Remove the parentheses (first and last characters).
@@ -234,7 +234,7 @@ fn remove_conversion_call(
     let mut expression = match_expression(&parenthesized_content)?;
 
     // Replace the formatted call expression at `index` with a conversion flag.
-    let mut formatted_string_expression = match_part(index, &mut expression)?;
+    let formatted_string_expression = match_part(index, &mut expression)?;
     let call = match_call_mut(&mut formatted_string_expression.expression)?;
     formatted_string_expression.expression = call.args[0].value.clone();
 
@@ -260,7 +260,7 @@ fn convert_call_to_conversion_flag(
     let mut expression = match_expression(&parenthesized_content)?;
 
     // Replace the formatted call expression at `index` with a conversion flag.
-    let mut formatted_string_expression = match_part(index, &mut expression)?;
+    let formatted_string_expression = match_part(index, &mut expression)?;
     let call = match_call_mut(&mut formatted_string_expression.expression)?;
     let name = match_name(&call.func)?;
     match name.value {

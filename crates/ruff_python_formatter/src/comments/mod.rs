@@ -87,17 +87,6 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
-use rustpython_parser::ast::Mod;
-use std::fmt::Debug;
-use std::rc::Rc;
-
-mod debug;
-mod format;
-mod map;
-mod node_key;
-mod placement;
-mod visitor;
-
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
@@ -109,39 +98,59 @@ pub(crate) use format::{
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::CommentRanges;
+use rustpython_parser::ast::Mod;
+use std::cell::Cell;
+use std::fmt::Debug;
+use std::rc::Rc;
+
+mod debug;
+mod format;
+mod map;
+mod node_key;
+mod placement;
+mod visitor;
 
 /// A comment in the source document.
 #[derive(Debug, Clone)]
 pub(crate) struct SourceComment {
     /// The location of the comment in the source document.
     slice: SourceCodeSlice,
-
     /// Whether the comment has been formatted or not.
-    #[cfg(debug_assertions)]
-    formatted: std::cell::Cell<bool>,
-
+    formatted: Cell<bool>,
     position: CommentTextPosition,
 }
 
 impl SourceComment {
+    fn new(slice: SourceCodeSlice, position: CommentTextPosition) -> Self {
+        Self {
+            slice,
+            position,
+            formatted: Cell::new(false),
+        }
+    }
+
     /// Returns the location of the comment in the original source code.
     /// Allows retrieving the text of the comment.
-    pub(crate) fn slice(&self) -> &SourceCodeSlice {
+    pub(crate) const fn slice(&self) -> &SourceCodeSlice {
         &self.slice
     }
 
-    pub(crate) fn position(&self) -> CommentTextPosition {
+    pub(crate) const fn position(&self) -> CommentTextPosition {
         self.position
     }
 
-    #[cfg(not(debug_assertions))]
-    #[inline(always)]
-    pub(crate) fn mark_formatted(&self) {}
-
     /// Marks the comment as formatted
-    #[cfg(debug_assertions)]
     pub(crate) fn mark_formatted(&self) {
         self.formatted.set(true);
+    }
+
+    /// If the comment has already been formatted
+    pub(crate) fn is_formatted(&self) -> bool {
+        self.formatted.get()
+    }
+
+    pub(crate) fn is_unformatted(&self) -> bool {
+        !self.is_formatted()
     }
 }
 

@@ -3,31 +3,31 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP017.py:7:7: UP017 Use `datetime.UTC` alias
   |
-7 | print(datetime.timezone(-1))
-8 | print(timezone.utc)
+6 | print(datetime.timezone(-1))
+7 | print(timezone.utc)
   |       ^^^^^^^^^^^^ UP017
-9 | print(tz.utc)
+8 | print(tz.utc)
   |
   = help: Convert to `datetime.UTC` alias
 
 UP017.py:8:7: UP017 Use `datetime.UTC` alias
    |
- 8 | print(datetime.timezone(-1))
- 9 | print(timezone.utc)
-10 | print(tz.utc)
+ 6 | print(datetime.timezone(-1))
+ 7 | print(timezone.utc)
+ 8 | print(tz.utc)
    |       ^^^^^^ UP017
-11 | 
-12 | print(datetime.timezone.utc)
+ 9 | 
+10 | print(datetime.timezone.utc)
    |
    = help: Convert to `datetime.UTC` alias
 
 UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
    |
-10 | print(tz.utc)
-11 | 
-12 | print(datetime.timezone.utc)
+ 8 | print(tz.utc)
+ 9 | 
+10 | print(datetime.timezone.utc)
    |       ^^^^^^^^^^^^^^^^^^^^^ UP017
-13 | print(dt.timezone.utc)
+11 | print(dt.timezone.utc)
    |
    = help: Convert to `datetime.UTC` alias
 
@@ -41,8 +41,8 @@ UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
 
 UP017.py:11:7: UP017 Use `datetime.UTC` alias
    |
-11 | print(datetime.timezone.utc)
-12 | print(dt.timezone.utc)
+10 | print(datetime.timezone.utc)
+11 | print(dt.timezone.utc)
    |       ^^^^^^^^^^^^^^^ UP017
    |
    = help: Convert to `datetime.UTC` alias

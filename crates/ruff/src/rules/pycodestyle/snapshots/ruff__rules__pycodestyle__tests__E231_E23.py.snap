@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E23.py:2:7: E231 [*] Missing whitespace after ','
   |
-2 | #: E231
-3 | a = (1,2)
+1 | #: E231
+2 | a = (1,2)
   |       ^ E231
-4 | #: E231
-5 | a[b1,:]
+3 | #: E231
+4 | a[b1,:]
   |
   = help: Added missing whitespace after ','
 
@@ -21,12 +21,12 @@ E23.py:2:7: E231 [*] Missing whitespace after ','
 
 E23.py:4:5: E231 [*] Missing whitespace after ','
   |
-4 | a = (1,2)
-5 | #: E231
-6 | a[b1,:]
+2 | a = (1,2)
+3 | #: E231
+4 | a[b1,:]
   |     ^ E231
-7 | #: E231
-8 | a = [{'a':''}]
+5 | #: E231
+6 | a = [{'a':''}]
   |
   = help: Added missing whitespace after ','
 
@@ -41,15 +41,15 @@ E23.py:4:5: E231 [*] Missing whitespace after ','
 7 7 | #: Okay
 
 E23.py:6:10: E231 [*] Missing whitespace after ':'
-   |
- 6 | a[b1,:]
- 7 | #: E231
- 8 | a = [{'a':''}]
-   |          ^ E231
- 9 | #: Okay
-10 | a = (4,)
-   |
-   = help: Added missing whitespace after ':'
+  |
+4 | a[b1,:]
+5 | #: E231
+6 | a = [{'a':''}]
+  |          ^ E231
+7 | #: Okay
+8 | a = (4,)
+  |
+  = help: Added missing whitespace after ':'
 
 ℹ Suggested fix
 3 3 | #: E231
@@ -63,11 +63,11 @@ E23.py:6:10: E231 [*] Missing whitespace after ':'
 
 E23.py:19:10: E231 [*] Missing whitespace after ','
    |
-19 | def foo() -> None:
-20 |     #: E231
-21 |     if (1,2):
+17 | def foo() -> None:
+18 |     #: E231
+19 |     if (1,2):
    |          ^ E231
-22 |         pass
+20 |         pass
    |
    = help: Added missing whitespace after ','
 
@@ -83,11 +83,11 @@ E23.py:19:10: E231 [*] Missing whitespace after ','
 
 E23.py:29:20: E231 [*] Missing whitespace after ':'
    |
-29 | mdtypes_template = {
-30 |     'tag_full': [('mdtype', 'u4'), ('byte_count', 'u4')],
-31 |     'tag_smalldata':[('byte_count_mdtype', 'u4'), ('data', 'S4')],
+27 | mdtypes_template = {
+28 |     'tag_full': [('mdtype', 'u4'), ('byte_count', 'u4')],
+29 |     'tag_smalldata':[('byte_count_mdtype', 'u4'), ('data', 'S4')],
    |                    ^ E231
-32 | }
+30 | }
    |
    = help: Added missing whitespace after ':'
 

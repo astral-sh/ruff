@@ -257,7 +257,7 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
     }
 }
 
-/// RUF008/RUF011
+/// RUF008/RUF012
 pub(crate) fn mutable_class_default(checker: &mut Checker, body: &[Stmt], is_dataclass: bool) {
     fn diagnostic(is_dataclass: bool, value: &Expr) -> Diagnostic {
         if is_dataclass {

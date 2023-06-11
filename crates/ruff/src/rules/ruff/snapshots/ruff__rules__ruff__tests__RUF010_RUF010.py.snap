@@ -60,12 +60,12 @@ RUF010.py:9:29: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:11:4: RUF010 [*] Remove unnecessary `str` conversion
    |
-11 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-12 | 
-13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+ 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+10 | 
+11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |    ^^^^^^^^^^^ RUF010
-14 | 
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+12 | 
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Remove `str` call
 
@@ -81,12 +81,12 @@ RUF010.py:11:4: RUF010 [*] Remove unnecessary `str` conversion
 
 RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
    |
-11 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-12 | 
-13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+ 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+10 | 
+11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |                   ^^^^^^^^^^^^ RUF010
-14 | 
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+12 | 
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Replace with conversion flag
 
@@ -102,12 +102,12 @@ RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
    |
-11 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-12 | 
-13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+ 9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+10 | 
+11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |                                   ^^^^^^^^^^^^^ RUF010
-14 | 
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+12 | 
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Replace with conversion flag
 
@@ -123,12 +123,12 @@ RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:13:5: RUF010 [*] Remove unnecessary `str` conversion
    |
-13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-14 | 
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+12 | 
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |     ^^^^^^^^ RUF010
-16 | 
-17 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+14 | 
+15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Remove `str` call
 
@@ -144,12 +144,12 @@ RUF010.py:13:5: RUF010 [*] Remove unnecessary `str` conversion
 
 RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
    |
-13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-14 | 
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+12 | 
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |                   ^^^^^^^^^ RUF010
-16 | 
-17 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+14 | 
+15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Replace with conversion flag
 
@@ -165,12 +165,12 @@ RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
    |
-13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-14 | 
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+12 | 
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |                                  ^^^^^^^^^^ RUF010
-16 | 
-17 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+14 | 
+15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Replace with conversion flag
 
@@ -186,12 +186,12 @@ RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:15:4: RUF010 [*] Remove unnecessary conversion flag
    |
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-16 | 
-17 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+14 | 
+15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |    ^^^ RUF010
-18 | 
-19 | f"{foo(bla)}"  # OK
+16 | 
+17 | f"{foo(bla)}"  # OK
    |
    = help: Remove conversion flag
 
@@ -207,12 +207,12 @@ RUF010.py:15:4: RUF010 [*] Remove unnecessary conversion flag
 
 RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
    |
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-16 | 
-17 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+14 | 
+15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |              ^^^^^^^^^ RUF010
-18 | 
-19 | f"{foo(bla)}"  # OK
+16 | 
+17 | f"{foo(bla)}"  # OK
    |
    = help: Replace with conversion flag
 
@@ -228,12 +228,12 @@ RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
    |
-15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-16 | 
-17 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+14 | 
+15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |                             ^^^^^^^^^^ RUF010
-18 | 
-19 | f"{foo(bla)}"  # OK
+16 | 
+17 | f"{foo(bla)}"  # OK
    |
    = help: Replace with conversion flag
 
@@ -249,12 +249,12 @@ RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:21:4: RUF010 [*] Remove unnecessary conversion flag
    |
-21 | f"{str(bla, 'ascii')}, {str(bla, encoding='cp1255')}"  # OK
-22 | 
-23 | f"{bla!s} {[]!r} {'bar'!a}"  # OK
+19 | f"{str(bla, 'ascii')}, {str(bla, encoding='cp1255')}"  # OK
+20 | 
+21 | f"{bla!s} {[]!r} {'bar'!a}"  # OK
    |    ^^^ RUF010
-24 | 
-25 | "Not an f-string {str(bla)}, {repr(bla)}, {ascii(bla)}"  # OK
+22 | 
+23 | "Not an f-string {str(bla)}, {repr(bla)}, {ascii(bla)}"  # OK
    |
    = help: Remove conversion flag
 
@@ -270,11 +270,11 @@ RUF010.py:21:4: RUF010 [*] Remove unnecessary conversion flag
 
 RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
    |
-35 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
-36 |     " intermediary content "
-37 |     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
+33 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
+34 |     " intermediary content "
+35 |     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
    |                    ^^^^^^^^^ RUF010
-38 | )
+36 | )
    |
    = help: Replace with conversion flag
 
@@ -309,12 +309,12 @@ RUF010.py:39:4: RUF010 [*] Remove unnecessary `str` conversion
 
 RUF010.py:41:4: RUF010 [*] Use explicit conversion flag
    |
-41 | f"{str(bla)}"  # RUF010
-42 | 
-43 | f"{str(bla):20}"  # RUF010
+39 | f"{str(bla)}"  # RUF010
+40 | 
+41 | f"{str(bla):20}"  # RUF010
    |    ^^^^^^^^ RUF010
-44 | 
-45 | f"{bla!s}"  # RUF010
+42 | 
+43 | f"{bla!s}"  # RUF010
    |
    = help: Replace with conversion flag
 
@@ -330,12 +330,12 @@ RUF010.py:41:4: RUF010 [*] Use explicit conversion flag
 
 RUF010.py:43:4: RUF010 [*] Remove unnecessary conversion flag
    |
-43 | f"{str(bla):20}"  # RUF010
-44 | 
-45 | f"{bla!s}"  # RUF010
+41 | f"{str(bla):20}"  # RUF010
+42 | 
+43 | f"{bla!s}"  # RUF010
    |    ^^^ RUF010
-46 | 
-47 | f"{bla!s:20}"  # OK
+44 | 
+45 | f"{bla!s:20}"  # OK
    |
    = help: Remove conversion flag
 

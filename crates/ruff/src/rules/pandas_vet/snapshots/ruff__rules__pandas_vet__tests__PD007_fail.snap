@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pandas_vet/mod.rs
 ---
 <filename>:4:5: PD007 `.ix` is deprecated; use more explicit `.loc` or `.iloc`
   |
-4 | import pandas as pd
-5 | x = pd.DataFrame()
-6 | y = x.ix[[0, 2], "A"]
+2 | import pandas as pd
+3 | x = pd.DataFrame()
+4 | y = x.ix[[0, 2], "A"]
   |     ^^^^^^^^^^^^^^^^^ PD007
   |
 

@@ -18,11 +18,11 @@ SIM220.py:1:4: SIM220 [*] Use `False` instead of `a and not a`
 
 SIM220.py:4:5: SIM220 [*] Use `False` instead of `a and not a`
   |
-4 |     pass
-5 | 
-6 | if (a and not a) and b:
+2 |     pass
+3 | 
+4 | if (a and not a) and b:
   |     ^^^^^^^^^^^ SIM220
-7 |     pass
+5 |     pass
   |
   = help: Replace with `False`
 
@@ -37,14 +37,14 @@ SIM220.py:4:5: SIM220 [*] Use `False` instead of `a and not a`
 7 7 | if (a and not a) or b:
 
 SIM220.py:7:5: SIM220 [*] Use `False` instead of `a and not a`
-   |
- 7 |     pass
- 8 | 
- 9 | if (a and not a) or b:
-   |     ^^^^^^^^^^^ SIM220
-10 |     pass
-   |
-   = help: Replace with `False`
+  |
+5 |     pass
+6 | 
+7 | if (a and not a) or b:
+  |     ^^^^^^^^^^^ SIM220
+8 |     pass
+  |
+  = help: Replace with `False`
 
 ℹ Suggested fix
 4 4 | if (a and not a) and b:

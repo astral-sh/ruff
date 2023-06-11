@@ -3,20 +3,20 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
 DJ008.py:6:1: DJ008 Model does not define `__str__` method
    |
- 6 |   # Models without __str__
- 7 | / class TestModel1(models.Model):
- 8 | |     new_field = models.CharField(max_length=10)
- 9 | | 
-10 | |     class Meta:
-11 | |         verbose_name = "test model"
-12 | |         verbose_name_plural = "test models"
-13 | | 
-14 | |     @property
-15 | |     def my_brand_new_property(self):
-16 | |         return 1
-17 | | 
-18 | |     def my_beautiful_method(self):
-19 | |         return 2
+ 5 |   # Models without __str__
+ 6 | / class TestModel1(models.Model):
+ 7 | |     new_field = models.CharField(max_length=10)
+ 8 | | 
+ 9 | |     class Meta:
+10 | |         verbose_name = "test model"
+11 | |         verbose_name_plural = "test models"
+12 | | 
+13 | |     @property
+14 | |     def my_brand_new_property(self):
+15 | |         return 1
+16 | | 
+17 | |     def my_beautiful_method(self):
+18 | |         return 2
    | |________________^ DJ008
    |
 

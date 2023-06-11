@@ -18,11 +18,11 @@ SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
 
 SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
   |
-4 |     pass
-5 | 
-6 | if (a or not a) or b:
+2 |     pass
+3 | 
+4 | if (a or not a) or b:
   |     ^^^^^^^^^^ SIM221
-7 |     pass
+5 |     pass
   |
   = help: Replace with `True`
 
@@ -37,14 +37,14 @@ SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
 7 7 | if (a or not a) and b:
 
 SIM221.py:7:5: SIM221 [*] Use `True` instead of `a or not a`
-   |
- 7 |     pass
- 8 | 
- 9 | if (a or not a) and b:
-   |     ^^^^^^^^^^ SIM221
-10 |     pass
-   |
-   = help: Replace with `True`
+  |
+5 |     pass
+6 | 
+7 | if (a or not a) and b:
+  |     ^^^^^^^^^^ SIM221
+8 |     pass
+  |
+  = help: Replace with `True`
 
 ℹ Suggested fix
 4 4 | if (a or not a) or b:

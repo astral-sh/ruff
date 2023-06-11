@@ -105,7 +105,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,89 +1,45 @@
+@@ -1,89 +1,70 @@
 -"""Docstring."""
 +"NOT_YET_IMPLEMENTED_STRING"
  
@@ -115,31 +115,36 @@ def g():
 -    NO = ""
 -    SPACE = " "
 -    DOUBLESPACE = "  "
--
--    t = leaf.type
--    p = leaf.parent  # trailing comment
--    v = leaf.value
--
--    if t in ALWAYS_NO_SPACE:
--        pass
--    if t == token.COMMENT:  # another trailing comment
--        return DOUBLESPACE
 +    NO = "NOT_YET_IMPLEMENTED_STRING"
 +    SPACE = "NOT_YET_IMPLEMENTED_STRING"
 +    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
  
--    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
+-    t = leaf.type
+-    p = leaf.parent  # trailing comment
+-    v = leaf.value
 +    t = leaf.NOT_IMPLEMENTED_attr
 +    p = leaf.NOT_IMPLEMENTED_attr  # trailing comment
 +    v = leaf.NOT_IMPLEMENTED_attr
+ 
+-    if t in ALWAYS_NO_SPACE:
++    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+         pass
+-    if t == token.COMMENT:  # another trailing comment
++    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:  # another trailing comment
+         return DOUBLESPACE
+ 
+-    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
++    NOT_YET_IMPLEMENTED_StmtAssert
  
 -    prev = leaf.prev_sibling
 -    if not prev:
 -        prevp = preceding_leaf(p)
 -        if not prevp or prevp.type in OPENING_BRACKETS:
--            return NO
-+    NOT_YET_IMPLEMENTED_StmtIf
-+    NOT_YET_IMPLEMENTED_StmtIf  # another trailing comment
++    prev = leaf.NOT_IMPLEMENTED_attr
++    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
++        prevp = NOT_IMPLEMENTED_call()
++        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+             return NO
  
 -        if prevp.type == token.EQUAL:
 -            if prevp.parent and prevp.parent.type in {
@@ -149,8 +154,9 @@ def g():
 -                syms.arglist,
 -                syms.argument,
 -            }:
--                return NO
-+    NOT_YET_IMPLEMENTED_StmtAssert
++        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+                 return NO
  
 -        elif prevp.type == token.DOUBLESTAR:
 -            if prevp.parent and prevp.parent.type in {
@@ -160,9 +166,9 @@ def g():
 -                syms.arglist,
 -                syms.dictsetmaker,
 -            }:
--                return NO
-+    prev = leaf.NOT_IMPLEMENTED_attr
-+    NOT_YET_IMPLEMENTED_StmtIf
++        elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+                 return NO
  
  
  ###############################################################################
@@ -188,25 +194,29 @@ def g():
      # Comment because comments
  
 -    if t in ALWAYS_NO_SPACE:
--        pass
++    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+         pass
 -    if t == token.COMMENT:
--        return DOUBLESPACE
-+    NOT_YET_IMPLEMENTED_StmtIf
-+    NOT_YET_IMPLEMENTED_StmtIf
++    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+         return DOUBLESPACE
  
      # Another comment because more comments
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
--
++    NOT_YET_IMPLEMENTED_StmtAssert
+ 
 -    prev = leaf.prev_sibling
 -    if not prev:
 -        prevp = preceding_leaf(p)
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    prev = leaf.NOT_IMPLEMENTED_attr
++    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
++        prevp = NOT_IMPLEMENTED_call()
  
 -        if not prevp or prevp.type in OPENING_BRACKETS:
--            # Start of the line or a bracketed expression.
--            # More than one line for the comment.
--            return NO
--
++        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+             # Start of the line or a bracketed expression.
+             # More than one line for the comment.
+             return NO
+ 
 -        if prevp.type == token.EQUAL:
 -            if prevp.parent and prevp.parent.type in {
 -                syms.typedargslist,
@@ -215,9 +225,9 @@ def g():
 -                syms.arglist,
 -                syms.argument,
 -            }:
--                return NO
-+    prev = leaf.NOT_IMPLEMENTED_attr
-+    NOT_YET_IMPLEMENTED_StmtIf
++        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+                 return NO
 ```
 
 ## Ruff Output
@@ -236,13 +246,26 @@ def f():
     p = leaf.NOT_IMPLEMENTED_attr  # trailing comment
     v = leaf.NOT_IMPLEMENTED_attr
 
-    NOT_YET_IMPLEMENTED_StmtIf
-    NOT_YET_IMPLEMENTED_StmtIf  # another trailing comment
+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+        pass
+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:  # another trailing comment
+        return DOUBLESPACE
 
     NOT_YET_IMPLEMENTED_StmtAssert
 
     prev = leaf.NOT_IMPLEMENTED_attr
-    NOT_YET_IMPLEMENTED_StmtIf
+    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+        prevp = NOT_IMPLEMENTED_call()
+        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+            return NO
+
+        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+                return NO
+
+        elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+                return NO
 
 
 ###############################################################################
@@ -260,14 +283,26 @@ def g():
 
     # Comment because comments
 
-    NOT_YET_IMPLEMENTED_StmtIf
-    NOT_YET_IMPLEMENTED_StmtIf
+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+        pass
+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+        return DOUBLESPACE
 
     # Another comment because more comments
     NOT_YET_IMPLEMENTED_StmtAssert
 
     prev = leaf.NOT_IMPLEMENTED_attr
-    NOT_YET_IMPLEMENTED_StmtIf
+    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+        prevp = NOT_IMPLEMENTED_call()
+
+        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+            # Start of the line or a bracketed expression.
+            # More than one line for the comment.
+            return NO
+
+        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+                return NO
 ```
 
 ## Black Output

@@ -1,10 +1,10 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::comments::CommentTextPosition;
 use crate::trivia::{SimpleTokenizer, TokenKind};
-use ruff_newlines::StrExt;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 use std::cmp::Ordering;
@@ -212,6 +212,26 @@ fn handle_in_between_bodies_own_line_comment<'a>(
             //     # comment
             //     b
             // ```
+            return CommentPlacement::Default(comment);
+        }
+
+        // If there's any non-trivia token between the preceding node and the comment, than it means that
+        // we're past the case of the alternate branch, defer to the default rules
+        // ```python
+        // if a:
+        //      pass
+        //  else:
+        //      # leading comment
+        //      def inline_after_else(): ...
+        // ```
+        if SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(preceding.end(), comment.slice().start()),
+        )
+        .skip_trivia()
+        .next()
+        .is_some()
+        {
             return CommentPlacement::Default(comment);
         }
 
@@ -966,7 +986,7 @@ fn max_empty_lines(contents: &str) -> usize {
     let mut max_empty_lines = 0;
 
     for line in contents.universal_newlines().skip(1) {
-        if line.trim().is_empty() {
+        if line.trim_whitespace().is_empty() {
             empty_lines += 1;
         } else {
             max_empty_lines = max_empty_lines.max(empty_lines);

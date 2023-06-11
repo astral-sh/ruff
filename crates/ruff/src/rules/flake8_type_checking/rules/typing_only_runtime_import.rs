@@ -234,8 +234,7 @@ pub(crate) fn typing_only_runtime_import(
             && binding.references().all(|reference_id| {
                 checker
                     .semantic_model()
-                    .references
-                    .resolve(reference_id)
+                    .reference(reference_id)
                     .context()
                     .is_typing()
             })
@@ -430,8 +429,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         .map(|Import { reference_id, .. }| {
             checker
                 .semantic_model()
-                .references
-                .resolve(*reference_id)
+                .reference(*reference_id)
                 .range()
                 .start()
         })

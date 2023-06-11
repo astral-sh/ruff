@@ -3,44 +3,44 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 ---
 DTZ007.py:4:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
   |
-4 | # bad format
-5 | datetime.datetime.strptime("something", "%H:%M:%S%Z")
+3 | # bad format
+4 | datetime.datetime.strptime("something", "%H:%M:%S%Z")
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-6 | 
-7 | # no replace or astimezone
+5 | 
+6 | # no replace or astimezone
   |
 
 DTZ007.py:7:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
-   |
- 7 | # no replace or astimezone
- 8 | datetime.datetime.strptime("something", "something")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
- 9 | 
-10 | # wrong replace
-   |
+  |
+6 | # no replace or astimezone
+7 | datetime.datetime.strptime("something", "something")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
+8 | 
+9 | # wrong replace
+  |
 
 DTZ007.py:10:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
    |
-10 | # wrong replace
-11 | datetime.datetime.strptime("something", "something").replace(hour=1)
+ 9 | # wrong replace
+10 | datetime.datetime.strptime("something", "something").replace(hour=1)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-12 | 
-13 | # none replace
+11 | 
+12 | # none replace
    |
 
 DTZ007.py:13:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
    |
-13 | # none replace
-14 | datetime.datetime.strptime("something", "something").replace(tzinfo=None)
+12 | # none replace
+13 | datetime.datetime.strptime("something", "something").replace(tzinfo=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
-15 | 
-16 | # OK
+14 | 
+15 | # OK
    |
 
 DTZ007.py:35:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
    |
-35 | # no replace orastimezone unqualified
-36 | datetime.strptime("something", "something")
+34 | # no replace orastimezone unqualified
+35 | datetime.strptime("something", "something")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
    |
 

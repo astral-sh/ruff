@@ -39,11 +39,11 @@ PT024.py:20:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 
 PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
-27 | @pytest.fixture()
-28 | @pytest.mark.asyncio()
+26 | @pytest.fixture()
+27 | @pytest.mark.asyncio()
    | ^^^^^^^^^^^^^^^^^^^^^^ PT024
-29 | async def my_fixture():  # Error after
-30 |     return 0
+28 | async def my_fixture():  # Error after
+29 |     return 0
    |
    = help: Remove `pytest.mark.asyncio`
 
@@ -58,11 +58,11 @@ PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 
 PT024.py:33:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
-33 | @pytest.fixture()
-34 | @pytest.mark.asyncio
+32 | @pytest.fixture()
+33 | @pytest.mark.asyncio
    | ^^^^^^^^^^^^^^^^^^^^ PT024
-35 | async def my_fixture():  # Error after no parens
-36 |     return 0
+34 | async def my_fixture():  # Error after no parens
+35 |     return 0
    |
    = help: Remove `pytest.mark.asyncio`
 

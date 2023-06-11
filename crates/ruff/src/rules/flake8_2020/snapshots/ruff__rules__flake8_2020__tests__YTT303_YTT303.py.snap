@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
 YTT303.py:4:7: YTT303 `sys.version[:1]` referenced (python10), use `sys.version_info`
   |
-4 | from sys import version
-5 | 
-6 | print(sys.version[:1])
+2 | from sys import version
+3 | 
+4 | print(sys.version[:1])
   |       ^^^^^^^^^^^ YTT303
-7 | print(version[:1])
+5 | print(version[:1])
   |
 
 YTT303.py:5:7: YTT303 `sys.version[:1]` referenced (python10), use `sys.version_info`
   |
-5 | print(sys.version[:1])
-6 | print(version[:1])
+4 | print(sys.version[:1])
+5 | print(version[:1])
   |       ^^^^^^^ YTT303
   |
 

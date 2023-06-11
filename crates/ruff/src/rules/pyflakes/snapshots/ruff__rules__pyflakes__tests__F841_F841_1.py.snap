@@ -3,24 +3,24 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F841_1.py:6:5: F841 Local variable `x` is assigned to but never used
   |
-6 | def f():
-7 |     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
+5 | def f():
+6 |     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
   |     ^ F841
   |
   = help: Remove assignment to unused variable `x`
 
 F841_1.py:6:8: F841 Local variable `y` is assigned to but never used
   |
-6 | def f():
-7 |     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
+5 | def f():
+6 |     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
   |        ^ F841
   |
   = help: Remove assignment to unused variable `y`
 
 F841_1.py:16:14: F841 [*] Local variable `coords` is assigned to but never used
    |
-16 | def f():
-17 |     (x, y) = coords = 1, 2  # this triggers F841 on coords
+15 | def f():
+16 |     (x, y) = coords = 1, 2  # this triggers F841 on coords
    |              ^^^^^^ F841
    |
    = help: Remove assignment to unused variable `coords`
@@ -37,8 +37,8 @@ F841_1.py:16:14: F841 [*] Local variable `coords` is assigned to but never used
 
 F841_1.py:20:5: F841 [*] Local variable `coords` is assigned to but never used
    |
-20 | def f():
-21 |     coords = (x, y) = 1, 2  # this triggers F841 on coords
+19 | def f():
+20 |     coords = (x, y) = 1, 2  # this triggers F841 on coords
    |     ^^^^^^ F841
    |
    = help: Remove assignment to unused variable `coords`
@@ -55,32 +55,32 @@ F841_1.py:20:5: F841 [*] Local variable `coords` is assigned to but never used
 
 F841_1.py:24:6: F841 Local variable `a` is assigned to but never used
    |
-24 | def f():
-25 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
+23 | def f():
+24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |      ^ F841
    |
    = help: Remove assignment to unused variable `a`
 
 F841_1.py:24:9: F841 Local variable `b` is assigned to but never used
    |
-24 | def f():
-25 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
+23 | def f():
+24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |         ^ F841
    |
    = help: Remove assignment to unused variable `b`
 
 F841_1.py:24:15: F841 Local variable `x` is assigned to but never used
    |
-24 | def f():
-25 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
+23 | def f():
+24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |               ^ F841
    |
    = help: Remove assignment to unused variable `x`
 
 F841_1.py:24:18: F841 Local variable `y` is assigned to but never used
    |
-24 | def f():
-25 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
+23 | def f():
+24 |     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    |                  ^ F841
    |
    = help: Remove assignment to unused variable `y`

@@ -3,22 +3,22 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E11.py:9:1: E112 Expected an indented block
    |
- 9 | #: E112
-10 | if False:
-11 | print()
+ 7 | #: E112
+ 8 | if False:
+ 9 | print()
    |  E112
-12 | #: E113
-13 | print()
+10 | #: E113
+11 | print()
    |
 
 E11.py:45:1: E112 Expected an indented block
    |
-45 | #: E112
-46 | if False:  #
-47 | print()
+43 | #: E112
+44 | if False:  #
+45 | print()
    |  E112
-48 | #:
-49 | if False:
+46 | #:
+47 | if False:
    |
 
 

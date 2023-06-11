@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/flake8_executable/mod.rs
 ---
 EXE005_3.py:6:3: EXE005 Shebang should be at the beginning of the file
   |
-6 | """
-7 | # A python comment
-8 | #!/usr/bin/python
+4 | """
+5 | # A python comment
+6 | #!/usr/bin/python
   |   ^^^^^^^^^^^^^^^ EXE005
   |
 

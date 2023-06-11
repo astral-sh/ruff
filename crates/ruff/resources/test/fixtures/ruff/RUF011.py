@@ -1,22 +1,13 @@
-import typing
-from typing import ClassVar, Sequence
+data = ["some", "Data"]
 
-KNOWINGLY_MUTABLE_DEFAULT = []
+# Ok
+{value: value.upper() for value in data}
+{value.lower(): value.upper() for value in data}
+{v: v*v for v in range(10)}
+{(0, "a", v): v*v for v in range(10)} # Tuple with variable
 
-
-class A:
-    mutable_default: list[int] = []
-    immutable_annotation: typing.Sequence[int] = []
-    without_annotation = []
-    ignored_via_comment: list[int] = []  # noqa: RUF011
-    correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-    class_variable: typing.ClassVar[list[int]] = []
-
-
-class B:
-    mutable_default: list[int] = []
-    immutable_annotation: Sequence[int] = []
-    without_annotation = []
-    ignored_via_comment: list[int] = []  # noqa: RUF011
-    correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-    class_variable: ClassVar[list[int]] = []
+# Errors
+{"key": value.upper() for value in data}
+{True: value.upper() for value in data}
+{0: value.upper() for value in data}
+{(1, "a"): value.upper() for value in data} # constant tuple

@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E20.py:2:6: E201 [*] Whitespace after '('
   |
-2 | #: E201:1:6
-3 | spam( ham[1], {eggs: 2})
+1 | #: E201:1:6
+2 | spam( ham[1], {eggs: 2})
   |      ^ E201
-4 | #: E201:1:10
-5 | spam(ham[ 1], {eggs: 2})
+3 | #: E201:1:10
+4 | spam(ham[ 1], {eggs: 2})
   |
   = help: Remove whitespace before '('
 
@@ -21,12 +21,12 @@ E20.py:2:6: E201 [*] Whitespace after '('
 
 E20.py:4:10: E201 [*] Whitespace after '['
   |
-4 | spam( ham[1], {eggs: 2})
-5 | #: E201:1:10
-6 | spam(ham[ 1], {eggs: 2})
+2 | spam( ham[1], {eggs: 2})
+3 | #: E201:1:10
+4 | spam(ham[ 1], {eggs: 2})
   |          ^ E201
-7 | #: E201:1:15
-8 | spam(ham[1], { eggs: 2})
+5 | #: E201:1:15
+6 | spam(ham[1], { eggs: 2})
   |
   = help: Remove whitespace before '['
 
@@ -41,15 +41,15 @@ E20.py:4:10: E201 [*] Whitespace after '['
 7 7 | #: E201:1:6
 
 E20.py:6:15: E201 [*] Whitespace after '{'
-   |
- 6 | spam(ham[ 1], {eggs: 2})
- 7 | #: E201:1:15
- 8 | spam(ham[1], { eggs: 2})
-   |               ^ E201
- 9 | #: E201:1:6
-10 | spam(   ham[1], {eggs: 2})
-   |
-   = help: Remove whitespace before '{'
+  |
+4 | spam(ham[ 1], {eggs: 2})
+5 | #: E201:1:15
+6 | spam(ham[1], { eggs: 2})
+  |               ^ E201
+7 | #: E201:1:6
+8 | spam(   ham[1], {eggs: 2})
+  |
+  = help: Remove whitespace before '{'
 
 ℹ Fix
 3 3 | #: E201:1:10
@@ -63,12 +63,12 @@ E20.py:6:15: E201 [*] Whitespace after '{'
 
 E20.py:8:6: E201 [*] Whitespace after '('
    |
- 8 | spam(ham[1], { eggs: 2})
- 9 | #: E201:1:6
-10 | spam(   ham[1], {eggs: 2})
+ 6 | spam(ham[1], { eggs: 2})
+ 7 | #: E201:1:6
+ 8 | spam(   ham[1], {eggs: 2})
    |      ^^^ E201
-11 | #: E201:1:10
-12 | spam(ham[   1], {eggs: 2})
+ 9 | #: E201:1:10
+10 | spam(ham[   1], {eggs: 2})
    |
    = help: Remove whitespace before '('
 
@@ -84,12 +84,12 @@ E20.py:8:6: E201 [*] Whitespace after '('
 
 E20.py:10:10: E201 [*] Whitespace after '['
    |
-10 | spam(   ham[1], {eggs: 2})
-11 | #: E201:1:10
-12 | spam(ham[   1], {eggs: 2})
+ 8 | spam(   ham[1], {eggs: 2})
+ 9 | #: E201:1:10
+10 | spam(ham[   1], {eggs: 2})
    |          ^^^ E201
-13 | #: E201:1:15
-14 | spam(ham[1], {  eggs: 2})
+11 | #: E201:1:15
+12 | spam(ham[1], {  eggs: 2})
    |
    = help: Remove whitespace before '['
 
@@ -105,12 +105,12 @@ E20.py:10:10: E201 [*] Whitespace after '['
 
 E20.py:12:15: E201 [*] Whitespace after '{'
    |
-12 | spam(ham[   1], {eggs: 2})
-13 | #: E201:1:15
-14 | spam(ham[1], {  eggs: 2})
+10 | spam(ham[   1], {eggs: 2})
+11 | #: E201:1:15
+12 | spam(ham[1], {  eggs: 2})
    |               ^^ E201
-15 | #: Okay
-16 | spam(ham[1], {eggs: 2})
+13 | #: Okay
+14 | spam(ham[1], {eggs: 2})
    |
    = help: Remove whitespace before '{'
 
@@ -126,11 +126,11 @@ E20.py:12:15: E201 [*] Whitespace after '{'
 
 E20.py:81:6: E201 [*] Whitespace after '['
    |
-81 | #: E201:1:6
-82 | spam[ ~ham]
+80 | #: E201:1:6
+81 | spam[ ~ham]
    |      ^ E201
-83 | 
-84 | #: Okay
+82 | 
+83 | #: Okay
    |
    = help: Remove whitespace before '['
 

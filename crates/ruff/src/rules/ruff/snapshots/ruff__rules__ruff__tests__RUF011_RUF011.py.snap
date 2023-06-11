@@ -1,42 +1,40 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-RUF011.py:8:34: RUF011 Do not use mutable default values for class attributes
+RUF011.py:10:2: RUF011 Dictionary comprehension uses static key: `"key"`
    |
- 8 | class A:
- 9 |     mutable_default: list[int] = []
-   |                                  ^^ RUF011
-10 |     immutable_annotation: typing.Sequence[int] = []
-11 |     without_annotation = []
-   |
-
-RUF011.py:10:26: RUF011 Do not use mutable default values for class attributes
-   |
-10 |     mutable_default: list[int] = []
-11 |     immutable_annotation: typing.Sequence[int] = []
-12 |     without_annotation = []
-   |                          ^^ RUF011
-13 |     ignored_via_comment: list[int] = []  # noqa: RUF011
-14 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+ 9 | # Errors
+10 | {"key": value.upper() for value in data}
+   |  ^^^^^ RUF011
+11 | {True: value.upper() for value in data}
+12 | {0: value.upper() for value in data}
    |
 
-RUF011.py:17:34: RUF011 Do not use mutable default values for class attributes
+RUF011.py:11:2: RUF011 Dictionary comprehension uses static key: `True`
    |
-17 | class B:
-18 |     mutable_default: list[int] = []
-   |                                  ^^ RUF011
-19 |     immutable_annotation: Sequence[int] = []
-20 |     without_annotation = []
+ 9 | # Errors
+10 | {"key": value.upper() for value in data}
+11 | {True: value.upper() for value in data}
+   |  ^^^^ RUF011
+12 | {0: value.upper() for value in data}
+13 | {(1, "a"): value.upper() for value in data} # constant tuple
    |
 
-RUF011.py:19:26: RUF011 Do not use mutable default values for class attributes
+RUF011.py:12:2: RUF011 Dictionary comprehension uses static key: `0`
    |
-19 |     mutable_default: list[int] = []
-20 |     immutable_annotation: Sequence[int] = []
-21 |     without_annotation = []
-   |                          ^^ RUF011
-22 |     ignored_via_comment: list[int] = []  # noqa: RUF011
-23 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+10 | {"key": value.upper() for value in data}
+11 | {True: value.upper() for value in data}
+12 | {0: value.upper() for value in data}
+   |  ^ RUF011
+13 | {(1, "a"): value.upper() for value in data} # constant tuple
+   |
+
+RUF011.py:13:2: RUF011 Dictionary comprehension uses static key: `(1, "a")`
+   |
+11 | {True: value.upper() for value in data}
+12 | {0: value.upper() for value in data}
+13 | {(1, "a"): value.upper() for value in data} # constant tuple
+   |  ^^^^^^^^ RUF011
    |
 
 

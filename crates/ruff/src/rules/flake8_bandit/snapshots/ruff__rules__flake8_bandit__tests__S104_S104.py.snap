@@ -3,33 +3,33 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
 S104.py:9:1: S104 Possible binding to all interfaces
    |
- 9 | # Error
-10 | "0.0.0.0"
+ 8 | # Error
+ 9 | "0.0.0.0"
    | ^^^^^^^^^ S104
-11 | '0.0.0.0'
+10 | '0.0.0.0'
    |
 
 S104.py:10:1: S104 Possible binding to all interfaces
    |
-10 | # Error
-11 | "0.0.0.0"
-12 | '0.0.0.0'
+ 8 | # Error
+ 9 | "0.0.0.0"
+10 | '0.0.0.0'
    | ^^^^^^^^^ S104
    |
 
 S104.py:14:6: S104 Possible binding to all interfaces
    |
-14 | # Error
-15 | func("0.0.0.0")
+13 | # Error
+14 | func("0.0.0.0")
    |      ^^^^^^^^^ S104
    |
 
 S104.py:18:9: S104 Possible binding to all interfaces
    |
-18 | def my_func():
-19 |     x = "0.0.0.0"
+17 | def my_func():
+18 |     x = "0.0.0.0"
    |         ^^^^^^^^^ S104
-20 |     print(x)
+19 |     print(x)
    |
 
 
