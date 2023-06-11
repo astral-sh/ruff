@@ -16,10 +16,11 @@ use ruff_macros::CacheKey;
 use crate::registry::{Rule, RuleNamespace, RuleSet, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint,
+    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
+    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
@@ -111,6 +112,7 @@ pub struct Settings {
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_builtins: flake8_builtins::settings::Settings,
     pub flake8_comprehensions: flake8_comprehensions::settings::Settings,
+    pub copyright: copyright::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
@@ -199,6 +201,7 @@ impl Settings {
                 .flake8_comprehensions
                 .map(Into::into)
                 .unwrap_or_default(),
+            copyright: config.copyright.map(Into::into).unwrap_or_default(),
             flake8_errmsg: config.flake8_errmsg.map(Into::into).unwrap_or_default(),
             flake8_implicit_str_concat: config
                 .flake8_implicit_str_concat
