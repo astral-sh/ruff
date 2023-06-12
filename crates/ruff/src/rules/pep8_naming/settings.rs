@@ -96,13 +96,10 @@ impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
             ignore_names: match options.ignore_names {
-                Some(names) => names
-                    .into_iter()
-                    .map(|name| IdenifierMatcher::from(name))
-                    .collect(),
+                Some(names) => names.into_iter().map(IdenifierMatcher::from).collect(),
                 None => IGNORE_NAMES
                     .into_iter()
-                    .map(|name| IdenifierMatcher::from(name))
+                    .map(IdenifierMatcher::from)
                     .collect(),
             },
             classmethod_decorators: options.classmethod_decorators.unwrap_or_default(),
