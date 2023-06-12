@@ -1,3 +1,3 @@
-pub(crate) use blind_except::{blind_except, BlindExcept};
+pub(crate) use blind_except::*;
 
 mod blind_except;

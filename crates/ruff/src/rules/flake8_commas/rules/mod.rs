@@ -1,5 +1,3 @@
-pub(crate) use trailing_commas::{
-    trailing_commas, MissingTrailingComma, ProhibitedTrailingComma, TrailingCommaOnBareTuple,
-};
+pub(crate) use trailing_commas::*;
 
 mod trailing_commas;

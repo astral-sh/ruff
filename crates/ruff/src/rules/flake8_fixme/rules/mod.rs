@@ -1,5 +1,3 @@
-pub(crate) use todos::{
-    todos, LineContainsFixme, LineContainsHack, LineContainsTodo, LineContainsXxx,
-};
+pub(crate) use todos::*;
 
 mod todos;
