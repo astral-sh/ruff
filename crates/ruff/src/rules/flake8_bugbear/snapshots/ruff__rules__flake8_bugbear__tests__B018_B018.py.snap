@@ -3,255 +3,255 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B018.py:11:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-11 |     "str"  # Str (no raise)
-12 |     f"{int}"  # JoinedStr (no raise)
-13 |     1j  # Number (complex)
+ 9 |     "str"  # Str (no raise)
+10 |     f"{int}"  # JoinedStr (no raise)
+11 |     1j  # Number (complex)
    |     ^^ B018
-14 |     1  # Number (int)
-15 |     1.0  # Number (float)
+12 |     1  # Number (int)
+13 |     1.0  # Number (float)
    |
 
 B018.py:12:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-12 |     f"{int}"  # JoinedStr (no raise)
-13 |     1j  # Number (complex)
-14 |     1  # Number (int)
+10 |     f"{int}"  # JoinedStr (no raise)
+11 |     1j  # Number (complex)
+12 |     1  # Number (int)
    |     ^ B018
-15 |     1.0  # Number (float)
-16 |     b"foo"  # Binary
+13 |     1.0  # Number (float)
+14 |     b"foo"  # Binary
    |
 
 B018.py:13:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-13 |     1j  # Number (complex)
-14 |     1  # Number (int)
-15 |     1.0  # Number (float)
+11 |     1j  # Number (complex)
+12 |     1  # Number (int)
+13 |     1.0  # Number (float)
    |     ^^^ B018
-16 |     b"foo"  # Binary
-17 |     True  # NameConstant (True)
+14 |     b"foo"  # Binary
+15 |     True  # NameConstant (True)
    |
 
 B018.py:14:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-14 |     1  # Number (int)
-15 |     1.0  # Number (float)
-16 |     b"foo"  # Binary
+12 |     1  # Number (int)
+13 |     1.0  # Number (float)
+14 |     b"foo"  # Binary
    |     ^^^^^^ B018
-17 |     True  # NameConstant (True)
-18 |     False  # NameConstant (False)
+15 |     True  # NameConstant (True)
+16 |     False  # NameConstant (False)
    |
 
 B018.py:15:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-15 |     1.0  # Number (float)
-16 |     b"foo"  # Binary
-17 |     True  # NameConstant (True)
+13 |     1.0  # Number (float)
+14 |     b"foo"  # Binary
+15 |     True  # NameConstant (True)
    |     ^^^^ B018
-18 |     False  # NameConstant (False)
-19 |     None  # NameConstant (None)
+16 |     False  # NameConstant (False)
+17 |     None  # NameConstant (None)
    |
 
 B018.py:16:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-16 |     b"foo"  # Binary
-17 |     True  # NameConstant (True)
-18 |     False  # NameConstant (False)
+14 |     b"foo"  # Binary
+15 |     True  # NameConstant (True)
+16 |     False  # NameConstant (False)
    |     ^^^^^ B018
-19 |     None  # NameConstant (None)
-20 |     [1, 2]  # list
+17 |     None  # NameConstant (None)
+18 |     [1, 2]  # list
    |
 
 B018.py:17:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-17 |     True  # NameConstant (True)
-18 |     False  # NameConstant (False)
-19 |     None  # NameConstant (None)
+15 |     True  # NameConstant (True)
+16 |     False  # NameConstant (False)
+17 |     None  # NameConstant (None)
    |     ^^^^ B018
-20 |     [1, 2]  # list
-21 |     {1, 2}  # set
+18 |     [1, 2]  # list
+19 |     {1, 2}  # set
    |
 
 B018.py:18:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-18 |     False  # NameConstant (False)
-19 |     None  # NameConstant (None)
-20 |     [1, 2]  # list
+16 |     False  # NameConstant (False)
+17 |     None  # NameConstant (None)
+18 |     [1, 2]  # list
    |     ^^^^^^ B018
-21 |     {1, 2}  # set
-22 |     {"foo": "bar"}  # dict
+19 |     {1, 2}  # set
+20 |     {"foo": "bar"}  # dict
    |
 
 B018.py:19:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-19 |     None  # NameConstant (None)
-20 |     [1, 2]  # list
-21 |     {1, 2}  # set
+17 |     None  # NameConstant (None)
+18 |     [1, 2]  # list
+19 |     {1, 2}  # set
    |     ^^^^^^ B018
-22 |     {"foo": "bar"}  # dict
+20 |     {"foo": "bar"}  # dict
    |
 
 B018.py:20:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-20 |     [1, 2]  # list
-21 |     {1, 2}  # set
-22 |     {"foo": "bar"}  # dict
+18 |     [1, 2]  # list
+19 |     {1, 2}  # set
+20 |     {"foo": "bar"}  # dict
    |     ^^^^^^^^^^^^^^ B018
    |
 
 B018.py:24:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-24 | class Foo3:
-25 |     123
+23 | class Foo3:
+24 |     123
    |     ^^^ B018
-26 |     a = 2
-27 |     "str"
+25 |     a = 2
+26 |     "str"
    |
 
 B018.py:27:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-27 |     a = 2
-28 |     "str"
-29 |     1
+25 |     a = 2
+26 |     "str"
+27 |     1
    |     ^ B018
    |
 
 B018.py:39:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-39 |     "str"  # Str (no raise)
-40 |     f"{int}"  # JoinedStr (no raise)
-41 |     1j  # Number (complex)
+37 |     "str"  # Str (no raise)
+38 |     f"{int}"  # JoinedStr (no raise)
+39 |     1j  # Number (complex)
    |     ^^ B018
-42 |     1  # Number (int)
-43 |     1.0  # Number (float)
+40 |     1  # Number (int)
+41 |     1.0  # Number (float)
    |
 
 B018.py:40:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-40 |     f"{int}"  # JoinedStr (no raise)
-41 |     1j  # Number (complex)
-42 |     1  # Number (int)
+38 |     f"{int}"  # JoinedStr (no raise)
+39 |     1j  # Number (complex)
+40 |     1  # Number (int)
    |     ^ B018
-43 |     1.0  # Number (float)
-44 |     b"foo"  # Binary
+41 |     1.0  # Number (float)
+42 |     b"foo"  # Binary
    |
 
 B018.py:41:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-41 |     1j  # Number (complex)
-42 |     1  # Number (int)
-43 |     1.0  # Number (float)
+39 |     1j  # Number (complex)
+40 |     1  # Number (int)
+41 |     1.0  # Number (float)
    |     ^^^ B018
-44 |     b"foo"  # Binary
-45 |     True  # NameConstant (True)
+42 |     b"foo"  # Binary
+43 |     True  # NameConstant (True)
    |
 
 B018.py:42:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-42 |     1  # Number (int)
-43 |     1.0  # Number (float)
-44 |     b"foo"  # Binary
+40 |     1  # Number (int)
+41 |     1.0  # Number (float)
+42 |     b"foo"  # Binary
    |     ^^^^^^ B018
-45 |     True  # NameConstant (True)
-46 |     False  # NameConstant (False)
+43 |     True  # NameConstant (True)
+44 |     False  # NameConstant (False)
    |
 
 B018.py:43:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-43 |     1.0  # Number (float)
-44 |     b"foo"  # Binary
-45 |     True  # NameConstant (True)
+41 |     1.0  # Number (float)
+42 |     b"foo"  # Binary
+43 |     True  # NameConstant (True)
    |     ^^^^ B018
-46 |     False  # NameConstant (False)
-47 |     None  # NameConstant (None)
+44 |     False  # NameConstant (False)
+45 |     None  # NameConstant (None)
    |
 
 B018.py:44:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-44 |     b"foo"  # Binary
-45 |     True  # NameConstant (True)
-46 |     False  # NameConstant (False)
+42 |     b"foo"  # Binary
+43 |     True  # NameConstant (True)
+44 |     False  # NameConstant (False)
    |     ^^^^^ B018
-47 |     None  # NameConstant (None)
-48 |     [1, 2]  # list
+45 |     None  # NameConstant (None)
+46 |     [1, 2]  # list
    |
 
 B018.py:45:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-45 |     True  # NameConstant (True)
-46 |     False  # NameConstant (False)
-47 |     None  # NameConstant (None)
+43 |     True  # NameConstant (True)
+44 |     False  # NameConstant (False)
+45 |     None  # NameConstant (None)
    |     ^^^^ B018
-48 |     [1, 2]  # list
-49 |     {1, 2}  # set
+46 |     [1, 2]  # list
+47 |     {1, 2}  # set
    |
 
 B018.py:46:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-46 |     False  # NameConstant (False)
-47 |     None  # NameConstant (None)
-48 |     [1, 2]  # list
+44 |     False  # NameConstant (False)
+45 |     None  # NameConstant (None)
+46 |     [1, 2]  # list
    |     ^^^^^^ B018
-49 |     {1, 2}  # set
-50 |     {"foo": "bar"}  # dict
+47 |     {1, 2}  # set
+48 |     {"foo": "bar"}  # dict
    |
 
 B018.py:47:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-47 |     None  # NameConstant (None)
-48 |     [1, 2]  # list
-49 |     {1, 2}  # set
+45 |     None  # NameConstant (None)
+46 |     [1, 2]  # list
+47 |     {1, 2}  # set
    |     ^^^^^^ B018
-50 |     {"foo": "bar"}  # dict
+48 |     {"foo": "bar"}  # dict
    |
 
 B018.py:48:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-48 |     [1, 2]  # list
-49 |     {1, 2}  # set
-50 |     {"foo": "bar"}  # dict
+46 |     [1, 2]  # list
+47 |     {1, 2}  # set
+48 |     {"foo": "bar"}  # dict
    |     ^^^^^^^^^^^^^^ B018
    |
 
 B018.py:52:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-52 | def foo3():
-53 |     123
+51 | def foo3():
+52 |     123
    |     ^^^ B018
-54 |     a = 2
-55 |     "str"
+53 |     a = 2
+54 |     "str"
    |
 
 B018.py:55:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-55 |     a = 2
-56 |     "str"
-57 |     3
+53 |     a = 2
+54 |     "str"
+55 |     3
    |     ^ B018
    |
 
 B018.py:63:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-63 | def foo5():
-64 |     foo.bar  # Attribute (raise)
+62 | def foo5():
+63 |     foo.bar  # Attribute (raise)
    |     ^^^^^^^ B018
-65 |     object().__class__  # Attribute (raise)
-66 |     "foo" + "bar"  # BinOp (raise)
+64 |     object().__class__  # Attribute (raise)
+65 |     "foo" + "bar"  # BinOp (raise)
    |
 
 B018.py:64:5: B018 Found useless attribute access. Either assign it to a variable or remove it.
    |
-64 | def foo5():
-65 |     foo.bar  # Attribute (raise)
-66 |     object().__class__  # Attribute (raise)
+62 | def foo5():
+63 |     foo.bar  # Attribute (raise)
+64 |     object().__class__  # Attribute (raise)
    |     ^^^^^^^^^^^^^^^^^^ B018
-67 |     "foo" + "bar"  # BinOp (raise)
+65 |     "foo" + "bar"  # BinOp (raise)
    |
 
 B018.py:65:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
-65 |     foo.bar  # Attribute (raise)
-66 |     object().__class__  # Attribute (raise)
-67 |     "foo" + "bar"  # BinOp (raise)
+63 |     foo.bar  # Attribute (raise)
+64 |     object().__class__  # Attribute (raise)
+65 |     "foo" + "bar"  # BinOp (raise)
    |     ^^^^^^^^^^^^^ B018
    |
 

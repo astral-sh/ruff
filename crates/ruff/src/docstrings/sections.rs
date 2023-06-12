@@ -1,11 +1,11 @@
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
+use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
-use ruff_newlines::{StrExt, UniversalNewlineIterator};
-use ruff_python_ast::whitespace;
+use ruff_python_whitespace::{UniversalNewlineIterator, UniversalNewlines};
 
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};
@@ -154,8 +154,8 @@ impl<'a> SectionContexts<'a> {
             }
 
             if let Some(section_kind) = suspected_as_section(&line, style) {
-                let indent = whitespace::leading_space(&line);
-                let section_name = whitespace::leading_words(&line);
+                let indent = leading_space(&line);
+                let section_name = leading_words(&line);
 
                 let section_name_range = TextRange::at(indent.text_len(), section_name.text_len());
 
@@ -379,7 +379,7 @@ impl Debug for SectionContext<'_> {
 }
 
 fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> {
-    if let Some(kind) = SectionKind::from_str(whitespace::leading_words(line)) {
+    if let Some(kind) = SectionKind::from_str(leading_words(line)) {
         if style.sections().contains(&kind) {
             return Some(kind);
         }

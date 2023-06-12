@@ -31,6 +31,7 @@ mod tests {
         Rule::RepeatedIsinstanceCalls,
         Path::new("repeated_isinstance_calls.py")
     )]
+    #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
@@ -52,8 +53,8 @@ mod tests {
     #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
+    #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
-    #[test_case(Rule::DuplicateValue, Path::new("duplicate_value.py"))]
     #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
     #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"))]
     #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]

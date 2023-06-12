@@ -4,7 +4,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Constant, Expr, Identifier, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -386,7 +386,9 @@ pub struct StringDotFormatExtraNamedArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
+impl Violation for StringDotFormatExtraNamedArguments {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatExtraNamedArguments { missing } = self;
@@ -394,10 +396,10 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
         format!("`.format` call has unused named argument(s): {message}")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let StringDotFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
-        format!("Remove extra named arguments: {message}")
+        Some(format!("Remove extra named arguments: {message}"))
     }
 }
 
@@ -425,7 +427,9 @@ pub struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
+impl Violation for StringDotFormatExtraPositionalArguments {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatExtraPositionalArguments { missing } = self;
@@ -433,10 +437,12 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
         format!("`.format` call has unused arguments at position(s): {message}")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let StringDotFormatExtraPositionalArguments { missing } = self;
         let message = missing.join(", ");
-        format!("Remove extra positional arguments at position(s): {message}")
+        Some(format!(
+            "Remove extra positional arguments at position(s): {message}"
+        ))
     }
 }
 
@@ -568,13 +574,15 @@ pub(crate) fn percent_format_extra_named_arguments(
     let Expr::Dict(ast::ExprDict { keys, .. }) = &right else {
         return;
     };
+    // If any of the keys are spread, abort.
     if keys.iter().any(Option::is_none) {
-        return; // contains **x splat
+        return;
     }
 
-    let missing: Vec<&str> = keys
+    let missing: Vec<(usize, &str)> = keys
         .iter()
-        .filter_map(|k| match k {
+        .enumerate()
+        .filter_map(|(index, key)| match key {
             Some(Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
@@ -582,7 +590,7 @@ pub(crate) fn percent_format_extra_named_arguments(
                 if summary.keywords.contains(value) {
                     None
                 } else {
-                    Some(value.as_str())
+                    Some((index, value.as_str()))
                 }
             }
             _ => None,
@@ -593,21 +601,24 @@ pub(crate) fn percent_format_extra_named_arguments(
         return;
     }
 
+    let names: Vec<String> = missing
+        .iter()
+        .map(|(_, name)| (*name).to_string())
+        .collect();
     let mut diagnostic = Diagnostic::new(
-        PercentFormatExtraNamedArguments {
-            missing: missing.iter().map(|&arg| arg.to_string()).collect(),
-        },
+        PercentFormatExtraNamedArguments { missing: names },
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            remove_unused_format_arguments_from_dict(
-                &missing,
+        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+        diagnostic.try_set_fix(|| {
+            let edit = remove_unused_format_arguments_from_dict(
+                &indexes,
                 right,
                 checker.locator,
                 checker.stylist,
-            )
+            )?;
+            Ok(Fix::automatic(edit))
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -736,21 +747,22 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     keywords: &[Keyword],
     location: TextRange,
 ) {
+    // If there are any **kwargs, abort.
     if has_star_star_kwargs(keywords) {
         return;
     }
 
-    let keywords = keywords.iter().filter_map(|k| {
-        let Keyword { arg, .. } = &k;
-        arg.as_ref()
-    });
+    let keywords = keywords
+        .iter()
+        .filter_map(|Keyword { arg, .. }| arg.as_ref());
 
-    let missing: Vec<&str> = keywords
-        .filter_map(|arg| {
-            if summary.keywords.contains(arg.as_ref()) {
+    let missing: Vec<(usize, &str)> = keywords
+        .enumerate()
+        .filter_map(|(index, keyword)| {
+            if summary.keywords.contains(keyword.as_ref()) {
                 None
             } else {
-                Some(arg.as_str())
+                Some((index, keyword.as_str()))
             }
         })
         .collect();
@@ -759,21 +771,24 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
+    let names: Vec<String> = missing
+        .iter()
+        .map(|(_, name)| (*name).to_string())
+        .collect();
     let mut diagnostic = Diagnostic::new(
-        StringDotFormatExtraNamedArguments {
-            missing: missing.iter().map(|&arg| arg.to_string()).collect(),
-        },
+        StringDotFormatExtraNamedArguments { missing: names },
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            remove_unused_keyword_arguments_from_format_call(
-                &missing,
+        let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+        diagnostic.try_set_fix(|| {
+            let edit = remove_unused_keyword_arguments_from_format_call(
+                &indexes,
                 location,
                 checker.locator,
                 checker.stylist,
-            )
+            )?;
+            Ok(Fix::automatic(edit))
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -805,22 +820,48 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         StringDotFormatExtraPositionalArguments {
             missing: missing
                 .iter()
-                .map(std::string::ToString::to_string)
+                .map(ToString::to_string)
                 .collect::<Vec<String>>(),
         },
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            remove_unused_positional_arguments_from_format_call(
-                &missing,
-                location,
-                checker.locator,
-                checker.stylist,
-                &summary.format_string,
-            )
-        });
+        // We can only fix if the positional arguments we're removing don't require re-indexing
+        // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
+        // this requires changing the format string to `"{0}{1}"`. But we can fix
+        // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
+        fn is_contiguous_from_end<T>(indexes: &[usize], target: &[T]) -> bool {
+            if indexes.is_empty() {
+                return true;
+            }
+
+            let mut expected_index = target.len() - 1;
+            for &index in indexes.iter().rev() {
+                if index != expected_index {
+                    return false;
+                }
+
+                if expected_index == 0 {
+                    break;
+                }
+
+                expected_index -= 1;
+            }
+
+            true
+        }
+
+        if is_contiguous_from_end(&missing, args) {
+            diagnostic.try_set_fix(|| {
+                let edit = remove_unused_positional_arguments_from_format_call(
+                    &missing,
+                    location,
+                    checker.locator,
+                    checker.stylist,
+                )?;
+                Ok(Fix::automatic(edit))
+            });
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -20,31 +20,36 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 ```diff
 --- Black
 +++ Ruff
-@@ -1,12 +1,5 @@
- # This is a standalone comment.
--(
--    sdfjklsdfsjldkflkjsf,
--    sdfjsdfjlksdljkfsdlkf,
--    sdfsdjfklsdfjlksdljkf,
--    sdsfsdfjskdflsfsdf,
+@@ -4,9 +4,9 @@
+     sdfjsdfjlksdljkfsdlkf,
+     sdfsdjfklsdfjlksdljkf,
+     sdsfsdfjskdflsfsdf,
 -) = (1, 2, 3)
--
-+sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
++) = 1, 2, 3
+ 
  # This is as well.
 -(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
--
-+this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
- (a,) = call()
++(this_will_be_wrapped_in_parens,) = NOT_IMPLEMENTED_call()
+ 
+-(a,) = call()
++(a,) = NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
 # This is a standalone comment.
-sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
+(
+    sdfjklsdfsjldkflkjsf,
+    sdfjsdfjlksdljkfsdlkf,
+    sdfsdjfklsdfjlksdljkf,
+    sdsfsdfjskdflsfsdf,
+) = 1, 2, 3
+
 # This is as well.
-this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
-(a,) = call()
+(this_will_be_wrapped_in_parens,) = NOT_IMPLEMENTED_call()
+
+(a,) = NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

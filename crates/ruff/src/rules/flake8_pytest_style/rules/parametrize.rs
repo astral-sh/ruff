@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, Constant, Decorator, Expr, ExprContext, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -94,7 +94,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(decorator: &Expr, expr: &Expr, locator: &Locator) -> TextRange {
+fn get_parametrize_name_range(decorator: &Decorator, expr: &Expr, locator: &Locator) -> TextRange {
     let mut locations = Vec::new();
     let mut implicit_concat = None;
 
@@ -128,7 +128,7 @@ fn get_parametrize_name_range(decorator: &Expr, expr: &Expr, locator: &Locator) 
 }
 
 /// PT006
-fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
+fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
@@ -417,10 +417,10 @@ fn handle_value_rows(
     }
 }
 
-pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
+pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
     for decorator in decorators {
         if is_pytest_parametrize(checker.semantic_model(), decorator) {
-            if let Expr::Call(ast::ExprCall { args, .. }) = decorator {
+            if let Expr::Call(ast::ExprCall { args, .. }) = &decorator.expression {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
                     if let Some(names) = args.get(0) {
                         check_names(checker, decorator, names);

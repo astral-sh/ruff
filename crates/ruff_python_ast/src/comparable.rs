@@ -2,6 +2,7 @@
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
 use num_bigint::BigInt;
+use rustpython_ast::Decorator;
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
     Excepthandler, Expr, ExprContext, Identifier, Int, Keyword, MatchCase, Operator, Pattern, Stmt,
@@ -263,6 +264,19 @@ impl<'a> From<&'a MatchCase> for ComparableMatchCase<'a> {
             pattern: (&match_case.pattern).into(),
             guard: match_case.guard.as_ref().map(Into::into),
             body: match_case.body.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableDecorator<'a> {
+    pub expression: ComparableExpr<'a>,
+}
+
+impl<'a> From<&'a Decorator> for ComparableDecorator<'a> {
+    fn from(decorator: &'a Decorator) -> Self {
+        Self {
+            expression: (&decorator.expression).into(),
         }
     }
 }
@@ -777,7 +791,7 @@ pub enum ComparableStmt<'a> {
         name: &'a str,
         args: ComparableArguments<'a>,
         body: Vec<ComparableStmt<'a>>,
-        decorator_list: Vec<ComparableExpr<'a>>,
+        decorator_list: Vec<ComparableDecorator<'a>>,
         returns: Option<ComparableExpr<'a>>,
         type_comment: Option<&'a str>,
     },
@@ -785,7 +799,7 @@ pub enum ComparableStmt<'a> {
         name: &'a str,
         args: ComparableArguments<'a>,
         body: Vec<ComparableStmt<'a>>,
-        decorator_list: Vec<ComparableExpr<'a>>,
+        decorator_list: Vec<ComparableDecorator<'a>>,
         returns: Option<ComparableExpr<'a>>,
         type_comment: Option<&'a str>,
     },
@@ -794,7 +808,7 @@ pub enum ComparableStmt<'a> {
         bases: Vec<ComparableExpr<'a>>,
         keywords: Vec<ComparableKeyword<'a>>,
         body: Vec<ComparableStmt<'a>>,
-        decorator_list: Vec<ComparableExpr<'a>>,
+        decorator_list: Vec<ComparableDecorator<'a>>,
     },
     Return {
         value: Option<ComparableExpr<'a>>,

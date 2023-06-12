@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Stmt};
+use rustpython_parser::ast::{self, Decorator, Stmt};
 
 pub fn name(stmt: &Stmt) -> &str {
     match stmt {
@@ -8,7 +8,7 @@ pub fn name(stmt: &Stmt) -> &str {
     }
 }
 
-pub fn decorator_list(stmt: &Stmt) -> &[Expr] {
+pub fn decorator_list(stmt: &Stmt) -> &[Decorator] {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { decorator_list, .. }) => {

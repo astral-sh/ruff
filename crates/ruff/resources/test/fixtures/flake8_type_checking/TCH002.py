@@ -150,3 +150,17 @@ def f():
 
 def f():
     import pandas as pd
+
+
+def f():
+    from pandas import DataFrame  # noqa: TCH002
+
+    x: DataFrame = 2
+
+
+def f():
+    from pandas import (  # noqa: TCH002
+        DataFrame,
+    )
+
+    x: DataFrame = 2

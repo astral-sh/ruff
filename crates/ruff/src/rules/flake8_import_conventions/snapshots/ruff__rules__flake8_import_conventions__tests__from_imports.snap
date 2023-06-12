@@ -3,81 +3,81 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 ---
 from_imports.py:3:1: ICN001 `xml.dom.minidom` should be imported as `md`
   |
-3 | # Test absolute imports
-4 | # Violation cases
-5 | import xml.dom.minidom
+1 | # Test absolute imports
+2 | # Violation cases
+3 | import xml.dom.minidom
   | ^^^^^^^^^^^^^^^^^^^^^^ ICN001
-6 | import xml.dom.minidom as wrong
-7 | from xml.dom import minidom as wrong
+4 | import xml.dom.minidom as wrong
+5 | from xml.dom import minidom as wrong
   |
 
 from_imports.py:4:1: ICN001 `xml.dom.minidom` should be imported as `md`
   |
-4 | # Violation cases
-5 | import xml.dom.minidom
-6 | import xml.dom.minidom as wrong
+2 | # Violation cases
+3 | import xml.dom.minidom
+4 | import xml.dom.minidom as wrong
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-7 | from xml.dom import minidom as wrong
-8 | from xml.dom import minidom
+5 | from xml.dom import minidom as wrong
+6 | from xml.dom import minidom
   |
 
 from_imports.py:5:1: ICN001 `xml.dom.minidom` should be imported as `md`
   |
-5 | import xml.dom.minidom
-6 | import xml.dom.minidom as wrong
-7 | from xml.dom import minidom as wrong
+3 | import xml.dom.minidom
+4 | import xml.dom.minidom as wrong
+5 | from xml.dom import minidom as wrong
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-8 | from xml.dom import minidom
-9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+6 | from xml.dom import minidom
+7 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
   |
 
 from_imports.py:6:1: ICN001 `xml.dom.minidom` should be imported as `md`
-   |
- 6 | import xml.dom.minidom as wrong
- 7 | from xml.dom import minidom as wrong
- 8 | from xml.dom import minidom
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
- 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
-10 | from xml.dom.minidom import parseString
-   |
+  |
+4 | import xml.dom.minidom as wrong
+5 | from xml.dom import minidom as wrong
+6 | from xml.dom import minidom
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+7 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+8 | from xml.dom.minidom import parseString
+  |
 
 from_imports.py:7:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
-   |
- 7 | from xml.dom import minidom as wrong
- 8 | from xml.dom import minidom
- 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-10 | from xml.dom.minidom import parseString
-11 | from xml.dom.minidom import parse, parseString
-   |
+  |
+5 | from xml.dom import minidom as wrong
+6 | from xml.dom import minidom
+7 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+8 | from xml.dom.minidom import parseString
+9 | from xml.dom.minidom import parse, parseString
+  |
 
 from_imports.py:8:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
    |
- 8 | from xml.dom import minidom
- 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
-10 | from xml.dom.minidom import parseString
+ 6 | from xml.dom import minidom
+ 7 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+ 8 | from xml.dom.minidom import parseString
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-11 | from xml.dom.minidom import parse, parseString
-12 | from xml.dom.minidom import parse as ps, parseString as wrong
+ 9 | from xml.dom.minidom import parse, parseString
+10 | from xml.dom.minidom import parse as ps, parseString as wrong
    |
 
 from_imports.py:9:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
    |
- 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
-10 | from xml.dom.minidom import parseString
-11 | from xml.dom.minidom import parse, parseString
+ 7 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+ 8 | from xml.dom.minidom import parseString
+ 9 | from xml.dom.minidom import parse, parseString
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-12 | from xml.dom.minidom import parse as ps, parseString as wrong
+10 | from xml.dom.minidom import parse as ps, parseString as wrong
    |
 
 from_imports.py:10:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
    |
-10 | from xml.dom.minidom import parseString
-11 | from xml.dom.minidom import parse, parseString
-12 | from xml.dom.minidom import parse as ps, parseString as wrong
+ 8 | from xml.dom.minidom import parseString
+ 9 | from xml.dom.minidom import parse, parseString
+10 | from xml.dom.minidom import parse as ps, parseString as wrong
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-13 | 
-14 | # No ICN001 violations
+11 | 
+12 | # No ICN001 violations
    |
 
 

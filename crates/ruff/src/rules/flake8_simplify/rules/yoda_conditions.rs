@@ -1,7 +1,8 @@
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState, CompOp};
+use libcst_native::CompOp;
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -11,6 +12,36 @@ use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for conditions that position a constant on the left-hand side of the
+/// comparison operator, rather than the right-hand side.
+///
+/// ## Why is this bad?
+/// These conditions (sometimes referred to as "Yoda conditions") are less
+/// readable than conditions that place the variable on the left-hand side of
+/// the comparison operator.
+///
+/// In some languages, Yoda conditions are used to prevent accidental
+/// assignment in conditions (i.e., accidental uses of the `=` operator,
+/// instead of the `==` operator). However, Python does not allow assignments
+/// in conditions unless using the `:=` operator, so Yoda conditions provide
+/// no benefit in this regard.
+///
+/// ## Example
+/// ```python
+/// if "Foo" == foo:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if foo == "Foo":
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
+/// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
 #[violation]
 pub struct YodaConditions {
     pub suggestion: Option<String>,
@@ -117,13 +148,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
         _ => panic!("Expected comparison operator"),
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    expression.codegen(&mut state);
-    Ok(state.to_string())
+    Ok(expression.codegen_stylist(stylist))
 }
 
 /// SIM300

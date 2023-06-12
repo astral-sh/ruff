@@ -1,7 +1,5 @@
-pub(crate) use explicit::{explicit, ExplicitStringConcatenation};
-pub(crate) use implicit::{
-    implicit, MultiLineImplicitStringConcatenation, SingleLineImplicitStringConcatenation,
-};
+pub(crate) use explicit::*;
+pub(crate) use implicit::*;
 
 mod explicit;
 mod implicit;

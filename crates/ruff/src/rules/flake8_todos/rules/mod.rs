@@ -1,6 +1,3 @@
-pub(crate) use todos::{
-    todos, InvalidTodoCapitalization, InvalidTodoTag, MissingSpaceAfterTodoColon,
-    MissingTodoAuthor, MissingTodoColon, MissingTodoDescription, MissingTodoLink,
-};
+pub(crate) use todos::*;
 
 mod todos;

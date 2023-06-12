@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
 PYI014.pyi:3:7: PYI014 [*] Only simple default values allowed for arguments
   |
-3 | def f12(
-4 |     x,
-5 |     y=os.pathsep,  # Error PYI014
+1 | def f12(
+2 |     x,
+3 |     y=os.pathsep,  # Error PYI014
   |       ^^^^^^^^^^ PYI014
-6 | ) -> None: ...
-7 | def f11(*, x="x") -> None: ...  # OK
+4 | ) -> None: ...
+5 | def f11(*, x="x") -> None: ...  # OK
   |
   = help: Replace default value with `...`
 
@@ -23,16 +23,16 @@ PYI014.pyi:3:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:29:7: PYI014 [*] Only simple default values allowed for arguments
    |
-29 |   def f151(x={1: 2}) -> None: ...
-30 |   def f152(
-31 |       x={  # Error PYI014
+27 |   def f151(x={1: 2}) -> None: ...
+28 |   def f152(
+29 |       x={  # Error PYI014
    |  _______^
-32 | |         1: 2,
-33 | |         **{3: 4},
-34 | |     }
+30 | |         1: 2,
+31 | |         **{3: 4},
+32 | |     }
    | |_____^ PYI014
-35 |   ) -> None: ...
-36 |   def f153(
+33 |   ) -> None: ...
+34 |   def f153(
    |
    = help: Replace default value with `...`
 
@@ -51,25 +51,25 @@ PYI014.pyi:29:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:35:7: PYI014 [*] Only simple default values allowed for arguments
    |
-35 |   ) -> None: ...
-36 |   def f153(
-37 |       x=[  # Error PYI014
+33 |   ) -> None: ...
+34 |   def f153(
+35 |       x=[  # Error PYI014
    |  _______^
-38 | |         1,
-39 | |         2,
-40 | |         3,
-41 | |         4,
-42 | |         5,
-43 | |         6,
-44 | |         7,
-45 | |         8,
-46 | |         9,
-47 | |         10,
-48 | |         11,
-49 | |     ]
+36 | |         1,
+37 | |         2,
+38 | |         3,
+39 | |         4,
+40 | |         5,
+41 | |         6,
+42 | |         7,
+43 | |         8,
+44 | |         9,
+45 | |         10,
+46 | |         11,
+47 | |     ]
    | |_____^ PYI014
-50 |   ) -> None: ...
-51 |   def f154(
+48 |   ) -> None: ...
+49 |   def f154(
    |
    = help: Replace default value with `...`
 
@@ -97,16 +97,16 @@ PYI014.pyi:35:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:50:7: PYI014 [*] Only simple default values allowed for arguments
    |
-50 |   ) -> None: ...
-51 |   def f154(
-52 |       x=(  # Error PYI014
+48 |   ) -> None: ...
+49 |   def f154(
+50 |       x=(  # Error PYI014
    |  _______^
-53 | |         "foo",
-54 | |         ("bar", "baz"),
-55 | |     )
+51 | |         "foo",
+52 | |         ("bar", "baz"),
+53 | |     )
    | |_____^ PYI014
-56 |   ) -> None: ...
-57 |   def f141(
+54 |   ) -> None: ...
+55 |   def f141(
    |
    = help: Replace default value with `...`
 
@@ -125,12 +125,12 @@ PYI014.pyi:50:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:56:7: PYI014 [*] Only simple default values allowed for arguments
    |
-56 | ) -> None: ...
-57 | def f141(
-58 |     x=[*range(10)],  # Error PYI014
+54 | ) -> None: ...
+55 | def f141(
+56 |     x=[*range(10)],  # Error PYI014
    |       ^^^^^^^^^^^^ PYI014
-59 | ) -> None: ...
-60 | def f142(
+57 | ) -> None: ...
+58 | def f142(
    |
    = help: Replace default value with `...`
 
@@ -146,12 +146,12 @@ PYI014.pyi:56:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:59:7: PYI014 [*] Only simple default values allowed for arguments
    |
-59 | ) -> None: ...
-60 | def f142(
-61 |     x=list(range(10)),  # Error PYI014
+57 | ) -> None: ...
+58 | def f142(
+59 |     x=list(range(10)),  # Error PYI014
    |       ^^^^^^^^^^^^^^^ PYI014
-62 | ) -> None: ...
-63 | def f16(x=frozenset({b"foo", b"bar", b"baz"})) -> None: ...  # Error PYI014
+60 | ) -> None: ...
+61 | def f16(x=frozenset({b"foo", b"bar", b"baz"})) -> None: ...  # Error PYI014
    |
    = help: Replace default value with `...`
 
@@ -167,12 +167,12 @@ PYI014.pyi:59:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:61:11: PYI014 [*] Only simple default values allowed for arguments
    |
-61 |     x=list(range(10)),  # Error PYI014
-62 | ) -> None: ...
-63 | def f16(x=frozenset({b"foo", b"bar", b"baz"})) -> None: ...  # Error PYI014
+59 |     x=list(range(10)),  # Error PYI014
+60 | ) -> None: ...
+61 | def f16(x=frozenset({b"foo", b"bar", b"baz"})) -> None: ...  # Error PYI014
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI014
-64 | def f17(
-65 |     x="foo" + "bar",  # Error PYI014
+62 | def f17(
+63 |     x="foo" + "bar",  # Error PYI014
    |
    = help: Replace default value with `...`
 
@@ -188,12 +188,12 @@ PYI014.pyi:61:11: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:63:7: PYI014 [*] Only simple default values allowed for arguments
    |
-63 | def f16(x=frozenset({b"foo", b"bar", b"baz"})) -> None: ...  # Error PYI014
-64 | def f17(
-65 |     x="foo" + "bar",  # Error PYI014
+61 | def f16(x=frozenset({b"foo", b"bar", b"baz"})) -> None: ...  # Error PYI014
+62 | def f17(
+63 |     x="foo" + "bar",  # Error PYI014
    |       ^^^^^^^^^^^^^ PYI014
-66 | ) -> None: ...
-67 | def f18(
+64 | ) -> None: ...
+65 | def f18(
    |
    = help: Replace default value with `...`
 
@@ -209,12 +209,12 @@ PYI014.pyi:63:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:66:7: PYI014 [*] Only simple default values allowed for arguments
    |
-66 | ) -> None: ...
-67 | def f18(
-68 |     x=b"foo" + b"bar",  # Error PYI014
+64 | ) -> None: ...
+65 | def f18(
+66 |     x=b"foo" + b"bar",  # Error PYI014
    |       ^^^^^^^^^^^^^^^ PYI014
-69 | ) -> None: ...
-70 | def f19(
+67 | ) -> None: ...
+68 | def f19(
    |
    = help: Replace default value with `...`
 
@@ -230,12 +230,12 @@ PYI014.pyi:66:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:69:7: PYI014 [*] Only simple default values allowed for arguments
    |
-69 | ) -> None: ...
-70 | def f19(
-71 |     x="foo" + 4,  # Error PYI014
+67 | ) -> None: ...
+68 | def f19(
+69 |     x="foo" + 4,  # Error PYI014
    |       ^^^^^^^^^ PYI014
-72 | ) -> None: ...
-73 | def f20(
+70 | ) -> None: ...
+71 | def f20(
    |
    = help: Replace default value with `...`
 
@@ -251,12 +251,12 @@ PYI014.pyi:69:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:72:7: PYI014 [*] Only simple default values allowed for arguments
    |
-72 | ) -> None: ...
-73 | def f20(
-74 |     x=5 + 5,  # Error PYI014
+70 | ) -> None: ...
+71 | def f20(
+72 |     x=5 + 5,  # Error PYI014
    |       ^^^^^ PYI014
-75 | ) -> None: ...
-76 | def f21(
+73 | ) -> None: ...
+74 | def f21(
    |
    = help: Replace default value with `...`
 
@@ -272,12 +272,12 @@ PYI014.pyi:72:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:75:7: PYI014 [*] Only simple default values allowed for arguments
    |
-75 | ) -> None: ...
-76 | def f21(
-77 |     x=3j - 3j,  # Error PYI014
+73 | ) -> None: ...
+74 | def f21(
+75 |     x=3j - 3j,  # Error PYI014
    |       ^^^^^^^ PYI014
-78 | ) -> None: ...
-79 | def f22(
+76 | ) -> None: ...
+77 | def f22(
    |
    = help: Replace default value with `...`
 
@@ -293,12 +293,12 @@ PYI014.pyi:75:7: PYI014 [*] Only simple default values allowed for arguments
 
 PYI014.pyi:78:7: PYI014 [*] Only simple default values allowed for arguments
    |
-78 | ) -> None: ...
-79 | def f22(
-80 |     x=-42.5j + 4.3j,  # Error PYI014
+76 | ) -> None: ...
+77 | def f22(
+78 |     x=-42.5j + 4.3j,  # Error PYI014
    |       ^^^^^^^^^^^^^ PYI014
-81 | ) -> None: ...
-82 | def f23(
+79 | ) -> None: ...
+80 | def f23(
    |
    = help: Replace default value with `...`
 

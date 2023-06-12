@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Stmt};
+use rustpython_parser::ast::{Decorator, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,7 +51,7 @@ impl Violation for InvalidFunctionName {
 pub(crate) fn invalid_function_name(
     stmt: &Stmt,
     name: &str,
-    decorator_list: &[Expr],
+    decorator_list: &[Decorator],
     ignore_names: &[String],
     model: &SemanticModel,
     locator: &Locator,

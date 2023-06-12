@@ -3,21 +3,21 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B007.py:6:5: B007 Loop control variable `i` not used within loop body
   |
-6 | print(i)  # name no longer defined on Python 3; no warning yet
-7 | 
-8 | for i in range(10):  # name not used within the loop; B007
+4 | print(i)  # name no longer defined on Python 3; no warning yet
+5 | 
+6 | for i in range(10):  # name not used within the loop; B007
   |     ^ B007
-9 |     print(10)
+7 |     print(10)
   |
   = help: Rename unused `i` to `_i`
 
 B007.py:18:13: B007 [*] Loop control variable `k` not used within loop body
    |
-18 | for i in range(10):
-19 |     for j in range(10):
-20 |         for k in range(10):  # k not used, i and j used transitively
+16 | for i in range(10):
+17 |     for j in range(10):
+18 |         for k in range(10):  # k not used, i and j used transitively
    |             ^ B007
-21 |             print(i + j)
+19 |             print(i + j)
    |
    = help: Rename unused `k` to `_k`
 
@@ -59,54 +59,54 @@ B007.py:30:13: B007 [*] Loop control variable `k` not used within loop body
 
 B007.py:34:10: B007 Loop control variable `bar` may not be used within loop body
    |
-34 | FMT = "{foo} {bar}"
-35 | for foo, bar in [(1, 2)]:
+33 | FMT = "{foo} {bar}"
+34 | for foo, bar in [(1, 2)]:
    |          ^^^ B007
-36 |     if foo:
-37 |         print(FMT.format(**locals()))
+35 |     if foo:
+36 |         print(FMT.format(**locals()))
    |
    = help: Rename unused `bar` to `_bar`
 
 B007.py:38:10: B007 Loop control variable `bar` may not be used within loop body
    |
-38 |         print(FMT.format(**locals()))
-39 | 
-40 | for foo, bar in [(1, 2)]:
+36 |         print(FMT.format(**locals()))
+37 | 
+38 | for foo, bar in [(1, 2)]:
    |          ^^^ B007
-41 |     if foo:
-42 |         print(FMT.format(**globals()))
+39 |     if foo:
+40 |         print(FMT.format(**globals()))
    |
    = help: Rename unused `bar` to `_bar`
 
 B007.py:42:10: B007 Loop control variable `bar` may not be used within loop body
    |
-42 |         print(FMT.format(**globals()))
-43 | 
-44 | for foo, bar in [(1, 2)]:
+40 |         print(FMT.format(**globals()))
+41 | 
+42 | for foo, bar in [(1, 2)]:
    |          ^^^ B007
-45 |     if foo:
-46 |         print(FMT.format(**vars()))
+43 |     if foo:
+44 |         print(FMT.format(**vars()))
    |
    = help: Rename unused `bar` to `_bar`
 
 B007.py:46:10: B007 Loop control variable `bar` may not be used within loop body
    |
-46 |         print(FMT.format(**vars()))
-47 | 
-48 | for foo, bar in [(1, 2)]:
+44 |         print(FMT.format(**vars()))
+45 | 
+46 | for foo, bar in [(1, 2)]:
    |          ^^^ B007
-49 |     print(FMT.format(foo=foo, bar=eval("bar")))
+47 |     print(FMT.format(foo=foo, bar=eval("bar")))
    |
    = help: Rename unused `bar` to `_bar`
 
 B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
    |
-52 | def f():
-53 |     # Fixable.
-54 |     for foo, bar, baz in (["1", "2", "3"],):
+50 | def f():
+51 |     # Fixable.
+52 |     for foo, bar, baz in (["1", "2", "3"],):
    |              ^^^ B007
-55 |         if foo or baz:
-56 |             break
+53 |         if foo or baz:
+54 |             break
    |
    = help: Rename unused `bar` to `_bar`
 
@@ -122,23 +122,23 @@ B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
 
 B007.py:59:14: B007 Loop control variable `bar` not used within loop body
    |
-59 | def f():
-60 |     # Unfixable due to usage of `bar` outside of loop.
-61 |     for foo, bar, baz in (["1", "2", "3"],):
+57 | def f():
+58 |     # Unfixable due to usage of `bar` outside of loop.
+59 |     for foo, bar, baz in (["1", "2", "3"],):
    |              ^^^ B007
-62 |         if foo or baz:
-63 |             break
+60 |         if foo or baz:
+61 |             break
    |
    = help: Rename unused `bar` to `_bar`
 
 B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
    |
-68 | def f():
-69 |     # Fixable.
-70 |     for foo, bar, baz in (["1", "2", "3"],):
+66 | def f():
+67 |     # Fixable.
+68 |     for foo, bar, baz in (["1", "2", "3"],):
    |              ^^^ B007
-71 |         if foo or baz:
-72 |             break
+69 |         if foo or baz:
+70 |             break
    |
    = help: Rename unused `bar` to `_bar`
 
@@ -154,33 +154,33 @@ B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
 
 B007.py:77:14: B007 Loop control variable `bar` not used within loop body
    |
-77 | def f():
-78 |     # Unfixable.
-79 |     for foo, bar, baz in (["1", "2", "3"],):
+75 | def f():
+76 |     # Unfixable.
+77 |     for foo, bar, baz in (["1", "2", "3"],):
    |              ^^^ B007
-80 |         if foo or baz:
-81 |             break
+78 |         if foo or baz:
+79 |             break
    |
    = help: Rename unused `bar` to `_bar`
 
 B007.py:88:14: B007 Loop control variable `bar` not used within loop body
    |
-88 | def f():
-89 |     # Unfixable (false negative) due to usage of `bar` outside of loop.
-90 |     for foo, bar, baz in (["1", "2", "3"],):
+86 | def f():
+87 |     # Unfixable (false negative) due to usage of `bar` outside of loop.
+88 |     for foo, bar, baz in (["1", "2", "3"],):
    |              ^^^ B007
-91 |         if foo or baz:
-92 |             break
+89 |         if foo or baz:
+90 |             break
    |
    = help: Rename unused `bar` to `_bar`
 
 B007.py:98:5: B007 Loop control variable `line_` not used within loop body
-    |
- 98 | # Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
- 99 | # variable name).
-100 | for line_ in range(self.header_lines):
-    |     ^^^^^ B007
-101 |     fp.readline()
-    |
+   |
+96 | # Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
+97 | # variable name).
+98 | for line_ in range(self.header_lines):
+   |     ^^^^^ B007
+99 |     fp.readline()
+   |
 
 

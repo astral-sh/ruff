@@ -3,18 +3,18 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 ---
 DTZ003.py:4:1: DTZ003 The use of `datetime.datetime.utcnow()` is not allowed, use `datetime.datetime.now(tz=)` instead
   |
-4 | # qualified
-5 | datetime.datetime.utcnow()
+3 | # qualified
+4 | datetime.datetime.utcnow()
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ003
-6 | 
-7 | from datetime import datetime
+5 | 
+6 | from datetime import datetime
   |
 
 DTZ003.py:9:1: DTZ003 The use of `datetime.datetime.utcnow()` is not allowed, use `datetime.datetime.now(tz=)` instead
-   |
- 9 | # unqualified
-10 | datetime.utcnow()
-   | ^^^^^^^^^^^^^^^^^ DTZ003
-   |
+  |
+8 | # unqualified
+9 | datetime.utcnow()
+  | ^^^^^^^^^^^^^^^^^ DTZ003
+  |
 
 

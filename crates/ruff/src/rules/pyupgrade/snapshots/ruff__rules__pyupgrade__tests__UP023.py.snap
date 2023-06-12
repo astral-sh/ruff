@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP023.py:2:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
   |
-2 | # These two imports have something after cElementTree, so they should be fixed.
-3 | from xml.etree.cElementTree import XML, Element, SubElement
+1 | # These two imports have something after cElementTree, so they should be fixed.
+2 | from xml.etree.cElementTree import XML, Element, SubElement
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
-4 | import xml.etree.cElementTree as ET
+3 | import xml.etree.cElementTree as ET
   |
   = help: Replace with `ElementTree`
 
@@ -20,12 +20,12 @@ UP023.py:2:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:3:8: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
   |
-3 | # These two imports have something after cElementTree, so they should be fixed.
-4 | from xml.etree.cElementTree import XML, Element, SubElement
-5 | import xml.etree.cElementTree as ET
+1 | # These two imports have something after cElementTree, so they should be fixed.
+2 | from xml.etree.cElementTree import XML, Element, SubElement
+3 | import xml.etree.cElementTree as ET
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
-6 | 
-7 | # Weird spacing should not cause issues.
+4 | 
+5 | # Weird spacing should not cause issues.
   |
   = help: Replace with `ElementTree`
 
@@ -40,10 +40,10 @@ UP023.py:3:8: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:6:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
   |
-6 | # Weird spacing should not cause issues.
-7 | from   xml.etree.cElementTree    import  XML
+5 | # Weird spacing should not cause issues.
+6 | from   xml.etree.cElementTree    import  XML
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
-8 | import    xml.etree.cElementTree       as      ET
+7 | import    xml.etree.cElementTree       as      ET
   |
   = help: Replace with `ElementTree`
 
@@ -58,15 +58,15 @@ UP023.py:6:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 9 9 | # Multi line imports should also work fine.
 
 UP023.py:7:11: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
-   |
- 7 | # Weird spacing should not cause issues.
- 8 | from   xml.etree.cElementTree    import  XML
- 9 | import    xml.etree.cElementTree       as      ET
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
-10 | 
-11 | # Multi line imports should also work fine.
-   |
-   = help: Replace with `ElementTree`
+  |
+5 | # Weird spacing should not cause issues.
+6 | from   xml.etree.cElementTree    import  XML
+7 | import    xml.etree.cElementTree       as      ET
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
+8 | 
+9 | # Multi line imports should also work fine.
+  |
+  = help: Replace with `ElementTree`
 
 ℹ Suggested fix
 4 4 | 
@@ -80,15 +80,15 @@ UP023.py:7:11: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:10:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
-10 |   # Multi line imports should also work fine.
-11 | / from xml.etree.cElementTree import (
-12 | |     XML,
-13 | |     Element,
-14 | |     SubElement,
-15 | | )
+ 9 |   # Multi line imports should also work fine.
+10 | / from xml.etree.cElementTree import (
+11 | |     XML,
+12 | |     Element,
+13 | |     SubElement,
+14 | | )
    | |_^ UP023
-16 |   if True:
-17 |       import xml.etree.cElementTree as ET
+15 |   if True:
+16 |       import xml.etree.cElementTree as ET
    |
    = help: Replace with `ElementTree`
 
@@ -104,11 +104,11 @@ UP023.py:10:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:16:12: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
-16 | )
-17 | if True:
-18 |     import xml.etree.cElementTree as ET
+14 | )
+15 | if True:
+16 |     import xml.etree.cElementTree as ET
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
-19 |     from xml.etree import cElementTree as CET
+17 |     from xml.etree import cElementTree as CET
    |
    = help: Replace with `ElementTree`
 
@@ -124,12 +124,12 @@ UP023.py:16:12: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:17:27: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
-17 | if True:
-18 |     import xml.etree.cElementTree as ET
-19 |     from xml.etree import cElementTree as CET
+15 | if True:
+16 |     import xml.etree.cElementTree as ET
+17 |     from xml.etree import cElementTree as CET
    |                           ^^^^^^^^^^^^^^^^^^^ UP023
-20 | 
-21 | from xml.etree import cElementTree as ET
+18 | 
+19 | from xml.etree import cElementTree as ET
    |
    = help: Replace with `ElementTree`
 
@@ -145,12 +145,12 @@ UP023.py:17:27: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:19:23: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
-19 |     from xml.etree import cElementTree as CET
-20 | 
-21 | from xml.etree import cElementTree as ET
+17 |     from xml.etree import cElementTree as CET
+18 | 
+19 | from xml.etree import cElementTree as ET
    |                       ^^^^^^^^^^^^^^^^^^ UP023
-22 | 
-23 | import contextlib, xml.etree.cElementTree as ET
+20 | 
+21 | import contextlib, xml.etree.cElementTree as ET
    |
    = help: Replace with `ElementTree`
 
@@ -166,12 +166,12 @@ UP023.py:19:23: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:21:20: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
-21 | from xml.etree import cElementTree as ET
-22 | 
-23 | import contextlib, xml.etree.cElementTree as ET
+19 | from xml.etree import cElementTree as ET
+20 | 
+21 | import contextlib, xml.etree.cElementTree as ET
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
-24 | 
-25 | # This should fix the second, but not the first invocation.
+22 | 
+23 | # This should fix the second, but not the first invocation.
    |
    = help: Replace with `ElementTree`
 
@@ -187,11 +187,11 @@ UP023.py:21:20: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 
 UP023.py:24:32: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
-24 | # This should fix the second, but not the first invocation.
-25 | import xml.etree.cElementTree, xml.etree.cElementTree as ET
+23 | # This should fix the second, but not the first invocation.
+24 | import xml.etree.cElementTree, xml.etree.cElementTree as ET
    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP023
-26 | 
-27 | # The below items should NOT be changed.
+25 | 
+26 | # The below items should NOT be changed.
    |
    = help: Replace with `ElementTree`
 

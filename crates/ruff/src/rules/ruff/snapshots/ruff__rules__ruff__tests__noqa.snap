@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/ruff/mod.rs
 ---
 noqa.py:23:5: F841 [*] Local variable `I` is assigned to but never used
    |
-23 | def f():
-24 |     # Only `E741` should be ignored by the `noqa`.
-25 |     I = 1  # noqa: E741.F841
+21 | def f():
+22 |     # Only `E741` should be ignored by the `noqa`.
+23 |     I = 1  # noqa: E741.F841
    |     ^ F841
    |
    = help: Remove assignment to unused variable `I`

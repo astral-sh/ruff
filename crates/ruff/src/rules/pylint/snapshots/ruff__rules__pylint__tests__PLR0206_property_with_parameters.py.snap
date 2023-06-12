@@ -2,28 +2,28 @@
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
 property_with_parameters.py:7:9: PLR0206 Cannot have defined parameters for properties
-   |
- 7 | class Cls:
- 8 |     @property
- 9 |     def attribute(self, param, param1):  # [property-with-parameters]
-   |         ^^^^^^^^^ PLR0206
-10 |         return param + param1
-   |
+  |
+5 | class Cls:
+6 |     @property
+7 |     def attribute(self, param, param1):  # [property-with-parameters]
+  |         ^^^^^^^^^ PLR0206
+8 |         return param + param1
+  |
 
 property_with_parameters.py:11:9: PLR0206 Cannot have defined parameters for properties
    |
-11 |     @property
-12 |     def attribute_keyword_only(self, *, param, param1):  # [property-with-parameters]
+10 |     @property
+11 |     def attribute_keyword_only(self, *, param, param1):  # [property-with-parameters]
    |         ^^^^^^^^^^^^^^^^^^^^^^ PLR0206
-13 |         return param + param1
+12 |         return param + param1
    |
 
 property_with_parameters.py:15:9: PLR0206 Cannot have defined parameters for properties
    |
-15 |     @property
-16 |     def attribute_positional_only(self, param, param1, /):  # [property-with-parameters]
+14 |     @property
+15 |     def attribute_positional_only(self, param, param1, /):  # [property-with-parameters]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR0206
-17 |         return param + param1
+16 |         return param + param1
    |
 
 

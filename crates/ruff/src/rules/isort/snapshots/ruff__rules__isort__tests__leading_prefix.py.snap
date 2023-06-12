@@ -14,31 +14,31 @@ leading_prefix.py:1:8: I001 Import block is un-sorted or un-formatted
 
 leading_prefix.py:5:12: I001 Import block is un-sorted or un-formatted
   |
-5 |   if True:
-6 |       x = 1; import sys
+4 |   if True:
+5 |       x = 1; import sys
   |  ____________^
-7 | |     import os
+6 | |     import os
   | |_____________^ I001
-8 |   
-9 |   if True:
+7 |   
+8 |   if True:
   |
   = help: Organize imports
 
 leading_prefix.py:10:9: I001 Import block is un-sorted or un-formatted
    |
-10 | if True:
-11 |     x = 1; \
-12 |         import os
+ 8 | if True:
+ 9 |     x = 1; \
+10 |         import os
    |         ^^^^^^^^^ I001
-13 | 
-14 | x = 1; \
+11 | 
+12 | x = 1; \
    |
    = help: Organize imports
 
 leading_prefix.py:13:1: I001 Import block is un-sorted or un-formatted
    |
-13 | x = 1; \
-14 | import os
+12 | x = 1; \
+13 | import os
    | ^^^^^^^^^ I001
    |
    = help: Organize imports

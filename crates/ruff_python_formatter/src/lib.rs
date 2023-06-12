@@ -1,20 +1,18 @@
 use anyhow::{anyhow, Context, Result};
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::Mod;
+use ruff_formatter::prelude::*;
+use ruff_formatter::{format, write};
+use ruff_formatter::{Formatted, IndentStyle, Printed, SimpleFormatOptions, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
+use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
+use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast::{Mod, Ranged};
 use rustpython_parser::lexer::lex;
 use rustpython_parser::{parse_tokens, Mode};
+use std::borrow::Cow;
 
-use ruff_formatter::format_element::tag::VerbatimKind;
-use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::{source_position, source_text_slice, ContainsNewlines, Tag};
-use ruff_formatter::{
-    format, write, Buffer, Format, FormatContext, FormatElement, FormatResult, Formatted,
-    IndentStyle, Printed, SimpleFormatOptions, SourceCode,
+use crate::comments::{
+    dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
 };
-use ruff_python_ast::node::AstNode;
-use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
-
-use crate::comments::{dangling_comments, leading_comments, trailing_comments, Comments};
 use crate::context::PyFormatContext;
 
 pub(crate) mod builders;
@@ -32,6 +30,10 @@ mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
+/// TODO(konstin): hook this up to the settings by replacing `SimpleFormatOptions` with a python
+/// specific struct.
+pub(crate) const USE_MAGIC_TRAILING_COMMA: bool = true;
+
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
 
@@ -41,19 +43,17 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [source_position(node.start())])?;
         self.fmt_leading_comments(node, f)?;
         self.fmt_node(node, f)?;
         self.fmt_dangling_comments(node, f)?;
-        self.fmt_trailing_comments(node, f)?;
-        write!(f, [source_position(node.start())])
+        self.fmt_trailing_comments(node, f)
     }
 
     /// Formats the node without comments. Ignores any suppression comments.
     fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [source_position(node.start())])?;
         self.fmt_fields(node, f)?;
-
-        Ok(())
+        write!(f, [source_position(node.end())])
     }
 
     /// Formats the node's fields.
@@ -64,7 +64,7 @@ where
     /// You may want to override this method if you want to manually handle the formatting of comments
     /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
     fn fmt_leading_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        leading_comments(node).fmt(f)
+        leading_node_comments(node).fmt(f)
     }
 
     /// Formats the [dangling comments](comments#dangling-comments) of the node.
@@ -75,7 +75,7 @@ where
     ///
     /// A node can have dangling comments if all its children are tokens or if all node childrens are optional.
     fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        dangling_comments(node).fmt(f)
+        dangling_node_comments(node).fmt(f)
     }
 
     /// Formats the [trailing comments](comments#trailing-comments) of the node.
@@ -83,7 +83,7 @@ where
     /// You may want to override this method if you want to manually handle the formatting of comments
     /// inside of the `fmt_fields` method or customize the formatting of the trailing comments.
     fn fmt_trailing_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        trailing_comments(node).fmt(f)
+        trailing_node_comments(node).fmt(f)
     }
 }
 
@@ -137,20 +137,91 @@ pub fn format_node<'a>(
     )
 }
 
-pub(crate) struct VerbatimText(TextRange);
+pub(crate) struct NotYetImplemented(NodeKind);
 
-pub(crate) const fn verbatim_text(range: TextRange) -> VerbatimText {
-    VerbatimText(range)
+/// Formats a placeholder for nodes that have not yet been implemented
+pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    NotYetImplemented(node.into().kind())
 }
 
-impl<C: FormatContext> Format<C> for VerbatimText {
-    fn fmt(&self, f: &mut Formatter<C>) -> FormatResult<()> {
+impl Format<PyFormatContext<'_>> for NotYetImplemented {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0);
+
         f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            VerbatimKind::Verbatim {
+            tag::VerbatimKind::Verbatim {
+                length: text.text_len(),
+            },
+        )))?;
+
+        f.write_element(FormatElement::DynamicText {
+            text: Box::from(text),
+        })?;
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        Ok(())
+    }
+}
+
+pub(crate) struct NotYetImplementedCustomText(&'static str);
+
+/// Formats a placeholder for nodes that have not yet been implemented
+pub(crate) const fn not_yet_implemented_custom_text(
+    text: &'static str,
+) -> NotYetImplementedCustomText {
+    NotYetImplementedCustomText(text)
+}
+
+impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
+                length: self.0.text_len(),
+            },
+        )))?;
+
+        text(self.0).fmt(f)?;
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))
+    }
+}
+
+pub(crate) struct VerbatimText(TextRange);
+
+#[allow(unused)]
+pub(crate) fn verbatim_text<T>(item: &T) -> VerbatimText
+where
+    T: Ranged,
+{
+    VerbatimText(item.range())
+}
+
+impl Format<PyFormatContext<'_>> for VerbatimText {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
                 length: self.0.len(),
             },
         )))?;
-        write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
+
+        match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
+            Cow::Borrowed(_) => {
+                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
+            }
+            Cow::Owned(cleaned) => {
+                write!(
+                    f,
+                    [
+                        dynamic_text(&cleaned, Some(self.0.start())),
+                        source_position(self.0.end())
+                    ]
+                )?;
+            }
+        }
+
         f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
         Ok(())
     }
@@ -158,18 +229,16 @@ impl<C: FormatContext> Format<C> for VerbatimText {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::{Formatter, Write};
-    use std::fs;
-    use std::path::Path;
-
     use anyhow::Result;
     use insta::assert_snapshot;
+    use ruff_python_ast::source_code::CommentRangesBuilder;
+    use ruff_testing_macros::fixture;
     use rustpython_parser::lexer::lex;
     use rustpython_parser::{parse_tokens, Mode};
     use similar::TextDiff;
-
-    use ruff_python_ast::source_code::CommentRangesBuilder;
-    use ruff_testing_macros::fixture;
+    use std::fmt::{Formatter, Write};
+    use std::fs;
+    use std::path::Path;
 
     use crate::{format_module, format_node};
 
@@ -183,8 +252,8 @@ if    True:
 # trailing
 "#;
         let expected = r#"# preceding
-if    True:
-    print( "hi" )
+if True:
+    NOT_IMPLEMENTED_call()
 # trailing
 "#;
         let actual = format_module(input)?.as_code().to_string();
@@ -205,8 +274,15 @@ if    True:
 
         let formatted_code = printed.as_code();
 
-        let reformatted =
-            format_module(formatted_code).expect("Expected formatted code to be valid syntax");
+        let reformatted = match format_module(formatted_code) {
+            Ok(reformatted) => reformatted,
+            Err(err) => {
+                panic!(
+                    "Expected formatted code to be valid syntax: {err}:\
+                    \n---\n{formatted_code}---\n",
+                );
+            }
+        };
 
         if reformatted.as_code() != formatted_code {
             let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
@@ -215,13 +291,16 @@ if    True:
                 .to_string();
             panic!(
                 r#"Reformatting the formatted code a second time resulted in formatting changes.
-{diff}
+---
+{diff}---
 
 Formatted once:
-{formatted_code}
+---
+{formatted_code}---
 
 Formatted twice:
-{}"#,
+---
+{}---"#,
                 reformatted.as_code()
             );
         }
@@ -285,14 +364,58 @@ Formatted twice:
         Ok(())
     }
 
+    #[fixture(pattern = "resources/test/fixtures/ruff/**/*.py")]
+    #[test]
+    fn ruff_test(input_path: &Path) -> Result<()> {
+        let content = fs::read_to_string(input_path)?;
+
+        let printed = format_module(&content)?;
+        let formatted_code = printed.as_code();
+
+        let reformatted =
+            format_module(formatted_code).unwrap_or_else(|err| panic!("Expected formatted code to be valid syntax but it contains syntax errors: {err}\n{formatted_code}"));
+
+        if reformatted.as_code() != formatted_code {
+            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
+                .unified_diff()
+                .header("Formatted once", "Formatted twice")
+                .to_string();
+            panic!(
+                r#"Reformatting the formatted code a second time resulted in formatting changes.
+{diff}
+
+Formatted once:
+{formatted_code}
+
+Formatted twice:
+{}"#,
+                reformatted.as_code()
+            );
+        }
+
+        let snapshot = format!(
+            r#"## Input
+{}
+
+## Output
+{}"#,
+            CodeFrame::new("py", &content),
+            CodeFrame::new("py", formatted_code)
+        );
+        assert_snapshot!(snapshot);
+
+        Ok(())
+    }
+
     /// Use this test to debug the formatting of some snipped
     #[ignore]
     #[test]
     fn quick_test() {
         let src = r#"
-{
-    k: v for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
-}
+def test(): ...
+
+# Comment
+def with_leading_comment(): ...
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -314,16 +437,23 @@ Formatted twice:
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
-        // dbg!(formatted.document());
+        // dbg!(formatted
+        //     .document()
+        //     .display(formatted.context().source_code()));
+
+        // dbg!(formatted
+        //     .context()
+        //     .comments()
+        //     .debug(formatted.context().source_code()));
 
         let printed = formatted.print().unwrap();
 
         assert_eq!(
             printed.as_code(),
-            r#"{
-    k: v
-    for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
-}"#
+            r#"while True:
+    if something.changed:
+        do.stuff()  # trailing comment
+"#
         );
     }
 

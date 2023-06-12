@@ -3,42 +3,22 @@ source: crates/ruff/src/rules/flake8_tidy_imports/mod.rs
 ---
 application.py:5:1: TID252 Relative imports from parent modules are banned
   |
-5 | import attrs
-6 | 
-7 | from ....import unknown
+3 | import attrs
+4 | 
+5 | from ....import unknown
   | ^^^^^^^^^^^^^^^^^^^^^^^ TID252
-8 | from ..protocol import commands, definitions, responses
-9 | from ..server import example
+6 | from ..protocol import commands, definitions, responses
+7 | from ..server import example
   |
   = help: Replace relative imports from parent modules with absolute imports
 
 application.py:6:1: TID252 [*] Relative imports from parent modules are banned
   |
-6 | from ....import unknown
-7 | from ..protocol import commands, definitions, responses
+5 | from ....import unknown
+6 | from ..protocol import commands, definitions, responses
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
-8 | from ..server import example
-9 | from .. import server
-  |
-  = help: Replace relative imports from parent modules with absolute imports
-
-ℹ Suggested fix
-3 3 | import attrs
-4 4 | 
-5 5 | from ....import unknown
-6   |-from ..protocol import commands, definitions, responses
-  6 |+from my_package.sublib.protocol import commands, definitions, responses
-7 7 | from ..server import example
-8 8 | from .. import server
-9 9 | from . import logger, models
-
-application.py:6:1: TID252 [*] Relative imports from parent modules are banned
-  |
-6 | from ....import unknown
-7 | from ..protocol import commands, definitions, responses
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
-8 | from ..server import example
-9 | from .. import server
+7 | from ..server import example
+8 | from .. import server
   |
   = help: Replace relative imports from parent modules with absolute imports
 
@@ -54,11 +34,31 @@ application.py:6:1: TID252 [*] Relative imports from parent modules are banned
 
 application.py:6:1: TID252 [*] Relative imports from parent modules are banned
   |
-6 | from ....import unknown
-7 | from ..protocol import commands, definitions, responses
+5 | from ....import unknown
+6 | from ..protocol import commands, definitions, responses
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
-8 | from ..server import example
-9 | from .. import server
+7 | from ..server import example
+8 | from .. import server
+  |
+  = help: Replace relative imports from parent modules with absolute imports
+
+ℹ Suggested fix
+3 3 | import attrs
+4 4 | 
+5 5 | from ....import unknown
+6   |-from ..protocol import commands, definitions, responses
+  6 |+from my_package.sublib.protocol import commands, definitions, responses
+7 7 | from ..server import example
+8 8 | from .. import server
+9 9 | from . import logger, models
+
+application.py:6:1: TID252 [*] Relative imports from parent modules are banned
+  |
+5 | from ....import unknown
+6 | from ..protocol import commands, definitions, responses
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+7 | from ..server import example
+8 | from .. import server
   |
   = help: Replace relative imports from parent modules with absolute imports
 
@@ -73,15 +73,15 @@ application.py:6:1: TID252 [*] Relative imports from parent modules are banned
 9 9 | from . import logger, models
 
 application.py:7:1: TID252 [*] Relative imports from parent modules are banned
-   |
- 7 | from ....import unknown
- 8 | from ..protocol import commands, definitions, responses
- 9 | from ..server import example
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
-10 | from .. import server
-11 | from . import logger, models
-   |
-   = help: Replace relative imports from parent modules with absolute imports
+  |
+5 | from ....import unknown
+6 | from ..protocol import commands, definitions, responses
+7 | from ..server import example
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
+8 | from .. import server
+9 | from . import logger, models
+  |
+  = help: Replace relative imports from parent modules with absolute imports
 
 ℹ Suggested fix
 4 4 | 
@@ -95,12 +95,12 @@ application.py:7:1: TID252 [*] Relative imports from parent modules are banned
 
 application.py:8:1: TID252 [*] Relative imports from parent modules are banned
    |
- 8 | from ..protocol import commands, definitions, responses
- 9 | from ..server import example
-10 | from .. import server
+ 6 | from ..protocol import commands, definitions, responses
+ 7 | from ..server import example
+ 8 | from .. import server
    | ^^^^^^^^^^^^^^^^^^^^^ TID252
-11 | from . import logger, models
-12 | from ..protocol.UpperCaseModule import some_function
+ 9 | from . import logger, models
+10 | from ..protocol.UpperCaseModule import some_function
    |
    = help: Replace relative imports from parent modules with absolute imports
 
@@ -115,9 +115,9 @@ application.py:8:1: TID252 [*] Relative imports from parent modules are banned
 
 application.py:10:1: TID252 [*] Relative imports from parent modules are banned
    |
-10 | from .. import server
-11 | from . import logger, models
-12 | from ..protocol.UpperCaseModule import some_function
+ 8 | from .. import server
+ 9 | from . import logger, models
+10 | from ..protocol.UpperCaseModule import some_function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
    |
    = help: Replace relative imports from parent modules with absolute imports

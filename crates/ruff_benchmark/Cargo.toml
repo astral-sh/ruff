@@ -1,13 +1,15 @@
 [package]
 name = "ruff_benchmark"
 version = "0.0.0"
-publish = false
-edition.workspace = true
-authors.workspace = true
-homepage.workspace = true
-documentation.workspace = true
-repository.workspace = true
 description = "Ruff Micro-benchmarks"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [lib]
 bench = false
@@ -20,6 +22,10 @@ harness = false
 name = "parser"
 harness = false
 
+[[bench]]
+name = "formatter"
+harness = false
+
 [dependencies]
 once_cell.workspace = true
 serde.workspace = true
@@ -30,6 +36,7 @@ ureq = "2.6.2"
 [dev-dependencies]
 ruff.path = "../ruff"
 ruff_python_ast.path = "../ruff_python_ast"
+ruff_python_formatter = { path = "../ruff_python_formatter" }
 criterion = { version = "0.5.1"}
 rustpython-parser.workspace = true
 
@@ -38,3 +45,4 @@ mimalloc = "0.1.34"
 
 [target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dev-dependencies]
 tikv-jemallocator = "0.5.0"
+

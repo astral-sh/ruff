@@ -18,11 +18,11 @@ confusables.py:1:6: RUF001 [*] String contains ambiguous `𝐁` (MATHEMATICAL BO
 
 confusables.py:6:56: RUF002 [*] Docstring contains ambiguous `）` (FULLWIDTH RIGHT PARENTHESIS). Did you mean `)` (RIGHT PARENTHESIS)?
   |
-6 | def f():
-7 |     """Here's a docstring with an unusual parenthesis: ）"""
+5 | def f():
+6 |     """Here's a docstring with an unusual parenthesis: ）"""
   |                                                        ^^ RUF002
-8 |     # And here's a comment with an unusual punctuation mark: ᜵
-9 |     ...
+7 |     # And here's a comment with an unusual punctuation mark: ᜵
+8 |     ...
   |
   = help: Replace `）` (FULLWIDTH RIGHT PARENTHESIS) with `)` (RIGHT PARENTHESIS)
 
@@ -37,14 +37,14 @@ confusables.py:6:56: RUF002 [*] Docstring contains ambiguous `）` (FULLWIDTH RI
 9 9 | 
 
 confusables.py:7:62: RUF003 [*] Comment contains ambiguous `᜵` (PHILIPPINE SINGLE PUNCTUATION). Did you mean `/` (SOLIDUS)?
-   |
- 7 | def f():
- 8 |     """Here's a docstring with an unusual parenthesis: ）"""
- 9 |     # And here's a comment with an unusual punctuation mark: ᜵
-   |                                                              ^ RUF003
-10 |     ...
-   |
-   = help: Replace `᜵` (PHILIPPINE SINGLE PUNCTUATION) with `/` (SOLIDUS)
+  |
+5 | def f():
+6 |     """Here's a docstring with an unusual parenthesis: ）"""
+7 |     # And here's a comment with an unusual punctuation mark: ᜵
+  |                                                              ^ RUF003
+8 |     ...
+  |
+  = help: Replace `᜵` (PHILIPPINE SINGLE PUNCTUATION) with `/` (SOLIDUS)
 
 ℹ Suggested fix
 4 4 | 
@@ -76,12 +76,12 @@ confusables.py:17:6: RUF001 [*] String contains ambiguous `𝐁` (MATHEMATICAL B
 
 confusables.py:26:10: RUF001 [*] String contains ambiguous `α` (GREEK SMALL LETTER ALPHA). Did you mean `a` (LATIN SMALL LETTER A)?
    |
-26 | # The first word should be ignored, while the second should be included, since it
-27 | # contains ASCII.
-28 | x = "βα Bαd"
+24 | # The first word should be ignored, while the second should be included, since it
+25 | # contains ASCII.
+26 | x = "βα Bαd"
    |          ^ RUF001
-29 | 
-30 | # The two characters should be flagged here. The first character is a "word"
+27 | 
+28 | # The two characters should be flagged here. The first character is a "word"
    |
    = help: Replace `α` (GREEK SMALL LETTER ALPHA) with `a` (LATIN SMALL LETTER A)
 
@@ -97,9 +97,9 @@ confusables.py:26:10: RUF001 [*] String contains ambiguous `α` (GREEK SMALL LET
 
 confusables.py:31:6: RUF001 [*] String contains ambiguous `Р` (CYRILLIC CAPITAL LETTER ER). Did you mean `P` (LATIN CAPITAL LETTER P)?
    |
-31 | # consisting of a single ambiguous character, while the second character is a "word
-32 | # boundary" (whitespace) that it itself ambiguous.
-33 | x = "Р усский"
+29 | # consisting of a single ambiguous character, while the second character is a "word
+30 | # boundary" (whitespace) that it itself ambiguous.
+31 | x = "Р усский"
    |      ^ RUF001
    |
    = help: Replace `Р` (CYRILLIC CAPITAL LETTER ER) with `P` (LATIN CAPITAL LETTER P)
@@ -113,9 +113,9 @@ confusables.py:31:6: RUF001 [*] String contains ambiguous `Р` (CYRILLIC CAPITAL
 
 confusables.py:31:7: RUF001 [*] String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
    |
-31 | # consisting of a single ambiguous character, while the second character is a "word
-32 | # boundary" (whitespace) that it itself ambiguous.
-33 | x = "Р усский"
+29 | # consisting of a single ambiguous character, while the second character is a "word
+30 | # boundary" (whitespace) that it itself ambiguous.
+31 | x = "Р усский"
    |       ^ RUF001
    |
    = help: Replace ` ` (EN QUAD) with ` ` (SPACE)

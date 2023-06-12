@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F704.py:6:5: F704 `yield` statement outside of a function
   |
-6 | class Foo:
-7 |     yield 2
+5 | class Foo:
+6 |     yield 2
   |     ^^^^^^^ F704
   |
 
@@ -18,17 +18,17 @@ F704.py:9:1: F704 `yield` statement outside of a function
 
 F704.py:10:1: F704 `yield from` statement outside of a function
    |
-10 | yield 3
-11 | yield from 3
+ 9 | yield 3
+10 | yield from 3
    | ^^^^^^^^^^^^ F704
-12 | await f()
+11 | await f()
    |
 
 F704.py:11:1: F704 `await` statement outside of a function
    |
-11 | yield 3
-12 | yield from 3
-13 | await f()
+ 9 | yield 3
+10 | yield from 3
+11 | await f()
    | ^^^^^^^^^ F704
    |
 

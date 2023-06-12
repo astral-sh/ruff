@@ -3,231 +3,231 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 redefined_loop_name.py:6:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
   |
-6 | # For -> for, variable reused
-7 | for i in []:
-8 |     for i in []:  # error
+4 | # For -> for, variable reused
+5 | for i in []:
+6 |     for i in []:  # error
   |         ^ PLW2901
-9 |         pass
+7 |         pass
   |
 
 redefined_loop_name.py:11:9: PLW2901 `with` statement variable `i` overwritten by `for` loop target
    |
-11 | # With -> for, variable reused
-12 | with None as i:
-13 |     for i in []:  # error
+ 9 | # With -> for, variable reused
+10 | with None as i:
+11 |     for i in []:  # error
    |         ^ PLW2901
-14 |         pass
+12 |         pass
    |
 
 redefined_loop_name.py:16:18: PLW2901 `for` loop variable `i` overwritten by `with` statement target
    |
-16 | # For -> with, variable reused
-17 | for i in []:
-18 |     with None as i:  # error
+14 | # For -> with, variable reused
+15 | for i in []:
+16 |     with None as i:  # error
    |                  ^ PLW2901
-19 |         pass
+17 |         pass
    |
 
 redefined_loop_name.py:21:18: PLW2901 Outer `with` statement variable `i` overwritten by inner `with` statement target
    |
-21 | # With -> with, variable reused
-22 | with None as i:
-23 |     with None as i:  # error
+19 | # With -> with, variable reused
+20 | with None as i:
+21 |     with None as i:  # error
    |                  ^ PLW2901
-24 |         pass
+22 |         pass
    |
 
 redefined_loop_name.py:37:13: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
    |
-37 | for i in []:
-38 |     for j in []:
-39 |         for i in []:  # error
+35 | for i in []:
+36 |     for j in []:
+37 |         for i in []:  # error
    |             ^ PLW2901
-40 |             pass
+38 |             pass
    |
 
 redefined_loop_name.py:43:13: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
    |
-43 | for i in []:
-44 |     for j in []:
-45 |         for i in []:  # error
+41 | for i in []:
+42 |     for j in []:
+43 |         for i in []:  # error
    |             ^ PLW2901
-46 |             for j in []:  # error
-47 |                 pass
+44 |             for j in []:  # error
+45 |                 pass
    |
 
 redefined_loop_name.py:44:17: PLW2901 Outer `for` loop variable `j` overwritten by inner `for` loop target
    |
-44 |     for j in []:
-45 |         for i in []:  # error
-46 |             for j in []:  # error
+42 |     for j in []:
+43 |         for i in []:  # error
+44 |             for j in []:  # error
    |                 ^ PLW2901
-47 |                 pass
+45 |                 pass
    |
 
 redefined_loop_name.py:52:5: PLW2901 `for` loop variable `i` overwritten by assignment target
    |
-52 |     i = cast(int, i)
-53 |     i = typing.cast(int, i)
-54 |     i = 5  # error
+50 |     i = cast(int, i)
+51 |     i = typing.cast(int, i)
+52 |     i = 5  # error
    |     ^ PLW2901
-55 | 
-56 | # For -> augmented assignment
+53 | 
+54 | # For -> augmented assignment
    |
 
 redefined_loop_name.py:56:5: PLW2901 `for` loop variable `i` overwritten by assignment target
    |
-56 | # For -> augmented assignment
-57 | for i in []:
-58 |     i += 5  # error
+54 | # For -> augmented assignment
+55 | for i in []:
+56 |     i += 5  # error
    |     ^ PLW2901
-59 | 
-60 | # For -> annotated assignment
+57 | 
+58 | # For -> annotated assignment
    |
 
 redefined_loop_name.py:60:5: PLW2901 `for` loop variable `i` overwritten by assignment target
    |
-60 | # For -> annotated assignment
-61 | for i in []:
-62 |     i: int = 5  # error
+58 | # For -> annotated assignment
+59 | for i in []:
+60 |     i: int = 5  # error
    |     ^ PLW2901
-63 | 
-64 | # For -> annotated assignment without value
+61 | 
+62 | # For -> annotated assignment without value
    |
 
 redefined_loop_name.py:68:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
    |
-68 | # Async for -> for, variable reused
-69 | async for i in []:
-70 |     for i in []:  # error
+66 | # Async for -> for, variable reused
+67 | async for i in []:
+68 |     for i in []:  # error
    |         ^ PLW2901
-71 |         pass
+69 |         pass
    |
 
 redefined_loop_name.py:73:15: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
    |
-73 | # For -> async for, variable reused
-74 | for i in []:
-75 |     async for i in []:  # error
+71 | # For -> async for, variable reused
+72 | for i in []:
+73 |     async for i in []:  # error
    |               ^ PLW2901
-76 |         pass
+74 |         pass
    |
 
 redefined_loop_name.py:78:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
    |
-78 | # For -> for, outer loop unpacks tuple
-79 | for i, j in enumerate([]):
-80 |     for i in []:  # error
+76 | # For -> for, outer loop unpacks tuple
+77 | for i, j in enumerate([]):
+78 |     for i in []:  # error
    |         ^ PLW2901
-81 |         pass
+79 |         pass
    |
 
 redefined_loop_name.py:83:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
    |
-83 | # For -> for, inner loop unpacks tuple
-84 | for i in []:
-85 |     for i, j in enumerate([]):  # error
+81 | # For -> for, inner loop unpacks tuple
+82 | for i in []:
+83 |     for i, j in enumerate([]):  # error
    |         ^ PLW2901
-86 |         pass
+84 |         pass
    |
 
 redefined_loop_name.py:88:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
    |
-88 | # For -> for, both loops unpack tuple
-89 | for (i, (j, k)) in []:
-90 |     for i, j in enumerate([]):  # two errors
+86 | # For -> for, both loops unpack tuple
+87 | for (i, (j, k)) in []:
+88 |     for i, j in enumerate([]):  # two errors
    |         ^ PLW2901
-91 |         pass
+89 |         pass
    |
 
 redefined_loop_name.py:88:12: PLW2901 Outer `for` loop variable `j` overwritten by inner `for` loop target
    |
-88 | # For -> for, both loops unpack tuple
-89 | for (i, (j, k)) in []:
-90 |     for i, j in enumerate([]):  # two errors
+86 | # For -> for, both loops unpack tuple
+87 | for (i, (j, k)) in []:
+88 |     for i, j in enumerate([]):  # two errors
    |            ^ PLW2901
-91 |         pass
+89 |         pass
    |
 
 redefined_loop_name.py:105:9: PLW2901 Outer `for` loop variable `j` overwritten by inner `for` loop target
     |
-105 | # For -> for, outer loop unpacks with asterisk
-106 | for i, *j in []:
-107 |     for j in []:  # error
+103 | # For -> for, outer loop unpacks with asterisk
+104 | for i, *j in []:
+105 |     for j in []:  # error
     |         ^ PLW2901
-108 |         pass
+106 |         pass
     |
 
 redefined_loop_name.py:122:13: PLW2901 `for` loop variable `i` overwritten by assignment target
     |
-122 |     def f():
-123 |         for i in []:  # no error
-124 |             i = 2  # error
+120 |     def f():
+121 |         for i in []:  # no error
+122 |             i = 2  # error
     |             ^ PLW2901
-125 | 
-126 | # For -> class definition -> for -> for
+123 | 
+124 | # For -> class definition -> for -> for
     |
 
 redefined_loop_name.py:128:17: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
     |
-128 |     class A:
-129 |         for i in []:  # no error
-130 |             for i in []:  # error
+126 |     class A:
+127 |         for i in []:  # no error
+128 |             for i in []:  # error
     |                 ^ PLW2901
-131 |                 pass
+129 |                 pass
     |
 
 redefined_loop_name.py:143:5: PLW2901 `for` loop variable `a[0]` overwritten by assignment target
     |
-143 | # For target with subscript -> assignment
-144 | for a[0] in []:
-145 |     a[0] = 2  # error
+141 | # For target with subscript -> assignment
+142 | for a[0] in []:
+143 |     a[0] = 2  # error
     |     ^^^^ PLW2901
-146 |     a[1] = 2  # no error
+144 |     a[1] = 2  # no error
     |
 
 redefined_loop_name.py:148:5: PLW2901 `for` loop variable `a['i']` overwritten by assignment target
     |
-148 | # For target with subscript -> assignment
-149 | for a['i'] in []:
-150 |     a['i'] = 2  # error
+146 | # For target with subscript -> assignment
+147 | for a['i'] in []:
+148 |     a['i'] = 2  # error
     |     ^^^^^^ PLW2901
-151 |     a['j'] = 2  # no error
+149 |     a['j'] = 2  # no error
     |
 
 redefined_loop_name.py:153:5: PLW2901 `for` loop variable `a.i` overwritten by assignment target
     |
-153 | # For target with attribute -> assignment
-154 | for a.i in []:
-155 |     a.i = 2  # error
+151 | # For target with attribute -> assignment
+152 | for a.i in []:
+153 |     a.i = 2  # error
     |     ^^^ PLW2901
-156 |     a.j = 2  # no error
+154 |     a.j = 2  # no error
     |
 
 redefined_loop_name.py:158:5: PLW2901 `for` loop variable `a.i.j` overwritten by assignment target
     |
-158 | # For target with double nested attribute -> assignment
-159 | for a.i.j in []:
-160 |     a.i.j = 2  # error
+156 | # For target with double nested attribute -> assignment
+157 | for a.i.j in []:
+158 |     a.i.j = 2  # error
     |     ^^^^^ PLW2901
-161 |     a.j.i = 2  # no error
+159 |     a.j.i = 2  # no error
     |
 
 redefined_loop_name.py:163:5: PLW2901 `for` loop variable `a.i` overwritten by assignment target
     |
-163 | # For target with attribute -> assignment with different spacing
-164 | for a.i in []:
-165 |     a. i = 2  # error
+161 | # For target with attribute -> assignment with different spacing
+162 | for a.i in []:
+163 |     a. i = 2  # error
     |     ^^^^ PLW2901
-166 | for a. i in []:
-167 |     a.i = 2  # error
+164 | for a. i in []:
+165 |     a.i = 2  # error
     |
 
 redefined_loop_name.py:165:5: PLW2901 `for` loop variable `a.i` overwritten by assignment target
     |
-165 |     a. i = 2  # error
-166 | for a. i in []:
-167 |     a.i = 2  # error
+163 |     a. i = 2  # error
+164 | for a. i in []:
+165 |     a.i = 2  # error
     |     ^^^ PLW2901
     |
 

@@ -4,7 +4,7 @@ use rustpython_parser::ast::Expr;
 use ruff_python_semantic::binding::{BindingKind, Importation};
 use ruff_python_semantic::model::SemanticModel;
 
-pub(crate) enum Resolution {
+pub(super) enum Resolution {
     /// The expression resolves to an irrelevant expression type (e.g., a constant).
     IrrelevantExpression,
     /// The expression resolves to an irrelevant binding (e.g., a function definition).
@@ -16,7 +16,7 @@ pub(crate) enum Resolution {
 }
 
 /// Test an [`Expr`] for relevance to Pandas-related operations.
-pub(crate) fn test_expression(expr: &Expr, model: &SemanticModel) -> Resolution {
+pub(super) fn test_expression(expr: &Expr, model: &SemanticModel) -> Resolution {
     match expr {
         Expr::Constant(_)
         | Expr::Tuple(_)
@@ -36,15 +36,13 @@ pub(crate) fn test_expression(expr: &Expr, model: &SemanticModel) -> Resolution 
                         | BindingKind::Argument
                         | BindingKind::Assignment
                         | BindingKind::NamedExprAssignment
-                        | BindingKind::Binding
+                        | BindingKind::UnpackedAssignment
                         | BindingKind::LoopVar
                         | BindingKind::Global
                         | BindingKind::Nonlocal => Resolution::RelevantLocal,
-                        BindingKind::Importation(Importation { full_name: module })
-                            if module == "pandas" =>
-                        {
-                            Resolution::PandasModule
-                        }
+                        BindingKind::Importation(Importation {
+                            qualified_name: module,
+                        }) if module == "pandas" => Resolution::PandasModule,
                         _ => Resolution::IrrelevantBinding,
                     }
                 })

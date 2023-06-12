@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
   |
-5 | # dict literal
-6 | MyType = TypedDict("MyType", {"a": int, "b": str})
+4 | # dict literal
+5 | MyType = TypedDict("MyType", {"a": int, "b": str})
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-7 | 
-8 | # dict call
+6 | 
+7 | # dict call
   |
   = help: Convert `MyType` to class syntax
 
@@ -25,11 +25,11 @@ UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class sy
 
 UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
- 8 | # dict call
- 9 | MyType = TypedDict("MyType", dict(a=int, b=str))
+ 7 | # dict call
+ 8 | MyType = TypedDict("MyType", dict(a=int, b=str))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-10 | 
-11 | # kwargs
+ 9 | 
+10 | # kwargs
    |
    = help: Convert `MyType` to class syntax
 
@@ -47,11 +47,11 @@ UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class sy
 
 UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-11 | # kwargs
-12 | MyType = TypedDict("MyType", a=int, b=str)
+10 | # kwargs
+11 | MyType = TypedDict("MyType", a=int, b=str)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-13 | 
-14 | # Empty TypedDict
+12 | 
+13 | # Empty TypedDict
    |
    = help: Convert `MyType` to class syntax
 
@@ -69,11 +69,11 @@ UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-14 | # Empty TypedDict
-15 | MyType = TypedDict("MyType")
+13 | # Empty TypedDict
+14 | MyType = TypedDict("MyType")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-16 | 
-17 | # Literal values
+15 | 
+16 | # Literal values
    |
    = help: Convert `MyType` to class syntax
 
@@ -90,10 +90,10 @@ UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:17:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-17 | # Literal values
-18 | MyType = TypedDict("MyType", {"a": "hello"})
+16 | # Literal values
+17 | MyType = TypedDict("MyType", {"a": "hello"})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-19 | MyType = TypedDict("MyType", a="hello")
+18 | MyType = TypedDict("MyType", a="hello")
    |
    = help: Convert `MyType` to class syntax
 
@@ -110,12 +110,12 @@ UP013.py:17:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-18 | # Literal values
-19 | MyType = TypedDict("MyType", {"a": "hello"})
-20 | MyType = TypedDict("MyType", a="hello")
+16 | # Literal values
+17 | MyType = TypedDict("MyType", {"a": "hello"})
+18 | MyType = TypedDict("MyType", a="hello")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-21 | 
-22 | # NotRequired
+19 | 
+20 | # NotRequired
    |
    = help: Convert `MyType` to class syntax
 
@@ -132,11 +132,11 @@ UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-21 | # NotRequired
-22 | MyType = TypedDict("MyType", {"a": NotRequired[dict]})
+20 | # NotRequired
+21 | MyType = TypedDict("MyType", {"a": NotRequired[dict]})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-23 | 
-24 | # total
+22 | 
+23 | # total
    |
    = help: Convert `MyType` to class syntax
 
@@ -153,11 +153,11 @@ UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-24 | # total
-25 | MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
+23 | # total
+24 | MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-26 | 
-27 | # using Literal type
+25 | 
+26 | # using Literal type
    |
    = help: Convert `MyType` to class syntax
 
@@ -175,11 +175,11 @@ UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-27 | # using Literal type
-28 | MyType = TypedDict("MyType", {"key": Literal["value"]})
+26 | # using Literal type
+27 | MyType = TypedDict("MyType", {"key": Literal["value"]})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-29 | 
-30 | # using namespace TypedDict
+28 | 
+29 | # using namespace TypedDict
    |
    = help: Convert `MyType` to class syntax
 
@@ -196,11 +196,11 @@ UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-30 | # using namespace TypedDict
-31 | MyType = typing.TypedDict("MyType", {"key": int})
+29 | # using namespace TypedDict
+30 | MyType = typing.TypedDict("MyType", {"key": int})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-32 | 
-33 | # invalid identifiers (OK)
+31 | 
+32 | # invalid identifiers (OK)
    |
    = help: Convert `MyType` to class syntax
 
@@ -217,11 +217,11 @@ UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-40 | # Empty dict literal
-41 | MyType = TypedDict("MyType", {})
+39 | # Empty dict literal
+40 | MyType = TypedDict("MyType", {})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-42 | 
-43 | # Empty dict call
+41 | 
+42 | # Empty dict call
    |
    = help: Convert `MyType` to class syntax
 
@@ -238,8 +238,8 @@ UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 
 UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
-43 | # Empty dict call
-44 | MyType = TypedDict("MyType", dict())
+42 | # Empty dict call
+43 | MyType = TypedDict("MyType", dict())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
    |
    = help: Convert `MyType` to class syntax

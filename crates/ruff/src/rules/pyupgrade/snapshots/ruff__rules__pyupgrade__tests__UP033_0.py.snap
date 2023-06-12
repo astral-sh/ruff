@@ -22,11 +22,11 @@ UP033_0.py:4:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cac
 
 UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
-10 | @other_decorator
-11 | @functools.lru_cache(maxsize=None)
+ 9 | @other_decorator
+10 | @functools.lru_cache(maxsize=None)
    |                     ^^^^^^^^^^^^^^ UP033
-12 | def fixme():
-13 |     pass
+11 | def fixme():
+12 |     pass
    |
    = help: Rewrite with `@functools.cache
 

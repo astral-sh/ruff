@@ -1,7 +1,10 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use ruff_formatter::{format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
-use rustpython_parser::ast::{Stmt, Suite};
+use crate::trivia::lines_before;
+use ruff_formatter::{
+    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
+};
+use rustpython_parser::ast::{Ranged, Stmt, Suite};
 
 /// Level at which the [`Suite`] appears in the source code.
 #[derive(Copy, Clone, Debug)]
@@ -11,6 +14,12 @@ pub enum SuiteLevel {
 
     /// Statements in a nested body
     Nested,
+}
+
+impl SuiteLevel {
+    const fn is_nested(self) -> bool {
+        matches!(self, SuiteLevel::Nested)
+    }
 }
 
 #[derive(Debug)]
@@ -28,10 +37,18 @@ impl Default for FormatSuite {
 
 impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
-        let mut joiner = f.join_nodes(match self.level {
+        let node_level = match self.level {
             SuiteLevel::TopLevel => NodeLevel::TopLevel,
-            SuiteLevel::Nested => NodeLevel::Statement,
-        });
+            SuiteLevel::Nested => NodeLevel::CompoundStatement,
+        };
+
+        let comments = f.context().comments().clone();
+        let source = f.context().contents();
+
+        let saved_level = f.context().node_level();
+        f.context_mut().set_node_level(node_level);
+
+        let mut joiner = f.join_nodes(node_level);
 
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
@@ -41,6 +58,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         // First entry has never any separator, doesn't matter which one we take;
         joiner.entry(first, &first.format());
 
+        let mut last = first;
         let mut is_last_function_or_class_definition = is_class_or_function_definition(first);
 
         for statement in iter {
@@ -53,21 +71,66 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         joiner.entry_with_separator(
                             &format_args![empty_line(), empty_line()],
                             &statement.format(),
+                            statement,
                         );
                     }
                     SuiteLevel::Nested => {
-                        joiner
-                            .entry_with_separator(&format_args![empty_line()], &statement.format());
+                        joiner.entry_with_separator(&empty_line(), &statement.format(), statement);
                     }
                 }
+            } else if is_compound_statement(last) {
+                // Handles the case where a body has trailing comments. The issue is that RustPython does not include
+                // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
+                // ```python
+                // def test():
+                //      ...
+                //      # The body of `test` ends right after `...` and before this comment
+                //
+                // # leading comment
+                //
+                //
+                // a = 10
+                // ```
+                // Using `lines_after` for the node doesn't work because it would count the lines after the `...`
+                // which is 0 instead of 1, the number of lines between the trailing comment and
+                // the leading comment. This is why the suite handling counts the lines before the
+                // start of the next statement or before the first leading comments for compound statements.
+                let separator = format_with(|f| {
+                    let start = if let Some(first_leading) =
+                        comments.leading_comments(statement.into()).first()
+                    {
+                        first_leading.slice().start()
+                    } else {
+                        statement.start()
+                    };
+
+                    match lines_before(start, source) {
+                        0 | 1 => hard_line_break().fmt(f),
+                        2 => empty_line().fmt(f),
+                        3.. => {
+                            if self.level.is_nested() {
+                                empty_line().fmt(f)
+                            } else {
+                                write!(f, [empty_line(), empty_line()])
+                            }
+                        }
+                    }
+                });
+
+                joiner.entry_with_separator(&separator, &statement.format(), statement);
             } else {
                 joiner.entry(statement, &statement.format());
             }
 
             is_last_function_or_class_definition = is_current_function_or_class_definition;
+            last = statement;
         }
 
-        joiner.finish()
+        let result = joiner.finish();
+
+        f.context_mut().set_node_level(saved_level);
+
+        result
     }
 }
 
@@ -75,6 +138,24 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
     matches!(
         stmt,
         Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_)
+    )
+}
+
+const fn is_compound_statement(stmt: &Stmt) -> bool {
+    matches!(
+        stmt,
+        Stmt::FunctionDef(_)
+            | Stmt::AsyncFunctionDef(_)
+            | Stmt::ClassDef(_)
+            | Stmt::While(_)
+            | Stmt::For(_)
+            | Stmt::AsyncFor(_)
+            | Stmt::Match(_)
+            | Stmt::With(_)
+            | Stmt::AsyncWith(_)
+            | Stmt::If(_)
+            | Stmt::Try(_)
+            | Stmt::TryStar(_)
     )
 }
 
@@ -107,7 +188,7 @@ mod tests {
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteLevel;
-    use ruff_formatter::{format, SimpleFormatOptions};
+    use ruff_formatter::{format, IndentStyle, SimpleFormatOptions};
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
@@ -135,8 +216,14 @@ def trailing_func():
 
         let statements = Suite::parse(source, "test.py").unwrap();
 
-        let context =
-            PyFormatContext::new(SimpleFormatOptions::default(), source, Comments::default());
+        let context = PyFormatContext::new(
+            SimpleFormatOptions {
+                indent_style: IndentStyle::Space(4),
+                ..SimpleFormatOptions::default()
+            },
+            source,
+            Comments::default(),
+        );
 
         let test_formatter =
             format_with(|f: &mut PyFormatter| statements.format().with_options(level).fmt(f));
@@ -165,8 +252,7 @@ one_leading_newline = 10
 no_leading_newline = 30
 
 
-class InTheMiddle:
-    pass
+NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 trailing_statement = 1
@@ -177,7 +263,8 @@ def func():
 
 
 def trailing_func():
-    pass"#
+    pass
+"#
         );
     }
 
@@ -196,8 +283,7 @@ two_leading_newlines = 20
 one_leading_newline = 10
 no_leading_newline = 30
 
-class InTheMiddle:
-    pass
+NOT_YET_IMPLEMENTED_StmtClassDef
 
 trailing_statement = 1
 
@@ -205,7 +291,8 @@ def func():
     pass
 
 def trailing_func():
-    pass"#
+    pass
+"#
         );
     }
 }

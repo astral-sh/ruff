@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Expr, Ranged};
+use rustpython_parser::ast::{Arguments, Decorator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -59,7 +59,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
     checker: &Checker,
     scope: &Scope,
     name: &str,
-    decorator_list: &[Expr],
+    decorator_list: &[Decorator],
     args: &Arguments,
 ) -> Option<Diagnostic> {
     if !matches!(

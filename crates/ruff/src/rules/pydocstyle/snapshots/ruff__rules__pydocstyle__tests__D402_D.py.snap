@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:378:5: D402 First line should not be the function's signature
     |
-378 | @expect('D402: First line should not be the function\'s "signature"')
-379 | def foobar():
-380 |     """Signature: foobar()."""
+376 | @expect('D402: First line should not be the function\'s "signature"')
+377 | def foobar():
+378 |     """Signature: foobar()."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D402
     |
 

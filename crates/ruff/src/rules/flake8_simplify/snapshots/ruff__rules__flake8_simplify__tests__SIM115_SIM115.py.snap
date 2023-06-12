@@ -3,21 +3,21 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
 SIM115.py:4:5: SIM115 Use context handler for opening files
   |
-4 | # SIM115
-5 | f = open("foo.txt")
+3 | # SIM115
+4 | f = open("foo.txt")
   |     ^^^^ SIM115
-6 | data = f.read()
-7 | f.close()
+5 | data = f.read()
+6 | f.close()
   |
 
 SIM115.py:31:9: SIM115 Use context handler for opening files
    |
-31 | # SIM115
-32 | with contextlib.ExitStack():
-33 |     f = open("filename")
+29 | # SIM115
+30 | with contextlib.ExitStack():
+31 |     f = open("filename")
    |         ^^^^ SIM115
-34 | 
-35 | # OK
+32 | 
+33 | # OK
    |
 
 

@@ -29,7 +29,7 @@ use ruff_python_semantic::binding::{
 use ruff_python_semantic::context::ExecutionContext;
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::globals::Globals;
-use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
+use ruff_python_semantic::model::{ResolvedRead, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -48,9 +48,9 @@ use crate::rules::{
     flake8_debugger, flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
     flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle,
-    pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_simplify, flake8_slots, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -136,34 +136,34 @@ impl<'a> Checker<'a> {
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
-        fn quote_style(
-            model: &SemanticModel,
-            locator: &Locator,
-            indexer: &Indexer,
-        ) -> Option<Quote> {
-            if !model.in_f_string() {
-                return None;
-            }
-
-            // Find the quote character used to start the containing f-string.
-            let expr = model.expr()?;
-            let string_range = indexer.f_string_range(expr.start())?;
-            let trailing_quote = trailing_quote(locator.slice(string_range))?;
-
-            // Invert the quote character, if it's a single quote.
-            match *trailing_quote {
-                "'" => Some(Quote::Double),
-                "\"" => Some(Quote::Single),
-                _ => None,
-            }
-        }
-
         Generator::new(
             self.stylist.indentation(),
-            quote_style(&self.semantic_model, self.locator, self.indexer)
-                .unwrap_or(self.stylist.quote()),
+            self.f_string_quote_style().unwrap_or(self.stylist.quote()),
             self.stylist.line_ending(),
         )
+    }
+
+    /// Returns the appropriate quoting for f-string by reversing the one used outside of
+    /// the f-string.
+    ///
+    /// If the current expression in the context is not an f-string, returns ``None``.
+    pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
+        let model = &self.semantic_model;
+        if !model.in_f_string() {
+            return None;
+        }
+
+        // Find the quote character used to start the containing f-string.
+        let expr = model.expr()?;
+        let string_range = self.indexer.f_string_range(expr.start())?;
+        let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
+
+        // Invert the quote character, if it's a single quote.
+        match *trailing_quote {
+            "'" => Some(Quote::Double),
+            "\"" => Some(Quote::Single),
+            _ => None,
+        }
     }
 
     /// Returns the [`IsolationLevel`] for fixes in the current context.
@@ -291,14 +291,14 @@ where
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
-                    // and the current scope.)
+                    // and the current scope, and, per standard resolution rules, any class scopes.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let binding_id = self
                             .semantic_model
                             .scopes
                             .ancestors(self.semantic_model.scope_id)
                             .skip(1)
-                            .take_while(|scope| !scope.kind.is_module())
+                            .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
@@ -307,9 +307,18 @@ where
                                 stmt.range(),
                                 ExecutionContext::Runtime,
                             );
-                        } else {
-                            // Ensure that every nonlocal has an existing binding from a parent scope.
-                            if self.enabled(Rule::NonlocalWithoutBinding) {
+                        }
+
+                        // Ensure that every nonlocal has an existing binding from a parent scope.
+                        if self.enabled(Rule::NonlocalWithoutBinding) {
+                            if self
+                                .semantic_model
+                                .scopes
+                                .ancestors(self.semantic_model.scope_id)
+                                .skip(1)
+                                .take_while(|scope| !scope.kind.is_module())
+                                .all(|scope| !scope.declares(name.as_str()))
+                            {
                                 self.diagnostics.push(Diagnostic::new(
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
@@ -382,6 +391,10 @@ where
                     }
                 }
 
+                if self.enabled(Rule::InvalidStrReturnType) {
+                    pylint::rules::invalid_str_return(self, name, body);
+                }
+
                 if self.enabled(Rule::InvalidFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
                         stmt,
@@ -446,6 +459,12 @@ where
                             args,
                             stmt.is_async_function_def_stmt(),
                         );
+                    }
+                    if self.enabled(Rule::StrOrReprDefinedInStub) {
+                        flake8_pyi::rules::str_or_repr_defined_in_stub(self, stmt);
+                    }
+                    if self.enabled(Rule::NoReturnArgumentAnnotationInStub) {
+                        flake8_pyi::rules::no_return_argument_annotation(self, args);
                     }
                 }
 
@@ -637,10 +656,11 @@ where
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
 
-                if self.semantic_model.scope().kind.is_class() {
+                if let ScopeKind::Class(class_def) = self.semantic_model.scope().kind {
                     if self.enabled(Rule::BuiltinAttributeShadowing) {
                         flake8_builtins::rules::builtin_attribute_shadowing(
                             self,
+                            class_def,
                             name,
                             AnyShadowing::from(stmt),
                         );
@@ -663,14 +683,16 @@ where
                     pylint::rules::return_in_init(self, stmt);
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                name,
-                bases,
-                keywords,
-                decorator_list,
-                body,
-                range: _,
-            }) => {
+            Stmt::ClassDef(
+                class_def @ ast::StmtClassDef {
+                    name,
+                    bases,
+                    keywords,
+                    decorator_list,
+                    body,
+                    range: _,
+                },
+            ) => {
                 if self.enabled(Rule::DjangoNullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
@@ -706,7 +728,10 @@ where
                     pylint::rules::global_statement(self, name);
                 }
                 if self.enabled(Rule::UselessObjectInheritance) {
-                    pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
+                    pyupgrade::rules::useless_object_inheritance(self, class_def, stmt);
+                }
+                if self.enabled(Rule::UnnecessaryClassParentheses) {
+                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def, stmt);
                 }
 
                 if self.enabled(Rule::AmbiguousClassName) {
@@ -770,18 +795,16 @@ where
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
-                if self.any_enabled(&[
-                    Rule::MutableDataclassDefault,
-                    Rule::FunctionCallInDataclassDefaultArgument,
-                ]) && ruff::rules::is_dataclass(&self.semantic_model, decorator_list)
-                {
-                    if self.enabled(Rule::MutableDataclassDefault) {
-                        ruff::rules::mutable_dataclass_default(self, body);
-                    }
+                if self.enabled(Rule::MutableClassDefault) {
+                    ruff::rules::mutable_class_default(self, class_def);
+                }
 
-                    if self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                        ruff::rules::function_call_in_dataclass_defaults(self, body);
-                    }
+                if self.enabled(Rule::MutableDataclassDefault) {
+                    ruff::rules::mutable_dataclass_default(self, class_def);
+                }
+
+                if self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+                    ruff::rules::function_call_in_dataclass_default(self, class_def);
                 }
 
                 if self.enabled(Rule::FStringDocstring) {
@@ -798,6 +821,18 @@ where
 
                 if self.enabled(Rule::DuplicateBases) {
                     pylint::rules::duplicate_bases(self, name, bases);
+                }
+
+                if self.enabled(Rule::NoSlotsInStrSubclass) {
+                    flake8_slots::rules::no_slots_in_str_subclass(self, stmt, class_def);
+                }
+
+                if self.enabled(Rule::NoSlotsInTupleSubclass) {
+                    flake8_slots::rules::no_slots_in_tuple_subclass(self, stmt, class_def);
+                }
+
+                if self.enabled(Rule::NoSlotsInNamedtupleSubclass) {
+                    flake8_slots::rules::no_slots_in_namedtuple_subclass(self, stmt, class_def);
                 }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
@@ -844,23 +879,25 @@ where
                             }
                         }
                     } else if alias.name.contains('.') && alias.asname.is_none() {
-                        // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
+                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
                         // "foo.bar".
                         let name = alias.name.split('.').next().unwrap();
-                        let full_name = &alias.name;
+                        let qualified_name = &alias.name;
                         self.add_binding(
                             name,
                             alias.range(),
-                            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }),
+                            BindingKind::SubmoduleImportation(SubmoduleImportation {
+                                qualified_name,
+                            }),
                             BindingFlags::empty(),
                         );
                     } else {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let full_name = &alias.name;
+                        let qualified_name = &alias.name;
                         self.add_binding(
                             name,
                             alias.range(),
-                            BindingKind::Importation(Importation { full_name }),
+                            BindingKind::Importation(Importation { qualified_name }),
                             if alias
                                 .asname
                                 .as_ref()
@@ -1086,6 +1123,9 @@ where
                     if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
                         flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
                     }
+                    if self.enabled(Rule::FutureAnnotationsInStub) {
+                        flake8_pyi::rules::from_future_import(self, import_from);
+                    }
                 }
                 for alias in names {
                     if let Some("__future__") = module {
@@ -1146,16 +1186,16 @@ where
                             }
                         }
 
-                        // Given `from foo import bar`, `name` would be "bar" and `full_name` would
+                        // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
-                        // and `full_name` would be "foo.bar".
+                        // and `qualified_name` would be "foo.bar".
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let full_name =
+                        let qualified_name =
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
                             alias.range(),
-                            BindingKind::FromImportation(FromImportation { full_name }),
+                            BindingKind::FromImportation(FromImportation { qualified_name }),
                             if alias
                                 .asname
                                 .as_ref()
@@ -1191,12 +1231,12 @@ where
                     }
 
                     if self.enabled(Rule::UnconventionalImportAlias) {
-                        let full_name =
+                        let qualified_name =
                             helpers::format_import_from_member(level, module, &alias.name);
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::conventional_import_alias(
                                 stmt,
-                                &full_name,
+                                &qualified_name,
                                 alias.asname.as_deref(),
                                 &self.settings.flake8_import_conventions.aliases,
                             )
@@ -1207,12 +1247,12 @@ where
 
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
-                            let full_name =
+                            let qualified_name =
                                 helpers::format_import_from_member(level, module, &alias.name);
                             if let Some(diagnostic) =
                                 flake8_import_conventions::rules::banned_import_alias(
                                     stmt,
-                                    &full_name,
+                                    &qualified_name,
                                     asname,
                                     &self.settings.flake8_import_conventions.banned_aliases,
                                 )
@@ -1321,9 +1361,9 @@ where
                         pyflakes::rules::raise_not_implemented(self, expr);
                     }
                 }
-                if self.enabled(Rule::CannotRaiseLiteral) {
+                if self.enabled(Rule::RaiseLiteral) {
                     if let Some(exc) = exc {
-                        flake8_bugbear::rules::cannot_raise_literal(self, exc);
+                        flake8_bugbear::rules::raise_literal(self, exc);
                     }
                 }
                 if self.any_enabled(&[
@@ -1476,7 +1516,8 @@ where
                     pygrep_hooks::rules::non_existent_mock_method(self, test);
                 }
             }
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body, .. })
+            | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
@@ -1812,8 +1853,8 @@ where
             }) => {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
-                for expr in decorator_list {
-                    self.visit_expr(expr);
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
@@ -1922,8 +1963,8 @@ where
                 for keyword in keywords {
                     self.visit_keyword(keyword);
                 }
-                for expr in decorator_list {
-                    self.visit_expr(expr);
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -2329,10 +2370,11 @@ where
                             }
                         }
 
-                        if self.semantic_model.scope().kind.is_class() {
+                        if let ScopeKind::Class(class_def) = self.semantic_model.scope().kind {
                             if self.enabled(Rule::BuiltinAttributeShadowing) {
                                 flake8_builtins::rules::builtin_attribute_shadowing(
                                     self,
+                                    class_def,
                                     id,
                                     AnyShadowing::from(expr),
                                 );
@@ -2612,7 +2654,9 @@ where
                 if self.enabled(Rule::ZipWithoutExplicitStrict)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
-                    flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
+                    flake8_bugbear::rules::zip_without_explicit_strict(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.enabled(Rule::NoExplicitStacklevel) {
                     flake8_bugbear::rules::no_explicit_stacklevel(self, func, args, keywords);
@@ -2692,22 +2736,12 @@ where
                 }
                 if self.enabled(Rule::UnnecessaryGeneratorSet) {
                     flake8_comprehensions::rules::unnecessary_generator_set(
-                        self,
-                        expr,
-                        self.semantic_model.expr_parent(),
-                        func,
-                        args,
-                        keywords,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.enabled(Rule::UnnecessaryGeneratorDict) {
                     flake8_comprehensions::rules::unnecessary_generator_dict(
-                        self,
-                        expr,
-                        self.semantic_model.expr_parent(),
-                        func,
-                        args,
-                        keywords,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.enabled(Rule::UnnecessaryListComprehensionSet) {
@@ -2797,7 +2831,7 @@ where
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = self.semantic_model.scope_mut();
-                        scope.uses_locals = true;
+                        scope.set_uses_locals();
                     }
                 }
 
@@ -3051,7 +3085,7 @@ where
             }
             Expr::Set(ast::ExprSet { elts, range: _ }) => {
                 if self.enabled(Rule::DuplicateValue) {
-                    pylint::rules::duplicate_value(self, elts);
+                    flake8_bugbear::rules::duplicate_value(self, elts);
                 }
             }
             Expr::Yield(_) => {
@@ -3302,13 +3336,7 @@ where
                 }
 
                 if self.enabled(Rule::IsLiteral) {
-                    pyflakes::rules::invalid_literal_comparison(
-                        self,
-                        left,
-                        ops,
-                        comparators,
-                        expr.range(),
-                    );
+                    pyflakes::rules::invalid_literal_comparison(self, left, ops, comparators, expr);
                 }
 
                 if self.enabled(Rule::TypeComparison) {
@@ -3332,6 +3360,10 @@ where
                             comparators,
                         ),
                     );
+                }
+
+                if self.enabled(Rule::ComparisonWithItself) {
+                    pylint::rules::comparison_with_itself(self, left, ops, comparators);
                 }
 
                 if self.enabled(Rule::ComparisonOfConstant) {
@@ -3535,6 +3567,9 @@ where
                     for generator in generators {
                         pylint::rules::iteration_over_set(self, &generator.iter);
                     }
+                }
+                if self.enabled(Rule::StaticKeyDictComprehension) {
+                    ruff::rules::static_key_dict_comprehension(self, key);
                 }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {
@@ -4030,7 +4065,7 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self.semantic_model.scope().defines(name) {
+                        if self.semantic_model.scope().has(name) {
                             self.handle_node_store(
                                 name,
                                 &Expr::Name(ast::ExprName {
@@ -4055,7 +4090,7 @@ where
 
                         if let Some(binding_id) = {
                             let scope = self.semantic_model.scope_mut();
-                            scope.remove(name)
+                            scope.delete(name)
                         } {
                             if !self.semantic_model.is_used(binding_id) {
                                 if self.enabled(Rule::UnusedVariable) {
@@ -4116,6 +4151,10 @@ where
             if self.enabled(Rule::ArgumentDefaultInStub) {
                 flake8_pyi::rules::argument_simple_defaults(self, arguments);
             }
+        }
+
+        if self.settings.rules.enabled(Rule::ImplicitOptional) {
+            ruff::rules::implicit_optional(self, arguments);
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
@@ -4401,13 +4440,8 @@ impl<'a> Checker<'a> {
                                 },
                                 binding.trimmed_range(&self.semantic_model, self.locator),
                             );
-                            if let Some(parent) = binding.source {
-                                let parent = self.semantic_model.stmts[parent];
-                                if parent.is_import_from_stmt()
-                                    && parent.range().contains_range(binding.range)
-                                {
-                                    diagnostic.set_parent(parent.start());
-                                }
+                            if let Some(range) = binding.parent_range(&self.semantic_model) {
+                                diagnostic.set_parent(range.start());
                             }
                             self.diagnostics.push(diagnostic);
                         }
@@ -4477,11 +4511,11 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        match self.semantic_model.resolve_reference(id, expr.range()) {
-            ResolvedReference::Resolved(..) | ResolvedReference::ImplicitGlobal => {
+        match self.semantic_model.resolve_read(id, expr.range()) {
+            ResolvedRead::Resolved(..) | ResolvedRead::ImplicitGlobal => {
                 // Nothing to do.
             }
-            ResolvedReference::StarImport => {
+            ResolvedRead::StarImport => {
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = self
@@ -4504,7 +4538,7 @@ impl<'a> Checker<'a> {
                     ));
                 }
             }
-            ResolvedReference::NotFound => {
+            ResolvedRead::NotFound => {
                 // F821
                 if self.enabled(Rule::UndefinedName) {
                     // Allow __path__.
@@ -4599,7 +4633,7 @@ impl<'a> Checker<'a> {
             self.add_binding(
                 id,
                 expr.range(),
-                BindingKind::Binding,
+                BindingKind::UnpackedAssignment,
                 BindingFlags::empty(),
             );
             return;
@@ -4607,14 +4641,8 @@ impl<'a> Checker<'a> {
 
         let scope = self.semantic_model.scope();
 
-        if id == "__all__"
-            && scope.kind.is_module()
-            && matches!(
-                parent,
-                Stmt::Assign(_) | Stmt::AugAssign(_) | Stmt::AnnAssign(_)
-            )
-        {
-            if match parent {
+        if scope.kind.is_module()
+            && match parent {
                 Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                     if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
                         id == "__all__"
@@ -4637,47 +4665,32 @@ impl<'a> Checker<'a> {
                     }
                 }
                 _ => false,
-            } {
-                let (all_names, all_names_flags) = {
-                    let (mut names, flags) =
-                        extract_all_names(parent, |name| self.semantic_model.is_builtin(name));
-
-                    // Grab the existing bound __all__ values.
-                    if let Stmt::AugAssign(_) = parent {
-                        if let Some(binding_id) = scope.get("__all__") {
-                            if let BindingKind::Export(Export { names: existing }) =
-                                &self.semantic_model.bindings[binding_id].kind
-                            {
-                                names.extend_from_slice(existing);
-                            }
-                        }
-                    }
-
-                    (names, flags)
-                };
-
-                if self.enabled(Rule::InvalidAllFormat) {
-                    if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
-                        self.diagnostics
-                            .push(pylint::rules::invalid_all_format(expr));
-                    }
-                }
-
-                if self.enabled(Rule::InvalidAllObject) {
-                    if matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT) {
-                        self.diagnostics
-                            .push(pylint::rules::invalid_all_object(expr));
-                    }
-                }
-
-                self.add_binding(
-                    id,
-                    expr.range(),
-                    BindingKind::Export(Export { names: all_names }),
-                    BindingFlags::empty(),
-                );
-                return;
             }
+        {
+            let (names, flags) =
+                extract_all_names(parent, |name| self.semantic_model.is_builtin(name));
+
+            if self.enabled(Rule::InvalidAllFormat) {
+                if matches!(flags, AllNamesFlags::INVALID_FORMAT) {
+                    self.diagnostics
+                        .push(pylint::rules::invalid_all_format(expr));
+                }
+            }
+
+            if self.enabled(Rule::InvalidAllObject) {
+                if matches!(flags, AllNamesFlags::INVALID_OBJECT) {
+                    self.diagnostics
+                        .push(pylint::rules::invalid_all_object(expr));
+                }
+            }
+
+            self.add_binding(
+                id,
+                expr.range(),
+                BindingKind::Export(Export { names }),
+                BindingFlags::empty(),
+            );
+            return;
         }
 
         if self
@@ -4711,19 +4724,16 @@ impl<'a> Checker<'a> {
         }
 
         let scope = self.semantic_model.scope_mut();
-        if scope.remove(id.as_str()).is_some() {
-            return;
+        if scope.delete(id.as_str()).is_none() {
+            if self.enabled(Rule::UndefinedName) {
+                self.diagnostics.push(Diagnostic::new(
+                    pyflakes::rules::UndefinedName {
+                        name: id.to_string(),
+                    },
+                    expr.range(),
+                ));
+            }
         }
-        if !self.enabled(Rule::UndefinedName) {
-            return;
-        }
-
-        self.diagnostics.push(Diagnostic::new(
-            pyflakes::rules::UndefinedName {
-                name: id.to_string(),
-            },
-            expr.range(),
-        ));
     }
 
     fn check_deferred_future_type_definitions(&mut self) {
@@ -4911,49 +4921,30 @@ impl<'a> Checker<'a> {
         }
 
         // Mark anything referenced in `__all__` as used.
-        let all_bindings: Option<(Vec<BindingId>, TextRange)> = {
+        let exports: Vec<(&str, TextRange)> = {
             let global_scope = self.semantic_model.global_scope();
-            let all_names: Option<(&[&str], TextRange)> = global_scope
-                .get("__all__")
+            global_scope
+                .bindings_for_name("__all__")
                 .map(|binding_id| &self.semantic_model.bindings[binding_id])
-                .and_then(|binding| match &binding.kind {
+                .filter_map(|binding| match &binding.kind {
                     BindingKind::Export(Export { names }) => {
-                        Some((names.as_slice(), binding.range))
+                        Some(names.iter().map(|name| (*name, binding.range)))
                     }
                     _ => None,
-                });
-
-            all_names.map(|(names, range)| {
-                (
-                    names
-                        .iter()
-                        .filter_map(|name| global_scope.get(name))
-                        .collect(),
-                    range,
-                )
-            })
+                })
+                .flatten()
+                .collect()
         };
 
-        if let Some((bindings, range)) = all_bindings {
-            for binding_id in bindings {
+        for (name, range) in &exports {
+            if let Some(binding_id) = self.semantic_model.global_scope().get(name) {
                 self.semantic_model.add_global_reference(
                     binding_id,
-                    range,
+                    *range,
                     ExecutionContext::Runtime,
                 );
             }
         }
-
-        // Extract `__all__` names from the global scope.
-        let all_names: Option<(&[&str], TextRange)> = self
-            .semantic_model
-            .global_scope()
-            .get("__all__")
-            .map(|binding_id| &self.semantic_model.bindings[binding_id])
-            .and_then(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => Some((names.as_slice(), binding.range)),
-                _ => None,
-            });
 
         // Identify any valid runtime imports. If a module is imported at runtime, and
         // used at runtime, then by default, we avoid flagging any other
@@ -4991,35 +4982,33 @@ impl<'a> Checker<'a> {
                 // F822
                 if self.enabled(Rule::UndefinedExport) {
                     if !self.path.ends_with("__init__.py") {
-                        if let Some((names, range)) = all_names {
+                        for (name, range) in &exports {
                             diagnostics
-                                .extend(pyflakes::rules::undefined_export(names, range, scope));
+                                .extend(pyflakes::rules::undefined_export(name, *range, scope));
                         }
                     }
                 }
 
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                    if let Some((names, range)) = &all_names {
-                        let sources: Vec<String> = scope
-                            .star_imports()
-                            .map(|StarImportation { level, module }| {
-                                helpers::format_import_from(*level, *module)
-                            })
-                            .sorted()
-                            .dedup()
-                            .collect();
-                        if !sources.is_empty() {
-                            for name in names.iter() {
-                                if !scope.defines(name) {
-                                    diagnostics.push(Diagnostic::new(
-                                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                            name: (*name).to_string(),
-                                            sources: sources.clone(),
-                                        },
-                                        *range,
-                                    ));
-                                }
+                    let sources: Vec<String> = scope
+                        .star_imports()
+                        .map(|StarImportation { level, module }| {
+                            helpers::format_import_from(*level, *module)
+                        })
+                        .sorted()
+                        .dedup()
+                        .collect();
+                    if !sources.is_empty() {
+                        for (name, range) in &exports {
+                            if !scope.has(name) {
+                                diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                        name: (*name).to_string(),
+                                        sources: sources.clone(),
+                                    },
+                                    *range,
+                                ));
                             }
                         }
                     }
@@ -5056,12 +5045,11 @@ impl<'a> Checker<'a> {
             // the bindings are in different scopes.
             if self.enabled(Rule::RedefinedWhileUnused) {
                 for (name, binding_id) in scope.bindings() {
-                    if let Some(shadowed) = self.semantic_model.shadowed_binding(binding_id) {
+                    if let Some(shadowed_id) = self.semantic_model.shadowed_binding(binding_id) {
+                        let shadowed = &self.semantic_model.bindings[shadowed_id];
                         if shadowed.is_used() {
                             continue;
                         }
-
-                        let binding = &self.semantic_model.bindings[binding_id];
 
                         #[allow(deprecated)]
                         let line = self.locator.compute_line_index(
@@ -5070,6 +5058,7 @@ impl<'a> Checker<'a> {
                                 .start(),
                         );
 
+                        let binding = &self.semantic_model.bindings[binding_id];
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::RedefinedWhileUnused {
                                 name: (*name).to_string(),
@@ -5077,13 +5066,8 @@ impl<'a> Checker<'a> {
                             },
                             binding.trimmed_range(&self.semantic_model, self.locator),
                         );
-                        if let Some(parent) = binding
-                            .source
-                            .map(|source| &self.semantic_model.stmts[source])
-                        {
-                            if parent.is_import_from_stmt() {
-                                diagnostic.set_parent(parent.start());
-                            }
+                        if let Some(range) = binding.parent_range(&self.semantic_model) {
+                            diagnostic.set_parent(range.start());
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -5101,22 +5085,19 @@ impl<'a> Checker<'a> {
                         .copied()
                         .collect()
                 };
-                for binding_id in scope.binding_ids() {
-                    let binding = &self.semantic_model.bindings[binding_id];
 
-                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                        self,
-                        binding,
-                        &mut diagnostics,
-                    );
+                flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                    self,
+                    scope,
+                    &mut diagnostics,
+                );
 
-                    flake8_type_checking::rules::typing_only_runtime_import(
-                        self,
-                        binding,
-                        &runtime_imports,
-                        &mut diagnostics,
-                    );
-                }
+                flake8_type_checking::rules::typing_only_runtime_import(
+                    self,
+                    scope,
+                    &runtime_imports,
+                    &mut diagnostics,
+                );
             }
 
             if self.enabled(Rule::UnusedImport) {

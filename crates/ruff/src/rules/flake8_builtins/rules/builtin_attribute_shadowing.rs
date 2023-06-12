@@ -1,6 +1,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use rustpython_parser::ast;
 
 use crate::checkers::ast::Checker;
 
@@ -64,10 +65,21 @@ impl Violation for BuiltinAttributeShadowing {
 /// A003
 pub(crate) fn builtin_attribute_shadowing(
     checker: &mut Checker,
+    class_def: &ast::StmtClassDef,
     name: &str,
     shadowing: AnyShadowing,
 ) {
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+        // Ignore shadowing within `TypedDict` definitions, since these are only accessible through
+        // subscripting and not through attribute access.
+        if class_def.bases.iter().any(|base| {
+            checker
+                .semantic_model()
+                .match_typing_expr(base, "TypedDict")
+        }) {
+            return;
+        }
+
         checker.diagnostics.push(Diagnostic::new(
             BuiltinAttributeShadowing {
                 name: name.to_string(),

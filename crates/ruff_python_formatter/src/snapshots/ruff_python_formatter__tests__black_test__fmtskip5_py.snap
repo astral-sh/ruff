@@ -22,29 +22,29 @@ else:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,6 @@
--a, b, c = 3, 4, 5
-+a, b, c = 3, 4,       5
- if (
+@@ -1,9 +1,5 @@
+ a, b, c = 3, 4, 5
+-if (
 -    a == 3
-+    a ==    3
-     and b    != 9  # fmt: skip
-     and c is not None
- ):
+-    and b    != 9  # fmt: skip
+-    and c is not None
+-):
+-    print("I'm good!")
++if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++    NOT_IMPLEMENTED_call()
+ else:
+-    print("I'm bad")
++    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
-a, b, c = 3, 4,       5
-if (
-    a ==    3
-    and b    != 9  # fmt: skip
-    and c is not None
-):
-    print("I'm good!")
+a, b, c = 3, 4, 5
+if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    NOT_IMPLEMENTED_call()
 else:
-    print("I'm bad")
+    NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

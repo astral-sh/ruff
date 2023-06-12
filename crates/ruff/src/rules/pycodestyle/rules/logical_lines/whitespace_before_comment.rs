@@ -4,6 +4,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_whitespace::PythonWhitespace;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
@@ -156,7 +157,7 @@ pub(crate) fn whitespace_before_comment(
             ));
             let token_text = locator.slice(range);
 
-            let is_inline_comment = !line_text.trim().is_empty();
+            let is_inline_comment = !line_text.trim_whitespace().is_empty();
             if is_inline_comment {
                 if range.start() - prev_end < "  ".text_len() {
                     context.push(

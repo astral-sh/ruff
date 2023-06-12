@@ -2,13 +2,13 @@
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
 too_many_branches.py:6:5: PLR0912 Too many branches (13 > 12)
-   |
- 6 | """
- 7 | # pylint: disable=using-constant-test
- 8 | def wrong(): # [too-many-branches]
-   |     ^^^^^ PLR0912
- 9 |     """ Has too many branches. """
-10 |     if 1:
-   |
+  |
+4 | """
+5 | # pylint: disable=using-constant-test
+6 | def wrong(): # [too-many-branches]
+  |     ^^^^^ PLR0912
+7 |     """ Has too many branches. """
+8 |     if 1:
+  |
 
 

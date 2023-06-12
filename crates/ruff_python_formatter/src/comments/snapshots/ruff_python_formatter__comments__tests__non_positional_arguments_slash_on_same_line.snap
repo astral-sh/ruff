@@ -5,8 +5,8 @@ expression: comments.debug(test_case.source_code)
 {
     Node {
         kind: Arguments,
-        range: 10..94,
-        source: `a=10,/, # trailing position...t comment.⏎`,
+        range: 9..96,
+        source: `(a=10,/, # trailing positio...t comment.⏎`,
     }: {
         "leading": [],
         "dangling": [

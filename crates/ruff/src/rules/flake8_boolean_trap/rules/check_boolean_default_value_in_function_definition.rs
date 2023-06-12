@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Expr};
+use rustpython_parser::ast::{Arguments, Decorator};
 
 use ruff_diagnostics::Violation;
 
@@ -61,15 +61,16 @@ impl Violation for BooleanDefaultValueInFunctionDefinition {
 pub(crate) fn check_boolean_default_value_in_function_definition(
     checker: &mut Checker,
     name: &str,
-    decorator_list: &[Expr],
+    decorator_list: &[Decorator],
     arguments: &Arguments,
 ) {
     if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
         return;
     }
 
-    if decorator_list.iter().any(|expr| {
-        collect_call_path(expr).map_or(false, |call_path| call_path.as_slice() == [name, "setter"])
+    if decorator_list.iter().any(|decorator| {
+        collect_call_path(&decorator.expression)
+            .map_or(false, |call_path| call_path.as_slice() == [name, "setter"])
     }) {
         return;
     }

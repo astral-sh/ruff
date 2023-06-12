@@ -183,7 +183,6 @@ mod tests {
     use ruff_python_ast::node::AnyNode;
     use ruff_text_size::{TextRange, TextSize};
     use rustpython_parser::ast::{StmtBreak, StmtContinue};
-    use std::cell::Cell;
 
     #[test]
     fn debug() {
@@ -207,32 +206,26 @@ break;
 
         comments_map.push_leading(
             continue_statement.as_ref().into(),
-            SourceComment {
-                slice: source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
-                #[cfg(debug_assertions)]
-                formatted: Cell::new(false),
-                position: CommentTextPosition::OwnLine,
-            },
+            SourceComment::new(
+                source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
+                CommentTextPosition::OwnLine,
+            ),
         );
 
         comments_map.push_trailing(
             continue_statement.as_ref().into(),
-            SourceComment {
-                slice: source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
-                #[cfg(debug_assertions)]
-                formatted: Cell::new(false),
-                position: CommentTextPosition::EndOfLine,
-            },
+            SourceComment::new(
+                source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
+                CommentTextPosition::EndOfLine,
+            ),
         );
 
         comments_map.push_leading(
             break_statement.as_ref().into(),
-            SourceComment {
-                slice: source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
-                #[cfg(debug_assertions)]
-                formatted: Cell::new(false),
-                position: CommentTextPosition::OwnLine,
-            },
+            SourceComment::new(
+                source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
+                CommentTextPosition::OwnLine,
+            ),
         );
 
         let comments = Comments::new(comments_map);

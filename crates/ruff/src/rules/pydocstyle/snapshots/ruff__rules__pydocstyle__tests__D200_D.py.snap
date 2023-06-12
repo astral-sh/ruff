@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:129:5: D200 [*] One-line docstring should fit on one line
     |
-129 |   @expect('D212: Multi-line docstring summary should start at the first line')
-130 |   def asdlkfasd():
-131 |       """
+127 |   @expect('D212: Multi-line docstring summary should start at the first line')
+128 |   def asdlkfasd():
+129 |       """
     |  _____^
-132 | |     Wrong.
-133 | |     """
+130 | |     Wrong.
+131 | |     """
     | |_______^ D200
     |
     = help: Reformat to one line
@@ -27,12 +27,12 @@ D.py:129:5: D200 [*] One-line docstring should fit on one line
 
 D.py:597:5: D200 [*] One-line docstring should fit on one line
     |
-597 |   @expect('D212: Multi-line docstring summary should start at the first line')
-598 |   def one_liner():
-599 |       """
+595 |   @expect('D212: Multi-line docstring summary should start at the first line')
+596 |   def one_liner():
+597 |       """
     |  _____^
-600 | | 
-601 | |     Wrong."""
+598 | | 
+599 | |     Wrong."""
     | |_____________^ D200
     |
     = help: Reformat to one line
@@ -51,12 +51,12 @@ D.py:597:5: D200 [*] One-line docstring should fit on one line
 
 D.py:606:5: D200 [*] One-line docstring should fit on one line
     |
-606 |   @expect('D212: Multi-line docstring summary should start at the first line')
-607 |   def one_liner():
-608 |       r"""Wrong.
+604 |   @expect('D212: Multi-line docstring summary should start at the first line')
+605 |   def one_liner():
+606 |       r"""Wrong.
     |  _____^
-609 | | 
-610 | |     """
+607 | | 
+608 | |     """
     | |_______^ D200
     |
     = help: Reformat to one line
@@ -75,24 +75,24 @@ D.py:606:5: D200 [*] One-line docstring should fit on one line
 
 D.py:615:5: D200 One-line docstring should fit on one line
     |
-615 |   @expect('D212: Multi-line docstring summary should start at the first line')
-616 |   def one_liner():
-617 |       """Wrong."
+613 |   @expect('D212: Multi-line docstring summary should start at the first line')
+614 |   def one_liner():
+615 |       """Wrong."
     |  _____^
-618 | | 
-619 | |     """
+616 | | 
+617 | |     """
     | |_______^ D200
     |
     = help: Reformat to one line
 
 D.py:624:5: D200 One-line docstring should fit on one line
     |
-624 |   @expect('D212: Multi-line docstring summary should start at the first line')
-625 |   def one_liner():
-626 |       """
+622 |   @expect('D212: Multi-line docstring summary should start at the first line')
+623 |   def one_liner():
+624 |       """
     |  _____^
-627 | | 
-628 | |     "Wrong."""
+625 | | 
+626 | |     "Wrong."""
     | |______________^ D200
     |
     = help: Reformat to one line

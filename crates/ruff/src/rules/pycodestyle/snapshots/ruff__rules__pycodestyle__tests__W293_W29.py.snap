@@ -2,15 +2,15 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 W29.py:7:1: W293 [*] Blank line contains whitespace
-   |
- 7 | #: W293:2:1
- 8 | class Foo(object):
- 9 |     
-   | ^^^^ W293
-10 |     bang = 12
-11 | #: W291:2:35
-   |
-   = help: Remove whitespace from blank line
+  |
+5 | #: W293:2:1
+6 | class Foo(object):
+7 |     
+  | ^^^^ W293
+8 |     bang = 12
+9 | #: W291:2:35
+  |
+  = help: Remove whitespace from blank line
 
 ℹ Suggested fix
 4 4 | print 

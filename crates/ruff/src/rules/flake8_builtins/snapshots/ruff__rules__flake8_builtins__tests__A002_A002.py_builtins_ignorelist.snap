@@ -45,9 +45,9 @@ A002.py:5:17: A002 Argument `bytes` is shadowing a Python builtin
 
 A002.py:11:16: A002 Argument `float` is shadowing a Python builtin
    |
-11 |     pass
-12 | 
-13 | map([], lambda float: ...)
+ 9 |     pass
+10 | 
+11 | map([], lambda float: ...)
    |                ^^^^^ A002
    |
 

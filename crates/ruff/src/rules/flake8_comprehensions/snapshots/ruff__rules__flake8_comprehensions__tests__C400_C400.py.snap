@@ -19,11 +19,11 @@ C400.py:1:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 
 C400.py:2:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
-2 |   x = list(x for x in range(3))
-3 |   x = list(
+1 |   x = list(x for x in range(3))
+2 |   x = list(
   |  _____^
-4 | |     x for x in range(3)
-5 | | )
+3 | |     x for x in range(3)
+4 | | )
   | |_^ C400
   |
   = help: Rewrite as a `list` comprehension

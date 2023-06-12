@@ -32,6 +32,17 @@
         "null"
       ]
     },
+    "copyright": {
+      "description": "Options for the `copyright` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CopyrightOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "dummy-variable-rgx": {
       "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
       "type": [
@@ -528,7 +539,7 @@
       ]
     },
     "target-version": {
-      "description": "The Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, the target version will be inferred from the `project.requires-python` field in the relevant `pyproject.toml` (e.g., `requires-python = \">=3.8\"`), if present.",
+      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -619,6 +630,35 @@
           ]
         }
       ]
+    },
+    "CopyrightOptions": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Author to enforce within the copyright notice. If provided, the author must be present immediately following the copyright notice.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "min-file-size": {
+          "description": "A minimum file size (in bytes) required for a copyright notice to be enforced. By default, all files are validated.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "notice-rgx": {
+          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+(\\(C\\)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "Flake8AnnotationsOptions": {
       "type": "object",
@@ -1639,6 +1679,7 @@
         "B030",
         "B031",
         "B032",
+        "B033",
         "B9",
         "B90",
         "B904",
@@ -1678,6 +1719,10 @@
         "COM812",
         "COM818",
         "COM819",
+        "CPY",
+        "CPY0",
+        "CPY00",
+        "CPY001",
         "D",
         "D1",
         "D10",
@@ -1917,6 +1962,13 @@
         "FBT001",
         "FBT002",
         "FBT003",
+        "FIX",
+        "FIX0",
+        "FIX00",
+        "FIX001",
+        "FIX002",
+        "FIX003",
+        "FIX004",
         "FLY",
         "FLY0",
         "FLY00",
@@ -2063,6 +2115,7 @@
         "PLE03",
         "PLE030",
         "PLE0302",
+        "PLE0307",
         "PLE06",
         "PLE060",
         "PLE0604",
@@ -2099,6 +2152,8 @@
         "PLR",
         "PLR0",
         "PLR01",
+        "PLR012",
+        "PLR0124",
         "PLR013",
         "PLR0133",
         "PLR02",
@@ -2136,7 +2191,6 @@
         "PLW0120",
         "PLW0129",
         "PLW013",
-        "PLW0130",
         "PLW0131",
         "PLW04",
         "PLW040",
@@ -2241,6 +2295,7 @@
         "PYI021",
         "PYI024",
         "PYI025",
+        "PYI029",
         "PYI03",
         "PYI032",
         "PYI033",
@@ -2249,9 +2304,11 @@
         "PYI04",
         "PYI042",
         "PYI043",
+        "PYI044",
         "PYI045",
         "PYI048",
         "PYI05",
+        "PYI050",
         "PYI052",
         "PYI053",
         "PYI054",
@@ -2290,6 +2347,9 @@
         "RUF009",
         "RUF01",
         "RUF010",
+        "RUF011",
+        "RUF012",
+        "RUF013",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -2404,14 +2464,13 @@
         "SLF0",
         "SLF00",
         "SLF001",
+        "SLOT",
+        "SLOT0",
+        "SLOT00",
+        "SLOT000",
+        "SLOT001",
+        "SLOT002",
         "T",
-        "T",
-        "T0",
-        "T00",
-        "T001",
-        "T002",
-        "T003",
-        "T004",
         "T1",
         "T10",
         "T100",
@@ -2503,6 +2562,7 @@
         "UP036",
         "UP037",
         "UP038",
+        "UP039",
         "W",
         "W1",
         "W19",

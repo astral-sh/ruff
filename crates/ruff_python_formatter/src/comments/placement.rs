@@ -1,10 +1,10 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-
 use crate::comments::CommentTextPosition;
-use crate::trivia::find_first_non_trivia_character_in_range;
+use crate::trivia::{SimpleTokenizer, TokenKind};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 use std::cmp::Ordering;
@@ -20,10 +20,15 @@ pub(super) fn place_comment<'a>(
         .or_else(|comment| handle_in_between_bodies_end_of_line_comment(comment, locator))
         .or_else(|comment| handle_trailing_body_comment(comment, locator))
         .or_else(handle_trailing_end_of_line_body_comment)
+        .or_else(|comment| handle_trailing_end_of_line_condition_comment(comment, locator))
+        .or_else(|comment| {
+            handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
+        })
         .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
         .or_else(|comment| {
             handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
         })
+        .or_else(handle_leading_function_with_decorators_comment)
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -99,9 +104,8 @@ fn handle_match_comment<'a>(
         }
     } else {
         // Comment after the last statement in a match case...
-        let match_stmt_indentation = whitespace::indentation(locator, match_stmt)
-            .unwrap_or_default()
-            .len();
+        let match_stmt_indentation =
+            whitespace::indentation(locator, match_stmt).map_or(usize::MAX, str::len);
 
         if comment_indentation <= match_case_indentation
             && comment_indentation > match_stmt_indentation
@@ -208,6 +212,26 @@ fn handle_in_between_bodies_own_line_comment<'a>(
             //     # comment
             //     b
             // ```
+            return CommentPlacement::Default(comment);
+        }
+
+        // If there's any non-trivia token between the preceding node and the comment, than it means that
+        // we're past the case of the alternate branch, defer to the default rules
+        // ```python
+        // if a:
+        //      pass
+        //  else:
+        //      # leading comment
+        //      def inline_after_else(): ...
+        // ```
+        if SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(preceding.end(), comment.slice().start()),
+        )
+        .skip_trivia()
+        .next()
+        .is_some()
+        {
             return CommentPlacement::Default(comment);
         }
 
@@ -375,9 +399,8 @@ fn handle_trailing_body_comment<'a>(
     let mut grand_parent_body = None;
 
     loop {
-        let child_indentation = whitespace::indentation(locator, &current_child)
-            .map(str::len)
-            .unwrap_or_default();
+        let child_indentation =
+            whitespace::indentation(locator, &current_child).map_or(usize::MAX, str::len);
 
         match comment_indentation_len.cmp(&child_indentation) {
             Ordering::Less => {
@@ -469,6 +492,97 @@ fn handle_trailing_end_of_line_body_comment(comment: DecoratedComment<'_>) -> Co
         //  ```
         CommentPlacement::Default(comment)
     }
+}
+
+/// Handles end of line comments after the `:` of a condition
+///
+/// ```python
+/// while True: # comment
+///     pass
+/// ```
+///
+/// It attaches the comment as dangling comment to the enclosing `while` statement.
+fn handle_trailing_end_of_line_condition_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    use ruff_python_ast::prelude::*;
+
+    // Must be an end of line comment
+    if comment.text_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Must be between the condition expression and the first body element
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let expression_before_colon = match comment.enclosing_node() {
+        AnyNodeRef::StmtIf(StmtIf { test: expr, .. })
+        | AnyNodeRef::StmtWhile(StmtWhile { test: expr, .. })
+        | AnyNodeRef::StmtFor(StmtFor { iter: expr, .. })
+        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { iter: expr, .. }) => {
+            Some(AnyNodeRef::from(expr.as_ref()))
+        }
+
+        AnyNodeRef::StmtWith(StmtWith { items, .. })
+        | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { items, .. }) => {
+            items.last().map(AnyNodeRef::from)
+        }
+        AnyNodeRef::StmtFunctionDef(StmtFunctionDef { returns, args, .. })
+        | AnyNodeRef::StmtAsyncFunctionDef(StmtAsyncFunctionDef { returns, args, .. }) => returns
+            .as_deref()
+            .map(AnyNodeRef::from)
+            .or_else(|| Some(AnyNodeRef::from(args.as_ref()))),
+        _ => None,
+    };
+
+    let Some(last_before_colon) = expression_before_colon else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // If the preceding is the node before the `colon`
+    // `while true:` The node before the `colon` is the `true` constant.
+    if preceding.ptr_eq(last_before_colon) {
+        let tokens = SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(preceding.end(), following.start()),
+        )
+        .skip_trivia();
+
+        for token in tokens {
+            match token.kind() {
+                TokenKind::Colon => {
+                    if comment.slice().start() > token.start() {
+                        // Comment comes after the colon
+                        // ```python
+                        // while a: # comment
+                        //      ...
+                        // ```
+                        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+                    }
+
+                    // Comment comes before the colon
+                    // ```python
+                    // while (
+                    //  a # comment
+                    // ):
+                    //      ...
+                    // ```
+                    break;
+                }
+                TokenKind::RParen => {
+                    // Skip over any closing parentheses
+                }
+                _ => {
+                    unreachable!("Only ')' or ':' should follow the condition")
+                }
+            }
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attaches comments for the positional-only arguments separator `/` as trailing comments to the
@@ -563,21 +677,17 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let mut between_operands_range = TextRange::new(
+    let between_operands_range = TextRange::new(
         binary_expression.left.end(),
         binary_expression.right.start(),
     );
 
-    let operator_offset = loop {
-        match find_first_non_trivia_character_in_range(locator.contents(), between_operands_range) {
-            // Skip over closing parens
-            Some((offset, ')')) => {
-                between_operands_range =
-                    TextRange::new(offset + TextSize::new(1), between_operands_range.end());
-            }
-            Some((offset, _)) => break offset,
-            None => return CommentPlacement::Default(comment),
-        }
+    let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range).skip_trivia();
+    let operator_offset = if let Some(non_r_paren) = tokens.find(|t| t.kind() != TokenKind::RParen)
+    {
+        non_r_paren.start()
+    } else {
+        return CommentPlacement::Default(comment);
     };
 
     let comment_range = comment.slice().range();
@@ -640,31 +750,124 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     }
 }
 
+/// Handles own line comments on the module level before a class or function statement.
+/// A comment only becomes the leading comment of a class or function if it isn't separated by an empty
+/// line from the class. Comments that are separated by at least one empty line from the header of the
+/// class are considered trailing comments of the previous statement.
+///
+/// This handling is necessary because Ruff inserts two empty lines before each class or function.
+/// Let's take this example:
+///
+/// ```python
+/// some = statement
+/// # This should be stick to the statement above
+///
+///
+/// # This should be split from the above by two lines
+/// class MyClassWithComplexLeadingComments:
+///     pass
+/// ```
+///
+/// By default, the `# This should be stick to the statement above` would become a leading comment
+/// of the `class` AND the `Suite` formatting separates the comment by two empty lines from the
+/// previous statement, so that the result becomes:
+///
+/// ```python
+/// some = statement
+///
+///
+/// # This should be stick to the statement above
+///
+///
+/// # This should be split from the above by two lines
+/// class MyClassWithComplexLeadingComments:
+///     pass
+/// ```
+///
+/// Which is not what we want. The work around is to make the `# This should be stick to the statement above`
+/// a trailing comment of the previous statement.
+fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // Only applies for own line comments on the module level...
+    if !comment.text_position().is_own_line() || !comment.enclosing_node().is_module() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // ... for comments with a preceding and following node,
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+        return CommentPlacement::Default(comment)
+    };
+
+    // ... where the following is a function or class statement.
+    if !matches!(
+        following,
+        AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+    ) {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Make the comment a leading comment if there's no empty line between the comment and the function / class header
+    if max_empty_lines(locator.slice(TextRange::new(comment.slice().end(), following.start()))) == 0
+    {
+        CommentPlacement::leading(following, comment)
+    } else {
+        // Otherwise attach the comment as trailing comment to the previous statement
+        CommentPlacement::trailing(preceding, comment)
+    }
+}
+
 /// Finds the offset of the `/` that separates the positional only and arguments from the other arguments.
 /// Returns `None` if the positional only separator `/` isn't present in the specified range.
 fn find_pos_only_slash_offset(
     between_arguments_range: TextRange,
     locator: &Locator,
 ) -> Option<TextSize> {
-    // First find the comma separating the two arguments
-    find_first_non_trivia_character_in_range(locator.contents(), between_arguments_range).and_then(
-        |(comma_offset, comma)| {
-            debug_assert_eq!(comma, ',');
+    let mut tokens =
+        SimpleTokenizer::new(locator.contents(), between_arguments_range).skip_trivia();
 
-            // Then find the position of the `/` operator
-            find_first_non_trivia_character_in_range(
-                locator.contents(),
-                TextRange::new(
-                    comma_offset + TextSize::new(1),
-                    between_arguments_range.end(),
-                ),
-            )
-            .map(|(offset, c)| {
-                debug_assert_eq!(c, '/');
-                offset
-            })
-        },
-    )
+    if let Some(comma) = tokens.next() {
+        debug_assert_eq!(comma.kind(), TokenKind::Comma);
+
+        if let Some(maybe_slash) = tokens.next() {
+            if maybe_slash.kind() == TokenKind::Slash {
+                return Some(maybe_slash.start());
+            }
+
+            debug_assert_eq!(maybe_slash.kind(), TokenKind::RParen);
+        }
+    }
+
+    None
+}
+
+/// Handles own line comments between the last function decorator and the *header* of the function.
+/// It attaches these comments as dangling comments to the function instead of making them
+/// leading argument comments.
+///
+/// ```python
+/// @decorator
+/// # leading function comment
+/// def test():
+///      ...
+/// ```
+fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) -> CommentPlacement {
+    let is_preceding_decorator = comment
+        .preceding_node()
+        .map_or(false, |node| node.is_decorator());
+
+    let is_following_arguments = comment
+        .following_node()
+        .map_or(false, |node| node.is_arguments());
+
+    if comment.text_position().is_own_line() && is_preceding_decorator && is_following_arguments {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
@@ -774,5 +977,72 @@ fn is_first_statement_in_enclosing_alternate_body(
         }
 
         _ => false,
+    }
+}
+
+/// Counts the number of newlines in `contents`.
+fn max_empty_lines(contents: &str) -> usize {
+    let mut empty_lines = 0;
+    let mut max_empty_lines = 0;
+
+    for line in contents.universal_newlines().skip(1) {
+        if line.trim_whitespace().is_empty() {
+            empty_lines += 1;
+        } else {
+            max_empty_lines = max_empty_lines.max(empty_lines);
+            empty_lines = 0;
+        }
+    }
+
+    max_empty_lines
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::comments::placement::max_empty_lines;
+
+    #[test]
+    fn count_empty_lines_in_trivia() {
+        assert_eq!(max_empty_lines(""), 0);
+        assert_eq!(max_empty_lines("# trailing comment\n # other comment\n"), 0);
+        assert_eq!(
+            max_empty_lines("# trailing comment\n# own line comment\n"),
+            0
+        );
+        assert_eq!(
+            max_empty_lines("# trailing comment\n\n# own line comment\n"),
+            1
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n# an other own line comment"
+            ),
+            1
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n# an other own line comment\n# block"
+            ),
+            1
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"
+            ),
+            2
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                r#"# This multiline comments section
+# should be split from the statement
+# above by two lines.
+"#
+            ),
+            0
+        );
     }
 }

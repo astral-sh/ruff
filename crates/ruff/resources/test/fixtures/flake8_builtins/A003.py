@@ -1,6 +1,6 @@
 class MyClass:
     ImportError = 4
-    id = 5
+    id: int
     dir = "/"
 
     def __init__(self):
@@ -10,3 +10,10 @@ class MyClass:
 
     def str(self):
         pass
+
+
+from typing import TypedDict
+
+
+class MyClass(TypedDict):
+    id: int

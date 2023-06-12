@@ -1,0 +1,42 @@
+---
+source: crates/ruff_python_formatter/src/trivia.rs
+expression: test_case.tokens()
+---
+[
+    Token {
+        kind: Whitespace,
+        range: 0..1,
+    },
+    Token {
+        kind: Comment,
+        range: 1..30,
+    },
+    Token {
+        kind: Newline,
+        range: 30..31,
+    },
+    Token {
+        kind: Whitespace,
+        range: 31..39,
+    },
+    Token {
+        kind: Comment,
+        range: 39..77,
+    },
+    Token {
+        kind: Newline,
+        range: 77..78,
+    },
+    Token {
+        kind: Whitespace,
+        range: 78..86,
+    },
+    Token {
+        kind: Comma,
+        range: 86..87,
+    },
+    Token {
+        kind: Slash,
+        range: 87..88,
+    },
+]
