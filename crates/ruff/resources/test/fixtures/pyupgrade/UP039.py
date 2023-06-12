@@ -13,6 +13,14 @@ class A \
     pass
 
 
+@decorator()
+class A():
+    pass
+
+@decorator
+class A():
+    pass
+
 # OK
 class A:
     pass
@@ -23,4 +31,13 @@ class A(A):
 
 
 class A(metaclass=type):
+    pass
+
+
+@decorator()
+class A:
+    pass
+
+@decorator
+class A:
     pass

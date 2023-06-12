@@ -727,10 +727,10 @@ where
                     pylint::rules::global_statement(self, name);
                 }
                 if self.enabled(Rule::UselessObjectInheritance) {
-                    pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
+                    pyupgrade::rules::useless_object_inheritance(self, class_def, stmt);
                 }
                 if self.enabled(Rule::UnnecessaryClassParentheses) {
-                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def);
+                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def, stmt);
                 }
 
                 if self.enabled(Rule::AmbiguousClassName) {

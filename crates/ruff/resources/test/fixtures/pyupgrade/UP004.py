@@ -134,6 +134,19 @@ class A(
     ...
 
 
+class A(object, object):
+    ...
+
+
+@decorator()
+class A(object):
+    ...
+
+@decorator()  # class A(object):
+class A(object):
+    ...
+
+
 object = A
 
 
