@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Cursor, Write};
 use std::iter;
 use std::path::Path;
 
@@ -22,6 +22,16 @@ use crate::IOError;
 pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
 
 const MAGIC_PREFIX: [&str; 3] = ["%", "!", "?"];
+
+/// Run round-trip source code generation on a given Jupyter notebook file path.
+pub fn round_trip(path: &Path) -> String {
+    let mut notebook = Notebook::read(path).unwrap();
+    let code = notebook.content().to_string();
+    notebook.update_cell_content(&code);
+    let mut buffer = Cursor::new(Vec::new());
+    notebook.write_inner(&mut buffer).unwrap();
+    String::from_utf8(buffer.into_inner()).unwrap()
+}
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
 pub fn is_jupyter_notebook(path: &Path) -> bool {
@@ -370,13 +380,18 @@ impl Notebook {
             .map_or(true, |language| language.name == "python")
     }
 
+    fn write_inner(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
+        let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
+        let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
+        self.raw.serialize(&mut ser)?;
+        Ok(())
+    }
+
     /// Write back with an indent of 1, just like black
     pub fn write(&self, path: &Path) -> anyhow::Result<()> {
         let mut writer = BufWriter::new(File::create(path)?);
-        // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
-        let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
-        let mut ser = serde_json::Serializer::with_formatter(&mut writer, formatter);
-        self.raw.serialize(&mut ser)?;
+        self.write_inner(&mut writer)?;
         Ok(())
     }
 }
