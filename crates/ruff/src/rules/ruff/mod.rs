@@ -20,12 +20,16 @@ mod tests {
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
+    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
-    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
+    #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
+    #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
+    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -38,7 +42,7 @@ mod tests {
 
     #[test_case(Path::new("RUF013_0.py"))]
     #[test_case(Path::new("RUF013_1.py"))]
-    fn implicit_optional(path: &Path) -> Result<()> {
+    fn implicit_optional_py39(path: &Path) -> Result<()> {
         let snapshot = format!(
             "PY39_{}_{}",
             Rule::ImplicitOptional.noqa_code(),
@@ -176,39 +180,6 @@ mod tests {
             &settings::Settings::for_rules(vec![Rule::NonPEP604Annotation]),
         )?;
         assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn ruff_pairwise_over_zipped() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/RUF007.py"),
-            &settings::Settings::for_rules(vec![Rule::PairwiseOverZipped]),
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
-    #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
-    fn mutable_dataclass_defaults(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("ruff").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
-    fn mutable_class_defaults(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("ruff").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
