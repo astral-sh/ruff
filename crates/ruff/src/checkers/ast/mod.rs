@@ -1514,7 +1514,8 @@ where
                     pygrep_hooks::rules::non_existent_mock_method(self, test);
                 }
             }
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body, .. })
+            | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
