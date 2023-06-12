@@ -1,10 +1,11 @@
 use std::ops::Add;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self};
+use rustpython_parser::ast::{self, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -43,12 +44,17 @@ impl AlwaysAutofixableViolation for UnnecessaryClassParentheses {
 }
 
 /// UP039
-pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn unnecessary_class_parentheses(
+    checker: &mut Checker,
+    class_def: &ast::StmtClassDef,
+    stmt: &Stmt,
+) {
     if !class_def.bases.is_empty() || !class_def.keywords.is_empty() {
         return;
     }
 
-    let contents = checker.locator.slice(class_def.range);
+    let offset = identifier_range(stmt, checker.locator).start();
+    let contents = checker.locator.after(offset);
 
     // Find the open and closing parentheses between the class name and the colon, if they exist.
     let mut depth = 0u32;
@@ -85,8 +91,8 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
     let end = TextSize::try_from(end).unwrap();
 
     // Add initial offset.
-    let start = class_def.range.start().add(start);
-    let end = class_def.range.start().add(end);
+    let start = offset.add(start);
+    let end = offset.add(end);
 
     let mut diagnostic = Diagnostic::new(UnnecessaryClassParentheses, TextRange::new(start, end));
     if checker.patch(diagnostic.kind.rule()) {
