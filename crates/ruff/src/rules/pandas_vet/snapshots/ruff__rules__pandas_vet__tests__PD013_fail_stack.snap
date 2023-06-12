@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pandas_vet/mod.rs
 ---
 <filename>:4:5: PD013 `.melt` is preferred to `.stack`; provides same functionality
   |
-4 | import pandas as pd
-5 | x = pd.DataFrame()
-6 | y = x.stack(level=-1, dropna=True)
+2 | import pandas as pd
+3 | x = pd.DataFrame()
+4 | y = x.stack(level=-1, dropna=True)
   |     ^^^^^^^ PD013
   |
 

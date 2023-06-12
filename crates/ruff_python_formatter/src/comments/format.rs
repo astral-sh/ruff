@@ -1,7 +1,7 @@
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::{lines_after, lines_before};
+use crate::trivia::{lines_after, lines_before, skip_trailing_trivia};
 use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::AstNode;
@@ -36,7 +36,10 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
             FormatLeadingComments::Comments(comments) => comments,
         };
 
-        for comment in leading_comments {
+        for comment in leading_comments
+            .iter()
+            .filter(|comment| comment.is_unformatted())
+        {
             let slice = comment.slice();
 
             let lines_after_comment = lines_after(slice.end(), f.context().contents());
@@ -86,9 +89,10 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
+            let full_end = skip_trailing_trivia(last_preceding.end(), f.context().contents());
             // The leading comments formatting ensures that it preserves the right amount of lines after
             // We need to take care of this ourselves, if there's no leading `else` comment.
-            if lines_after(last_preceding.end(), f.context().contents()) > 1 {
+            if lines_after(full_end, f.context().contents()) > 1 {
                 write!(f, [empty_line()])?;
             }
         }
@@ -126,7 +130,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
 
         let mut has_trailing_own_line_comment = false;
 
-        for trailing in trailing_comments {
+        for trailing in trailing_comments
+            .iter()
+            .filter(|comment| comment.is_unformatted())
+        {
             let slice = trailing.slice();
 
             has_trailing_own_line_comment |= trailing.position().is_own_line();
@@ -197,7 +204,10 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
         };
 
         let mut first = true;
-        for comment in dangling_comments {
+        for comment in dangling_comments
+            .iter()
+            .filter(|comment| comment.is_unformatted())
+        {
             if first && comment.position().is_end_of_line() {
                 write!(f, [space(), space()])?;
             }

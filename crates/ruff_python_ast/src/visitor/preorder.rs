@@ -18,6 +18,10 @@ pub trait PreorderVisitor<'a> {
         walk_expr(self, expr);
     }
 
+    fn visit_decorator(&mut self, decorator: &'a Decorator) {
+        walk_decorator(self, decorator);
+    }
+
     fn visit_constant(&mut self, constant: &'a Constant) {
         walk_constant(self, constant);
     }
@@ -151,8 +155,8 @@ where
             returns,
             ..
         }) => {
-            for expr in decorator_list {
-                visitor.visit_expr(expr);
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
             }
 
             visitor.visit_arguments(args);
@@ -171,8 +175,8 @@ where
             decorator_list,
             ..
         }) => {
-            for expr in decorator_list {
-                visitor.visit_expr(expr);
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
             }
 
             for expr in bases {
@@ -385,6 +389,13 @@ where
         | Stmt::Global(_)
         | Stmt::Nonlocal(_) => {}
     }
+}
+
+pub fn walk_decorator<'a, V>(visitor: &mut V, decorator: &'a Decorator)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    visitor.visit_expr(&decorator.expression);
 }
 
 pub fn walk_expr<'a, V>(visitor: &mut V, expr: &'a Expr)

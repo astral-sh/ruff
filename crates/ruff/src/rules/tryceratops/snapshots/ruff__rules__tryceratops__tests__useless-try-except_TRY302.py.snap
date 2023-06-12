@@ -3,148 +3,148 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
 TRY302.py:12:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-12 |       try:
-13 |           process()
-14 |       except Exception:
+10 |       try:
+11 |           process()
+12 |       except Exception:
    |  _____^
-15 | |         raise
+13 | |         raise
    | |_____________^ TRY302
-16 |   
-17 |   def bad():
+14 |   
+15 |   def bad():
    |
 
 TRY302.py:18:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-18 |       try:
-19 |           process()
-20 |       except Exception:
+16 |       try:
+17 |           process()
+18 |       except Exception:
    |  _____^
-21 | |         raise
-22 | |         print("this code is pointless!")
+19 | |         raise
+20 | |         print("this code is pointless!")
    | |________________________________________^ TRY302
-23 |   
-24 |   def bad():
+21 |   
+22 |   def bad():
    |
 
 TRY302.py:25:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-25 |       try:
-26 |           process()
-27 |       except:
+23 |       try:
+24 |           process()
+25 |       except:
    |  _____^
-28 | |         # I am a comment, not a statement!
-29 | |         raise
+26 | |         # I am a comment, not a statement!
+27 | |         raise
    | |_____________^ TRY302
-30 |   
-31 |   def bad():
+28 |   
+29 |   def bad():
    |
 
 TRY302.py:32:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-32 |       try:
-33 |           process()
-34 |       except Exception:
+30 |       try:
+31 |           process()
+32 |       except Exception:
    |  _____^
-35 | |         raise
+33 | |         raise
    | |_____________^ TRY302
-36 |   
-37 |   def bad():
+34 |   
+35 |   def bad():
    |
 
 TRY302.py:38:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-38 |       try:
-39 |           process()
-40 |       except Exception as e:
+36 |       try:
+37 |           process()
+38 |       except Exception as e:
    |  _____^
-41 | |         raise
+39 | |         raise
    | |_____________^ TRY302
-42 |   
-43 |   def bad():
+40 |   
+41 |   def bad():
    |
 
 TRY302.py:44:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-44 |       try:
-45 |           process()
-46 |       except Exception as e:
+42 |       try:
+43 |           process()
+44 |       except Exception as e:
    |  _____^
-47 | |         raise e
+45 | |         raise e
    | |_______________^ TRY302
-48 |   
-49 |   def bad():
+46 |   
+47 |   def bad():
    |
 
 TRY302.py:50:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-50 |       try:
-51 |           process()
-52 |       except MyException:
+48 |       try:
+49 |           process()
+50 |       except MyException:
    |  _____^
-53 | |         raise
+51 | |         raise
    | |_____________^ TRY302
-54 |       except Exception:
-55 |           raise
+52 |       except Exception:
+53 |           raise
    |
 
 TRY302.py:52:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-52 |       except MyException:
-53 |           raise
-54 |       except Exception:
+50 |       except MyException:
+51 |           raise
+52 |       except Exception:
    |  _____^
-55 | |         raise
+53 | |         raise
    | |_____________^ TRY302
-56 |   
-57 |   def bad():
+54 |   
+55 |   def bad():
    |
 
 TRY302.py:58:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-58 |       try:
-59 |           process()
-60 |       except MyException as e:
+56 |       try:
+57 |           process()
+58 |       except MyException as e:
    |  _____^
-61 | |         raise e
+59 | |         raise e
    | |_______________^ TRY302
-62 |       except Exception as e:
-63 |           raise e
+60 |       except Exception as e:
+61 |           raise e
    |
 
 TRY302.py:60:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-60 |       except MyException as e:
-61 |           raise e
-62 |       except Exception as e:
+58 |       except MyException as e:
+59 |           raise e
+60 |       except Exception as e:
    |  _____^
-63 | |         raise e
+61 | |         raise e
    | |_______________^ TRY302
-64 |   
-65 |   def bad():
+62 |   
+63 |   def bad():
    |
 
 TRY302.py:66:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-66 |       try:
-67 |           process()
-68 |       except MyException as ex:
+64 |       try:
+65 |           process()
+66 |       except MyException as ex:
    |  _____^
-69 | |         raise ex
+67 | |         raise ex
    | |________________^ TRY302
-70 |       except Exception as e:
-71 |           raise e
+68 |       except Exception as e:
+69 |           raise e
    |
 
 TRY302.py:68:5: TRY302 Remove exception handler; error is immediately re-raised
    |
-68 |       except MyException as ex:
-69 |           raise ex
-70 |       except Exception as e:
+66 |       except MyException as ex:
+67 |           raise ex
+68 |       except Exception as e:
    |  _____^
-71 | |         raise e
+69 | |         raise e
    | |_______________^ TRY302
-72 |   
-73 |   def fine():
+70 |   
+71 |   def fine():
    |
 
 

@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F811_12.py:6:20: F811 Redefinition of unused `mixer` from line 2
   |
-6 |     pass
-7 | else:
-8 |     from bb import mixer
+4 |     pass
+5 | else:
+6 |     from bb import mixer
   |                    ^^^^^ F811
-9 | mixer(123)
+7 | mixer(123)
   |
 
 

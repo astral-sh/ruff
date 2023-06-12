@@ -45,7 +45,6 @@ impl AlwaysAutofixableViolation for UnnecessaryGeneratorSet {
 pub(crate) fn unnecessary_generator_set(
     checker: &mut Checker,
     expr: &Expr,
-    parent: Option<&Expr>,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
@@ -60,9 +59,8 @@ pub(crate) fn unnecessary_generator_set(
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
-                fixes::fix_unnecessary_generator_set(checker.locator, checker.stylist, expr, parent)
-            });
+            diagnostic
+                .try_set_fix_from_edit(|| fixes::fix_unnecessary_generator_set(checker, expr));
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -61,15 +61,14 @@ while (
 else:
     ...
 
-while some_condition(unformatted, args) and anotherCondition or aThirdCondition:  # comment
-    print("Do something")
+while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:  # comment
+    NOT_IMPLEMENTED_call()
 
 
 while (
-    some_condition(unformatted, args) # trailing some condition
-    and anotherCondition or aThirdCondition  # trailing third condition
+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2  # trailing third condition
 ):  # comment
-    print("Do something")
+    NOT_IMPLEMENTED_call()
 ```
 
 

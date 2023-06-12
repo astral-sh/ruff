@@ -1,14 +1,15 @@
 [package]
 name = "ruff_cli"
-version = "0.0.270"
-authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
+version = "0.0.272"
+publish = false
+authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
-documentation = "https://github.com/charliermarsh/ruff"
-homepage = "https://github.com/charliermarsh/ruff"
-repository = "https://github.com/charliermarsh/ruff"
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 readme = "../../README.md"
-license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

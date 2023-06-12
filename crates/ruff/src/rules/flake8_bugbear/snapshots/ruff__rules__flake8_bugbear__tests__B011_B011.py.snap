@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
- 8 | assert 1 != 2
- 9 | assert False
+ 7 | assert 1 != 2
+ 8 | assert False
    |        ^^^^^ B011
-10 | assert 1 != 2, "message"
-11 | assert False, "message"
+ 9 | assert 1 != 2, "message"
+10 | assert False, "message"
    |
    = help: Replace `assert False`
 
@@ -22,9 +22,9 @@ B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), r
 
 B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
-10 | assert False
-11 | assert 1 != 2, "message"
-12 | assert False, "message"
+ 8 | assert False
+ 9 | assert 1 != 2, "message"
+10 | assert False, "message"
    |        ^^^^^ B011
    |
    = help: Replace `assert False`

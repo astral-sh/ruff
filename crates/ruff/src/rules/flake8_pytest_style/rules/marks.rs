@@ -1,5 +1,4 @@
-use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -52,7 +51,7 @@ impl AlwaysAutofixableViolation for PytestUseFixturesWithoutParameters {
 
 fn pytest_mark_parentheses(
     checker: &mut Checker,
-    decorator: &Expr,
+    decorator: &Decorator,
     call_path: &CallPath,
     fix: Fix,
     preferred: &str,
@@ -72,8 +71,8 @@ fn pytest_mark_parentheses(
     checker.diagnostics.push(diagnostic);
 }
 
-fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &CallPath) {
-    match decorator {
+fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, call_path: &CallPath) {
+    match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
             args,
@@ -99,14 +98,14 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &C
     }
 }
 
-fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path: &CallPath) {
+fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, call_path: &CallPath) {
     if *call_path.last().unwrap() != "usefixtures" {
         return;
     }
 
     let mut has_parameters = false;
 
-    if let Expr::Call(ast::ExprCall { args, keywords, .. }) = decorator {
+    if let Expr::Call(ast::ExprCall { args, keywords, .. }) = &decorator.expression {
         if !args.is_empty() || !keywords.is_empty() {
             has_parameters = true;
         }
@@ -116,24 +115,22 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
         let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
-                decorator.range().sub_start(TextSize::from(1)),
-            )));
+            diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(decorator.range())));
         }
         checker.diagnostics.push(diagnostic);
     }
 }
 
-pub(crate) fn marks(checker: &mut Checker, decorators: &[Expr]) {
+pub(crate) fn marks(checker: &mut Checker, decorators: &[Decorator]) {
     let enforce_parentheses = checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle);
     let enforce_useless_usefixtures = checker.enabled(Rule::PytestUseFixturesWithoutParameters);
 
-    for (expr, call_path) in get_mark_decorators(decorators) {
+    for (decorator, call_path) in get_mark_decorators(decorators) {
         if enforce_parentheses {
-            check_mark_parentheses(checker, expr, &call_path);
+            check_mark_parentheses(checker, decorator, &call_path);
         }
         if enforce_useless_usefixtures {
-            check_useless_usefixtures(checker, expr, &call_path);
+            check_useless_usefixtures(checker, decorator, &call_path);
         }
     }
 }

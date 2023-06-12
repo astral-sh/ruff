@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
 docstring_doubles_module_multiline.py:4:1: Q001 [*] Double quote multiline found but single quotes preferred
-   |
- 4 |   Double quotes multiline module docstring
- 5 |   """
- 6 | / """
- 7 | | this is not a docstring
- 8 | | """
-   | |___^ Q001
- 9 |   def foo():
-10 |       pass
-   |
-   = help: Replace double multiline quotes with single quotes
+  |
+2 |   Double quotes multiline module docstring
+3 |   """
+4 | / """
+5 | | this is not a docstring
+6 | | """
+  | |___^ Q001
+7 |   def foo():
+8 |       pass
+  |
+  = help: Replace double multiline quotes with single quotes
 
 ℹ Suggested fix
 1 1 | """
@@ -29,11 +29,11 @@ docstring_doubles_module_multiline.py:4:1: Q001 [*] Double quote multiline found
 
 docstring_doubles_module_multiline.py:9:1: Q001 [*] Double quote multiline found but single quotes preferred
    |
- 9 |   def foo():
-10 |       pass
-11 | / """
-12 | | this is not a docstring
-13 | | """
+ 7 |   def foo():
+ 8 |       pass
+ 9 | / """
+10 | | this is not a docstring
+11 | | """
    | |___^ Q001
    |
    = help: Replace double multiline quotes with single quotes

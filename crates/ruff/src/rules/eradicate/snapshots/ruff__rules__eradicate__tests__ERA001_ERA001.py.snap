@@ -18,11 +18,11 @@ ERA001.py:1:1: ERA001 [*] Found commented-out code
 
 ERA001.py:2:1: ERA001 [*] Found commented-out code
   |
-2 | #import os
-3 | # from foo import junk
+1 | #import os
+2 | # from foo import junk
   | ^^^^^^^^^^^^^^^^^^^^^^ ERA001
-4 | #a = 3
-5 | a = 4
+3 | #a = 3
+4 | a = 4
   |
   = help: Remove commented-out code
 
@@ -35,12 +35,12 @@ ERA001.py:2:1: ERA001 [*] Found commented-out code
 
 ERA001.py:3:1: ERA001 [*] Found commented-out code
   |
-3 | #import os
-4 | # from foo import junk
-5 | #a = 3
+1 | #import os
+2 | # from foo import junk
+3 | #a = 3
   | ^^^^^^ ERA001
-6 | a = 4
-7 | #foo(1, 2, 3)
+4 | a = 4
+5 | #foo(1, 2, 3)
   |
   = help: Remove commented-out code
 
@@ -54,12 +54,12 @@ ERA001.py:3:1: ERA001 [*] Found commented-out code
 
 ERA001.py:5:1: ERA001 [*] Found commented-out code
   |
-5 | #a = 3
-6 | a = 4
-7 | #foo(1, 2, 3)
+3 | #a = 3
+4 | a = 4
+5 | #foo(1, 2, 3)
   | ^^^^^^^^^^^^^ ERA001
-8 | 
-9 | def foo(x, y, z):
+6 | 
+7 | def foo(x, y, z):
   |
   = help: Remove commented-out code
 
@@ -74,11 +74,11 @@ ERA001.py:5:1: ERA001 [*] Found commented-out code
 
 ERA001.py:13:5: ERA001 [*] Found commented-out code
    |
-13 |     # This is a real comment.
-14 |     # # This is a (nested) comment.
-15 |     #return True
+11 |     # This is a real comment.
+12 |     # # This is a (nested) comment.
+13 |     #return True
    |     ^^^^^^^^^^^^ ERA001
-16 |     return False
+14 |     return False
    |
    = help: Remove commented-out code
 
@@ -93,9 +93,9 @@ ERA001.py:13:5: ERA001 [*] Found commented-out code
 
 ERA001.py:21:5: ERA001 [*] Found commented-out code
    |
-21 | class A():
-22 |     pass
-23 |     # b = c
+19 | class A():
+20 |     pass
+21 |     # b = c
    |     ^^^^^^^ ERA001
    |
    = help: Remove commented-out code

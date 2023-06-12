@@ -3,32 +3,32 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E27.py:20:2: E272 Multiple spaces before keyword
    |
-20 | a and  2
-21 | #: E271 E272
-22 | 1  and  b
+18 | a and  2
+19 | #: E271 E272
+20 | 1  and  b
    |  ^^ E272
-23 | #: E271 E272
-24 | a  and  2
+21 | #: E271 E272
+22 | a  and  2
    |
 
 E27.py:22:2: E272 Multiple spaces before keyword
    |
-22 | 1  and  b
-23 | #: E271 E272
-24 | a  and  2
+20 | 1  and  b
+21 | #: E271 E272
+22 | a  and  2
    |  ^^ E272
-25 | #: E272
-26 | this  and False
+23 | #: E272
+24 | this  and False
    |
 
 E27.py:24:5: E272 Multiple spaces before keyword
    |
-24 | a  and  2
-25 | #: E272
-26 | this  and False
+22 | a  and  2
+23 | #: E272
+24 | this  and False
    |     ^^ E272
-27 | #: E273
-28 | a and   b
+25 | #: E273
+26 | a and   b
    |
 
 

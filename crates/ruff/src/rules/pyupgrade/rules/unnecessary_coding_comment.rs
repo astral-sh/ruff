@@ -3,7 +3,7 @@ use regex::Regex;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::Line;
+use ruff_python_whitespace::Line;
 
 // TODO: document referencing [PEP 3120]: https://peps.python.org/pep-3120/
 #[violation]

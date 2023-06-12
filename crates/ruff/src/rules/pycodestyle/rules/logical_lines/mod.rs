@@ -1,49 +1,24 @@
-use bitflags::bitflags;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
+pub(crate) use extraneous_whitespace::*;
+pub(crate) use indentation::*;
+pub(crate) use missing_whitespace::*;
+pub(crate) use missing_whitespace_after_keyword::*;
+pub(crate) use missing_whitespace_around_operator::*;
+pub(crate) use space_around_operator::*;
+pub(crate) use whitespace_around_keywords::*;
+pub(crate) use whitespace_around_named_parameter_equals::*;
+pub(crate) use whitespace_before_comment::*;
+pub(crate) use whitespace_before_parameters::*;
+
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
+use bitflags::bitflags;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::lexer::LexResult;
+
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-
-pub(crate) use extraneous_whitespace::{
-    extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,
-    WhitespaceBeforePunctuation,
-};
-pub(crate) use indentation::{
-    indentation, IndentationWithInvalidMultiple, IndentationWithInvalidMultipleComment,
-    NoIndentedBlock, NoIndentedBlockComment, OverIndented, UnexpectedIndentation,
-    UnexpectedIndentationComment,
-};
-pub(crate) use missing_whitespace::{missing_whitespace, MissingWhitespace};
-pub(crate) use missing_whitespace_after_keyword::{
-    missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
-};
-pub(crate) use missing_whitespace_around_operator::{
-    missing_whitespace_around_operator, MissingWhitespaceAroundArithmeticOperator,
-    MissingWhitespaceAroundBitwiseOrShiftOperator, MissingWhitespaceAroundModuloOperator,
-    MissingWhitespaceAroundOperator,
-};
-pub(crate) use space_around_operator::{
-    space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
-    TabAfterOperator, TabBeforeOperator,
-};
-pub(crate) use whitespace_around_keywords::{
-    whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
-    TabAfterKeyword, TabBeforeKeyword,
-};
-pub(crate) use whitespace_around_named_parameter_equals::{
-    whitespace_around_named_parameter_equals, MissingWhitespaceAroundParameterEquals,
-    UnexpectedSpacesAroundKeywordParameterEquals,
-};
-pub(crate) use whitespace_before_comment::{
-    whitespace_before_comment, MultipleLeadingHashesForBlockComment, NoSpaceAfterBlockComment,
-    NoSpaceAfterInlineComment, TooFewSpacesBeforeInlineComment,
-};
-pub(crate) use whitespace_before_parameters::{
-    whitespace_before_parameters, WhitespaceBeforeParameters,
-};
+use ruff_python_whitespace::is_python_whitespace;
 
 mod extraneous_whitespace;
 mod indentation;
@@ -378,7 +353,7 @@ impl Whitespace {
                 len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
                 break;
-            } else if c.is_whitespace() {
+            } else if is_python_whitespace(c) {
                 count += 1;
                 len += c.text_len();
             } else {
@@ -409,7 +384,7 @@ impl Whitespace {
             } else if matches!(c, '\n' | '\r') {
                 // Indent
                 return (Self::None, TextSize::default());
-            } else if c.is_whitespace() {
+            } else if is_python_whitespace(c) {
                 count += 1;
                 len += c.text_len();
             } else {

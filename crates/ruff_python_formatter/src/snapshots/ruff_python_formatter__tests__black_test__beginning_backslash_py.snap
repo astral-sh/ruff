@@ -1,0 +1,40 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/beginning_backslash.py
+---
+## Input
+
+```py
+\
+
+
+
+
+
+print("hello, world")
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1 +1 @@
+-print("hello, world")
++NOT_IMPLEMENTED_call()
+```
+
+## Ruff Output
+
+```py
+NOT_IMPLEMENTED_call()
+```
+
+## Black Output
+
+```py
+print("hello, world")
+```
+
+

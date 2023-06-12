@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
-2 |   def f():
-3 |       for x in y:
+1 |   def f():
+2 |       for x in y:
   |  _____^
-4 | |         yield x
+3 | |         yield x
   | |_______________^ UP028
   |
   = help: Replace with `yield from`
@@ -22,10 +22,10 @@ UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
-7 |   def g():
-8 |       for x, y in z:
+6 |   def g():
+7 |       for x, y in z:
   |  _____^
-9 | |         yield (x, y)
+8 | |         yield (x, y)
   | |____________________^ UP028
   |
   = help: Replace with `yield from`
@@ -43,10 +43,10 @@ UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-12 |   def h():
-13 |       for x in [1, 2, 3]:
+11 |   def h():
+12 |       for x in [1, 2, 3]:
    |  _____^
-14 | |         yield x
+13 | |         yield x
    | |_______________^ UP028
    |
    = help: Replace with `yield from`
@@ -64,10 +64,10 @@ UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-17 |   def i():
-18 |       for x in {x for x in y}:
+16 |   def i():
+17 |       for x in {x for x in y}:
    |  _____^
-19 | |         yield x
+18 | |         yield x
    | |_______________^ UP028
    |
    = help: Replace with `yield from`
@@ -85,10 +85,10 @@ UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-22 |   def j():
-23 |       for x in (1, 2, 3):
+21 |   def j():
+22 |       for x in (1, 2, 3):
    |  _____^
-24 | |         yield x
+23 | |         yield x
    | |_______________^ UP028
    |
    = help: Replace with `yield from`
@@ -106,10 +106,10 @@ UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-27 |   def k():
-28 |       for x, y in {3: "x", 6: "y"}:
+26 |   def k():
+27 |       for x, y in {3: "x", 6: "y"}:
    |  _____^
-29 | |         yield x, y
+28 | |         yield x, y
    | |__________________^ UP028
    |
    = help: Replace with `yield from`
@@ -127,18 +127,18 @@ UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-33 |   def f():  # Comment one\n'
-34 |       # Comment two\n'
-35 |       for x, y in {  # Comment three\n'
+31 |   def f():  # Comment one\n'
+32 |       # Comment two\n'
+33 |       for x, y in {  # Comment three\n'
    |  _____^
-36 | |         3: "x",  # Comment four\n'
-37 | |         # Comment five\n'
-38 | |         6: "y",  # Comment six\n'
-39 | |     }:  # Comment seven\n'
-40 | |         # Comment eight\n'
-41 | |         yield x, y  # Comment nine\n'
+34 | |         3: "x",  # Comment four\n'
+35 | |         # Comment five\n'
+36 | |         6: "y",  # Comment six\n'
+37 | |     }:  # Comment seven\n'
+38 | |         # Comment eight\n'
+39 | |         yield x, y  # Comment nine\n'
    | |__________________^ UP028
-42 |           # Comment ten',
+40 |           # Comment ten',
    |
    = help: Replace with `yield from`
 
@@ -161,10 +161,10 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-44 |   def f():
-45 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
+43 |   def f():
+44 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
    |  _____^
-46 | |         yield x, y
+45 | |         yield x, y
    | |__________________^ UP028
    |
    = help: Replace with `yield from`
@@ -182,13 +182,13 @@ UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-49 |   def f():
-50 |       for x, y in z():
+48 |   def f():
+49 |       for x, y in z():
    |  _____^
-51 | |         yield x, y
+50 | |         yield x, y
    | |__________________^ UP028
-52 |   
-53 |   def f():
+51 |   
+52 |   def f():
    |
    = help: Replace with `yield from`
 
@@ -205,15 +205,15 @@ UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-55 |       def func():
-56 |           # This comment is preserved\n'
-57 |           for x, y in z():  # Comment one\n'
+53 |       def func():
+54 |           # This comment is preserved\n'
+55 |           for x, y in z():  # Comment one\n'
    |  _________^
-58 | |             # Comment two\n'
-59 | |             yield x, y  # Comment three\n'
+56 | |             # Comment two\n'
+57 | |             yield x, y  # Comment three\n'
    | |______________________^ UP028
-60 |               # Comment four\n'
-61 |   # Comment\n'
+58 |               # Comment four\n'
+59 |   # Comment\n'
    |
    = help: Replace with `yield from`
 
@@ -231,11 +231,11 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-67 |       for x in y:
-68 |           yield x
-69 |       for z in x:
+65 |       for x in y:
+66 |           yield x
+67 |       for z in x:
    |  _____^
-70 | |         yield z
+68 | |         yield z
    | |_______________^ UP028
    |
    = help: Replace with `yield from`
@@ -253,12 +253,12 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 
 UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
-72 |   def f():
-73 |       for x, y in z():
+71 |   def f():
+72 |       for x, y in z():
    |  _____^
-74 | |         yield x, y
+73 | |         yield x, y
    | |__________________^ UP028
-75 |       x = 1
+74 |       x = 1
    |
    = help: Replace with `yield from`
 

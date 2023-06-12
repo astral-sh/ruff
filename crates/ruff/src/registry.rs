@@ -80,6 +80,9 @@ pub enum Linter {
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
+    /// Copyright-related rules
+    #[prefix = "CPY"]
+    Copyright,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
@@ -137,6 +140,9 @@ pub enum Linter {
     /// [flake8-self](https://pypi.org/project/flake8-self/)
     #[prefix = "SLF"]
     Flake8Self,
+    /// [flake8-slots](https://pypi.org/project/flake8-slots/)
+    #[prefix = "SLOT"]
+    Flake8Slots,
     /// [flake8-simplify](https://pypi.org/project/flake8-simplify/)
     #[prefix = "SIM"]
     Flake8Simplify,
@@ -159,7 +165,7 @@ pub enum Linter {
     #[prefix = "TD"]
     Flake8Todos,
     /// [flake8-fixme](https://github.com/tommilligan/flake8-fixme)
-    #[prefix = "T"]
+    #[prefix = "FIX"]
     Flake8Fixme,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
@@ -264,6 +270,7 @@ impl Rule {
             | Rule::ShebangLeadingWhitespace
             | Rule::TrailingWhitespace
             | Rule::TabIndentation
+            | Rule::MissingCopyrightNotice
             | Rule::BlankLineWithWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring

@@ -70,7 +70,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
 
-    new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
+    new_pub_use = f"pub(crate) use {rule_name_snake}::*"
     new_mod = f"mod {rule_name_snake};"
 
     if len(parts) == 2:

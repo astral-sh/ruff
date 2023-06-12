@@ -41,11 +41,11 @@ UP011.py:10:11: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
 
 UP011.py:16:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
-16 | @other_decorator
-17 | @functools.lru_cache()
+15 | @other_decorator
+16 | @functools.lru_cache()
    |                     ^^ UP011
-18 | def fixme():
-19 |     pass
+17 | def fixme():
+18 |     pass
    |
    = help: Remove unnecessary parentheses
 

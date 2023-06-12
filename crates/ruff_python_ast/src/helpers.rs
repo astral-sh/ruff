@@ -1,10 +1,10 @@
 use std::borrow::Cow;
+use std::ops::Sub;
 use std::path::Path;
 
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
-use ruff_newlines::UniversalNewlineIterator;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -13,6 +13,8 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
+
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator};
 
 use crate::call_path::CallPath;
 use crate::source_code::{Indexer, Locator};
@@ -363,7 +365,9 @@ where
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
                 || returns
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
@@ -380,7 +384,9 @@ where
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
         }
         Stmt::Return(ast::StmtReturn {
             value,
@@ -1027,7 +1033,7 @@ pub fn trailing_lines_end(stmt: &Stmt, locator: &Locator) -> TextSize {
     let rest = &locator.contents()[usize::from(line_end)..];
 
     UniversalNewlineIterator::with_offset(rest, line_end)
-        .take_while(|line| line.trim().is_empty())
+        .take_while(|line| line.trim_whitespace().is_empty())
         .last()
         .map_or(line_end, |l| l.full_end())
 }
@@ -1198,10 +1204,8 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
 }
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    let Stmt::If(ast::StmtIf { body, orelse, .. } )= stmt else {
-        return None;
-    };
+pub fn elif_else_range(stmt: &ast::StmtIf, locator: &Locator) -> Option<TextRange> {
+    let ast::StmtIf { body, orelse, .. } = stmt;
 
     let start = body.last().expect("Expected body to be non-empty").end();
 
@@ -1436,14 +1440,24 @@ impl LocatedCmpop {
     }
 }
 
-/// Extract all [`Cmpop`] operators from a source code snippet, with appropriate
+/// Extract all [`Cmpop`] operators from an expression snippet, with appropriate
 /// ranges.
 ///
 /// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
 /// `CPython` doesn't either. This method iterates over the token stream and
 /// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
-pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
-    let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
+pub fn locate_cmpops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpop> {
+    // If `Expr` is a multi-line expression, we need to parenthesize it to
+    // ensure that it's lexed correctly.
+    let contents = locator.slice(expr.range());
+    let parenthesized_contents = format!("({contents})");
+    let mut tok_iter = lexer::lex(&parenthesized_contents, Mode::Expression)
+        .flatten()
+        .skip(1)
+        .map(|(tok, range)| (tok, range.sub(TextSize::from(1))))
+        .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment(_)))
+        .peekable();
+
     let mut ops: Vec<LocatedCmpop> = vec![];
     let mut count = 0u32;
     loop {
@@ -1608,7 +1622,7 @@ mod tests {
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_ast::Suite;
+    use rustpython_ast::{Expr, Stmt, Suite};
     use rustpython_parser::ast::Cmpop;
     use rustpython_parser::Parse;
 
@@ -1660,11 +1674,10 @@ y = 2
     #[test]
     fn extract_identifier_range() -> Result<()> {
         let contents = "def f(): pass".trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(4), TextSize::from(5))
         );
 
@@ -1674,29 +1687,26 @@ def \
   pass
 "#
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(8), TextSize::from(9))
         );
 
         let contents = "class Class(): pass".trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
         let contents = "class Class: pass".trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
@@ -1706,20 +1716,18 @@ class Class():
   pass
 "#
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(19), TextSize::from(24))
         );
 
         let contents = r#"x = y + 1"#.trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(0), TextSize::from(9))
         );
 
@@ -1772,10 +1780,9 @@ else:
     pass
 "#
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
-        let range = else_range(stmt, &locator).unwrap();
+        let range = else_range(&stmt, &locator).unwrap();
         assert_eq!(&contents[range], "else");
         assert_eq!(
             range,
@@ -1799,29 +1806,25 @@ else:
 
     #[test]
     fn extract_elif_else_range() -> Result<()> {
-        let contents = "
-if a:
+        let contents = "if a:
     ...
 elif b:
     ...
-"
-        .trim_start();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+";
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
         assert_eq!(range.end(), TextSize::from(18));
 
-        let contents = "
-if a:
+        let contents = "if a:
     ...
 else:
     ...
-"
-        .trim_start();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+";
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
@@ -1831,61 +1834,84 @@ else:
     }
 
     #[test]
-    fn extract_cmpop_location() {
+    fn extract_cmpop_location() -> Result<()> {
+        let contents = "x == 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x == 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::Eq
             )]
         );
 
+        let contents = "x != 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x != 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::NotEq
             )]
         );
 
+        let contents = "x is 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x is 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::Is
             )]
         );
 
+        let contents = "x is not 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x is not 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(8),
                 Cmpop::IsNot
             )]
         );
 
+        let contents = "x in 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x in 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::In
             )]
         );
 
+        let contents = "x not in 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x not in 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(8),
                 Cmpop::NotIn
             )]
         );
 
+        let contents = "x != (1 is not 2)";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x != (1 is not 2)"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::NotEq
             )]
         );
+
+        Ok(())
     }
 }

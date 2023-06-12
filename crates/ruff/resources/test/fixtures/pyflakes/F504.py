@@ -7,3 +7,5 @@ hidden = {"a": "!"}
 
 "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
 "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
+
+'' % {'a''b' : ''}  # F504 ("ab" not used)

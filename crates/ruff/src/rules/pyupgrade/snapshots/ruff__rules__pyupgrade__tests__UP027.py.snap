@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP027.py:2:17: UP027 [*] Replace unpacked list comprehension with a generator expression
   |
-2 | # Should change
-3 | foo, bar, baz = [fn(x) for x in items]
+1 | # Should change
+2 | foo, bar, baz = [fn(x) for x in items]
   |                 ^^^^^^^^^^^^^^^^^^^^^^ UP027
-4 | 
-5 | foo, bar, baz =[fn(x) for x in items]
+3 | 
+4 | foo, bar, baz =[fn(x) for x in items]
   |
   = help: Replace with generator expression
 
@@ -21,12 +21,12 @@ UP027.py:2:17: UP027 [*] Replace unpacked list comprehension with a generator ex
 
 UP027.py:4:16: UP027 [*] Replace unpacked list comprehension with a generator expression
   |
-4 | foo, bar, baz = [fn(x) for x in items]
-5 | 
-6 | foo, bar, baz =[fn(x) for x in items]
+2 | foo, bar, baz = [fn(x) for x in items]
+3 | 
+4 | foo, bar, baz =[fn(x) for x in items]
   |                ^^^^^^^^^^^^^^^^^^^^^^ UP027
-7 | 
-8 | foo, bar, baz =          [fn(x) for x in items]
+5 | 
+6 | foo, bar, baz =          [fn(x) for x in items]
   |
   = help: Replace with generator expression
 
@@ -41,15 +41,15 @@ UP027.py:4:16: UP027 [*] Replace unpacked list comprehension with a generator ex
 7 7 | 
 
 UP027.py:6:26: UP027 [*] Replace unpacked list comprehension with a generator expression
-   |
- 6 | foo, bar, baz =[fn(x) for x in items]
- 7 | 
- 8 | foo, bar, baz =          [fn(x) for x in items]
-   |                          ^^^^^^^^^^^^^^^^^^^^^^ UP027
- 9 | 
-10 | foo, bar, baz = [[i for i in fn(x)] for x in items]
-   |
-   = help: Replace with generator expression
+  |
+4 | foo, bar, baz =[fn(x) for x in items]
+5 | 
+6 | foo, bar, baz =          [fn(x) for x in items]
+  |                          ^^^^^^^^^^^^^^^^^^^^^^ UP027
+7 | 
+8 | foo, bar, baz = [[i for i in fn(x)] for x in items]
+  |
+  = help: Replace with generator expression
 
 ℹ Suggested fix
 3 3 | 
@@ -63,12 +63,12 @@ UP027.py:6:26: UP027 [*] Replace unpacked list comprehension with a generator ex
 
 UP027.py:8:17: UP027 [*] Replace unpacked list comprehension with a generator expression
    |
- 8 | foo, bar, baz =          [fn(x) for x in items]
- 9 | 
-10 | foo, bar, baz = [[i for i in fn(x)] for x in items]
+ 6 | foo, bar, baz =          [fn(x) for x in items]
+ 7 | 
+ 8 | foo, bar, baz = [[i for i in fn(x)] for x in items]
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP027
-11 | 
-12 | foo, bar, baz = [
+ 9 | 
+10 | foo, bar, baz = [
    |
    = help: Replace with generator expression
 
@@ -84,16 +84,16 @@ UP027.py:8:17: UP027 [*] Replace unpacked list comprehension with a generator ex
 
 UP027.py:10:17: UP027 [*] Replace unpacked list comprehension with a generator expression
    |
-10 |   foo, bar, baz = [[i for i in fn(x)] for x in items]
-11 |   
-12 |   foo, bar, baz = [
+ 8 |   foo, bar, baz = [[i for i in fn(x)] for x in items]
+ 9 |   
+10 |   foo, bar, baz = [
    |  _________________^
-13 | |     fn(x)
-14 | |     for x in items
-15 | | ]
+11 | |     fn(x)
+12 | |     for x in items
+13 | | ]
    | |_^ UP027
-16 |   
-17 |   # Should not change
+14 |   
+15 |   # Should not change
    |
    = help: Replace with generator expression
 

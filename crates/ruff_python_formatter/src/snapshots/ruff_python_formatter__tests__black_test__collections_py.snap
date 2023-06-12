@@ -84,42 +84,44 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,75 +1,49 @@
- import core, time, a
+@@ -1,99 +1,52 @@
+-import core, time, a
++NOT_YET_IMPLEMENTED_StmtImport
  
- from . import A, B, C
--
+-from . import A, B, C
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
  # keeps existing trailing comma
- from foo import (
-     bar,
- )
--
+-from foo import (
+-    bar,
+-)
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
  # also keeps existing structure
- from foo import (
-     baz,
-     qux,
- )
--
+-from foo import (
+-    baz,
+-    qux,
+-)
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
  # `as` works as well
- from foo import (
-     xyzzy as magic,
- )
+-from foo import (
+-    xyzzy as magic,
+-)
++NOT_YET_IMPLEMENTED_StmtImportFrom
  
 -a = {
 -    1,
 -    2,
 -    3,
 -}
--b = {1, 2, 3}
-+a = {1,2,3,}
-+b = {
-+1,2,
-+     3}
- c = {
-     1,
-     2,
-     3,
- }
++a = {1, 2, 3}
+ b = {1, 2, 3}
+-c = {
+-    1,
+-    2,
+-    3,
+-}
 -x = (1,)
 -y = (narf(),)
 -nested = {
@@ -127,26 +129,29 @@ if True:
 -    (4, 5, 6),
 -}
 -nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
--nested_long_lines = [
++c = {1, 2, 3}
++x = (1, 2)
++y = (1, 2)
++nested = {(1, 2), (1, 2)}
++nested_no_trailing_comma = {(1, 2), (1, 2)}
+ nested_long_lines = [
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 -    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 -    "cccccccccccccccccccccccccccccccccccccccc",
 -    (1, 2, 3),
 -    "dddddddddddddddddddddddddddddddddddddddd",
--]
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    (1, 2),
++    "NOT_YET_IMPLEMENTED_STRING",
+ ]
 -{
 -    "oneple": (1,),
 -}
-+x = 1,
-+y = narf(),
-+nested = {(1,2,3),(4,5,6),}
-+nested_no_trailing_comma = {(1,2,3),(4,5,6)}
-+nested_long_lines = ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccccccccccccccccccccccc", (1, 2, 3), "dddddddddddddddddddddddddddddddddddddddd"]
-+{"oneple": (1,),}
- {"oneple": (1,)}
+-{"oneple": (1,)}
 -["ls", "lsoneple/%s" % (foo,)]
-+['ls', 'lsoneple/%s' % (foo,)]
- x = {"oneple": (1,)}
+-x = {"oneple": (1,)}
 -y = {
 -    "oneple": (1,),
 -}
@@ -154,14 +159,20 @@ if True:
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
 -    % bar
 -)
--
-+y = {"oneple": (1,),}
-+assert False, ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s" % bar)
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (1, 2)]
++x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++NOT_YET_IMPLEMENTED_StmtAssert
+ 
  # looping over a 1-tuple should also not get wrapped
- for x in (1,):
-     pass
- for (x,) in (1,), (2,), (3,):
-     pass
+-for x in (1,):
+-    pass
+-for (x,) in (1,), (2,), (3,):
+-    pass
++NOT_YET_IMPLEMENTED_StmtFor
++NOT_YET_IMPLEMENTED_StmtFor
  
 -[
 -    1,
@@ -171,109 +182,98 @@ if True:
 +[1, 2, 3]
  
 -division_result_tuple = (6 / 2,)
-+division_result_tuple = (6/2,)
- print("foo %r", (foo.bar,))
+-print("foo %r", (foo.bar,))
++division_result_tuple = (1, 2)
++NOT_IMPLEMENTED_call()
  
  if True:
-@@ -79,21 +53,15 @@
-     )
+-    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
+-        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
+-        | {pylons.controllers.WSGIController}
+-    )
++    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
++        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
++    }
  
  if True:
 -    ec2client.get_waiter("instance_stopped").wait(
-+    ec2client.get_waiter('instance_stopped').wait(
-         InstanceIds=[instance.id],
-         WaiterConfig={
--            "Delay": 5,
--        },
--    )
-+            'Delay': 5,
-+        })
-     ec2client.get_waiter("instance_stopped").wait(
-         InstanceIds=[instance.id],
--        WaiterConfig={
--            "Delay": 5,
--        },
-+        WaiterConfig={"Delay": 5,},
-     )
-     ec2client.get_waiter("instance_stopped").wait(
 -        InstanceIds=[instance.id],
 -        WaiterConfig={
 -            "Delay": 5,
 -        },
-+        InstanceIds=[instance.id], WaiterConfig={"Delay": 5,},
-     )
+-    )
+-    ec2client.get_waiter("instance_stopped").wait(
+-        InstanceIds=[instance.id],
+-        WaiterConfig={
+-            "Delay": 5,
+-        },
+-    )
+-    ec2client.get_waiter("instance_stopped").wait(
+-        InstanceIds=[instance.id],
+-        WaiterConfig={
+-            "Delay": 5,
+-        },
+-    )
++    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
-import core, time, a
+NOT_YET_IMPLEMENTED_StmtImport
 
-from . import A, B, C
+NOT_YET_IMPLEMENTED_StmtImportFrom
+
 # keeps existing trailing comma
-from foo import (
-    bar,
-)
-# also keeps existing structure
-from foo import (
-    baz,
-    qux,
-)
-# `as` works as well
-from foo import (
-    xyzzy as magic,
-)
+NOT_YET_IMPLEMENTED_StmtImportFrom
 
-a = {1,2,3,}
-b = {
-1,2,
-     3}
-c = {
-    1,
-    2,
-    3,
-}
-x = 1,
-y = narf(),
-nested = {(1,2,3),(4,5,6),}
-nested_no_trailing_comma = {(1,2,3),(4,5,6)}
-nested_long_lines = ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccccccccccccccccccccccc", (1, 2, 3), "dddddddddddddddddddddddddddddddddddddddd"]
-{"oneple": (1,),}
-{"oneple": (1,)}
-['ls', 'lsoneple/%s' % (foo,)]
-x = {"oneple": (1,)}
-y = {"oneple": (1,),}
-assert False, ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s" % bar)
+# also keeps existing structure
+NOT_YET_IMPLEMENTED_StmtImportFrom
+
+# `as` works as well
+NOT_YET_IMPLEMENTED_StmtImportFrom
+
+a = {1, 2, 3}
+b = {1, 2, 3}
+c = {1, 2, 3}
+x = (1, 2)
+y = (1, 2)
+nested = {(1, 2), (1, 2)}
+nested_no_trailing_comma = {(1, 2), (1, 2)}
+nested_long_lines = [
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    (1, 2),
+    "NOT_YET_IMPLEMENTED_STRING",
+]
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (1, 2)]
+x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+NOT_YET_IMPLEMENTED_StmtAssert
+
 # looping over a 1-tuple should also not get wrapped
-for x in (1,):
-    pass
-for (x,) in (1,), (2,), (3,):
-    pass
+NOT_YET_IMPLEMENTED_StmtFor
+NOT_YET_IMPLEMENTED_StmtFor
 
 [1, 2, 3]
 
-division_result_tuple = (6/2,)
-print("foo %r", (foo.bar,))
+division_result_tuple = (1, 2)
+NOT_IMPLEMENTED_call()
 
 if True:
-    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
-        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
-        | {pylons.controllers.WSGIController}
-    )
+    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
+        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
+    }
 
 if True:
-    ec2client.get_waiter('instance_stopped').wait(
-        InstanceIds=[instance.id],
-        WaiterConfig={
-            'Delay': 5,
-        })
-    ec2client.get_waiter("instance_stopped").wait(
-        InstanceIds=[instance.id],
-        WaiterConfig={"Delay": 5,},
-    )
-    ec2client.get_waiter("instance_stopped").wait(
-        InstanceIds=[instance.id], WaiterConfig={"Delay": 5,},
-    )
+    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

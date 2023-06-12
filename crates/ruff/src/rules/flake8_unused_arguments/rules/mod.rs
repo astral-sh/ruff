@@ -1,6 +1,3 @@
-pub(crate) use unused_arguments::{
-    unused_arguments, UnusedClassMethodArgument, UnusedFunctionArgument, UnusedLambdaArgument,
-    UnusedMethodArgument, UnusedStaticMethodArgument,
-};
+pub(crate) use unused_arguments::*;
 
 mod unused_arguments;

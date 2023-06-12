@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 invalid_characters.py:25:16: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |
-25 | sub_ok = '\x1a'
-26 | 
-27 | esc = 'esc esc '
+23 | sub_ok = '\x1a'
+24 | 
+25 | esc = 'esc esc '
    |                 PLE2513
-28 | 
-29 | esc_ok = '\x1b'
+26 | 
+27 | esc_ok = '\x1b'
    |
    = help: Replace with escape sequence
 

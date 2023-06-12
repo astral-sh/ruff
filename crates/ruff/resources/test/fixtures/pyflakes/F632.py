@@ -19,3 +19,9 @@ if ("123" != x) is 3:
 
 if "123" != (x is 3):
     pass
+
+{2 is
+not ''}
+
+{2 is
+ not ''}

@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E714.py:2:8: E714 [*] Test for object identity should be `is not`
   |
-2 | #: E714
-3 | if not X is Y:
+1 | #: E714
+2 | if not X is Y:
   |        ^^^^^^ E714
-4 |     pass
-5 | #: E714
+3 |     pass
+4 | #: E714
   |
   = help: Convert to `is not`
 
@@ -21,11 +21,11 @@ E714.py:2:8: E714 [*] Test for object identity should be `is not`
 
 E714.py:5:8: E714 [*] Test for object identity should be `is not`
   |
-5 |     pass
-6 | #: E714
-7 | if not X.B is Y:
+3 |     pass
+4 | #: E714
+5 | if not X.B is Y:
   |        ^^^^^^^^ E714
-8 |     pass
+6 |     pass
   |
   = help: Convert to `is not`
 

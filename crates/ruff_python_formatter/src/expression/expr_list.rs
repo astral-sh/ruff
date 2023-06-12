@@ -1,4 +1,4 @@
-use crate::comments::dangling_comments;
+use crate::comments::{dangling_comments, Comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -57,8 +57,13 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 }
 
 impl NeedsParentheses for ExprList {
-    fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source) {
+    fn needs_parentheses(
+        &self,
+        parenthesize: Parenthesize,
+        source: &str,
+        comments: &Comments,
+    ) -> Parentheses {
+        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
             Parentheses::Optional => Parentheses::Never,
             parentheses => parentheses,
         }

@@ -7,14 +7,14 @@ use libcst_native::{ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
-use crate::autofix;
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_semantic::model::SemanticModel;
 use ruff_textwrap::indent;
 
+use crate::autofix;
+use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::importer::insertion::Insertion;
 
@@ -83,12 +83,12 @@ impl<'a> Importer<'a> {
     /// import statement.
     pub(crate) fn runtime_import_edit(
         &self,
-        import: &StmtImport,
+        import: &StmtImports,
         at: TextSize,
     ) -> Result<RuntimeImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &[import.qualified_name],
+            &import.qualified_names,
             import.stmt,
             self.locator,
             self.stylist,
@@ -114,13 +114,13 @@ impl<'a> Importer<'a> {
     /// `TYPE_CHECKING` block.
     pub(crate) fn typing_import_edit(
         &self,
-        import: &StmtImport,
+        import: &StmtImports,
         at: TextSize,
         semantic_model: &SemanticModel,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &[import.qualified_name],
+            &import.qualified_names,
             import.stmt,
             self.locator,
             self.stylist,
@@ -442,12 +442,12 @@ impl<'a> ImportRequest<'a> {
     }
 }
 
-/// An existing module or member import, located within an import statement.
-pub(crate) struct StmtImport<'a> {
+/// An existing list of module or member imports, located within an import statement.
+pub(crate) struct StmtImports<'a> {
     /// The import statement.
     pub(crate) stmt: &'a Stmt,
-    /// The "full name" of the imported module or member.
-    pub(crate) qualified_name: &'a str,
+    /// The "qualified names" of the imported modules or members.
+    pub(crate) qualified_names: Vec<&'a str>,
 }
 
 /// The result of an [`Importer::get_or_import_symbol`] call.

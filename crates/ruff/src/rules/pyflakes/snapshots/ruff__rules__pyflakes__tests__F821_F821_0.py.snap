@@ -3,48 +3,48 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F821_0.py:2:12: F821 Undefined name `self`
   |
-2 | def get_name():
-3 |     return self.name
+1 | def get_name():
+2 |     return self.name
   |            ^^^^ F821
   |
 
 F821_0.py:6:13: F821 Undefined name `self`
   |
-6 | def get_name():
-7 |     return (self.name,)
+5 | def get_name():
+6 |     return (self.name,)
   |             ^^^^ F821
   |
 
 F821_0.py:10:9: F821 Undefined name `self`
    |
-10 | def get_name():
-11 |     del self.name
+ 9 | def get_name():
+10 |     del self.name
    |         ^^^^ F821
    |
 
 F821_0.py:21:12: F821 Undefined name `numeric_string`
    |
-21 | def randdec(maxprec, maxexp):
-22 |     return numeric_string(maxprec, maxexp)
+20 | def randdec(maxprec, maxexp):
+21 |     return numeric_string(maxprec, maxexp)
    |            ^^^^^^^^^^^^^^ F821
    |
 
 F821_0.py:58:5: F821 Undefined name `Bar`
    |
-58 | y: int = 1
-59 | 
-60 | x: "Bar" = 1
+56 | y: int = 1
+57 | 
+58 | x: "Bar" = 1
    |     ^^^ F821
-61 | 
-62 | [first] = ["yup"]
+59 | 
+60 | [first] = ["yup"]
    |
 
 F821_0.py:83:11: F821 Undefined name `TOMATO`
    |
-83 | def update_tomato():
-84 |     print(TOMATO)
+82 | def update_tomato():
+83 |     print(TOMATO)
    |           ^^^^^^ F821
-85 |     TOMATO = "cherry tomato"
+84 |     TOMATO = "cherry tomato"
    |
 
 F821_0.py:87:8: F821 Undefined name `B`
@@ -57,61 +57,61 @@ F821_0.py:87:8: F821 Undefined name `B`
 
 F821_0.py:90:8: F821 Undefined name `B`
    |
-90 | A = (
-91 |     f'B'
-92 |     f'{B}'
+88 | A = (
+89 |     f'B'
+90 |     f'{B}'
    |        ^ F821
-93 | )
-94 | C = f'{A:{B}}'
+91 | )
+92 | C = f'{A:{B}}'
    |
 
 F821_0.py:92:11: F821 Undefined name `B`
    |
-92 |     f'{B}'
-93 | )
-94 | C = f'{A:{B}}'
+90 |     f'{B}'
+91 | )
+92 | C = f'{A:{B}}'
    |           ^ F821
-95 | C = f'{A:{f"{B}"}}'
+93 | C = f'{A:{f"{B}"}}'
    |
 
 F821_0.py:93:14: F821 Undefined name `B`
    |
-93 | )
-94 | C = f'{A:{B}}'
-95 | C = f'{A:{f"{B}"}}'
+91 | )
+92 | C = f'{A:{B}}'
+93 | C = f'{A:{f"{B}"}}'
    |              ^ F821
-96 | 
-97 | from typing import Annotated, Literal
+94 | 
+95 | from typing import Annotated, Literal
    |
 
 F821_0.py:115:10: F821 Undefined name `PEP593Test123`
     |
-115 |     ]
-116 |     field_with_undefined_stringified_type: Annotated[
-117 |         "PEP593Test123",
+113 |     ]
+114 |     field_with_undefined_stringified_type: Annotated[
+115 |         "PEP593Test123",
     |          ^^^^^^^^^^^^^ F821
-118 |         123,
-119 |     ]
+116 |         123,
+117 |     ]
     |
 
 F821_0.py:123:15: F821 Undefined name `foo`
     |
-123 |     ]
-124 |     field_with_undefined_nested_subscript: Annotated[
-125 |         dict["foo", "bar"],  # Expected to fail as undefined.
+121 |     ]
+122 |     field_with_undefined_nested_subscript: Annotated[
+123 |         dict["foo", "bar"],  # Expected to fail as undefined.
     |               ^^^ F821
-126 |         123,
-127 |     ]
+124 |         123,
+125 |     ]
     |
 
 F821_0.py:123:22: F821 Undefined name `bar`
     |
-123 |     ]
-124 |     field_with_undefined_nested_subscript: Annotated[
-125 |         dict["foo", "bar"],  # Expected to fail as undefined.
+121 |     ]
+122 |     field_with_undefined_nested_subscript: Annotated[
+123 |         dict["foo", "bar"],  # Expected to fail as undefined.
     |                      ^^^ F821
-126 |         123,
-127 |     ]
+124 |         123,
+125 |     ]
     |
 
 

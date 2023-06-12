@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
 SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   |
-2 |   # SIM117
-3 | / with A() as a:
-4 | |     with B() as b:
+1 |   # SIM117
+2 | / with A() as a:
+3 | |     with B() as b:
   | |__________________^ SIM117
-5 |           print("hello")
+4 |           print("hello")
   |
   = help: Combine `with` statements
 
@@ -24,12 +24,12 @@ SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts i
 
 SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
- 7 |   # SIM117
- 8 | / with A():
- 9 | |     with B():
-10 | |         with C():
+ 6 |   # SIM117
+ 7 | / with A():
+ 8 | |     with B():
+ 9 | |         with C():
    | |_________________^ SIM117
-11 |               print("hello")
+10 |               print("hello")
    |
    = help: Combine `with` statements
 
@@ -50,23 +50,23 @@ SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts i
 
 SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
-13 |   # SIM117
-14 | / with A() as a:
-15 | |     # Unfixable due to placement of this comment.
-16 | |     with B() as b:
+12 |   # SIM117
+13 | / with A() as a:
+14 | |     # Unfixable due to placement of this comment.
+15 | |     with B() as b:
    | |__________________^ SIM117
-17 |           print("hello")
+16 |           print("hello")
    |
    = help: Combine `with` statements
 
 SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
-19 |   # SIM117
-20 | / with A() as a:
-21 | |     with B() as b:
+18 |   # SIM117
+19 | / with A() as a:
+20 | |     with B() as b:
    | |__________________^ SIM117
-22 |           # Fixable due to placement of this comment.
-23 |           print("hello")
+21 |           # Fixable due to placement of this comment.
+22 |           print("hello")
    |
    = help: Combine `with` statements
 
@@ -87,14 +87,14 @@ SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 
 SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
-53 |   while True:
-54 |       # SIM117
-55 |       with A() as a:
+51 |   while True:
+52 |       # SIM117
+53 |       with A() as a:
    |  _____^
-56 | |         with B() as b:
+54 | |         with B() as b:
    | |______________________^ SIM117
-57 |               """this
-58 |   is valid"""
+55 |               """this
+56 |   is valid"""
    |
    = help: Combine `with` statements
 
@@ -125,14 +125,14 @@ SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts 
 
 SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
-68 |   # SIM117
-69 | / with (
-70 | |     A() as a,
-71 | |     B() as b,
-72 | | ):
-73 | |     with C() as c:
+67 |   # SIM117
+68 | / with (
+69 | |     A() as a,
+70 | |     B() as b,
+71 | | ):
+72 | |     with C() as c:
    | |__________________^ SIM117
-74 |           print("hello")
+73 |           print("hello")
    |
    = help: Combine `with` statements
 
@@ -152,14 +152,14 @@ SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 
 SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
-76 |   # SIM117
-77 | / with A() as a:
-78 | |     with (
-79 | |         B() as b,
-80 | |         C() as c,
-81 | |     ):
+75 |   # SIM117
+76 | / with A() as a:
+77 | |     with (
+78 | |         B() as b,
+79 | |         C() as c,
+80 | |     ):
    | |______^ SIM117
-82 |           print("hello")
+81 |           print("hello")
    |
    = help: Combine `with` statements
 
@@ -184,17 +184,17 @@ SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 
 SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
-84 |   # SIM117
-85 | / with (
-86 | |     A() as a,
-87 | |     B() as b,
-88 | | ):
-89 | |     with (
-90 | |         C() as c,
-91 | |         D() as d,
-92 | |     ):
+83 |   # SIM117
+84 | / with (
+85 | |     A() as a,
+86 | |     B() as b,
+87 | | ):
+88 | |     with (
+89 | |         C() as c,
+90 | |         D() as d,
+91 | |     ):
    | |______^ SIM117
-93 |           print("hello")
+92 |           print("hello")
    |
    = help: Combine `with` statements
 
@@ -218,11 +218,11 @@ SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 
 SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
-95 |   # SIM117 (auto-fixable)
-96 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
-97 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+94 |   # SIM117 (auto-fixable)
+95 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
+96 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
    | |__________________________________________________^ SIM117
-98 |           print("hello")
+97 |           print("hello")
    |
    = help: Combine `with` statements
 
@@ -241,11 +241,11 @@ SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 
 SIM117.py:100:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
     |
-100 |   # SIM117 (not auto-fixable too long)
-101 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
-102 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+ 99 |   # SIM117 (not auto-fixable too long)
+100 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
+101 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
     | |__________________________________________________^ SIM117
-103 |           print("hello")
+102 |           print("hello")
     |
     = help: Combine `with` statements
 

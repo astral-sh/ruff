@@ -2,13 +2,13 @@
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
 G101_2.py:6:9: G101 Logging statement uses an extra field that clashes with a LogRecord field: `name`
-   |
- 6 |     "Hello world!",
- 7 |     extra=dict(
- 8 |         name="foobar",
-   |         ^^^^^^^^^^^^^ G101
- 9 |     ),
-10 | )
-   |
+  |
+4 |     "Hello world!",
+5 |     extra=dict(
+6 |         name="foobar",
+  |         ^^^^^^^^^^^^^ G101
+7 |     ),
+8 | )
+  |
 
 

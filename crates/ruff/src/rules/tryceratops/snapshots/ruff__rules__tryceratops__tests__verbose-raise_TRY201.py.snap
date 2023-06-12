@@ -3,24 +3,24 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
 TRY201.py:20:15: TRY201 Use `raise` without specifying exception name
    |
-20 |     except MyException as e:
-21 |         logger.exception("process failed")
-22 |         raise e
+18 |     except MyException as e:
+19 |         logger.exception("process failed")
+20 |         raise e
    |               ^ TRY201
    |
 
 TRY201.py:63:19: TRY201 Use `raise` without specifying exception name
    |
-63 |         logger.exception("process failed")
-64 |         if True:
-65 |             raise e
+61 |         logger.exception("process failed")
+62 |         if True:
+63 |             raise e
    |                   ^ TRY201
    |
 
 TRY201.py:74:23: TRY201 Use `raise` without specifying exception name
    |
-74 |             def foo():
-75 |                 raise e
+73 |             def foo():
+74 |                 raise e
    |                       ^ TRY201
    |
 

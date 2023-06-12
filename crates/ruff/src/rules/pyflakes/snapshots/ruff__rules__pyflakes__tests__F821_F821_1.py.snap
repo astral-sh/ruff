@@ -3,29 +3,29 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F821_1.py:11:11: F821 Undefined name `Model`
    |
-11 | # F821 Undefined name `Model`
-12 | x = cast("Model", x)
+10 | # F821 Undefined name `Model`
+11 | x = cast("Model", x)
    |           ^^^^^ F821
    |
 
 F821_1.py:18:18: F821 Undefined name `Model`
    |
-18 | # F821 Undefined name `Model`
-19 | x = typing.cast("Model", x)
+17 | # F821 Undefined name `Model`
+18 | x = typing.cast("Model", x)
    |                  ^^^^^ F821
    |
 
 F821_1.py:24:14: F821 Undefined name `Model`
    |
-24 | # F821 Undefined name `Model`
-25 | x = Pattern["Model"]
+23 | # F821 Undefined name `Model`
+24 | x = Pattern["Model"]
    |              ^^^^^ F821
    |
 
 F821_1.py:30:12: F821 Undefined name `Model`
    |
-30 | # F821 Undefined name `Model`
-31 | x = Match["Model"]
+29 | # F821 Undefined name `Model`
+30 | x = Match["Model"]
    |            ^^^^^ F821
    |
 

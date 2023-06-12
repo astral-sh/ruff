@@ -11,6 +11,7 @@ use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace;
+use ruff_python_whitespace::PythonWhitespace;
 
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 
@@ -44,7 +45,7 @@ pub(crate) fn fix_nested_if_statements(
     let contents = locator.lines(stmt.range());
 
     // Handle `elif` blocks differently; detect them upfront.
-    let is_elif = contents.trim_start().starts_with("elif");
+    let is_elif = contents.trim_whitespace_start().starts_with("elif");
 
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)

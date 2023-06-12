@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
 DJ007.py:6:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
   |
-6 | class TestModelForm1(forms.ModelForm):
-7 |     class Meta:
-8 |         fields = "__all__"
+4 | class TestModelForm1(forms.ModelForm):
+5 |     class Meta:
+6 |         fields = "__all__"
   |         ^^^^^^^^^^^^^^^^^^ DJ007
   |
 
 DJ007.py:11:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
    |
-11 | class TestModelForm2(forms.ModelForm):
-12 |     class Meta:
-13 |         fields = b"__all__"
+ 9 | class TestModelForm2(forms.ModelForm):
+10 |     class Meta:
+11 |         fields = b"__all__"
    |         ^^^^^^^^^^^^^^^^^^^ DJ007
    |
 

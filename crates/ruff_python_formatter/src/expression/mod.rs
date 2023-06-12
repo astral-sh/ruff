@@ -1,3 +1,4 @@
+use crate::comments::Comments;
 use crate::context::NodeLevel;
 use crate::expression::parentheses::{NeedsParentheses, Parentheses, Parenthesize};
 use crate::prelude::*;
@@ -51,7 +52,11 @@ impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
 
 impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     fn fmt(&self, item: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
-        let parentheses = item.needs_parentheses(self.parenthesize, f.context().contents());
+        let parentheses = item.needs_parentheses(
+            self.parenthesize,
+            f.context().contents(),
+            f.context().comments(),
+        );
 
         let format_expr = format_with(|f| match item {
             Expr::BoolOp(expr) => expr.format().fmt(f),
@@ -118,35 +123,40 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 }
 
 impl NeedsParentheses for Expr {
-    fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
+    fn needs_parentheses(
+        &self,
+        parenthesize: Parenthesize,
+        source: &str,
+        comments: &Comments,
+    ) -> Parentheses {
         match self {
-            Expr::BoolOp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::NamedExpr(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::BinOp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::UnaryOp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Lambda(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::IfExp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Dict(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Set(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::ListComp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::SetComp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::DictComp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::GeneratorExp(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Await(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Yield(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::YieldFrom(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Compare(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Call(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::FormattedValue(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::JoinedStr(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Constant(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Attribute(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Subscript(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Starred(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Name(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::List(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Tuple(expr) => expr.needs_parentheses(parenthesize, source),
-            Expr::Slice(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::BoolOp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::NamedExpr(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::BinOp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::UnaryOp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Lambda(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::IfExp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Dict(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Set(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::ListComp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::SetComp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::DictComp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::GeneratorExp(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Await(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Yield(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::YieldFrom(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Compare(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Call(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::FormattedValue(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::JoinedStr(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Constant(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Attribute(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Subscript(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Starred(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Name(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::List(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Tuple(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::Slice(expr) => expr.needs_parentheses(parenthesize, source, comments),
         }
     }
 }

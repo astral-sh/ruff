@@ -3,16 +3,16 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 sections.py:144:5: D214 [*] Section is over-indented ("Returns")
     |
-144 |   @expect("D214: Section is over-indented ('Returns')")
-145 |   def section_overindented():  # noqa: D416
-146 |       """Toggle the gizmo.
+142 |   @expect("D214: Section is over-indented ('Returns')")
+143 |   def section_overindented():  # noqa: D416
+144 |       """Toggle the gizmo.
     |  _____^
-147 | | 
-148 | |         Returns
-149 | |     -------
-150 | |     A value of some sort.
-151 | | 
-152 | |     """
+145 | | 
+146 | |         Returns
+147 | |     -------
+148 | |     A value of some sort.
+149 | | 
+150 | |     """
     | |_______^ D214
     |
     = help: Remove over-indentation from "Returns"

@@ -3,21 +3,21 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 return_in_init.py:14:9: PLE0101 Explicit return in `__init__`
    |
-14 | class B:
-15 |     def __init__(self):
-16 |         return 3
+12 | class B:
+13 |     def __init__(self):
+14 |         return 3
    |         ^^^^^^^^ PLE0101
-17 | 
-18 |     def gen(self):
+15 | 
+16 |     def gen(self):
    |
 
 return_in_init.py:22:9: PLE0101 Explicit return in `__init__`
    |
-22 |     def __init__(self):
-23 |         return 1
+21 |     def __init__(self):
+22 |         return 1
    |         ^^^^^^^^ PLE0101
-24 | 
-25 | class MyClass2:
+23 | 
+24 | class MyClass2:
    |
 
 

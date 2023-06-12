@@ -3,31 +3,31 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F50x.py:2:1: F506 `%`-format string has mixed positional and named placeholders
   |
-2 | '%(foo)' % {'foo': 'bar'}  # F501
-3 | '%s %(foo)s' % {'foo': 'bar'}  # F506
+1 | '%(foo)' % {'foo': 'bar'}  # F501
+2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F506
-4 | '%(foo)s %s' % {'foo': 'bar'}  # F506
-5 | '%j' % (1,)  # F509
+3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+4 | '%j' % (1,)  # F509
   |
 
 F50x.py:3:1: F506 `%`-format string has mixed positional and named placeholders
   |
-3 | '%(foo)' % {'foo': 'bar'}  # F501
-4 | '%s %(foo)s' % {'foo': 'bar'}  # F506
-5 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+1 | '%(foo)' % {'foo': 'bar'}  # F501
+2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
+3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F506
-6 | '%j' % (1,)  # F509
-7 | '%s %s' % (1,)  # F507
+4 | '%j' % (1,)  # F509
+5 | '%s %s' % (1,)  # F507
   |
 
 F50x.py:11:1: F506 `%`-format string has mixed positional and named placeholders
    |
-11 | '%(bar)s' % (1, 2, 3)  # F502
-12 | '%s %s' % {'k': 'v'}  # F503
-13 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
+ 9 | '%(bar)s' % (1, 2, 3)  # F502
+10 | '%s %s' % {'k': 'v'}  # F503
+11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F506
-14 | 
-15 | # ok: single %s with mapping
+12 | 
+13 | # ok: single %s with mapping
    |
 
 

@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP020.py:3:6: UP020 [*] Use builtin `open`
   |
-3 | import io
-4 | 
-5 | with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
+1 | import io
+2 | 
+3 | with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP020
-6 |     print(f.read())
+4 |     print(f.read())
   |
   = help: Replace with builtin `open`
 
@@ -21,13 +21,13 @@ UP020.py:3:6: UP020 [*] Use builtin `open`
 6 6 | from io import open
 
 UP020.py:8:6: UP020 Use builtin `open`
-   |
- 8 | from io import open
- 9 | 
-10 | with open("f.txt") as f:
-   |      ^^^^^^^^^^^^^ UP020
-11 |     print(f.read())
-   |
-   = help: Replace with builtin `open`
+  |
+6 | from io import open
+7 | 
+8 | with open("f.txt") as f:
+  |      ^^^^^^^^^^^^^ UP020
+9 |     print(f.read())
+  |
+  = help: Replace with builtin `open`
 
 

@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D400.py:2:5: D400 [*] First line should end with a period
   |
-2 | def f():
-3 |     "Here's a line without a period"
+1 | def f():
+2 |     "Here's a line without a period"
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
-4 |     ...
+3 |     ...
   |
   = help: Add period
 
@@ -20,10 +20,10 @@ D400.py:2:5: D400 [*] First line should end with a period
 
 D400.py:7:5: D400 [*] First line should end with a period
   |
-7 | def f():
-8 |     """Here's a line without a period"""
+6 | def f():
+7 |     """Here's a line without a period"""
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
-9 |     ...
+8 |     ...
   |
   = help: Add period
 
@@ -39,14 +39,14 @@ D400.py:7:5: D400 [*] First line should end with a period
 
 D400.py:12:5: D400 [*] First line should end with a period
    |
-12 |   def f():
-13 |       """
+11 |   def f():
+12 |       """
    |  _____^
-14 | |     Here's a line without a period,
-15 | |     but here's the next line
-16 | |     """
+13 | |     Here's a line without a period,
+14 | |     but here's the next line
+15 | |     """
    | |_______^ D400
-17 |       ...
+16 |       ...
    |
    = help: Add period
 
@@ -62,10 +62,10 @@ D400.py:12:5: D400 [*] First line should end with a period
 
 D400.py:20:5: D400 [*] First line should end with a period
    |
-20 | def f():
-21 |     """Here's a line without a period"""
+19 | def f():
+20 |     """Here's a line without a period"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
-22 |     ...
+21 |     ...
    |
    = help: Add period
 
@@ -81,13 +81,13 @@ D400.py:20:5: D400 [*] First line should end with a period
 
 D400.py:25:5: D400 [*] First line should end with a period
    |
-25 |   def f():
-26 |       """
+24 |   def f():
+25 |       """
    |  _____^
-27 | |     Here's a line without a period,
-28 | |     but here's the next line"""
+26 | |     Here's a line without a period,
+27 | |     but here's the next line"""
    | |_______________________________^ D400
-29 |       ...
+28 |       ...
    |
    = help: Add period
 
@@ -103,13 +103,13 @@ D400.py:25:5: D400 [*] First line should end with a period
 
 D400.py:32:5: D400 [*] First line should end with a period
    |
-32 |   def f():
-33 |       """
+31 |   def f():
+32 |       """
    |  _____^
-34 | |     Here's a line without a period,
-35 | |     but here's the next line with trailing space """
+33 | |     Here's a line without a period,
+34 | |     but here's the next line with trailing space """
    | |____________________________________________________^ D400
-36 |       ...
+35 |       ...
    |
    = help: Add period
 
@@ -125,10 +125,10 @@ D400.py:32:5: D400 [*] First line should end with a period
 
 D400.py:39:5: D400 [*] First line should end with a period
    |
-39 | def f():
-40 |     r"Here's a line without a period"
+38 | def f():
+39 |     r"Here's a line without a period"
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
-41 |     ...
+40 |     ...
    |
    = help: Add period
 
@@ -144,10 +144,10 @@ D400.py:39:5: D400 [*] First line should end with a period
 
 D400.py:44:5: D400 [*] First line should end with a period
    |
-44 | def f():
-45 |     r"""Here's a line without a period"""
+43 | def f():
+44 |     r"""Here's a line without a period"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
-46 |     ...
+45 |     ...
    |
    = help: Add period
 
@@ -163,14 +163,14 @@ D400.py:44:5: D400 [*] First line should end with a period
 
 D400.py:49:5: D400 [*] First line should end with a period
    |
-49 |   def f():
-50 |       r"""
+48 |   def f():
+49 |       r"""
    |  _____^
-51 | |     Here's a line without a period,
-52 | |     but here's the next line
-53 | |     """
+50 | |     Here's a line without a period,
+51 | |     but here's the next line
+52 | |     """
    | |_______^ D400
-54 |       ...
+53 |       ...
    |
    = help: Add period
 
@@ -186,10 +186,10 @@ D400.py:49:5: D400 [*] First line should end with a period
 
 D400.py:57:5: D400 [*] First line should end with a period
    |
-57 | def f():
-58 |     r"""Here's a line without a period"""
+56 | def f():
+57 |     r"""Here's a line without a period"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
-59 |     ...
+58 |     ...
    |
    = help: Add period
 
@@ -205,13 +205,13 @@ D400.py:57:5: D400 [*] First line should end with a period
 
 D400.py:62:5: D400 [*] First line should end with a period
    |
-62 |   def f():
-63 |       r"""
+61 |   def f():
+62 |       r"""
    |  _____^
-64 | |     Here's a line without a period,
-65 | |     but here's the next line"""
+63 | |     Here's a line without a period,
+64 | |     but here's the next line"""
    | |_______________________________^ D400
-66 |       ...
+65 |       ...
    |
    = help: Add period
 
@@ -227,13 +227,13 @@ D400.py:62:5: D400 [*] First line should end with a period
 
 D400.py:69:5: D400 [*] First line should end with a period
    |
-69 |   def f():
-70 |       r"""
+68 |   def f():
+69 |       r"""
    |  _____^
-71 | |     Here's a line without a period,
-72 | |     but here's the next line with trailing space """
+70 | |     Here's a line without a period,
+71 | |     but here's the next line with trailing space """
    | |____________________________________________________^ D400
-73 |       ...
+72 |       ...
    |
    = help: Add period
 

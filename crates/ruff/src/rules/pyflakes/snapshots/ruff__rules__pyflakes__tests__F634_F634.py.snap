@@ -12,13 +12,13 @@ F634.py:1:1: F634 If test is a tuple, which is always `True`
 
 F634.py:7:5: F634 If test is a tuple, which is always `True`
    |
- 7 |       if True:
- 8 |           pass
- 9 |       elif (3, 4):
+ 5 |       if True:
+ 6 |           pass
+ 7 |       elif (3, 4):
    |  _____^
+ 8 | |         pass
+ 9 | |     elif ():
 10 | |         pass
-11 | |     elif ():
-12 | |         pass
    | |____________^ F634
    |
 

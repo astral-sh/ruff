@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:631:5: D404 First word of the docstring should not be "This"
     |
-631 | @expect('D404: First word of the docstring should not be "This"')
-632 | def starts_with_this():
-633 |     """This is a docstring."""
+629 | @expect('D404: First word of the docstring should not be "This"')
+630 | def starts_with_this():
+631 |     """This is a docstring."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D404
     |
 
 D.py:636:5: D404 First word of the docstring should not be "This"
     |
-636 | @expect('D404: First word of the docstring should not be "This"')
-637 | def starts_with_space_then_this():
-638 |     """ This is a docstring that starts with a space."""  # noqa: D210
+634 | @expect('D404: First word of the docstring should not be "This"')
+635 | def starts_with_space_then_this():
+636 |     """ This is a docstring that starts with a space."""  # noqa: D210
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D404
     |
 

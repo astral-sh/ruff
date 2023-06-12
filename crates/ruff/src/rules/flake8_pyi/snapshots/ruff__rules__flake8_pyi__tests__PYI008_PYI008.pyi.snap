@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
 PYI008.pyi:3:20: PYI008 Unrecognized platform `linus`
   |
-3 | import sys
-4 | 
-5 | if sys.platform == "linus": ...  # Error: PYI008 Unrecognized platform `linus`
+1 | import sys
+2 | 
+3 | if sys.platform == "linus": ...  # Error: PYI008 Unrecognized platform `linus`
   |                    ^^^^^^^ PYI008
-6 | 
-7 | if sys.platform != "linux": ...  # OK
+4 | 
+5 | if sys.platform != "linux": ...  # OK
   |
 
 

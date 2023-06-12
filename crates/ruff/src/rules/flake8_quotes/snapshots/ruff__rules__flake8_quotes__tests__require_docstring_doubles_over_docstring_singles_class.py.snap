@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
 docstring_singles_class.py:2:5: Q002 [*] Single quote docstring found but double quotes preferred
   |
-2 | class SingleLineDocstrings():
-3 |     ''' Double quotes single line class docstring '''
+1 | class SingleLineDocstrings():
+2 |     ''' Double quotes single line class docstring '''
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
-4 |     ''' Not a docstring '''
+3 |     ''' Not a docstring '''
   |
   = help: Replace single quotes docstring with double quotes
 
@@ -20,10 +20,10 @@ docstring_singles_class.py:2:5: Q002 [*] Single quote docstring found but double
 
 docstring_singles_class.py:6:9: Q002 [*] Single quote docstring found but double quotes preferred
   |
-6 |     def foo(self, bar='''not a docstring'''):
-7 |         ''' Double quotes single line method docstring'''
+5 |     def foo(self, bar='''not a docstring'''):
+6 |         ''' Double quotes single line method docstring'''
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
-8 |         pass
+7 |         pass
   |
   = help: Replace single quotes docstring with double quotes
 
@@ -38,13 +38,13 @@ docstring_singles_class.py:6:9: Q002 [*] Single quote docstring found but double
 9 9 |     class Nested(foo()[:]): ''' inline docstring '''; pass
 
 docstring_singles_class.py:9:29: Q002 [*] Single quote docstring found but double quotes preferred
-   |
- 9 |         pass
-10 | 
-11 |     class Nested(foo()[:]): ''' inline docstring '''; pass
-   |                             ^^^^^^^^^^^^^^^^^^^^^^^^ Q002
-   |
-   = help: Replace single quotes docstring with double quotes
+  |
+7 |         pass
+8 | 
+9 |     class Nested(foo()[:]): ''' inline docstring '''; pass
+  |                             ^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+  |
+  = help: Replace single quotes docstring with double quotes
 
 ℹ Suggested fix
 6 6 |         ''' Double quotes single line method docstring'''

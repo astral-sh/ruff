@@ -9,6 +9,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::collect_arg_names;
+use ruff_python_ast::prelude::Decorator;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
@@ -243,7 +244,10 @@ where
     }
 }
 
-fn get_fixture_decorator<'a>(model: &SemanticModel, decorators: &'a [Expr]) -> Option<&'a Expr> {
+fn get_fixture_decorator<'a>(
+    model: &SemanticModel,
+    decorators: &'a [Decorator],
+) -> Option<&'a Decorator> {
     decorators.iter().find(|decorator| {
         is_pytest_fixture(model, decorator) || is_pytest_yield_fixture(model, decorator)
     })
@@ -251,7 +255,7 @@ fn get_fixture_decorator<'a>(model: &SemanticModel, decorators: &'a [Expr]) -> O
 
 fn pytest_fixture_parentheses(
     checker: &mut Checker,
-    decorator: &Expr,
+    decorator: &Decorator,
     fix: Fix,
     expected: Parentheses,
     actual: Parentheses,
@@ -277,8 +281,8 @@ pub(crate) fn fix_extraneous_scope_function(
 }
 
 /// PT001, PT002, PT003
-fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Expr) {
-    match decorator {
+fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Decorator) {
+    match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
             args,
@@ -431,7 +435,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PT020
-fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
+fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
     if is_pytest_yield_fixture(checker.semantic_model(), decorator) {
         checker.diagnostics.push(Diagnostic::new(
             PytestDeprecatedYieldFixture,
@@ -461,7 +465,7 @@ fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[S
 }
 
 /// PT024, PT025
-fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
+fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
     for (expr, call_path) in get_mark_decorators(decorators) {
         let name = call_path.last().expect("Expected a mark name");
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
@@ -497,7 +501,7 @@ pub(crate) fn fixture(
     stmt: &Stmt,
     name: &str,
     args: &Arguments,
-    decorators: &[Expr],
+    decorators: &[Decorator],
     body: &[Stmt],
 ) {
     let decorator = get_fixture_decorator(checker.semantic_model(), decorators);

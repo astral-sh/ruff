@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP024_4.py:9:8: UP024 [*] Replace aliased errors with `OSError`
    |
- 9 |     conn.ensure_connection(max_retries=2)
-10 |     conn._close()
-11 | except (socket.error, exceptions.OperationalError):
+ 7 |     conn.ensure_connection(max_retries=2)
+ 8 |     conn._close()
+ 9 | except (socket.error, exceptions.OperationalError):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP024
-12 |     return HttpResponseServerError("cache: cannot connect to broker.")
+10 |     return HttpResponseServerError("cache: cannot connect to broker.")
    |
    = help: Replace with builtin `OSError`
 

@@ -13,3 +13,5 @@ f"{0}".format(a)
 f"{0}".format(1)
 
 print(f"{0}".format(1))
+
+''.format(1)

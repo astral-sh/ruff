@@ -66,7 +66,7 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
         diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)
+            fixes::fix_unnecessary_list_comprehension_dict(checker, expr)
         });
     }
     checker.diagnostics.push(diagnostic);

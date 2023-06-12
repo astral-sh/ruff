@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F822_1.py:3:1: F822 Undefined name `b` in `__all__`
   |
-3 | a = 1
-4 | 
-5 | __all__ = list(["a", "b"])
+1 | a = 1
+2 | 
+3 | __all__ = list(["a", "b"])
   | ^^^^^^^ F822
   |
 

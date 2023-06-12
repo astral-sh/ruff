@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
 C411.py:2:1: C411 [*] Unnecessary `list` call (remove the outer call to `list()`)
   |
-2 | x = [1, 2, 3]
-3 | list([i for i in x])
+1 | x = [1, 2, 3]
+2 | list([i for i in x])
   | ^^^^^^^^^^^^^^^^^^^^ C411
   |
   = help: Remove outer `list` call

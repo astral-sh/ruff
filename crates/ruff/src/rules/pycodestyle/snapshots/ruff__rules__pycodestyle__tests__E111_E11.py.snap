@@ -3,22 +3,22 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E11.py:3:1: E111 Indentation is not a multiple of 4
   |
-3 | #: E111
-4 | if x > 2:
-5 |   print(x)
+1 | #: E111
+2 | if x > 2:
+3 |   print(x)
   | ^^ E111
-6 | #: E111 E117
-7 | if True:
+4 | #: E111 E117
+5 | if True:
   |
 
 E11.py:6:1: E111 Indentation is not a multiple of 4
-   |
- 6 | #: E111 E117
- 7 | if True:
- 8 |      print()
-   | ^^^^^ E111
- 9 | #: E112
-10 | if False:
-   |
+  |
+4 | #: E111 E117
+5 | if True:
+6 |      print()
+  | ^^^^^ E111
+7 | #: E112
+8 | if False:
+  |
 
 

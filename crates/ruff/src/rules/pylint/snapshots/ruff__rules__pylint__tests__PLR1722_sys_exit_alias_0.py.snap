@@ -19,8 +19,8 @@ sys_exit_alias_0.py:1:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
 
 sys_exit_alias_0.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
-2 | exit(0)
-3 | quit(0)
+1 | exit(0)
+2 | quit(0)
   | ^^^^ PLR1722
   |
   = help: Replace `quit` with `sys.exit()`
@@ -36,10 +36,10 @@ sys_exit_alias_0.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
 
 sys_exit_alias_0.py:6:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
-6 | def main():
-7 |     exit(2)
+5 | def main():
+6 |     exit(2)
   |     ^^^^ PLR1722
-8 |     quit(2)
+7 |     quit(2)
   |
   = help: Replace `exit` with `sys.exit()`
 
@@ -56,9 +56,9 @@ sys_exit_alias_0.py:6:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
 
 sys_exit_alias_0.py:7:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
-7 | def main():
-8 |     exit(2)
-9 |     quit(2)
+5 | def main():
+6 |     exit(2)
+7 |     quit(2)
   |     ^^^^ PLR1722
   |
   = help: Replace `quit` with `sys.exit()`

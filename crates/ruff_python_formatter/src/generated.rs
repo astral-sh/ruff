@@ -2858,3 +2858,35 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::MatchCase {
         FormatOwnedWithRule::new(self, crate::other::match_case::FormatMatchCase::default())
     }
 }
+
+impl FormatRule<ast::Decorator, PyFormatContext<'_>> for crate::other::decorator::FormatDecorator {
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::Decorator,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::Decorator>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Decorator {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::Decorator,
+        crate::other::decorator::FormatDecorator,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::decorator::FormatDecorator::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Decorator {
+    type Format = FormatOwnedWithRule<
+        ast::Decorator,
+        crate::other::decorator::FormatDecorator,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::decorator::FormatDecorator::default())
+    }
+}

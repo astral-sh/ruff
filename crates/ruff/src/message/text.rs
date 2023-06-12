@@ -215,7 +215,7 @@ impl Display for MessageCodeFrame<'_> {
             title: None,
             slices: vec![Slice {
                 source: &source.text,
-                line_start: content_start_index.get(),
+                line_start: start_index.get(),
                 annotations: vec![SourceAnnotation {
                     label: &label,
                     annotation_type: AnnotationType::Error,

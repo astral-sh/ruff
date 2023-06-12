@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
 G004.py:4:14: G004 Logging statement uses f-string
   |
-4 | name = "world"
-5 | logging.info(f"Hello {name}")
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
   |              ^^^^^^^^^^^^^^^ G004
-6 | logging.log(logging.INFO, f"Hello {name}")
+5 | logging.log(logging.INFO, f"Hello {name}")
   |
 
 G004.py:5:27: G004 Logging statement uses f-string
   |
-5 | name = "world"
-6 | logging.info(f"Hello {name}")
-7 | logging.log(logging.INFO, f"Hello {name}")
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
+5 | logging.log(logging.INFO, f"Hello {name}")
   |                           ^^^^^^^^^^^^^^^ G004
   |
 

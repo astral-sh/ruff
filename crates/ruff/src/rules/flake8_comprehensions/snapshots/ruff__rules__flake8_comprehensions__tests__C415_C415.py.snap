@@ -3,41 +3,41 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
 C415.py:2:5: C415 Unnecessary subscript reversal of iterable within `set()`
   |
-2 | lst = [2, 1, 3]
-3 | a = set(lst[::-1])
+1 | lst = [2, 1, 3]
+2 | a = set(lst[::-1])
   |     ^^^^^^^^^^^^^^ C415
-4 | b = reversed(lst[::-1])
-5 | c = sorted(lst[::-1])
+3 | b = reversed(lst[::-1])
+4 | c = sorted(lst[::-1])
   |
 
 C415.py:3:5: C415 Unnecessary subscript reversal of iterable within `reversed()`
   |
-3 | lst = [2, 1, 3]
-4 | a = set(lst[::-1])
-5 | b = reversed(lst[::-1])
+1 | lst = [2, 1, 3]
+2 | a = set(lst[::-1])
+3 | b = reversed(lst[::-1])
   |     ^^^^^^^^^^^^^^^^^^^ C415
-6 | c = sorted(lst[::-1])
-7 | d = sorted(lst[::-1], reverse=True)
+4 | c = sorted(lst[::-1])
+5 | d = sorted(lst[::-1], reverse=True)
   |
 
 C415.py:4:5: C415 Unnecessary subscript reversal of iterable within `sorted()`
   |
-4 | a = set(lst[::-1])
-5 | b = reversed(lst[::-1])
-6 | c = sorted(lst[::-1])
+2 | a = set(lst[::-1])
+3 | b = reversed(lst[::-1])
+4 | c = sorted(lst[::-1])
   |     ^^^^^^^^^^^^^^^^^ C415
-7 | d = sorted(lst[::-1], reverse=True)
-8 | e = set(lst[2:-1])
+5 | d = sorted(lst[::-1], reverse=True)
+6 | e = set(lst[2:-1])
   |
 
 C415.py:5:5: C415 Unnecessary subscript reversal of iterable within `sorted()`
   |
-5 | b = reversed(lst[::-1])
-6 | c = sorted(lst[::-1])
-7 | d = sorted(lst[::-1], reverse=True)
+3 | b = reversed(lst[::-1])
+4 | c = sorted(lst[::-1])
+5 | d = sorted(lst[::-1], reverse=True)
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C415
-8 | e = set(lst[2:-1])
-9 | f = set(lst[:1:-1])
+6 | e = set(lst[2:-1])
+7 | f = set(lst[:1:-1])
   |
 
 

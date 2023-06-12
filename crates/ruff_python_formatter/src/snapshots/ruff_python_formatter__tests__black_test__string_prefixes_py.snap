@@ -33,25 +33,36 @@ def docstring_multiline():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,13 +1,13 @@
+@@ -1,20 +1,18 @@
  #!/usr/bin/env python3
  
- name = "Łukasz"
+-name = "Łukasz"
 -(f"hello {name}", f"hello {name}")
 -(b"", b"")
 -("", "")
-+(f"hello {name}", F"hello {name}")
-+(b"", B"")
-+(u"", U"")
- (r"", R"")
+-(r"", R"")
++name = "NOT_YET_IMPLEMENTED_STRING"
++(1, 2)
++(1, 2)
++(1, 2)
++(1, 2)
  
 -(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
 -(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
-+(rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
-+(rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
++(1, 2)
++(1, 2)
  
  
  def docstring_singleline():
+-    R"""2020 was one hell of a year. The good news is that we were able to"""
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+ 
+ def docstring_multiline():
+-    R"""
+-    clear out all of the issues opened in that time :p
+-    """
++    "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 ## Ruff Output
@@ -59,24 +70,22 @@ def docstring_multiline():
 ```py
 #!/usr/bin/env python3
 
-name = "Łukasz"
-(f"hello {name}", F"hello {name}")
-(b"", B"")
-(u"", U"")
-(r"", R"")
+name = "NOT_YET_IMPLEMENTED_STRING"
+(1, 2)
+(1, 2)
+(1, 2)
+(1, 2)
 
-(rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
-(rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
+(1, 2)
+(1, 2)
 
 
 def docstring_singleline():
-    R"""2020 was one hell of a year. The good news is that we were able to"""
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
 def docstring_multiline():
-    R"""
-    clear out all of the issues opened in that time :p
-    """
+    "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 ## Black Output
