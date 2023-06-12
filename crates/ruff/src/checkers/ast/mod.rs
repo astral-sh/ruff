@@ -1121,7 +1121,7 @@ where
                     if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
                         flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
                     }
-                    if self.enabled(Rule::ImportFromFuture) {
+                    if self.enabled(Rule::FutureAnnotationsInStub) {
                         flake8_pyi::rules::from_future_import(self, import_from);
                     }
                 }

@@ -6,9 +6,9 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct ImportFromFuture;
+pub struct FutureAnnotationsInStub;
 
-impl Violation for ImportFromFuture {
+impl Violation for FutureAnnotationsInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics")
@@ -27,7 +27,7 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
         if name == "__future__" && names.iter().any(|alias| &*alias.name == "annotations") {
             checker
                 .diagnostics
-                .push(Diagnostic::new(ImportFromFuture, *range));
+                .push(Diagnostic::new(FutureAnnotationsInStub, *range));
         }
     }
 }
