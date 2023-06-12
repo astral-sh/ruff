@@ -32,7 +32,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 return write!(
                     f,
                     [
-                        // A single element tuple always needs parentheses
+                        // An empty tuple always needs parentheses, but does not have a comma
                         &text("("),
                         block_indent(&dangling_node_comments(item)),
                         &text(")"),
@@ -43,7 +43,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 return write!(
                     f,
                     [group(&format_args![
-                        // A single element tuple always needs parentheses
+                        // A single element tuple always needs parentheses and a trailing comma
                         &text("("),
                         soft_block_indent(&format_args![single.format(), &text(",")]),
                         &text(")"),
@@ -80,7 +80,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             write!(
                 f,
                 [group(&format_args![
-                    // If it was previously parenthesized, add them again
+                    // If there were previously parentheses, keep them
                     &text("("),
                     soft_block_indent(&ExprSequence::new(elts)),
                     &text(")"),
@@ -123,8 +123,7 @@ impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
         f.join_with(&format_args!(text(","), soft_line_break_or_space()))
             .entries(self.elts.iter().formatted())
             .finish()?;
-        // We need a trailing comma on the last entry of an expanded group since we have more
-        // than one element
+        // Black style has a trailing comma on the last entry of an expanded group
         write!(f, [if_group_breaks(&text(","))])
     }
 }
