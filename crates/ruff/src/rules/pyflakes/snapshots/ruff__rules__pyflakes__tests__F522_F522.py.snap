@@ -19,11 +19,11 @@ F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
 
 F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
   |
-2 | "{}".format(1, bar=2)  # F522
-3 | "{bar}{}".format(1, bar=2, spam=3)  # F522
+1 | "{}".format(1, bar=2)  # F522
+2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
-4 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
-5 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
   |
   = help: Remove extra named arguments: spam
 
@@ -37,12 +37,12 @@ F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
 
 F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
   |
-4 | "{bar}{}".format(1, bar=2, spam=3)  # F522
-5 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
-6 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
+3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
-7 | # Not fixable
-8 | (''
+5 | # Not fixable
+6 | (''
   |
   = help: Remove extra named arguments: eggs, ham
 
@@ -58,11 +58,11 @@ F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
 
 F522.py:6:2: F522 `.format` call has unused named argument(s): x
   |
-6 |   "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
-7 |   # Not fixable
-8 |   (''
+4 |   "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+5 |   # Not fixable
+6 |   (''
   |  __^
-9 | |  .format(x=2))
+7 | |  .format(x=2))
   | |_____________^ F522
   |
   = help: Remove extra named arguments: x

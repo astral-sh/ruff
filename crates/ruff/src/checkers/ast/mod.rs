@@ -29,7 +29,7 @@ use ruff_python_semantic::binding::{
 use ruff_python_semantic::context::ExecutionContext;
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::globals::Globals;
-use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
+use ruff_python_semantic::model::{ResolvedRead, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -794,13 +794,16 @@ where
                 if self.any_enabled(&[
                     Rule::MutableDataclassDefault,
                     Rule::FunctionCallInDataclassDefaultArgument,
-                ]) && ruff::rules::is_dataclass(&self.semantic_model, decorator_list)
-                {
-                    if self.enabled(Rule::MutableDataclassDefault) {
-                        ruff::rules::mutable_dataclass_default(self, body);
+                    Rule::MutableClassDefault,
+                ]) {
+                    let is_dataclass =
+                        ruff::rules::is_dataclass(&self.semantic_model, decorator_list);
+                    if self.any_enabled(&[Rule::MutableDataclassDefault, Rule::MutableClassDefault])
+                    {
+                        ruff::rules::mutable_class_default(self, body, is_dataclass);
                     }
 
-                    if self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+                    if is_dataclass && self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
                         ruff::rules::function_call_in_dataclass_defaults(self, body);
                     }
                 }
@@ -1121,6 +1124,9 @@ where
                     if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
                         flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
                     }
+                    if self.enabled(Rule::FutureAnnotationsInStub) {
+                        flake8_pyi::rules::from_future_import(self, import_from);
+                    }
                 }
                 for alias in names {
                     if let Some("__future__") = module {
@@ -1356,9 +1362,9 @@ where
                         pyflakes::rules::raise_not_implemented(self, expr);
                     }
                 }
-                if self.enabled(Rule::CannotRaiseLiteral) {
+                if self.enabled(Rule::RaiseLiteral) {
                     if let Some(exc) = exc {
-                        flake8_bugbear::rules::cannot_raise_literal(self, exc);
+                        flake8_bugbear::rules::raise_literal(self, exc);
                     }
                 }
                 if self.any_enabled(&[
@@ -1511,7 +1517,8 @@ where
                     pygrep_hooks::rules::non_existent_mock_method(self, test);
                 }
             }
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body, .. })
+            | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
@@ -3329,13 +3336,7 @@ where
                 }
 
                 if self.enabled(Rule::IsLiteral) {
-                    pyflakes::rules::invalid_literal_comparison(
-                        self,
-                        left,
-                        ops,
-                        comparators,
-                        expr.range(),
-                    );
+                    pyflakes::rules::invalid_literal_comparison(self, left, ops, comparators, expr);
                 }
 
                 if self.enabled(Rule::TypeComparison) {
@@ -4510,11 +4511,11 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        match self.semantic_model.resolve_reference(id, expr.range()) {
-            ResolvedReference::Resolved(..) | ResolvedReference::ImplicitGlobal => {
+        match self.semantic_model.resolve_read(id, expr.range()) {
+            ResolvedRead::Resolved(..) | ResolvedRead::ImplicitGlobal => {
                 // Nothing to do.
             }
-            ResolvedReference::StarImport => {
+            ResolvedRead::StarImport => {
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = self
@@ -4537,7 +4538,7 @@ impl<'a> Checker<'a> {
                     ));
                 }
             }
-            ResolvedReference::NotFound => {
+            ResolvedRead::NotFound => {
                 // F821
                 if self.enabled(Rule::UndefinedName) {
                     // Allow __path__.
@@ -4632,7 +4633,7 @@ impl<'a> Checker<'a> {
             self.add_binding(
                 id,
                 expr.range(),
-                BindingKind::Binding,
+                BindingKind::UnpackedAssignment,
                 BindingFlags::empty(),
             );
             return;
@@ -5044,12 +5045,11 @@ impl<'a> Checker<'a> {
             // the bindings are in different scopes.
             if self.enabled(Rule::RedefinedWhileUnused) {
                 for (name, binding_id) in scope.bindings() {
-                    if let Some(shadowed) = self.semantic_model.shadowed_binding(binding_id) {
+                    if let Some(shadowed_id) = self.semantic_model.shadowed_binding(binding_id) {
+                        let shadowed = &self.semantic_model.bindings[shadowed_id];
                         if shadowed.is_used() {
                             continue;
                         }
-
-                        let binding = &self.semantic_model.bindings[binding_id];
 
                         #[allow(deprecated)]
                         let line = self.locator.compute_line_index(
@@ -5058,6 +5058,7 @@ impl<'a> Checker<'a> {
                                 .start(),
                         );
 
+                        let binding = &self.semantic_model.bindings[binding_id];
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::RedefinedWhileUnused {
                                 name: (*name).to_string(),

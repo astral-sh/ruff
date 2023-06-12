@@ -3,38 +3,38 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
 ARG.py:35:17: ARG002 Unused method argument: `x`
    |
-35 |     # Unused arguments.
-36 |     ###
-37 |     def f(self, x):
+33 |     # Unused arguments.
+34 |     ###
+35 |     def f(self, x):
    |                 ^ ARG002
-38 |         print("Hello, world!")
+36 |         print("Hello, world!")
    |
 
 ARG.py:38:20: ARG002 Unused method argument: `x`
    |
-38 |         print("Hello, world!")
-39 | 
-40 |     def f(self, /, x):
+36 |         print("Hello, world!")
+37 | 
+38 |     def f(self, /, x):
    |                    ^ ARG002
-41 |         print("Hello, world!")
+39 |         print("Hello, world!")
    |
 
 ARG.py:41:16: ARG002 Unused method argument: `x`
    |
-41 |         print("Hello, world!")
-42 | 
-43 |     def f(cls, x):
+39 |         print("Hello, world!")
+40 | 
+41 |     def f(cls, x):
    |                ^ ARG002
-44 |         print("Hello, world!")
+42 |         print("Hello, world!")
    |
 
 ARG.py:190:24: ARG002 Unused method argument: `x`
     |
-190 | ###
-191 | class C:
-192 |     def __init__(self, x) -> None:
+188 | ###
+189 | class C:
+190 |     def __init__(self, x) -> None:
     |                        ^ ARG002
-193 |         print("Hello, world!")
+191 |         print("Hello, world!")
     |
 
 

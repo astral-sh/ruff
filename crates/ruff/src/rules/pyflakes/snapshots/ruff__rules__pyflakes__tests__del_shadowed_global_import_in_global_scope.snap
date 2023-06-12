@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 <filename>:5:12: F401 [*] `os` imported but unused
   |
-5 | def f():
-6 |     import os
+4 | def f():
+5 |     import os
   |            ^^ F401
-7 | 
-8 | # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
+6 | 
+7 | # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
   |
   = help: Remove unused import: `os`
 

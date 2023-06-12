@@ -3,41 +3,41 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 bidirectional_unicode.py:2:1: PLE2502 Contains control characters that can permit obfuscated code
   |
-2 |   # E2502
-3 | / print("שלום‬")
-4 | | 
+1 |   # E2502
+2 | / print("שלום‬")
+3 | | 
   | |_^ PLE2502
-5 |   # E2502
-6 |   example = "x‏" * 100  #    "‏x" is assigned
+4 |   # E2502
+5 |   example = "x‏" * 100  #    "‏x" is assigned
   |
 
 bidirectional_unicode.py:5:1: PLE2502 Contains control characters that can permit obfuscated code
   |
-5 |   # E2502
-6 | / example = "x‏" * 100  #    "‏x" is assigned
-7 | | 
+4 |   # E2502
+5 | / example = "x‏" * 100  #    "‏x" is assigned
+6 | | 
   | |_^ PLE2502
-8 |   # E2502
-9 |   if access_level != "none‮⁦":  # Check if admin ⁩⁦' and access_level != 'user
+7 |   # E2502
+8 |   if access_level != "none‮⁦":  # Check if admin ⁩⁦' and access_level != 'user
   |
 
 bidirectional_unicode.py:8:1: PLE2502 Contains control characters that can permit obfuscated code
-   |
- 8 |   # E2502
- 9 | / if access_level != "none‮⁦":  # Check if admin ⁩⁦' and access_level != 'user
-10 | |     print("You are an admin.")
-   | |_^ PLE2502
-   |
+  |
+7 |   # E2502
+8 | / if access_level != "none‮⁦":  # Check if admin ⁩⁦' and access_level != 'user
+9 | |     print("You are an admin.")
+  | |_^ PLE2502
+  |
 
 bidirectional_unicode.py:14:1: PLE2502 Contains control characters that can permit obfuscated code
    |
-14 |   # E2502
-15 |   def subtract_funds(account: str, amount: int):
-16 | /     """Subtract funds from bank account then ⁧"""
-17 | |     return
+12 |   # E2502
+13 |   def subtract_funds(account: str, amount: int):
+14 | /     """Subtract funds from bank account then ⁧"""
+15 | |     return
    | |_^ PLE2502
-18 |       bank[account] -= amount
-19 |       return
+16 |       bank[account] -= amount
+17 |       return
    |
 
 

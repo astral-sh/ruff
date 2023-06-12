@@ -11,20 +11,20 @@ PYI021.pyi:1:1: PYI021 Docstrings should not be included in stubs
 
 PYI021.pyi:4:5: PYI021 Docstrings should not be included in stubs
   |
-4 | def foo():
-5 |     """foo"""  # ERROR PYI021
+3 | def foo():
+4 |     """foo"""  # ERROR PYI021
   |     ^^^^^^^^^ PYI021
-6 | 
-7 | class Bar:
+5 | 
+6 | class Bar:
   |
 
 PYI021.pyi:7:5: PYI021 Docstrings should not be included in stubs
-   |
- 7 | class Bar:
- 8 |     """bar"""  # ERROR PYI021
-   |     ^^^^^^^^^ PYI021
- 9 | 
-10 | def bar():
-   |
+  |
+6 | class Bar:
+7 |     """bar"""  # ERROR PYI021
+  |     ^^^^^^^^^ PYI021
+8 | 
+9 | def bar():
+  |
 
 

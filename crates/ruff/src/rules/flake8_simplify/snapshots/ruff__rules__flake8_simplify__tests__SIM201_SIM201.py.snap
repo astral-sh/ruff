@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
 SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
   |
-2 | # SIM201
-3 | if not a == b:
+1 | # SIM201
+2 | if not a == b:
   |    ^^^^^^^^^^ SIM201
-4 |     pass
+3 |     pass
   |
   = help: Replace with `!=` operator
 
@@ -20,10 +20,10 @@ SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
 
 SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
   |
-6 | # SIM201
-7 | if not a == (b + c):
+5 | # SIM201
+6 | if not a == (b + c):
   |    ^^^^^^^^^^^^^^^^ SIM201
-8 |     pass
+7 |     pass
   |
   = help: Replace with `!=` operator
 
@@ -39,10 +39,10 @@ SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
 
 SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
    |
-10 | # SIM201
-11 | if not (a + b) == c:
+ 9 | # SIM201
+10 | if not (a + b) == c:
    |    ^^^^^^^^^^^^^^^^ SIM201
-12 |     pass
+11 |     pass
    |
    = help: Replace with `!=` operator
 

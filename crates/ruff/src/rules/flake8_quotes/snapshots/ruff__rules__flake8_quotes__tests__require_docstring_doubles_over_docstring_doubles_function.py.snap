@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
 docstring_doubles_function.py:3:5: Q001 [*] Double quote multiline found but single quotes preferred
   |
-3 | def foo():
-4 |     """function without params, single line docstring"""
-5 |     """ not a docstring"""
+1 | def foo():
+2 |     """function without params, single line docstring"""
+3 |     """ not a docstring"""
   |     ^^^^^^^^^^^^^^^^^^^^^^ Q001
-6 |     return
+4 |     return
   |
   = help: Replace double multiline quotes with single quotes
 
@@ -22,11 +22,11 @@ docstring_doubles_function.py:3:5: Q001 [*] Double quote multiline found but sin
 
 docstring_doubles_function.py:11:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
-11 |         function without params, multiline docstring
-12 |     """
-13 |     """ not a docstring"""
+ 9 |         function without params, multiline docstring
+10 |     """
+11 |     """ not a docstring"""
    |     ^^^^^^^^^^^^^^^^^^^^^^ Q001
-14 |     return
+12 |     return
    |
    = help: Replace double multiline quotes with single quotes
 
@@ -66,11 +66,11 @@ docstring_doubles_function.py:15:39: Q001 [*] Double quote multiline found but s
 
 docstring_doubles_function.py:17:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
-17 | def fun_with_params_no_docstring(a, b="""
-18 |     not a
-19 | """ """docstring"""):
+15 | def fun_with_params_no_docstring(a, b="""
+16 |     not a
+17 | """ """docstring"""):
    |     ^^^^^^^^^^^^^^^ Q001
-20 |     pass
+18 |     pass
    |
    = help: Replace double multiline quotes with single quotes
 
@@ -86,10 +86,10 @@ docstring_doubles_function.py:17:5: Q001 [*] Double quote multiline found but si
 
 docstring_doubles_function.py:22:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
-22 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
-23 |     """ not a docstring """):
+21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
+22 |     """ not a docstring """):
    |     ^^^^^^^^^^^^^^^^^^^^^^^ Q001
-24 |     pass
+23 |     pass
    |
    = help: Replace double multiline quotes with single quotes
 

@@ -9,6 +9,7 @@ homepage = "https://beta.ruff.rs/docs/"
 documentation = "https://beta.ruff.rs/docs/"
 repository = "https://github.com/astral-sh/ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
+license = "MIT"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.69" }

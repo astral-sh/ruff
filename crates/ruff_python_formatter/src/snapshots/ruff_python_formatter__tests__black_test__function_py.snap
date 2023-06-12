@@ -175,7 +175,7 @@ def __await__(): return (yield)
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
 +def spaces(
 +    a=1,
-+    b=(1, 2),
++    b=(),
 +    c=[],
 +    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
 +    e=True,
@@ -190,8 +190,7 @@ def __await__(): return (yield)
  
  def spaces_types(
      a: int = 1,
--    b: tuple = (),
-+    b: tuple = (1, 2),
+     b: tuple = (),
      c: list = [],
 -    d: dict = {},
 +    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
@@ -348,7 +347,7 @@ def function_signature_stress_test(
 
 def spaces(
     a=1,
-    b=(1, 2),
+    b=(),
     c=[],
     d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
     e=True,
@@ -363,7 +362,7 @@ def spaces(
 
 def spaces_types(
     a: int = 1,
-    b: tuple = (1, 2),
+    b: tuple = (),
     c: list = [],
     d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
     e: bool = True,

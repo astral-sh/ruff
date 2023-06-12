@@ -3,69 +3,69 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
 TRY400.py:16:9: TRY400 Use `logging.exception` instead of `logging.error`
    |
-16 |         a = 1
-17 |     except Exception:
-18 |         logging.error("Context message here")
+14 |         a = 1
+15 |     except Exception:
+16 |         logging.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-19 | 
-20 |         if True:
+17 | 
+18 |         if True:
    |
 
 TRY400.py:19:13: TRY400 Use `logging.exception` instead of `logging.error`
    |
-19 |         if True:
-20 |             logging.error("Context message here")
+18 |         if True:
+19 |             logging.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
    |
 
 TRY400.py:26:9: TRY400 Use `logging.exception` instead of `logging.error`
    |
-26 |         a = 1
-27 |     except Exception:
-28 |         logger.error("Context message here")
+24 |         a = 1
+25 |     except Exception:
+26 |         logger.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-29 | 
-30 |         if True:
+27 | 
+28 |         if True:
    |
 
 TRY400.py:29:13: TRY400 Use `logging.exception` instead of `logging.error`
    |
-29 |         if True:
-30 |             logger.error("Context message here")
+28 |         if True:
+29 |             logger.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
    |
 
 TRY400.py:36:9: TRY400 Use `logging.exception` instead of `logging.error`
    |
-36 |         a = 1
-37 |     except Exception:
-38 |         log.error("Context message here")
+34 |         a = 1
+35 |     except Exception:
+36 |         log.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-39 | 
-40 |         if True:
+37 | 
+38 |         if True:
    |
 
 TRY400.py:39:13: TRY400 Use `logging.exception` instead of `logging.error`
    |
-39 |         if True:
-40 |             log.error("Context message here")
+38 |         if True:
+39 |             log.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
    |
 
 TRY400.py:46:9: TRY400 Use `logging.exception` instead of `logging.error`
    |
-46 |         a = 1
-47 |     except Exception:
-48 |         self.logger.error("Context message here")
+44 |         a = 1
+45 |     except Exception:
+46 |         self.logger.error("Context message here")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
-49 | 
-50 |         if True:
+47 | 
+48 |         if True:
    |
 
 TRY400.py:49:13: TRY400 Use `logging.exception` instead of `logging.error`
    |
-49 |         if True:
-50 |             self.logger.error("Context message here")
+48 |         if True:
+49 |             self.logger.error("Context message here")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
    |
 

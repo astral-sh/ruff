@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:252:1: D208 [*] Docstring is over-indented
     |
-252 |     """Summary.
-253 | 
-254 |        Description.
+250 |     """Summary.
+251 | 
+252 |        Description.
     |  D208
-255 | 
-256 |     """
+253 | 
+254 |     """
     |
     = help: Remove over-indentation
 
@@ -24,9 +24,9 @@ D.py:252:1: D208 [*] Docstring is over-indented
 
 D.py:264:1: D208 [*] Docstring is over-indented
     |
-264 |     Description.
-265 | 
-266 |         """
+262 |     Description.
+263 | 
+264 |         """
     |  D208
     |
     = help: Remove over-indentation
@@ -43,12 +43,12 @@ D.py:264:1: D208 [*] Docstring is over-indented
 
 D.py:272:1: D208 [*] Docstring is over-indented
     |
-272 |     """Summary.
-273 | 
-274 |         Description.
+270 |     """Summary.
+271 | 
+272 |         Description.
     |  D208
-275 | 
-276 |     """
+273 | 
+274 |     """
     |
     = help: Remove over-indentation
 

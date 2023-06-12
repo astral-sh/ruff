@@ -5,8 +5,8 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::{StrExt, UniversalNewlineIterator};
 use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -102,10 +102,9 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
             .slice(TextRange::new(docstring.end(), stmt.end()));
 
         // If the docstring is only followed by blank and commented lines, abort.
-        let all_blank_after = after
-            .universal_newlines()
-            .skip(1)
-            .all(|line| line.trim().is_empty() || line.trim_start().starts_with('#'));
+        let all_blank_after = after.universal_newlines().skip(1).all(|line| {
+            line.trim_whitespace().is_empty() || line.trim_whitespace_start().starts_with('#')
+        });
         if all_blank_after {
             return;
         }
@@ -129,7 +128,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         // Avoid violations for blank lines followed by inner functions or classes.
         if blank_lines_after == 1
             && lines
-                .find(|line| !line.trim_start().starts_with('#'))
+                .find(|line| !line.trim_whitespace_start().starts_with('#'))
                 .map_or(false, |line| INNER_FUNCTION_OR_CLASS_REGEX.is_match(&line))
         {
             return;

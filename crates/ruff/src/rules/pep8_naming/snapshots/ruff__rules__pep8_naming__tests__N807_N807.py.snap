@@ -10,10 +10,10 @@ N807.py:1:5: N807 Function name should not start and end with `__`
 
 N807.py:14:9: N807 Function name should not start and end with `__`
    |
-14 | def nested():
-15 |     def __bad__():
+13 | def nested():
+14 |     def __bad__():
    |         ^^^^^^^ N807
-16 |         pass
+15 |         pass
    |
 
 

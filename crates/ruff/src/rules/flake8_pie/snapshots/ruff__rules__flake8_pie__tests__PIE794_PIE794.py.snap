@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 ---
 PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
   |
-4 |     name = StringField()
-5 |     # ....
-6 |     name = StringField()  # PIE794
+2 |     name = StringField()
+3 |     # ....
+4 |     name = StringField()  # PIE794
   |     ^^^^^^^^^^^^^^^^^^^^ PIE794
-7 | 
-8 |     def remove(self) -> None:
+5 | 
+6 |     def remove(self) -> None:
   |
   = help: Remove duplicate field definition for `name`
 
@@ -23,12 +23,12 @@ PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
 
 PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
    |
-13 |     name: str = StringField()
-14 |     # ....
-15 |     name = StringField()  # PIE794
+11 |     name: str = StringField()
+12 |     # ....
+13 |     name = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^^ PIE794
-16 | 
-17 |     def foo(self) -> None:
+14 | 
+15 |     def foo(self) -> None:
    |
    = help: Remove duplicate field definition for `name`
 
@@ -43,9 +43,9 @@ PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
 
 PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
    |
-23 |     foo: bool = BooleanField()
-24 |     # ...
-25 |     bar = StringField()  # PIE794
+21 |     foo: bool = BooleanField()
+22 |     # ...
+23 |     bar = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^ PIE794
    |
    = help: Remove duplicate field definition for `bar`
@@ -61,9 +61,9 @@ PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
 
 PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
    |
-40 |     foo: bool = BooleanField()
-41 |     # ...
-42 |     bar = StringField()  # PIE794
+38 |     foo: bool = BooleanField()
+39 |     # ...
+40 |     bar = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^ PIE794
    |
    = help: Remove duplicate field definition for `bar`

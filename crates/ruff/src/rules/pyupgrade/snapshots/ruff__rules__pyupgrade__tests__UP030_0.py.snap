@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
   |
-3 | # Invalid calls; errors expected.
-4 | 
-5 | "{0}" "{1}" "{2}".format(1, 2, 3)
+1 | # Invalid calls; errors expected.
+2 | 
+3 | "{0}" "{1}" "{2}".format(1, 2, 3)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-6 | 
-7 | "a {3} complicated {1} string with {0} {2}".format(
+4 | 
+5 | "a {3} complicated {1} string with {0} {2}".format(
   |
   = help: Remove explicit positional indices
 
@@ -22,17 +22,17 @@ UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
 6 6 |     "first", "second", "third", "fourth"
 
 UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
-   |
- 5 |   "{0}" "{1}" "{2}".format(1, 2, 3)
- 6 |   
- 7 | / "a {3} complicated {1} string with {0} {2}".format(
- 8 | |     "first", "second", "third", "fourth"
- 9 | | )
-   | |_^ UP030
-10 |   
-11 |   '{0}'.format(1)
-   |
-   = help: Remove explicit positional indices
+  |
+3 |   "{0}" "{1}" "{2}".format(1, 2, 3)
+4 |   
+5 | / "a {3} complicated {1} string with {0} {2}".format(
+6 | |     "first", "second", "third", "fourth"
+7 | | )
+  | |_^ UP030
+8 |   
+9 |   '{0}'.format(1)
+  |
+  = help: Remove explicit positional indices
 
 ℹ Suggested fix
 2 2 | 
@@ -48,12 +48,12 @@ UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
    |
- 9 | )
-10 | 
-11 | '{0}'.format(1)
+ 7 | )
+ 8 | 
+ 9 | '{0}'.format(1)
    | ^^^^^^^^^^^^^^^ UP030
-12 | 
-13 | '{0:x}'.format(30)
+10 | 
+11 | '{0:x}'.format(30)
    |
    = help: Remove explicit positional indices
 
@@ -69,12 +69,12 @@ UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
    |
-11 | '{0}'.format(1)
-12 | 
-13 | '{0:x}'.format(30)
+ 9 | '{0}'.format(1)
+10 | 
+11 | '{0:x}'.format(30)
    | ^^^^^^^^^^^^^^^^^^ UP030
-14 | 
-15 | x = '{0}'.format(1)
+12 | 
+13 | x = '{0}'.format(1)
    |
    = help: Remove explicit positional indices
 
@@ -90,12 +90,12 @@ UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
    |
-13 | '{0:x}'.format(30)
-14 | 
-15 | x = '{0}'.format(1)
+11 | '{0:x}'.format(30)
+12 | 
+13 | x = '{0}'.format(1)
    |     ^^^^^^^^^^^^^^^ UP030
-16 | 
-17 | '''{0}\n{1}\n'''.format(1, 2)
+14 | 
+15 | '''{0}\n{1}\n'''.format(1, 2)
    |
    = help: Remove explicit positional indices
 
@@ -111,12 +111,12 @@ UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
    |
-15 | x = '{0}'.format(1)
-16 | 
-17 | '''{0}\n{1}\n'''.format(1, 2)
+13 | x = '{0}'.format(1)
+14 | 
+15 | '''{0}\n{1}\n'''.format(1, 2)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-18 | 
-19 | x = "foo {0}" \
+16 | 
+17 | x = "foo {0}" \
    |
    = help: Remove explicit positional indices
 
@@ -132,14 +132,14 @@ UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
    |
-17 |   '''{0}\n{1}\n'''.format(1, 2)
-18 |   
-19 |   x = "foo {0}" \
+15 |   '''{0}\n{1}\n'''.format(1, 2)
+16 |   
+17 |   x = "foo {0}" \
    |  _____^
-20 | |     "bar {1}".format(1, 2)
+18 | |     "bar {1}".format(1, 2)
    | |__________________________^ UP030
-21 |   
-22 |   ("{0}").format(1)
+19 |   
+20 |   ("{0}").format(1)
    |
    = help: Remove explicit positional indices
 
@@ -157,12 +157,12 @@ UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
    |
-20 |     "bar {1}".format(1, 2)
-21 | 
-22 | ("{0}").format(1)
+18 |     "bar {1}".format(1, 2)
+19 | 
+20 | ("{0}").format(1)
    | ^^^^^^^^^^^^^^^^^ UP030
-23 | 
-24 | "\N{snowman} {0}".format(1)
+21 | 
+22 | "\N{snowman} {0}".format(1)
    |
    = help: Remove explicit positional indices
 
@@ -178,12 +178,12 @@ UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
    |
-22 | ("{0}").format(1)
-23 | 
-24 | "\N{snowman} {0}".format(1)
+20 | ("{0}").format(1)
+21 | 
+22 | "\N{snowman} {0}".format(1)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-25 | 
-26 | print(
+23 | 
+24 | print(
    |
    = help: Remove explicit positional indices
 
@@ -199,12 +199,12 @@ UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
    |
-25 |   print(
-26 |       'foo{0}'
+24 |   print(
+25 |       'foo{0}'
    |  _____^
-27 | |     'bar{1}'.format(1, 2)
+26 | |     'bar{1}'.format(1, 2)
    | |_________________________^ UP030
-28 |   )
+27 |   )
    |
    = help: Remove explicit positional indices
 
@@ -222,12 +222,12 @@ UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
    |
-30 |   print(
-31 |       'foo{0}'  # ohai\n"
+29 |   print(
+30 |       'foo{0}'  # ohai\n"
    |  _____^
-32 | |     'bar{1}'.format(1, 2)
+31 | |     'bar{1}'.format(1, 2)
    | |_________________________^ UP030
-33 |   )
+32 |   )
    |
    = help: Remove explicit positional indices
 
@@ -245,9 +245,9 @@ UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
 
 UP030_0.py:34:1: UP030 Use implicit references for positional format fields
    |
-34 | )
-35 | 
-36 | '{' '0}'.format(1)
+32 | )
+33 | 
+34 | '{' '0}'.format(1)
    | ^^^^^^^^^^^^^^^^^^ UP030
    |
    = help: Remove explicit positional indices

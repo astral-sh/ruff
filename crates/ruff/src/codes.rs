@@ -232,7 +232,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "013") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::RedundantTupleInExceptionHandler),
         (Flake8Bugbear, "014") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::DuplicateHandlerException),
         (Flake8Bugbear, "015") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UselessComparison),
-        (Flake8Bugbear, "016") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::CannotRaiseLiteral),
+        (Flake8Bugbear, "016") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::RaiseLiteral),
         (Flake8Bugbear, "017") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::AssertRaisesException),
         (Flake8Bugbear, "018") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UselessExpression),
         (Flake8Bugbear, "019") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::CachedInstanceMethod),
@@ -373,6 +373,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "300") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::YodaConditions),
         (Flake8Simplify, "401") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictGet),
         (Flake8Simplify, "910") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::DictGetWithNoneDefault),
+
+        // copyright
+        (Copyright, "001") => (RuleGroup::Unspecified, rules::copyright::rules::MissingCopyrightNotice),
 
         // pyupgrade
         (Pyupgrade, "001") => (RuleGroup::Unspecified, rules::pyupgrade::rules::UselessMetaclassType),
@@ -613,6 +616,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "035") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnassignedSpecialVariableInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::TSuffixedTypeAlias),
+        (Flake8Pyi, "044") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::FutureAnnotationsInStub),
         (Flake8Pyi, "045") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::IterMethodReturnIterable),
         (Flake8Pyi, "048") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StubBodyMultipleStatements),
         (Flake8Pyi, "050") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NoReturnArgumentAnnotationInStub),
@@ -748,7 +752,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "009") => (RuleGroup::Unspecified, rules::ruff::rules::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Unspecified, rules::ruff::rules::ExplicitFStringTypeConversion),
         (Ruff, "011") => (RuleGroup::Unspecified, rules::ruff::rules::StaticKeyDictComprehension),
-        (Ruff, "012") => (RuleGroup::Unspecified, rules::ruff::rules::ImplicitOptional),
+        (Ruff, "012") => (RuleGroup::Unspecified, rules::ruff::rules::MutableClassDefault),
+        (Ruff, "013") => (RuleGroup::Unspecified, rules::ruff::rules::ImplicitOptional),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 

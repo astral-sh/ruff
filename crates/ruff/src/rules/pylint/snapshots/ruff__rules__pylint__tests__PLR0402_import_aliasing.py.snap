@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 import_aliasing.py:9:8: PLR0402 [*] Use `from os import path` in lieu of alias
    |
- 9 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
-10 | from collections import OrderedDict as o_dict
-11 | import os.path as path  # [consider-using-from-import]
+ 7 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
+ 8 | from collections import OrderedDict as o_dict
+ 9 | import os.path as path  # [consider-using-from-import]
    |        ^^^^^^^^^^^^^^^ PLR0402
-12 | import os.path as p
-13 | import foo.bar.foobar as foobar  # [consider-using-from-import]
+10 | import os.path as p
+11 | import foo.bar.foobar as foobar  # [consider-using-from-import]
    |
    = help: Replace with `from os import path`
 
@@ -24,12 +24,12 @@ import_aliasing.py:9:8: PLR0402 [*] Use `from os import path` in lieu of alias
 
 import_aliasing.py:11:8: PLR0402 [*] Use `from foo.bar import foobar` in lieu of alias
    |
-11 | import os.path as path  # [consider-using-from-import]
-12 | import os.path as p
-13 | import foo.bar.foobar as foobar  # [consider-using-from-import]
+ 9 | import os.path as path  # [consider-using-from-import]
+10 | import os.path as p
+11 | import foo.bar.foobar as foobar  # [consider-using-from-import]
    |        ^^^^^^^^^^^^^^^^^^^^^^^^ PLR0402
-14 | import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
-15 | import os
+12 | import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
+13 | import os
    |
    = help: Replace with `from foo.bar import foobar`
 
@@ -45,12 +45,12 @@ import_aliasing.py:11:8: PLR0402 [*] Use `from foo.bar import foobar` in lieu of
 
 import_aliasing.py:12:8: PLR0402 Use `from foo.bar import foobar` in lieu of alias
    |
-12 | import os.path as p
-13 | import foo.bar.foobar as foobar  # [consider-using-from-import]
-14 | import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
+10 | import os.path as p
+11 | import foo.bar.foobar as foobar  # [consider-using-from-import]
+12 | import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
    |        ^^^^^^^^^^^^^^^^^^^^^^^^ PLR0402
-15 | import os
-16 | import os as OS
+13 | import os
+14 | import os as OS
    |
    = help: Replace with `from foo.bar import foobar`
 

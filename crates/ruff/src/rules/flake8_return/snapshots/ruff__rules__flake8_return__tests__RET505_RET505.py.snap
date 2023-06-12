@@ -3,82 +3,82 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
 RET505.py:8:5: RET505 Unnecessary `elif` after `return` statement
    |
- 8 |         a = 1
- 9 |         return y
-10 |     elif z:
+ 6 |         a = 1
+ 7 |         return y
+ 8 |     elif z:
    |     ^^^^ RET505
-11 |         b = 2
-12 |         return w
+ 9 |         b = 2
+10 |         return w
    |
 
 RET505.py:23:5: RET505 Unnecessary `elif` after `return` statement
    |
-23 |             b = 2
-24 |         return
-25 |     elif z:
+21 |             b = 2
+22 |         return
+23 |     elif z:
    |     ^^^^ RET505
-26 |         c = 2
-27 |     else:
+24 |         c = 2
+25 |     else:
    |
 
 RET505.py:41:5: RET505 Unnecessary `elif` after `return` statement
    |
-41 |         a = 1
-42 |         return y
-43 |     elif z:
+39 |         a = 1
+40 |         return y
+41 |     elif z:
    |     ^^^^ RET505
-44 |         b = 2
-45 |         return w
+42 |         b = 2
+43 |         return w
    |
 
 RET505.py:53:5: RET505 Unnecessary `else` after `return` statement
    |
-53 |         a = 1
-54 |         return y
-55 |     else:
+51 |         a = 1
+52 |         return y
+53 |     else:
    |     ^^^^ RET505
-56 |         b = 2
-57 |         return z
+54 |         b = 2
+55 |         return z
    |
 
 RET505.py:64:9: RET505 Unnecessary `else` after `return` statement
    |
-64 |             b = 2
-65 |             return y
-66 |         else:
+62 |             b = 2
+63 |             return y
+64 |         else:
    |         ^^^^ RET505
-67 |             c = 3
-68 |             return x
+65 |             c = 3
+66 |             return x
    |
 
 RET505.py:79:5: RET505 Unnecessary `else` after `return` statement
    |
-79 |             b = 2
-80 |         return
-81 |     else:
+77 |             b = 2
+78 |         return
+79 |     else:
    |     ^^^^ RET505
-82 |         c = 3
-83 |     return
+80 |         c = 3
+81 |     return
    |
 
 RET505.py:89:9: RET505 Unnecessary `else` after `return` statement
    |
-89 |             a = 4
-90 |             return
-91 |         else:
+87 |             a = 4
+88 |             return
+89 |         else:
    |         ^^^^ RET505
-92 |             b = 2
-93 |     else:
+90 |             b = 2
+91 |     else:
    |
 
 RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
     |
- 99 |     if x:  # [no-else-return]
-100 |         return True
-101 |     else:
+ 97 |     if x:  # [no-else-return]
+ 98 |         return True
+ 99 |     else:
     |     ^^^^ RET505
-102 |         try:
-103 |             return False
+100 |         try:
+101 |             return False
     |
 
 

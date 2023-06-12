@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
 SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
-2 | # SIM109
-3 | if a == b or a == c:
+1 | # SIM109
+2 | if a == b or a == c:
   |    ^^^^^^^^^^^^^^^^ SIM109
-4 |     d
+3 |     d
   |
   = help: Replace with `a in (b, c)`
 
@@ -20,10 +20,10 @@ SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
 
 SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
-6 | # SIM109
-7 | if (a == b or a == c) and None:
+5 | # SIM109
+6 | if (a == b or a == c) and None:
   |     ^^^^^^^^^^^^^^^^ SIM109
-8 |     d
+7 |     d
   |
   = help: Replace with `a in (b, c)`
 
@@ -39,10 +39,10 @@ SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
 
 SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
-10 | # SIM109
-11 | if a == b or a == c or None:
+ 9 | # SIM109
+10 | if a == b or a == c or None:
    |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
-12 |     d
+11 |     d
    |
    = help: Replace with `a in (b, c)`
 
@@ -58,10 +58,10 @@ SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
 
 SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
-14 | # SIM109
-15 | if a == b or None or a == c:
+13 | # SIM109
+14 | if a == b or None or a == c:
    |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
-16 |     d
+15 |     d
    |
    = help: Replace with `a in (b, c)`
 

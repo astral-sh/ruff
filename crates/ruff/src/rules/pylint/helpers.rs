@@ -8,7 +8,7 @@ use std::fmt;
 
 use crate::settings::Settings;
 
-pub(crate) fn in_dunder_init(model: &SemanticModel, settings: &Settings) -> bool {
+pub(super) fn in_dunder_init(model: &SemanticModel, settings: &Settings) -> bool {
     let scope = model.scope();
     let (
         ScopeKind::Function(ast::StmtFunctionDef {
@@ -49,7 +49,7 @@ pub(crate) fn in_dunder_init(model: &SemanticModel, settings: &Settings) -> bool
 
 /// A wrapper around [`Cmpop`] that implements `Display`.
 #[derive(Debug)]
-pub(crate) struct CmpopExt(Cmpop);
+pub(super) struct CmpopExt(Cmpop);
 
 impl From<&Cmpop> for CmpopExt {
     fn from(cmpop: &Cmpop) -> Self {

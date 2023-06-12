@@ -3,8 +3,8 @@ use ruff_text_size::{TextLen, TextRange};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::NewlineWithTrailingNewline;
-use ruff_python_ast::whitespace;
+use ruff_python_ast::docstrings::{clean_space, leading_space};
+use ruff_python_whitespace::NewlineWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -76,7 +76,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
             continue;
         }
 
-        let line_indent = whitespace::leading_space(line);
+        let line_indent = leading_space(line);
 
         // We only report tab indentation once, so only check if we haven't seen a tab
         // yet.
@@ -93,7 +93,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                        whitespace::clean(docstring.indentation),
+                        clean_space(docstring.indentation),
                         TextRange::at(line.start(), line_indent.text_len()),
                     )));
                 }
@@ -133,7 +133,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(over_indented.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    let indent = whitespace::clean(docstring.indentation);
+                    let indent = clean_space(docstring.indentation);
                     let edit = if indent.is_empty() {
                         Edit::range_deletion(over_indented)
                     } else {
@@ -148,12 +148,12 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
 
         // If the last line is over-indented...
         if let Some(last) = lines.last() {
-            let line_indent = whitespace::leading_space(last);
+            let line_indent = leading_space(last);
             if line_indent.len() > docstring.indentation.len() {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    let indent = whitespace::clean(docstring.indentation);
+                    let indent = clean_space(docstring.indentation);
                     let range = TextRange::at(last.start(), line_indent.text_len());
                     let edit = if indent.is_empty() {
                         Edit::range_deletion(range)

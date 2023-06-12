@@ -1,15 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-assertion_line: 57
 ---
 B013.py:3:8: B013 [*] A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`.
   |
-3 | try:
-4 |     pass
-5 | except (ValueError,):
+1 | try:
+2 |     pass
+3 | except (ValueError,):
   |        ^^^^^^^^^^^^^ B013
-6 |     pass
-7 | except AttributeError:
+4 |     pass
+5 | except AttributeError:
   |
   = help: Replace with `except ValueError`
 

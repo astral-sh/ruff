@@ -19,11 +19,11 @@ doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
 
 doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
   |
-2 | this_should_raise_Q003 = 'This is a \'string\''
-3 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
+1 | this_should_raise_Q003 = 'This is a \'string\''
+2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
-4 | this_is_fine = '"This" is a \'string\''
-5 | this_is_fine = "This is a 'string'"
+3 | this_is_fine = '"This" is a \'string\''
+4 | this_is_fine = "This is a 'string'"
   |
   = help: Change outer quotes to avoid escaping inner quotes
 
@@ -37,11 +37,11 @@ doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner qu
 
 doubles_escaped.py:10:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
-10 | this_should_raise = (
-11 |     'This is a'
-12 |     '\'string\''
+ 8 | this_should_raise = (
+ 9 |     'This is a'
+10 |     '\'string\''
    |     ^^^^^^^^^^^^ Q003
-13 | )
+11 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
 

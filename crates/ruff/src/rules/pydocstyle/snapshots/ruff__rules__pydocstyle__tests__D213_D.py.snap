@@ -3,13 +3,13 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:200:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-200 |   @expect('D213: Multi-line docstring summary should start at the second line')
-201 |   def multi_line_zero_separating_blanks():
-202 |       """Summary.
+198 |   @expect('D213: Multi-line docstring summary should start at the second line')
+199 |   def multi_line_zero_separating_blanks():
+200 |       """Summary.
     |  _____^
-203 | |     Description.
-204 | | 
-205 | |     """
+201 | |     Description.
+202 | | 
+203 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -27,15 +27,15 @@ D.py:200:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:210:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-210 |   @expect('D213: Multi-line docstring summary should start at the second line')
-211 |   def multi_line_two_separating_blanks():
-212 |       """Summary.
+208 |   @expect('D213: Multi-line docstring summary should start at the second line')
+209 |   def multi_line_two_separating_blanks():
+210 |       """Summary.
     |  _____^
-213 | | 
+211 | | 
+212 | | 
+213 | |     Description.
 214 | | 
-215 | |     Description.
-216 | | 
-217 | |     """
+215 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -53,14 +53,14 @@ D.py:210:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:220:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-220 |   @expect('D213: Multi-line docstring summary should start at the second line')
-221 |   def multi_line_one_separating_blanks():
-222 |       """Summary.
+218 |   @expect('D213: Multi-line docstring summary should start at the second line')
+219 |   def multi_line_one_separating_blanks():
+220 |       """Summary.
     |  _____^
+221 | | 
+222 | |     Description.
 223 | | 
-224 | |     Description.
-225 | | 
-226 | |     """
+224 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -78,14 +78,14 @@ D.py:220:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:230:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-230 |   @expect('D213: Multi-line docstring summary should start at the second line')
-231 |   def asdfsdf():
-232 |       """Summary.
+228 |   @expect('D213: Multi-line docstring summary should start at the second line')
+229 |   def asdfsdf():
+230 |       """Summary.
     |  _____^
+231 | | 
+232 | | Description.
 233 | | 
-234 | | Description.
-235 | | 
-236 | |     """
+234 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -103,14 +103,14 @@ D.py:230:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:240:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-240 |   @expect('D213: Multi-line docstring summary should start at the second line')
-241 |   def asdsdfsdffsdf():
-242 |       """Summary.
+238 |   @expect('D213: Multi-line docstring summary should start at the second line')
+239 |   def asdsdfsdffsdf():
+240 |       """Summary.
     |  _____^
+241 | | 
+242 | |     Description.
 243 | | 
-244 | |     Description.
-245 | | 
-246 | | """
+244 | | """
     | |___^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -128,14 +128,14 @@ D.py:240:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:250:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-250 |   @expect('D213: Multi-line docstring summary should start at the second line')
-251 |   def asdfsdsdf24():
-252 |       """Summary.
+248 |   @expect('D213: Multi-line docstring summary should start at the second line')
+249 |   def asdfsdsdf24():
+250 |       """Summary.
     |  _____^
+251 | | 
+252 | |        Description.
 253 | | 
-254 | |        Description.
-255 | | 
-256 | |     """
+254 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -153,14 +153,14 @@ D.py:250:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:260:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-260 |   @expect('D213: Multi-line docstring summary should start at the second line')
-261 |   def asdfsdsdfsdf24():
-262 |       """Summary.
+258 |   @expect('D213: Multi-line docstring summary should start at the second line')
+259 |   def asdfsdsdfsdf24():
+260 |       """Summary.
     |  _____^
+261 | | 
+262 | |     Description.
 263 | | 
-264 | |     Description.
-265 | | 
-266 | |         """
+264 | |         """
     | |___________^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -178,14 +178,14 @@ D.py:260:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:270:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-270 |   @expect('D213: Multi-line docstring summary should start at the second line')
-271 |   def asdfsdfsdsdsdfsdf24():
-272 |       """Summary.
+268 |   @expect('D213: Multi-line docstring summary should start at the second line')
+269 |   def asdfsdfsdsdsdfsdf24():
+270 |       """Summary.
     |  _____^
+271 | | 
+272 | |         Description.
 273 | | 
-274 | |         Description.
-275 | | 
-276 | |     """
+274 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -203,12 +203,12 @@ D.py:270:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:281:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-281 |   @expect('D213: Multi-line docstring summary should start at the second line')
-282 |   def asdfljdf24():
-283 |       """Summary.
+279 |   @expect('D213: Multi-line docstring summary should start at the second line')
+280 |   def asdfljdf24():
+281 |       """Summary.
     |  _____^
-284 | | 
-285 | |     Description."""
+282 | | 
+283 | |     Description."""
     | |___________________^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -226,13 +226,13 @@ D.py:281:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:299:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-299 |   @expect('D213: Multi-line docstring summary should start at the second line')
-300 |   def multiline():
-301 |       """ Whitespace at the beginning.
+297 |   @expect('D213: Multi-line docstring summary should start at the second line')
+298 |   def multiline():
+299 |       """ Whitespace at the beginning.
     |  _____^
-302 | | 
-303 | |     This is the end.
-304 | |     """
+300 | | 
+301 | |     This is the end.
+302 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -250,15 +250,15 @@ D.py:299:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:343:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-343 |   @expect('D213: Multi-line docstring summary should start at the second line')
-344 |   def exceptions_of_D301():
-345 |       """Exclude some backslashes from D301.
+341 |   @expect('D213: Multi-line docstring summary should start at the second line')
+342 |   def exceptions_of_D301():
+343 |       """Exclude some backslashes from D301.
     |  _____^
-346 | | 
-347 | |     In particular, line continuations \
-348 | |     and unicode literals \u0394 and \N{GREEK CAPITAL LETTER DELTA}.
-349 | |     They are considered to be intentionally unescaped.
-350 | |     """
+344 | | 
+345 | |     In particular, line continuations \
+346 | |     and unicode literals \u0394 and \N{GREEK CAPITAL LETTER DELTA}.
+347 | |     They are considered to be intentionally unescaped.
+348 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -276,15 +276,15 @@ D.py:343:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:383:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-383 |   @expect('D213: Multi-line docstring summary should start at the second line')
-384 |   def new_209():
-385 |       """First line.
+381 |   @expect('D213: Multi-line docstring summary should start at the second line')
+382 |   def new_209():
+383 |       """First line.
     |  _____^
-386 | | 
-387 | |     More lines.
-388 | |     """
+384 | | 
+385 | |     More lines.
+386 | |     """
     | |_______^ D213
-389 |       pass
+387 |       pass
     |
     = help: Insert line break and indentation after opening quotes
 
@@ -301,14 +301,14 @@ D.py:383:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:392:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-392 |   @expect('D213: Multi-line docstring summary should start at the second line')
-393 |   def old_209():
-394 |       """One liner.
+390 |   @expect('D213: Multi-line docstring summary should start at the second line')
+391 |   def old_209():
+392 |       """One liner.
     |  _____^
+393 | | 
+394 | |     Multi-line comments. OK to have extra blank line
 395 | | 
-396 | |     Multi-line comments. OK to have extra blank line
-397 | | 
-398 | |     """
+396 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -326,13 +326,13 @@ D.py:392:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:438:37: D213 [*] Multi-line docstring summary should start at the second line
     |
-438 |   @expect("D207: Docstring is under-indented")
-439 |   @expect('D213: Multi-line docstring summary should start at the second line')
-440 |   def docstring_start_in_same_line(): """First Line.
+436 |   @expect("D207: Docstring is under-indented")
+437 |   @expect('D213: Multi-line docstring summary should start at the second line')
+438 |   def docstring_start_in_same_line(): """First Line.
     |  _____________________________________^
-441 | | 
-442 | |     Second Line
-443 | |     """
+439 | | 
+440 | |     Second Line
+441 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -350,14 +350,14 @@ D.py:438:37: D213 [*] Multi-line docstring summary should start at the second li
 
 D.py:450:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-450 |   @expect('D213: Multi-line docstring summary should start at the second line')
-451 |   def a_following_valid_function(x=None):
-452 |       """Check for a bug where the previous function caused an assertion.
+448 |   @expect('D213: Multi-line docstring summary should start at the second line')
+449 |   def a_following_valid_function(x=None):
+450 |       """Check for a bug where the previous function caused an assertion.
     |  _____^
+451 | | 
+452 | |     The assertion was caused in the next function, so this one is necessary.
 453 | | 
-454 | |     The assertion was caused in the next function, so this one is necessary.
-455 | | 
-456 | |     """
+454 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -375,19 +375,19 @@ D.py:450:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:526:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-526 |   # parameters as functions for Google / Numpy conventions.
-527 |   class Blah:  # noqa: D203,D213
-528 |       """A Blah.
+524 |   # parameters as functions for Google / Numpy conventions.
+525 |   class Blah:  # noqa: D203,D213
+526 |       """A Blah.
     |  _____^
-529 | | 
-530 | |     Parameters
-531 | |     ----------
-532 | |     x : int
-533 | | 
-534 | |     """
+527 | | 
+528 | |     Parameters
+529 | |     ----------
+530 | |     x : int
+531 | | 
+532 | |     """
     | |_______^ D213
-535 |   
-536 |       def __init__(self, x):
+533 |   
+534 |       def __init__(self, x):
     |
     = help: Insert line break and indentation after opening quotes
 
@@ -404,13 +404,13 @@ D.py:526:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:546:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-546 |   def multiline_leading_space():
-547 |   
-548 |       """Leading space.
+544 |   def multiline_leading_space():
+545 |   
+546 |       """Leading space.
     |  _____^
-549 | | 
-550 | |     More content.
-551 | |     """
+547 | | 
+548 | |     More content.
+549 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -428,16 +428,16 @@ D.py:546:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:555:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-555 |   @expect('D213: Multi-line docstring summary should start at the second line')
-556 |   def multiline_trailing_space():
-557 |       """Leading space.
+553 |   @expect('D213: Multi-line docstring summary should start at the second line')
+554 |   def multiline_trailing_space():
+555 |       """Leading space.
     |  _____^
-558 | | 
-559 | |     More content.
-560 | |     """
+556 | | 
+557 | |     More content.
+558 | |     """
     | |_______^ D213
-561 |   
-562 |       pass
+559 |   
+560 |       pass
     |
     = help: Insert line break and indentation after opening quotes
 
@@ -454,16 +454,16 @@ D.py:555:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:568:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-568 |   def multiline_trailing_and_leading_space():
-569 |   
-570 |       """Trailing and leading space.
+566 |   def multiline_trailing_and_leading_space():
+567 |   
+568 |       """Trailing and leading space.
     |  _____^
-571 | | 
-572 | |     More content.
-573 | |     """
+569 | | 
+570 | |     More content.
+571 | |     """
     | |_______^ D213
-574 |   
-575 |       pass
+572 |   
+573 |       pass
     |
     = help: Insert line break and indentation after opening quotes
 
@@ -480,12 +480,12 @@ D.py:568:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:588:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-588 |   @expect('D213: Multi-line docstring summary should start at the second line')
-589 |   def asdfljdjgf24():
-590 |       """Summary.
+586 |   @expect('D213: Multi-line docstring summary should start at the second line')
+587 |   def asdfljdjgf24():
+588 |       """Summary.
     |  _____^
-591 | | 
-592 | |     Description.  """
+589 | | 
+590 | |     Description.  """
     | |_____________________^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -503,12 +503,12 @@ D.py:588:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:606:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-606 |   @expect('D212: Multi-line docstring summary should start at the first line')
-607 |   def one_liner():
-608 |       r"""Wrong.
+604 |   @expect('D212: Multi-line docstring summary should start at the first line')
+605 |   def one_liner():
+606 |       r"""Wrong.
     |  _____^
-609 | | 
-610 | |     """
+607 | | 
+608 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes
@@ -526,12 +526,12 @@ D.py:606:5: D213 [*] Multi-line docstring summary should start at the second lin
 
 D.py:615:5: D213 [*] Multi-line docstring summary should start at the second line
     |
-615 |   @expect('D212: Multi-line docstring summary should start at the first line')
-616 |   def one_liner():
-617 |       """Wrong."
+613 |   @expect('D212: Multi-line docstring summary should start at the first line')
+614 |   def one_liner():
+615 |       """Wrong."
     |  _____^
-618 | | 
-619 | |     """
+616 | | 
+617 | |     """
     | |_______^ D213
     |
     = help: Insert line break and indentation after opening quotes

@@ -11,11 +11,11 @@ F631.py:1:1: F631 Assert test is a non-empty tuple, which is always `True`
 
 F631.py:2:1: F631 Assert test is a non-empty tuple, which is always `True`
   |
-2 | assert (False, "x")
-3 | assert (False,)
+1 | assert (False, "x")
+2 | assert (False,)
   | ^^^^^^^^^^^^^^^ F631
-4 | assert ()
-5 | assert True
+3 | assert ()
+4 | assert True
   |
 
 

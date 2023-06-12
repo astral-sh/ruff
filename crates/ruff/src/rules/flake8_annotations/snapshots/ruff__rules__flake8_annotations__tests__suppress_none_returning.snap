@@ -3,27 +3,27 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 ---
 suppress_none_returning.py:45:5: ANN201 Missing return type annotation for public function `foo`
    |
-45 | # Error
-46 | def foo():
+44 | # Error
+45 | def foo():
    |     ^^^ ANN201
-47 |     return True
+46 |     return True
    |
 
 suppress_none_returning.py:50:5: ANN201 Missing return type annotation for public function `foo`
    |
-50 | # Error
-51 | def foo():
+49 | # Error
+50 | def foo():
    |     ^^^ ANN201
-52 |     a = 2 + 2
-53 |     if a == 4:
+51 |     a = 2 + 2
+52 |     if a == 4:
    |
 
 suppress_none_returning.py:59:9: ANN001 Missing type annotation for function argument `a`
    |
-59 | # Error (on the argument, but not the return type)
-60 | def foo(a):
+58 | # Error (on the argument, but not the return type)
+59 | def foo(a):
    |         ^ ANN001
-61 |     a = 2 + 2
+60 |     a = 2 + 2
    |
 
 

@@ -13,7 +13,7 @@ fn to_formatted_value_expr(inner: &Expr) -> Expr {
 }
 
 /// Convert a string to a constant string expression.
-pub(crate) fn to_constant_string(s: &str) -> Expr {
+pub(super) fn to_constant_string(s: &str) -> Expr {
     let node = ast::ExprConstant {
         value: Constant::Str(s.to_owned()),
         kind: None,
@@ -47,7 +47,7 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
-pub(crate) fn to_fstring_elem(expr: &Expr) -> Option<Expr> {
+pub(super) fn to_fstring_elem(expr: &Expr) -> Option<Expr> {
     match expr {
         // These are directly handled by `unparse_fstring_elem`:
         Expr::Constant(ast::ExprConstant {

@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F821_2.py:5:13: F821 Undefined name `Model`
   |
-5 | # F821 Undefined name `Model`
-6 | x: Literal["Model"]
+4 | # F821 Undefined name `Model`
+5 | x: Literal["Model"]
   |             ^^^^^ F821
-7 | 
-8 | from typing_extensions import Literal
+6 | 
+7 | from typing_extensions import Literal
   |
 
 

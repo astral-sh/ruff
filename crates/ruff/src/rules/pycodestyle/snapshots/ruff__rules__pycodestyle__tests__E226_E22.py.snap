@@ -3,140 +3,140 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E22.py:92:4: E226 Missing whitespace around arithmetic operator
    |
-92 | i = 1@ 2
-93 | #: E225 E226
-94 | i=i+1
+90 | i = 1@ 2
+91 | #: E225 E226
+92 | i=i+1
    |    ^ E226
-95 | #: E225 E226
-96 | i =i+1
+93 | #: E225 E226
+94 | i =i+1
    |
 
 E22.py:94:5: E226 Missing whitespace around arithmetic operator
    |
-94 | i=i+1
-95 | #: E225 E226
-96 | i =i+1
+92 | i=i+1
+93 | #: E225 E226
+94 | i =i+1
    |     ^ E226
-97 | #: E225 E226
-98 | i= i+1
+95 | #: E225 E226
+96 | i= i+1
    |
 
 E22.py:96:5: E226 Missing whitespace around arithmetic operator
-    |
- 96 | i =i+1
- 97 | #: E225 E226
- 98 | i= i+1
-    |     ^ E226
- 99 | #: E225 E226
-100 | c = (a +b)*(a - b)
-    |
+   |
+94 | i =i+1
+95 | #: E225 E226
+96 | i= i+1
+   |     ^ E226
+97 | #: E225 E226
+98 | c = (a +b)*(a - b)
+   |
 
 E22.py:98:11: E226 Missing whitespace around arithmetic operator
     |
- 98 | i= i+1
- 99 | #: E225 E226
-100 | c = (a +b)*(a - b)
+ 96 | i= i+1
+ 97 | #: E225 E226
+ 98 | c = (a +b)*(a - b)
     |           ^ E226
-101 | #: E225 E226
-102 | c = (a+ b)*(a - b)
+ 99 | #: E225 E226
+100 | c = (a+ b)*(a - b)
     |
 
 E22.py:100:11: E226 Missing whitespace around arithmetic operator
     |
-100 | c = (a +b)*(a - b)
-101 | #: E225 E226
-102 | c = (a+ b)*(a - b)
+ 98 | c = (a +b)*(a - b)
+ 99 | #: E225 E226
+100 | c = (a+ b)*(a - b)
     |           ^ E226
-103 | #:
+101 | #:
     |
 
 E22.py:104:6: E226 Missing whitespace around arithmetic operator
     |
-104 | #: E226
-105 | z = 2//30
+103 | #: E226
+104 | z = 2//30
     |      ^^ E226
-106 | #: E226 E226
-107 | c = (a+b) * (a-b)
+105 | #: E226 E226
+106 | c = (a+b) * (a-b)
     |
 
 E22.py:106:7: E226 Missing whitespace around arithmetic operator
     |
-106 | z = 2//30
-107 | #: E226 E226
-108 | c = (a+b) * (a-b)
+104 | z = 2//30
+105 | #: E226 E226
+106 | c = (a+b) * (a-b)
     |       ^ E226
-109 | #: E226
-110 | norman = True+False
+107 | #: E226
+108 | norman = True+False
     |
 
 E22.py:106:15: E226 Missing whitespace around arithmetic operator
     |
-106 | z = 2//30
-107 | #: E226 E226
-108 | c = (a+b) * (a-b)
+104 | z = 2//30
+105 | #: E226 E226
+106 | c = (a+b) * (a-b)
     |               ^ E226
-109 | #: E226
-110 | norman = True+False
+107 | #: E226
+108 | norman = True+False
     |
 
 E22.py:110:6: E226 Missing whitespace around arithmetic operator
     |
-110 | norman = True+False
-111 | #: E226
-112 | x = x*2 - 1
+108 | norman = True+False
+109 | #: E226
+110 | x = x*2 - 1
     |      ^ E226
-113 | #: E226
-114 | x = x/2 - 1
+111 | #: E226
+112 | x = x/2 - 1
     |
 
 E22.py:112:6: E226 Missing whitespace around arithmetic operator
     |
-112 | x = x*2 - 1
-113 | #: E226
-114 | x = x/2 - 1
+110 | x = x*2 - 1
+111 | #: E226
+112 | x = x/2 - 1
     |      ^ E226
-115 | #: E226 E226
-116 | hypot2 = x*x + y*y
+113 | #: E226 E226
+114 | hypot2 = x*x + y*y
     |
 
 E22.py:114:11: E226 Missing whitespace around arithmetic operator
     |
-114 | x = x/2 - 1
-115 | #: E226 E226
-116 | hypot2 = x*x + y*y
+112 | x = x/2 - 1
+113 | #: E226 E226
+114 | hypot2 = x*x + y*y
     |           ^ E226
-117 | #: E226
-118 | c = (a + b)*(a - b)
+115 | #: E226
+116 | c = (a + b)*(a - b)
     |
 
 E22.py:114:17: E226 Missing whitespace around arithmetic operator
     |
-114 | x = x/2 - 1
-115 | #: E226 E226
-116 | hypot2 = x*x + y*y
+112 | x = x/2 - 1
+113 | #: E226 E226
+114 | hypot2 = x*x + y*y
     |                 ^ E226
-117 | #: E226
-118 | c = (a + b)*(a - b)
+115 | #: E226
+116 | c = (a + b)*(a - b)
     |
 
 E22.py:116:12: E226 Missing whitespace around arithmetic operator
     |
-116 | hypot2 = x*x + y*y
-117 | #: E226
-118 | c = (a + b)*(a - b)
+114 | hypot2 = x*x + y*y
+115 | #: E226
+116 | c = (a + b)*(a - b)
     |            ^ E226
-119 | #: E226
-120 | def halves(n):
+117 | #: E226
+118 | def halves(n):
     |
 
 E22.py:119:14: E226 Missing whitespace around arithmetic operator
     |
-119 | #: E226
-120 | def halves(n):
-121 |     return (i//2 for i in range(n))
+117 | #: E226
+118 | def halves(n):
+119 |     return (i//2 for i in range(n))
     |              ^^ E226
-122 | #: E227
-123 | _1kB = _1MB>>10
+120 | #: E227
+121 | _1kB = _1MB>>10
     |
 
 

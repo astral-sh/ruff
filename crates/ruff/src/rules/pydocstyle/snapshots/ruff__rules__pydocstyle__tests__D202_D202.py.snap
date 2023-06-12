@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D202.py:57:5: D202 [*] No blank lines allowed after function docstring (found 2)
    |
-57 | # D202
-58 | def outer():
-59 |     """This is a docstring."""
+55 | # D202
+56 | def outer():
+57 |     """This is a docstring."""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
    |
    = help: Remove blank line(s) after function docstring
@@ -22,9 +22,9 @@ D202.py:57:5: D202 [*] No blank lines allowed after function docstring (found 2)
 
 D202.py:68:5: D202 [*] No blank lines allowed after function docstring (found 2)
    |
-68 | # D202
-69 | def outer():
-70 |     """This is a docstring."""
+66 | # D202
+67 | def outer():
+68 |     """This is a docstring."""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
    |
    = help: Remove blank line(s) after function docstring
@@ -41,12 +41,12 @@ D202.py:68:5: D202 [*] No blank lines allowed after function docstring (found 2)
 
 D202.py:80:5: D202 [*] No blank lines allowed after function docstring (found 1)
    |
-80 | # D202
-81 | def outer():
-82 |     """This is a docstring."""
+78 | # D202
+79 | def outer():
+80 |     """This is a docstring."""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
-83 | 
-84 |     # This is a comment.
+81 | 
+82 |     # This is a comment.
    |
    = help: Remove blank line(s) after function docstring
 

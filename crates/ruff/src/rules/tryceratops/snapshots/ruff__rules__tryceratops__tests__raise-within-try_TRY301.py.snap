@@ -3,62 +3,62 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
 TRY301.py:14:13: TRY301 Abstract `raise` to an inner function
    |
-14 |         a = process()
-15 |         if not a:
-16 |             raise MyException(a)
+12 |         a = process()
+13 |         if not a:
+14 |             raise MyException(a)
    |             ^^^^^^^^^^^^^^^^^^^^ TRY301
-17 | 
-18 |         raise MyException(a)
+15 | 
+16 |         raise MyException(a)
    |
 
 TRY301.py:16:9: TRY301 Abstract `raise` to an inner function
    |
-16 |             raise MyException(a)
-17 | 
-18 |         raise MyException(a)
+14 |             raise MyException(a)
+15 | 
+16 |         raise MyException(a)
    |         ^^^^^^^^^^^^^^^^^^^^ TRY301
-19 | 
-20 |         try:
+17 | 
+18 |         try:
    |
 
 TRY301.py:21:17: TRY301 Abstract `raise` to an inner function
    |
-21 |             b = process()
-22 |             if not b:
-23 |                 raise MyException(b)
+19 |             b = process()
+20 |             if not b:
+21 |                 raise MyException(b)
    |                 ^^^^^^^^^^^^^^^^^^^^ TRY301
-24 |         except Exception:
-25 |             logger.exception("something failed")
+22 |         except Exception:
+23 |             logger.exception("something failed")
    |
 
 TRY301.py:32:13: TRY301 Abstract `raise` to an inner function
    |
-32 |         a = process()
-33 |         if not a:
-34 |             raise MyException(a)
+30 |         a = process()
+31 |         if not a:
+32 |             raise MyException(a)
    |             ^^^^^^^^^^^^^^^^^^^^ TRY301
-35 | 
-36 |         raise MyException(a)
+33 | 
+34 |         raise MyException(a)
    |
 
 TRY301.py:34:9: TRY301 Abstract `raise` to an inner function
    |
-34 |             raise MyException(a)
-35 | 
-36 |         raise MyException(a)
+32 |             raise MyException(a)
+33 | 
+34 |         raise MyException(a)
    |         ^^^^^^^^^^^^^^^^^^^^ TRY301
-37 | 
-38 |         try:
+35 | 
+36 |         try:
    |
 
 TRY301.py:39:17: TRY301 Abstract `raise` to an inner function
    |
-39 |             b = process()
-40 |             if not b:
-41 |                 raise MyException(b)
+37 |             b = process()
+38 |             if not b:
+39 |                 raise MyException(b)
    |                 ^^^^^^^^^^^^^^^^^^^^ TRY301
-42 |         except* Exception:
-43 |             logger.exception("something failed")
+40 |         except* Exception:
+41 |             logger.exception("something failed")
    |
 
 

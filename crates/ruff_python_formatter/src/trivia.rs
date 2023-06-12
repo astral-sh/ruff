@@ -1,6 +1,8 @@
-use ruff_python_ast::whitespace::is_python_whitespace;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::str::Chars;
+
+use ruff_text_size::{TextLen, TextRange, TextSize};
+
+use ruff_python_whitespace::is_python_whitespace;
 
 /// Searches for the first non-trivia character in `range`.
 ///
@@ -528,9 +530,10 @@ impl<'a> Cursor<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token};
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextLen, TextRange, TextSize};
+
+    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token};
 
     struct TokenizationTestCase {
         source: &'static str,

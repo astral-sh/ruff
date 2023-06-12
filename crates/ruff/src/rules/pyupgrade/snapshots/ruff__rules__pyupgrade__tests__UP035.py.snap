@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |
-2 | # UP035
-3 | from collections import Mapping
+1 | # UP035
+2 | from collections import Mapping
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-4 | 
-5 | from collections import Mapping as MAP
+3 | 
+4 | from collections import Mapping as MAP
   |
   = help: Import from `collections.abc`
 
@@ -21,12 +21,12 @@ UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |
-4 | from collections import Mapping
-5 | 
-6 | from collections import Mapping as MAP
+2 | from collections import Mapping
+3 | 
+4 | from collections import Mapping as MAP
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-7 | 
-8 | from collections import Mapping, Sequence
+5 | 
+6 | from collections import Mapping, Sequence
   |
   = help: Import from `collections.abc`
 
@@ -41,15 +41,15 @@ UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 7 7 | 
 
 UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
-   |
- 6 | from collections import Mapping as MAP
- 7 | 
- 8 | from collections import Mapping, Sequence
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
- 9 | 
-10 | from collections import Counter, Mapping
-   |
-   = help: Import from `collections.abc`
+  |
+4 | from collections import Mapping as MAP
+5 | 
+6 | from collections import Mapping, Sequence
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+7 | 
+8 | from collections import Counter, Mapping
+  |
+  = help: Import from `collections.abc`
 
 ℹ Suggested fix
 3 3 | 
@@ -63,12 +63,12 @@ UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Seque
 
 UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
- 8 | from collections import Mapping, Sequence
- 9 | 
-10 | from collections import Counter, Mapping
+ 6 | from collections import Mapping, Sequence
+ 7 | 
+ 8 | from collections import Counter, Mapping
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-11 | 
-12 | from collections import (Counter, Mapping)
+ 9 | 
+10 | from collections import (Counter, Mapping)
    |
    = help: Import from `collections.abc`
 
@@ -85,12 +85,12 @@ UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-10 | from collections import Counter, Mapping
-11 | 
-12 | from collections import (Counter, Mapping)
+ 8 | from collections import Counter, Mapping
+ 9 | 
+10 | from collections import (Counter, Mapping)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-13 | 
-14 | from collections import (Counter,
+11 | 
+12 | from collections import (Counter,
    |
    = help: Import from `collections.abc`
 
@@ -107,13 +107,13 @@ UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-12 |   from collections import (Counter, Mapping)
-13 |   
-14 | / from collections import (Counter,
-15 | |                          Mapping)
+10 |   from collections import (Counter, Mapping)
+11 |   
+12 | / from collections import (Counter,
+13 | |                          Mapping)
    | |_________________________________^ UP035
-16 |   
-17 |   from collections import Counter, \
+14 |   
+15 |   from collections import Counter, \
    |
    = help: Import from `collections.abc`
 
@@ -131,13 +131,13 @@ UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-15 |                            Mapping)
-16 |   
-17 | / from collections import Counter, \
-18 | |                          Mapping
+13 |                            Mapping)
+14 |   
+15 | / from collections import Counter, \
+16 | |                          Mapping
    | |________________________________^ UP035
-19 |   
-20 |   from collections import Counter, Mapping, Sequence
+17 |   
+18 |   from collections import Counter, Mapping, Sequence
    |
    = help: Import from `collections.abc`
 
@@ -155,12 +155,12 @@ UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
    |
-18 |                          Mapping
-19 | 
-20 | from collections import Counter, Mapping, Sequence
+16 |                          Mapping
+17 | 
+18 | from collections import Counter, Mapping, Sequence
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-21 | 
-22 | from collections import Mapping as mapping, Counter
+19 | 
+20 | from collections import Mapping as mapping, Counter
    |
    = help: Import from `collections.abc`
 
@@ -177,12 +177,12 @@ UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequ
 
 UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-20 | from collections import Counter, Mapping, Sequence
-21 | 
-22 | from collections import Mapping as mapping, Counter
+18 | from collections import Counter, Mapping, Sequence
+19 | 
+20 | from collections import Mapping as mapping, Counter
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-23 | 
-24 | if True:
+21 | 
+22 | if True:
    |
    = help: Import from `collections.abc`
 
@@ -199,11 +199,11 @@ UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-23 | if True:
-24 |     from collections import Mapping, Counter
+22 | if True:
+23 |     from collections import Mapping, Counter
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-25 | 
-26 | if True:
+24 | 
+25 | if True:
    |
    = help: Import from `collections.abc`
 
@@ -220,12 +220,12 @@ UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-28 |     if True:
-29 |         pass
-30 |     from collections import Mapping, Counter
+26 |     if True:
+27 |         pass
+28 |     from collections import Mapping, Counter
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-31 | 
-32 | if True: from collections import Mapping
+29 | 
+30 | if True: from collections import Mapping
    |
    = help: Import from `collections.abc`
 
@@ -242,12 +242,12 @@ UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-30 |     from collections import Mapping, Counter
-31 | 
-32 | if True: from collections import Mapping
+28 |     from collections import Mapping, Counter
+29 | 
+30 | if True: from collections import Mapping
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-33 | 
-34 | import os
+31 | 
+32 | import os
    |
    = help: Import from `collections.abc`
 
@@ -263,10 +263,10 @@ UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
-33 | import os
-34 | from collections import Counter, Mapping
+32 | import os
+33 | from collections import Counter, Mapping
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-35 | import sys
+34 | import sys
    |
    = help: Import from `collections.abc`
 
@@ -283,17 +283,17 @@ UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 
 UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
    |
-37 |   if True:
-38 |       from collections import (
+36 |   if True:
+37 |       from collections import (
    |  _____^
-39 | |         Mapping,
-40 | |         Callable,
-41 | |         Bad,
-42 | |         Good,
-43 | |     )
+38 | |         Mapping,
+39 | |         Callable,
+40 | |         Bad,
+41 | |         Good,
+42 | |     )
    | |_____^ UP035
-44 |   
-45 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+43 |   
+44 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    |
    = help: Import from `collections.abc`
 
@@ -313,12 +313,12 @@ UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Call
 
 UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
    |
-44 |     )
-45 | 
-46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+42 |     )
+43 | 
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-47 | 
-48 | if True: from collections import (
+45 | 
+46 | if True: from collections import (
    |
    = help: Import from `collections.abc`
 
@@ -335,12 +335,12 @@ UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 
 UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
    |
-44 |     )
-45 | 
-46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+42 |     )
+43 | 
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-47 | 
-48 | if True: from collections import (
+45 | 
+46 | if True: from collections import (
    |
    = help: Import from `collections`
 
@@ -357,12 +357,12 @@ UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
 
 UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
    |
-44 |     )
-45 | 
-46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+42 |     )
+43 | 
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-47 | 
-48 | if True: from collections import (
+45 | 
+46 | if True: from collections import (
    |
    = help: Import from `re`
 
@@ -379,44 +379,44 @@ UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
 
 UP035.py:44:1: UP035 `typing.List` is deprecated, use `list` instead
    |
-44 |     )
-45 | 
-46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+42 |     )
+43 | 
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-47 | 
-48 | if True: from collections import (
+45 | 
+46 | if True: from collections import (
    |
 
 UP035.py:44:1: UP035 `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
    |
-44 |     )
-45 | 
-46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+42 |     )
+43 | 
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-47 | 
-48 | if True: from collections import (
+45 | 
+46 | if True: from collections import (
    |
 
 UP035.py:44:1: UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
    |
-44 |     )
-45 | 
-46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+42 |     )
+43 | 
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-47 | 
-48 | if True: from collections import (
+45 | 
+46 | if True: from collections import (
    |
 
 UP035.py:46:10: UP035 Import from `collections.abc` instead: `Mapping`
    |
-46 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-47 |   
-48 |   if True: from collections import (
+44 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+45 |   
+46 |   if True: from collections import (
    |  __________^
-49 | |     Mapping, Counter)
+47 | |     Mapping, Counter)
    | |_____________________^ UP035
-50 |   
-51 |   # OK
+48 |   
+49 |   # OK
    |
    = help: Import from `collections.abc`
 

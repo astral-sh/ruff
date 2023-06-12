@@ -3,44 +3,44 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 ---
 DTZ005.py:4:1: DTZ005 The use of `datetime.datetime.now()` without `tz` argument is not allowed
   |
-4 | # no args
-5 | datetime.datetime.now()
+3 | # no args
+4 | datetime.datetime.now()
   | ^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
-6 | 
-7 | # wrong keywords
+5 | 
+6 | # wrong keywords
   |
 
 DTZ005.py:7:1: DTZ005 The use of `datetime.datetime.now()` without `tz` argument is not allowed
-   |
- 7 | # wrong keywords
- 8 | datetime.datetime.now(bad=datetime.timezone.utc)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
- 9 | 
-10 | # none args
-   |
+  |
+6 | # wrong keywords
+7 | datetime.datetime.now(bad=datetime.timezone.utc)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
+8 | 
+9 | # none args
+  |
 
 DTZ005.py:10:1: DTZ005 The use of `datetime.datetime.now()` without `tz` argument is not allowed
    |
-10 | # none args
-11 | datetime.datetime.now(None)
+ 9 | # none args
+10 | datetime.datetime.now(None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
-12 | 
-13 | # none keywords
+11 | 
+12 | # none keywords
    |
 
 DTZ005.py:13:1: DTZ005 The use of `datetime.datetime.now()` without `tz` argument is not allowed
    |
-13 | # none keywords
-14 | datetime.datetime.now(tz=None)
+12 | # none keywords
+13 | datetime.datetime.now(tz=None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ005
-15 | 
-16 | from datetime import datetime
+14 | 
+15 | from datetime import datetime
    |
 
 DTZ005.py:18:1: DTZ005 The use of `datetime.datetime.now()` without `tz` argument is not allowed
    |
-18 | # no args unqualified
-19 | datetime.now()
+17 | # no args unqualified
+18 | datetime.now()
    | ^^^^^^^^^^^^^^ DTZ005
    |
 

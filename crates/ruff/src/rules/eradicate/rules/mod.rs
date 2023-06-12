@@ -1,3 +1,3 @@
-pub(crate) use commented_out_code::{commented_out_code, CommentedOutCode};
+pub(crate) use commented_out_code::*;
 
 mod commented_out_code;

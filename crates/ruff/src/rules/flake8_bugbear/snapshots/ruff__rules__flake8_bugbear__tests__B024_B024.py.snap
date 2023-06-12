@@ -43,10 +43,10 @@ B024.py:92:7: B024 `notabc_Base_1` is an abstract base class, but it has no abst
 
 B024.py:141:7: B024 `abc_set_class_variable_4` is an abstract base class, but it has no abstract methods
     |
-141 | # this doesn't actually declare a class variable, it's just an expression
-142 | class abc_set_class_variable_4(ABC):  # error
+140 | # this doesn't actually declare a class variable, it's just an expression
+141 | class abc_set_class_variable_4(ABC):  # error
     |       ^^^^^^^^^^^^^^^^^^^^^^^^ B024
-143 |     foo
+142 |     foo
     |
 
 

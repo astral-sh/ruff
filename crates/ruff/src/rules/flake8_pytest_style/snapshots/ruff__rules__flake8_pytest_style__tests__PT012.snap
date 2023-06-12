@@ -3,98 +3,98 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
 PT012.py:28:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-28 |   def test_error_multiple_statements():
-29 |       with pytest.raises(AttributeError):
+27 |   def test_error_multiple_statements():
+28 |       with pytest.raises(AttributeError):
    |  _____^
-30 | |         len([])
-31 | |         [].size
+29 | |         len([])
+30 | |         [].size
    | |_______________^ PT012
    |
 
 PT012.py:34:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-34 |   async def test_error_complex_statement():
-35 |       with pytest.raises(AttributeError):
+33 |   async def test_error_complex_statement():
+34 |       with pytest.raises(AttributeError):
    |  _____^
-36 | |         if True:
-37 | |             [].size
+35 | |         if True:
+36 | |             [].size
    | |___________________^ PT012
-38 |   
-39 |       with pytest.raises(AttributeError):
+37 |   
+38 |       with pytest.raises(AttributeError):
    |
 
 PT012.py:38:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-38 |               [].size
-39 |   
-40 |       with pytest.raises(AttributeError):
+36 |               [].size
+37 |   
+38 |       with pytest.raises(AttributeError):
    |  _____^
-41 | |         for i in []:
-42 | |             [].size
+39 | |         for i in []:
+40 | |             [].size
    | |___________________^ PT012
-43 |   
-44 |       with pytest.raises(AttributeError):
+41 |   
+42 |       with pytest.raises(AttributeError):
    |
 
 PT012.py:42:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-42 |               [].size
-43 |   
-44 |       with pytest.raises(AttributeError):
+40 |               [].size
+41 |   
+42 |       with pytest.raises(AttributeError):
    |  _____^
-45 | |         async for i in []:
-46 | |             [].size
+43 | |         async for i in []:
+44 | |             [].size
    | |___________________^ PT012
-47 |   
-48 |       with pytest.raises(AttributeError):
+45 |   
+46 |       with pytest.raises(AttributeError):
    |
 
 PT012.py:46:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-46 |               [].size
-47 |   
-48 |       with pytest.raises(AttributeError):
+44 |               [].size
+45 |   
+46 |       with pytest.raises(AttributeError):
    |  _____^
-49 | |         while True:
-50 | |             [].size
+47 | |         while True:
+48 | |             [].size
    | |___________________^ PT012
-51 |   
-52 |       with pytest.raises(AttributeError):
+49 |   
+50 |       with pytest.raises(AttributeError):
    |
 
 PT012.py:50:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-50 |               [].size
-51 |   
-52 |       with pytest.raises(AttributeError):
+48 |               [].size
+49 |   
+50 |       with pytest.raises(AttributeError):
    |  _____^
-53 | |         with context_manager_under_test():
-54 | |             [].size
+51 | |         with context_manager_under_test():
+52 | |             [].size
    | |___________________^ PT012
-55 |   
-56 |       with pytest.raises(AttributeError):
+53 |   
+54 |       with pytest.raises(AttributeError):
    |
 
 PT012.py:54:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-54 |               [].size
-55 |   
-56 |       with pytest.raises(AttributeError):
+52 |               [].size
+53 |   
+54 |       with pytest.raises(AttributeError):
    |  _____^
-57 | |         async with context_manager_under_test():
-58 | |             [].size
+55 | |         async with context_manager_under_test():
+56 | |             [].size
    | |___________________^ PT012
    |
 
 PT012.py:60:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-60 |   def test_error_try():
-61 |       with pytest.raises(AttributeError):
+59 |   def test_error_try():
+60 |       with pytest.raises(AttributeError):
    |  _____^
-62 | |         try:
-63 | |             [].size
-64 | |         except:
-65 | |             raise
+61 | |         try:
+62 | |             [].size
+63 | |         except:
+64 | |             raise
    | |_________________^ PT012
    |
 

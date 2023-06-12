@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
   |
-3 | try:
-4 |     1 / 0
-5 | except ValueError as e:
+1 | try:
+2 |     1 / 0
+3 | except ValueError as e:
   |                      ^ F841
-6 |     pass
+4 |     pass
   |
   = help: Remove assignment to unused variable `e`
 
@@ -22,9 +22,9 @@ F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
 
 F841_0.py:16:5: F841 [*] Local variable `z` is assigned to but never used
    |
-16 |     x = 1
-17 |     y = 2
-18 |     z = x + y
+14 |     x = 1
+15 |     y = 2
+16 |     z = x + y
    |     ^ F841
    |
    = help: Remove assignment to unused variable `z`
@@ -41,10 +41,10 @@ F841_0.py:16:5: F841 [*] Local variable `z` is assigned to but never used
 
 F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
    |
-20 | def f():
-21 |     foo = (1, 2)
+19 | def f():
+20 |     foo = (1, 2)
    |     ^^^ F841
-22 |     (a, b) = (1, 2)
+21 |     (a, b) = (1, 2)
    |
    = help: Remove assignment to unused variable `foo`
 
@@ -59,31 +59,31 @@ F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
 
 F841_0.py:21:6: F841 Local variable `a` is assigned to but never used
    |
-21 | def f():
-22 |     foo = (1, 2)
-23 |     (a, b) = (1, 2)
+19 | def f():
+20 |     foo = (1, 2)
+21 |     (a, b) = (1, 2)
    |      ^ F841
-24 | 
-25 |     bar = (1, 2)
+22 | 
+23 |     bar = (1, 2)
    |
    = help: Remove assignment to unused variable `a`
 
 F841_0.py:21:9: F841 Local variable `b` is assigned to but never used
    |
-21 | def f():
-22 |     foo = (1, 2)
-23 |     (a, b) = (1, 2)
+19 | def f():
+20 |     foo = (1, 2)
+21 |     (a, b) = (1, 2)
    |         ^ F841
-24 | 
-25 |     bar = (1, 2)
+22 | 
+23 |     bar = (1, 2)
    |
    = help: Remove assignment to unused variable `b`
 
 F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
    |
-26 |     (c, d) = bar
-27 | 
-28 |     (x, y) = baz = bar
+24 |     (c, d) = bar
+25 | 
+26 |     (x, y) = baz = bar
    |              ^^^ F841
    |
    = help: Remove assignment to unused variable `baz`
@@ -100,12 +100,12 @@ F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
 
 F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
    |
-51 |     def c():
-52 |         # F841
-53 |         b = 1
+49 |     def c():
+50 |         # F841
+51 |         b = 1
    |         ^ F841
-54 | 
-55 |     def d():
+52 | 
+53 |     def d():
    |
    = help: Remove assignment to unused variable `b`
 
@@ -121,10 +121,10 @@ F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
 
 F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
    |
-79 | def f():
-80 |     with open("file") as my_file, open("") as ((this, that)):
+78 | def f():
+79 |     with open("file") as my_file, open("") as ((this, that)):
    |                          ^^^^^^^ F841
-81 |         print("hello")
+80 |         print("hello")
    |
    = help: Remove assignment to unused variable `my_file`
 
@@ -140,12 +140,12 @@ F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
 
 F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
    |
-85 | def f():
-86 |     with (
-87 |         open("file") as my_file,
+83 | def f():
+84 |     with (
+85 |         open("file") as my_file,
    |                         ^^^^^^^ F841
-88 |         open("") as ((this, that)),
-89 |     ):
+86 |         open("") as ((this, that)),
+87 |     ):
    |
    = help: Remove assignment to unused variable `my_file`
 
@@ -161,12 +161,12 @@ F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
 
 F841_0.py:102:5: F841 [*] Local variable `msg3` is assigned to but never used
     |
-102 |     msg1 = "Hello, world!"
-103 |     msg2 = "Hello, world!"
-104 |     msg3 = "Hello, world!"
+100 |     msg1 = "Hello, world!"
+101 |     msg2 = "Hello, world!"
+102 |     msg3 = "Hello, world!"
     |     ^^^^ F841
-105 |     match x:
-106 |         case 1:
+103 |     match x:
+104 |         case 1:
     |
     = help: Remove assignment to unused variable `msg3`
 
@@ -181,12 +181,12 @@ F841_0.py:102:5: F841 [*] Local variable `msg3` is assigned to but never used
 
 F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
     |
-115 |     Foo = enum.Enum("Foo", "A B")
-116 |     Bar = enum.Enum("Bar", "A B")
-117 |     Baz = enum.Enum("Baz", "A B")
+113 |     Foo = enum.Enum("Foo", "A B")
+114 |     Bar = enum.Enum("Bar", "A B")
+115 |     Baz = enum.Enum("Baz", "A B")
     |     ^^^ F841
-118 | 
-119 |     match x:
+116 | 
+117 |     match x:
     |
     = help: Remove assignment to unused variable `Baz`
 
@@ -202,20 +202,20 @@ F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
 
 F841_0.py:122:14: F841 Local variable `y` is assigned to but never used
     |
-122 |         case [Bar.A, *_]:
-123 |             print("A")
-124 |         case y:
+120 |         case [Bar.A, *_]:
+121 |             print("A")
+122 |         case y:
     |              ^ F841
-125 |             pass
+123 |             pass
     |
     = help: Remove assignment to unused variable `y`
 
 F841_0.py:127:21: F841 Local variable `value` is assigned to but never used
     |
-127 | def f():
-128 |     if any((key := (value := x)) for x in ["ok"]):
+126 | def f():
+127 |     if any((key := (value := x)) for x in ["ok"]):
     |                     ^^^^^ F841
-129 |         print(key)
+128 |         print(key)
     |
     = help: Remove assignment to unused variable `value`
 

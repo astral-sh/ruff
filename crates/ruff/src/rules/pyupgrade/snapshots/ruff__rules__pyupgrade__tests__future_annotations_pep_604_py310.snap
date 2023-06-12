@@ -21,9 +21,9 @@ future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
 
 future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
    |
-42 | x: Optional[int] = None
-43 | 
-44 | MyList: TypeAlias = Union[List[int], List[str]]
+40 | x: Optional[int] = None
+41 | 
+42 | MyList: TypeAlias = Union[List[int], List[str]]
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
    |
    = help: Convert to `X | Y`

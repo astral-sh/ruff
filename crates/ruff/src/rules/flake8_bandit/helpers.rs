@@ -8,7 +8,7 @@ static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(^|_)(?i)(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)($|_)").unwrap()
 });
 
-pub(crate) fn string_literal(expr: &Expr) -> Option<&str> {
+pub(super) fn string_literal(expr: &Expr) -> Option<&str> {
     match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(string),
@@ -18,11 +18,11 @@ pub(crate) fn string_literal(expr: &Expr) -> Option<&str> {
     }
 }
 
-pub(crate) fn matches_password_name(string: &str) -> bool {
+pub(super) fn matches_password_name(string: &str) -> bool {
     PASSWORD_CANDIDATE_REGEX.is_match(string)
 }
 
-pub(crate) fn is_untyped_exception(type_: Option<&Expr>, model: &SemanticModel) -> bool {
+pub(super) fn is_untyped_exception(type_: Option<&Expr>, model: &SemanticModel) -> bool {
     type_.map_or(true, |type_| {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {

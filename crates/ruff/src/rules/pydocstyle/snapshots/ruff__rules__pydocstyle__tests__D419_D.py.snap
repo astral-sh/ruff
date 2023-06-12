@@ -3,28 +3,28 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:20:9: D419 Docstring is empty
    |
-20 |     class meta:
-21 |         """"""
+19 |     class meta:
+20 |         """"""
    |         ^^^^^^ D419
-22 | 
-23 |     @expect('D102: Missing docstring in public method')
+21 | 
+22 |     @expect('D102: Missing docstring in public method')
    |
 
 D.py:74:5: D419 Docstring is empty
    |
-74 | @expect('D419: Docstring is empty')
-75 | def function():
-76 |     """ """
+72 | @expect('D419: Docstring is empty')
+73 | def function():
+74 |     """ """
    |     ^^^^^^^ D419
-77 |     def ok_since_nested():
-78 |         pass
+75 |     def ok_since_nested():
+76 |         pass
    |
 
 D.py:80:9: D419 Docstring is empty
    |
-80 |     @expect('D419: Docstring is empty')
-81 |     def nested():
-82 |         ''
+78 |     @expect('D419: Docstring is empty')
+79 |     def nested():
+80 |         ''
    |         ^^ D419
    |
 
