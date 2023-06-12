@@ -8,7 +8,7 @@ ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
 2 | 
 3 | _ = "abc" + "def"
   |
-  = help: Combine these string literals into one
+  = help: Combine string literals
 
 ℹ Fix
 1   |-_ = "a" "b" "c"
@@ -24,7 +24,7 @@ ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
 2 | 
 3 | _ = "abc" + "def"
   |
-  = help: Combine these string literals into one
+  = help: Combine string literals
 
 ℹ Fix
 1   |-_ = "a" "b" "c"
@@ -35,14 +35,14 @@ ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
 
 ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
-38 | )
-39 | 
-40 | _ = """a""" """b"""
+36 | )
+37 | 
+38 | _ = """a""" """b"""
    |     ^^^^^^^^^^^^^^^ ISC001
-41 | 
-42 | _ = """a
+39 | 
+40 | _ = """a
    |
-   = help: Combine these string literals into one
+   = help: Combine string literals
 
 ℹ Fix
 35 35 |   b"def"
@@ -56,17 +56,17 @@ ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
 
 ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
-40 |   _ = """a""" """b"""
-41 |   
-42 |   _ = """a
+38 |   _ = """a""" """b"""
+39 |   
+40 |   _ = """a
    |  _____^
-43 | | b""" """c
-44 | | d"""
+41 | | b""" """c
+42 | | d"""
    | |____^ ISC001
-45 |   
-46 |   _ = f"""a""" f"""b"""
+43 |   
+44 |   _ = f"""a""" f"""b"""
    |
-   = help: Combine these string literals into one
+   = help: Combine string literals
 
 ℹ Fix
 38 38 | _ = """a""" """b"""
@@ -80,14 +80,14 @@ ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
 
 ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
-44 | d"""
-45 | 
-46 | _ = f"""a""" f"""b"""
+42 | d"""
+43 | 
+44 | _ = f"""a""" f"""b"""
    |     ^^^^^^^^^^^^^^^^^ ISC001
-47 | 
-48 | _ = f"a" "b"
+45 | 
+46 | _ = f"a" "b"
    |
-   = help: Combine these string literals into one
+   = help: Combine string literals
 
 ℹ Fix
 41 41 | b""" """c
@@ -101,45 +101,45 @@ ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
 
 ISC.py:46:5: ISC001 Implicitly concatenated string literals on one line
    |
-46 | _ = f"""a""" f"""b"""
-47 | 
-48 | _ = f"a" "b"
+44 | _ = f"""a""" f"""b"""
+45 | 
+46 | _ = f"a" "b"
    |     ^^^^^^^^ ISC001
-49 | 
-50 | _ = """a""" "b"
+47 | 
+48 | _ = """a""" "b"
    |
-   = help: Combine these string literals into one
+   = help: Combine string literals
 
 ISC.py:48:5: ISC001 Implicitly concatenated string literals on one line
    |
-48 | _ = f"a" "b"
-49 | 
-50 | _ = """a""" "b"
+46 | _ = f"a" "b"
+47 | 
+48 | _ = """a""" "b"
    |     ^^^^^^^^^^^ ISC001
-51 | 
-52 | _ = 'a' "b"
+49 | 
+50 | _ = 'a' "b"
    |
-   = help: Combine these string literals into one
+   = help: Combine string literals
 
 ISC.py:50:5: ISC001 Implicitly concatenated string literals on one line
    |
-50 | _ = """a""" "b"
-51 | 
-52 | _ = 'a' "b"
+48 | _ = """a""" "b"
+49 | 
+50 | _ = 'a' "b"
    |     ^^^^^^^ ISC001
-53 | 
-54 | _ = rf"a" rf"b"
+51 | 
+52 | _ = rf"a" rf"b"
    |
-   = help: Combine these string literals into one
+   = help: Combine string literals
 
 ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
-52 | _ = 'a' "b"
-53 | 
-54 | _ = rf"a" rf"b"
+50 | _ = 'a' "b"
+51 | 
+52 | _ = rf"a" rf"b"
    |     ^^^^^^^^^^^ ISC001
    |
-   = help: Combine these string literals into one
+   = help: Combine string literals
 
 ℹ Fix
 49 49 | 

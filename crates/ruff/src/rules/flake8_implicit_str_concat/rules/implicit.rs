@@ -1,11 +1,12 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
+use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
-use rustpython_parser::{lexer::LexResult, StringKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::str::{leading_quote, trailing_quote};
 
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
 
@@ -42,7 +43,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
     }
 
     fn autofix_title(&self) -> Option<String> {
-        Option::Some("Combine these string literals into one".to_string())
+        Some("Combine string literals".to_string())
     }
 }
 
@@ -117,9 +118,7 @@ pub(crate) fn implicit(
                     TextRange::new(a_range.start(), b_range.end()),
                 );
 
-                if let Some(fix) = get_fix_for_single_line_implicit_string_concatenation(
-                    a_tok, *a_range, b_tok, *b_range, locator,
-                ) {
+                if let Some(fix) = concatenate_strings(*a_range, *b_range, locator) {
                     diagnostic.set_fix(fix);
                 }
 
@@ -130,77 +129,34 @@ pub(crate) fn implicit(
     diagnostics
 }
 
-fn get_fix_for_single_line_implicit_string_concatenation(
-    a_tok: &Tok,
-    a_range: TextRange,
-    b_tok: &Tok,
-    b_range: TextRange,
-    locator: &Locator,
-) -> Option<Fix> {
-    let (
-        Tok::String {
-            kind: a_kind,
-            triple_quoted: a_triple_quoted,
-            ..
-        },
-        Tok::String {
-            kind: b_kind,
-            triple_quoted: b_triple_quoted,
-            ..
-        },
-    ) = (a_tok, b_tok) else { return Option::None };
-
-    // Fix only strings of the same kind and triple-quotedness
-    if a_kind != b_kind || a_triple_quoted != b_triple_quoted {
-        return Option::None;
-    }
-
+fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator) -> Option<Fix> {
     let a_text = &locator.contents()[a_range];
     let b_text = &locator.contents()[b_range];
 
-    let a_quotes_style = get_quotes_style(a_text);
-    let b_quotes_style = get_quotes_style(b_text);
+    let a_leading_quote = leading_quote(a_text)?;
+    let b_leading_quote = leading_quote(b_text)?;
 
-    // Fix only strings with the same quotes style
-    if a_quotes_style != b_quotes_style {
-        return Option::None;
+    // Require, for now, that the leading quotes are the same.
+    if a_leading_quote != b_leading_quote {
+        return None;
     }
 
-    let text = skip_string_end(*a_triple_quoted, a_text).to_string()
-        + skip_string_start(*b_kind, *b_triple_quoted, b_text);
+    let a_trailing_quote = trailing_quote(a_text)?;
+    let b_trailing_quote = trailing_quote(b_text)?;
 
-    Option::Some(Fix::automatic(Edit::range_replacement(
-        text,
-        TextRange::new(a_range.start(), b_range.end()),
+    // Require, for now, that the trailing quotes are the same.
+    if a_trailing_quote != b_trailing_quote {
+        return None;
+    }
+
+    let a_body = &a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()];
+    let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
+
+    let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
+    let range = TextRange::new(a_range.start(), b_range.end());
+
+    Some(Fix::automatic(Edit::range_replacement(
+        concatenation,
+        range,
     )))
-}
-
-fn skip_string_start(kind: StringKind, triple_quoted: bool, text: &str) -> &str {
-    let quotes_len = match kind {
-        StringKind::String => 0,
-        StringKind::Bytes | StringKind::FString | StringKind::Unicode | StringKind::RawString => 1,
-        StringKind::RawBytes | StringKind::RawFString => 2,
-    } + (if triple_quoted { 3 } else { 1 });
-
-    &text[quotes_len..]
-}
-
-fn skip_string_end(triple_quoted: bool, text: &str) -> &str {
-    let quotes_len = if triple_quoted { 3 } else { 1 };
-
-    &text[..text.len() - quotes_len]
-}
-
-#[derive(PartialEq)]
-enum QuotesStyle {
-    Double,
-    Single,
-}
-
-fn get_quotes_style(text: &str) -> QuotesStyle {
-    if text.ends_with('\"') {
-        QuotesStyle::Double
-    } else {
-        QuotesStyle::Single
-    }
 }
