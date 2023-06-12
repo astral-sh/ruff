@@ -103,16 +103,18 @@ pub(crate) fn mutable_argument_default(
                 ));
                 let indentation = leading_space(indentation);
                 check_lines.push_str(format!("if {} is None:\n", parameter.name.as_str()).as_str());
+                check_lines.push_str(indentation);
+                check_lines.push_str(checker.stylist().indentation());
                 check_lines.push_str(
                     format!(
-                        "{}    {} = {}\n{}",
-                        indentation,
+                        "{} = {}",
                         parameter.name.as_str(),
                         checker.generator().expr(default),
-                        indentation
                     )
                     .as_str(),
                 );
+                check_lines.push_str(&*checker.stylist().line_ending());
+                check_lines.push_str(indentation);
                 let check_edit = Edit::insertion(check_lines, body[0].start());
 
                 diagnostic.set_fix(Fix::automatic_edits(arg_edit, [check_edit]));
