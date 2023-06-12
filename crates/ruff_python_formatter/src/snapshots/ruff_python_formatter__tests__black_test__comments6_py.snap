@@ -137,7 +137,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  
  
  def f(
-@@ -49,15 +49,10 @@
+@@ -49,10 +49,8 @@
      element = 0  # type: int
      another_element = 1  # type: float
      another_element_with_long_name = 2  # type: int
@@ -148,15 +148,9 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +    another_really_really_long_element_with_a_unnecessarily_long_name_to_describe_what_it_does_enterprise_style = 3  # type: int
 +    an_element_with_a_long_value = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2  # type: bool
  
--    tup = (
--        another_element,
--        another_really_really_long_element_with_a_unnecessarily_long_name_to_describe_what_it_does_enterprise_style,
--    )  # type: Tuple[int, int]
-+    tup = (1, 2)  # type: Tuple[int, int]
- 
-     a = (
-         element
-@@ -84,35 +79,22 @@
+     tup = (
+         another_element,
+@@ -84,35 +82,22 @@
  
  
  def func(
@@ -203,7 +197,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +NOT_IMPLEMENTED_call()
  
 -aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-+(1, 2) = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
++aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
@@ -263,7 +257,10 @@ def f(
     another_really_really_long_element_with_a_unnecessarily_long_name_to_describe_what_it_does_enterprise_style = 3  # type: int
     an_element_with_a_long_value = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2  # type: bool
 
-    tup = (1, 2)  # type: Tuple[int, int]
+    tup = (
+        another_element,
+        another_really_really_long_element_with_a_unnecessarily_long_name_to_describe_what_it_does_enterprise_style,
+    )  # type: Tuple[int, int]
 
     a = (
         element
@@ -308,7 +305,7 @@ AAAAAAAAAAAAA = (
 
 NOT_IMPLEMENTED_call()
 
-(1, 2) = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
+aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
 ```
 
 ## Black Output

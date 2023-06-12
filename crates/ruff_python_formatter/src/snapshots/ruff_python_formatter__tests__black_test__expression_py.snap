@@ -342,8 +342,6 @@ last_call()
 -{**a, **b, **c}
 -{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
 -({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
--()
--(1,)
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
@@ -377,11 +375,10 @@ last_call()
 +    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 +}
 +NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+(1, 2)
-+(1, 2)
-+(1, 2)
+ ()
+ (1,)
  (1, 2)
--(1, 2, 3)
+ (1, 2, 3)
  []
 -[1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
  [
@@ -395,11 +392,6 @@ last_call()
 -    *a,
      4,
      5,
--]
--[
--    4,
--    *a,
--    5,
 +    6,
 +    7,
 +    8,
@@ -408,6 +400,11 @@ last_call()
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
  ]
+-[
+-    4,
+-    *a,
+-    5,
+-]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
@@ -541,6 +538,9 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
+-]
+-very_long_variable_name_filters: t.List[
+-    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
 +[
 +    1,
 +    2,
@@ -555,9 +555,6 @@ last_call()
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
  ]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
--]
 -xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)
@@ -599,7 +596,7 @@ last_call()
 -[1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
  (SomeName)
  SomeName
--(Good, Bad, Ugly)
+ (Good, Bad, Ugly)
 -(i for i in (1, 2, 3))
 -((i**2) for i in (1, 2, 3))
 -((i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c")))
@@ -614,38 +611,25 @@ last_call()
 -    "import_session_id": 1,
 -    **kwargs,
 -}
--a = (1,)
--b = (1,)
-+(1, 2)
 +(i for i in [])
 +(i for i in [])
 +(i for i in [])
 +(i for i in [])
-+(1, 2)
++(NOT_YET_IMPLEMENTED_ExprStarred,)
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+a = (1, 2)
-+b = (1, 2)
+ a = (1,)
+ b = (1,)
  c = 1
--d = (1,) + a + (2,)
+ d = (1,) + a + (2,)
 -e = (1,).count(1)
 -f = 1, *range(10)
 -g = 1, *"ten"
 -what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
 -    vars_to_remove
-+d = (1, 2) + a + (1, 2)
-+e = NOT_IMPLEMENTED_call()
-+f = (1, 2)
-+g = (1, 2)
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names + NOT_IMPLEMENTED_call())
-+    + NOT_IMPLEMENTED_call()
- )
+-)
 -what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
 -    vars_to_remove
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call())
-+    - NOT_IMPLEMENTED_call()
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -653,7 +637,13 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
++e = NOT_IMPLEMENTED_call()
++f = 1, NOT_YET_IMPLEMENTED_ExprStarred
++g = 1, NOT_YET_IMPLEMENTED_ExprStarred
++what_is_up_with_those_new_coord_names = (
++    (coord_names + NOT_IMPLEMENTED_call())
++    + NOT_IMPLEMENTED_call()
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -663,7 +653,10 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_IMPLEMENTED_call())
++    - NOT_IMPLEMENTED_call()
+ )
 -Ø = set()
 -authors.łukasz.say_thanks()
 -mapping = {
@@ -899,10 +892,10 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
     (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 }
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+()
+(1,)
 (1, 2)
-(1, 2)
-(1, 2)
-(1, 2)
+(1, 2, 3)
 []
 [
     1,
@@ -1020,20 +1013,20 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 ]
 (SomeName)
 SomeName
-(1, 2)
+(Good, Bad, Ugly)
 (i for i in [])
 (i for i in [])
 (i for i in [])
 (i for i in [])
-(1, 2)
+(NOT_YET_IMPLEMENTED_ExprStarred,)
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-a = (1, 2)
-b = (1, 2)
+a = (1,)
+b = (1,)
 c = 1
-d = (1, 2) + a + (1, 2)
+d = (1,) + a + (2,)
 e = NOT_IMPLEMENTED_call()
-f = (1, 2)
-g = (1, 2)
+f = 1, NOT_YET_IMPLEMENTED_ExprStarred
+g = 1, NOT_YET_IMPLEMENTED_ExprStarred
 what_is_up_with_those_new_coord_names = (
     (coord_names + NOT_IMPLEMENTED_call())
     + NOT_IMPLEMENTED_call()
