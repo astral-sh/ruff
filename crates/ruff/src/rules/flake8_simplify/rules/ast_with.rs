@@ -60,8 +60,8 @@ impl Violation for MultipleWithStatements {
     }
 }
 
-/// Returns a boolean indicating its an async with statement, the items and
-/// body.
+/// Returns a boolean indicating whether it's an async with statement, the items
+/// and body.
 fn find_last_with(body: &[Stmt]) -> Option<(bool, &[Withitem], &[Stmt])> {
     let (is_async, items, body) = match body {
         [Stmt::With(ast::StmtWith { items, body, .. })] => (false, items, body),
@@ -78,6 +78,25 @@ pub(crate) fn multiple_with_statements(
     with_body: &[Stmt],
     with_parent: Option<&Stmt>,
 ) {
+    // Make sure we fix from top to bottom for nested with statements, e.g. for
+    // ```python
+    // with A():
+    //     with B():
+    //         with C():
+    //             print("hello")
+    // ```
+    // suggests
+    // ```python
+    // with A(), B():
+    //     with C():
+    //         print("hello")
+    // ```
+    // but not the following
+    // ```python
+    // with A():
+    //     with B(), C():
+    //         print("hello")
+    // ```
     if let Some(Stmt::With(ast::StmtWith { body, .. })) = with_parent {
         if body.len() == 1 {
             return;
