@@ -65,8 +65,8 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
     };
 
     let Expr::Attribute(ast::ExprAttribute { attr, value, ..  }) = func.as_ref() else {
-            return;
-        };
+        return;
+    };
 
     if attr != "items" {
         return;
