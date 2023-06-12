@@ -60,9 +60,15 @@ impl Violation for MultipleWithStatements {
     }
 }
 
-fn find_last_with(body: &[Stmt]) -> Option<(&[Withitem], &[Stmt])> {
-    let [Stmt::With(ast::StmtWith { items, body, .. })] = body else { return None };
-    find_last_with(body).or(Some((items, body)))
+/// Returns a boolean indicating its an async with statement, the items and
+/// body.
+fn find_last_with(body: &[Stmt]) -> Option<(bool, &[Withitem], &[Stmt])> {
+    let (is_async, items, body) = match body {
+        [Stmt::With(ast::StmtWith { items, body, .. })] => (false, items, body),
+        [Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. })] => (true, items, body),
+        _ => return None,
+    };
+    find_last_with(body).or(Some((is_async, items, body)))
 }
 
 /// SIM117
@@ -77,7 +83,14 @@ pub(crate) fn multiple_with_statements(
             return;
         }
     }
-    if let Some((items, body)) = find_last_with(with_body) {
+
+    if let Some((is_async, items, body)) = find_last_with(with_body) {
+        if is_async != with_stmt.is_async_with_stmt() {
+            // One of the statements is an async with, while the other is not,
+            // we can't merge those statements.
+            return;
+        }
+
         let last_item = items.last().expect("Expected items to be non-empty");
         let colon = first_colon_range(
             TextRange::new(
