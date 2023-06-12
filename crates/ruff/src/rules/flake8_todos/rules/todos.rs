@@ -359,7 +359,7 @@ fn static_errors(
                 trimmed.text_len()
             }
         } else if trimmed.starts_with('@') {
-            if let Some(end_index) = trimmed.find(|c| c.is_whitespace() || c == ':') {
+            if let Some(end_index) = trimmed.find(|c: char| c.is_whitespace() || c == ':') {
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD-002
