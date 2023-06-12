@@ -149,7 +149,9 @@ You can use `scratch.py` as a playground, e.g.
 `cargo run --bin ruff_python_formatter -- --emit stdout scratch.py`, which additional `--print-ir`
 and `--print-comments` options.
 
-The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter), e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter). The Rome repository can be a helpful reference when implementing something in the Ruff formatter
+The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter),
+e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
+The Rome repository can be a helpful reference when implementing something in the Ruff formatter
 
 ## The orphan rules and trait structure
 
