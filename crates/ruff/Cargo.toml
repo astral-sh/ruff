@@ -1,14 +1,15 @@
 [package]
 name = "ruff"
 version = "0.0.272"
-authors.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-documentation.workspace = true
-homepage.workspace = true
-repository.workspace = true
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 readme = "README.md"
-license = "MIT"
 
 [lib]
 name = "ruff"
