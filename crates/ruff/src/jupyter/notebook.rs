@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_newlines::NewlineWithTrailingNewline;
+use ruff_python_whitespace::NewlineWithTrailingNewline;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
