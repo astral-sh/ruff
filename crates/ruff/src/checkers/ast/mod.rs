@@ -1121,6 +1121,9 @@ where
                     if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
                         flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
                     }
+                    if self.enabled(Rule::ImportFromFuture) {
+                        flake8_pyi::rules::from_future_import(self, import_from);
+                    }
                 }
                 for alias in names {
                     if let Some("__future__") = module {
