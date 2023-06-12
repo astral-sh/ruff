@@ -1,7 +1,7 @@
 # Rust Python Formatter
 
-The goal of out formatter is to be compatible to black except for rare edge cases (mostly involving
-comment placement).
+The goal of out formatter is to be compatible with Black except for rare edge cases (mostly
+involving comment placement).
 
 ## Implementing a node
 
@@ -72,7 +72,7 @@ write!(
 If everything fits on a single line, the group doesn't break and we get something like `("a", "b")`.
 If it doesn't, we get something like
 
-```python
+```Python
 (
     "a",
     "b",
@@ -98,7 +98,7 @@ The generic comment formatting in `FormatNodeRule` handles comments correctly fo
 preceding and end-of-line comments depending on the node range. Sometimes however, you may have
 dangling comments that are not before or after a node but inside of it, e.g.
 
-```python
+```Python
 [
     # here we use an empty list
 ]
@@ -135,13 +135,13 @@ Comments are categorized into `Leading`, `Trailing` and `Dangling`, you can over
 
 ## Development notes
 
-Handling parentheses and comments are two major challenges in a python formatter.
+Handling parentheses and comments are two major challenges in a Python formatter.
 
-We have copied the majority of tests over from black and use [insta](https://insta.rs/docs/cli/) for
-snapshot testing with the diff between ruff and black, black output and ruff output. We put
+We have copied the majority of tests over from Black and use [insta](https://insta.rs/docs/cli/) for
+snapshot testing with the diff between Ruff and Black, Black output and Ruff output. We put
 additional test cases in `resources/test/fixtures/ruff`.
 
-The full ruff test suite is slow, `cargo test -p ruff_python_formatter` is a lot faster.
+The full Ruff test suite is slow, `cargo test -p ruff_python_formatter` is a lot faster.
 
 There is a `ruff_python_formatter` binary that avoid building and linking the main `ruff` crate.
 
@@ -149,10 +149,12 @@ You can use `scratch.py` as a playground, e.g.
 `cargo run --bin ruff_python_formatter -- --emit stdout scratch.py`, which additional `--print-ir`
 and `--print-comments` options.
 
-## The orphan rules and out trait structure
+The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter), e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter). The Rome repository can be a helpful reference when implementing something in the Ruff formatter
+
+## The orphan rules and trait structure
 
 For the formatter, we would like to implement `Format` from the rust_formatter crate for all AST
-nodes, defined in the rustpython_parser crate. This violates rust's orphan rules. We therefore
+nodes, defined in the rustpython_parser crate. This violates Rust's orphan rules. We therefore
 generate in `generate.py` a newtype for each AST node with implementations of `FormatNodeRule`,
 `FormatRule`, `AsFormat` and `IntoFormat` on it.
 
