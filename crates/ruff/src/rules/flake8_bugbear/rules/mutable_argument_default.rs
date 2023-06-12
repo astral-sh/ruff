@@ -113,7 +113,7 @@ pub(crate) fn mutable_argument_default(
                     )
                     .as_str(),
                 );
-                check_lines.push_str(&*checker.stylist().line_ending());
+                check_lines.push_str(&checker.stylist().line_ending());
                 check_lines.push_str(indentation);
                 let check_edit = Edit::insertion(check_lines, body[0].start());
 
