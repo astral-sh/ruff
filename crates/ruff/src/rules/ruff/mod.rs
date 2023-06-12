@@ -16,19 +16,40 @@ mod tests {
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
-    use crate::settings::types::PerFileIgnore;
+    use crate::settings::types::{PerFileIgnore, PythonVersion};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
-    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
+    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
+    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("RUF013_0.py"))]
+    #[test_case(Path::new("RUF013_1.py"))]
+    fn implicit_optional(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "PY39_{}_{}",
+            Rule::ImplicitOptional.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::Settings {
+                target_version: PythonVersion::Py39,
+                ..settings::Settings::for_rule(Rule::ImplicitOptional)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

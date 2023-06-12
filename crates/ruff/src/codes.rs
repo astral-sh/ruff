@@ -753,6 +753,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "010") => (RuleGroup::Unspecified, rules::ruff::rules::ExplicitFStringTypeConversion),
         (Ruff, "011") => (RuleGroup::Unspecified, rules::ruff::rules::StaticKeyDictComprehension),
         (Ruff, "012") => (RuleGroup::Unspecified, rules::ruff::rules::MutableClassDefault),
+        (Ruff, "013") => (RuleGroup::Unspecified, rules::ruff::rules::ImplicitOptional),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 
