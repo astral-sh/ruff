@@ -546,7 +546,7 @@ where
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
-fn is_dunder(id: &str) -> bool {
+pub fn is_dunder(id: &str) -> bool {
     id.starts_with("__") && id.ends_with("__")
 }
 

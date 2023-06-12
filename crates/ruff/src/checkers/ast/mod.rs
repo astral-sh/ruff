@@ -656,10 +656,11 @@ where
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
 
-                if self.semantic_model.scope().kind.is_class() {
+                if let ScopeKind::Class(class_def) = self.semantic_model.scope().kind {
                     if self.enabled(Rule::BuiltinAttributeShadowing) {
                         flake8_builtins::rules::builtin_attribute_shadowing(
                             self,
+                            class_def,
                             name,
                             AnyShadowing::from(stmt),
                         );
@@ -2369,10 +2370,11 @@ where
                             }
                         }
 
-                        if self.semantic_model.scope().kind.is_class() {
+                        if let ScopeKind::Class(class_def) = self.semantic_model.scope().kind {
                             if self.enabled(Rule::BuiltinAttributeShadowing) {
                                 flake8_builtins::rules::builtin_attribute_shadowing(
                                     self,
+                                    class_def,
                                     id,
                                     AnyShadowing::from(expr),
                                 );

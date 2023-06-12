@@ -5,6 +5,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged,
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_semantic::model::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -62,20 +63,21 @@ fn match_typed_dict_assign<'a>(
 /// Generate a `Stmt::AnnAssign` representing the provided property
 /// definition.
 fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
-    let node = annotation.clone();
-    let node1 = ast::ExprName {
-        id: property.into(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-    };
-    let node2 = ast::StmtAnnAssign {
-        target: Box::new(node1.into()),
-        annotation: Box::new(node),
+    ast::StmtAnnAssign {
+        target: Box::new(
+            ast::ExprName {
+                id: property.into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }
+            .into(),
+        ),
+        annotation: Box::new(annotation.clone()),
         value: None,
         simple: true,
         range: TextRange::default(),
-    };
-    node2.into()
+    }
+    .into()
 }
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body,
@@ -90,15 +92,15 @@ fn create_class_def_stmt(
         Some(keyword) => vec![keyword.clone()],
         None => vec![],
     };
-    let node = ast::StmtClassDef {
+    ast::StmtClassDef {
         name: class_name.into(),
         bases: vec![base_class.clone()],
         keywords,
         body,
         decorator_list: vec![],
         range: TextRange::default(),
-    };
-    node.into()
+    }
+    .into()
 }
 
 fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
@@ -116,11 +118,13 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
                 value: Constant::Str(property),
                 ..
             })) => {
-                if is_identifier(property) {
-                    Ok(create_property_assignment_stmt(property, value))
-                } else {
-                    bail!("Property name is not valid identifier: {}", property)
+                if !is_identifier(property) {
+                    bail!("Invalid property name: {}", property)
                 }
+                if is_dunder(property) {
+                    bail!("Cannot use dunder property name: {}", property)
+                }
+                Ok(create_property_assignment_stmt(property, value))
             }
             _ => bail!("Expected `key` to be `Constant::Str`"),
         })
@@ -170,12 +174,12 @@ fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
 // TypedDict('name', {'a': int}, total=True)
 // ```
 fn match_total_from_only_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
-    let keyword = keywords.get(0)?;
-    let arg = &keyword.arg.as_ref()?;
-    match arg.as_str() {
-        "total" => Some(keyword),
-        _ => None,
-    }
+    keywords.iter().find(|keyword| {
+        let Some(arg) = &keyword.arg else {
+           return  false
+        };
+        arg.as_str() == "total"
+    })
 }
 
 fn match_properties_and_total<'a>(
@@ -219,8 +223,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    #[allow(deprecated)]
-    Fix::unspecified(Edit::range_replacement(
+    Fix::suggested(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(
             class_name,
             body,
