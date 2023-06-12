@@ -13,7 +13,7 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::IncorrectDictIterator, Path::new("W8102.py"))]
+    #[test_case(Rule::IncorrectDictIterator, Path::new("PERF102.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

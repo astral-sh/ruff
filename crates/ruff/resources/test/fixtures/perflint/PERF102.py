@@ -4,19 +4,19 @@ some_dict = {
     "c": 44
 }
 
-for _, value in some_dict.items():  # W8102
+for _, value in some_dict.items():  # PERF102
     print(value)
 
 
-for key, _ in some_dict.items():  # W8102
+for key, _ in some_dict.items():  # PERF102
     print(key)
 
 
-for weird_arg_name, _ in some_dict.items():  # W8102
+for weird_arg_name, _ in some_dict.items():  # PERF102
     print(weird_arg_name)
 
 
-for name, (_, _) in some_dict.items():  # W8102
+for name, (_, _) in some_dict.items():  # PERF102
     pass
 
 
@@ -24,11 +24,11 @@ for name, (value1, _) in some_dict.items():  # OK
     pass
 
 
-for (key1, _), (_, _) in some_dict.items():  # W8102
+for (key1, _), (_, _) in some_dict.items():  # PERF102
     pass
 
 
-for (_, (_, _)), (value, _) in some_dict.items():  # W8102
+for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
     pass
 
 
@@ -40,7 +40,7 @@ for ((_, key2), (value1, _)) in some_dict.items():  # OK
     pass
 
 
-for ((_, key2), (_, _)) in some_dict.items():  # W8102
+for ((_, key2), (_, _)) in some_dict.items():  # PERF102
     pass
 
 

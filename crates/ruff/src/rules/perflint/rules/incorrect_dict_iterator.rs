@@ -58,7 +58,7 @@ fn is_ignored_tuple_or_name(expr: &Expr) -> bool {
     false
 }
 
-/// W8102
+/// PERF102
 pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
     let Expr::Call(ast::ExprCall { func, args, .. }) = iter else {
         return;
