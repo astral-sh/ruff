@@ -794,13 +794,16 @@ where
                 if self.any_enabled(&[
                     Rule::MutableDataclassDefault,
                     Rule::FunctionCallInDataclassDefaultArgument,
-                ]) && ruff::rules::is_dataclass(&self.semantic_model, decorator_list)
-                {
-                    if self.enabled(Rule::MutableDataclassDefault) {
-                        ruff::rules::mutable_dataclass_default(self, body);
+                    Rule::MutableClassDefault,
+                ]) {
+                    let is_dataclass =
+                        ruff::rules::is_dataclass(&self.semantic_model, decorator_list);
+                    if self.any_enabled(&[Rule::MutableDataclassDefault, Rule::MutableClassDefault])
+                    {
+                        ruff::rules::mutable_class_default(self, body, is_dataclass);
                     }
 
-                    if self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+                    if is_dataclass && self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
                         ruff::rules::function_call_in_dataclass_defaults(self, body);
                     }
                 }
