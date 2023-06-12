@@ -108,3 +108,16 @@ async def main():
             print("async-inside!")
 
     return 0
+
+# OK. Can't merge across different kinds of with statements.
+with a as a2:
+    async with b as b2:
+        with c as c2:
+            async with d as d2:
+                f(a2, b2, c2, d2)
+
+# OK. Can't merge across different kinds of with statements.
+async with b as b2:
+    with c as c2:
+        async with d as d2:
+            f(b2, c2, d2)

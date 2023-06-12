@@ -27,8 +27,8 @@ SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts i
  6 |   # SIM117
  7 | / with A():
  8 | |     with B():
- 9 | |         with C():
-   | |_________________^ SIM117
+   | |_____________^ SIM117
+ 9 |           with C():
 10 |               print("hello")
    |
    = help: Combine `with` statements

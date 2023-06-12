@@ -62,13 +62,12 @@ impl Violation for MultipleWithStatements {
 
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
-fn find_last_with(body: &[Stmt]) -> Option<(bool, &[Withitem], &[Stmt])> {
-    let (is_async, items, body) = match body {
-        [Stmt::With(ast::StmtWith { items, body, .. })] => (false, items, body),
-        [Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. })] => (true, items, body),
-        _ => return None,
-    };
-    find_last_with(body).or(Some((is_async, items, body)))
+fn next_with(body: &[Stmt]) -> Option<(bool, &[Withitem], &[Stmt])> {
+    match body {
+        [Stmt::With(ast::StmtWith { items, body, .. })] => Some((false, items, body)),
+        [Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. })] => Some((true, items, body)),
+        _ => None,
+    }
 }
 
 /// SIM117
@@ -103,7 +102,7 @@ pub(crate) fn multiple_with_statements(
         }
     }
 
-    if let Some((is_async, items, body)) = find_last_with(with_body) {
+    if let Some((is_async, items, body)) = next_with(with_body) {
         if is_async != with_stmt.is_async_with_stmt() {
             // One of the statements is an async with, while the other is not,
             // we can't merge those statements.
