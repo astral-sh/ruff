@@ -39,7 +39,7 @@ use crate::settings::types::PythonVersion;
 ///     pass
 /// ```
 ///
-/// For Python 3.10 and later:
+/// Or, for Python 3.10 and later:
 /// ```python
 /// def foo(arg: int | None = None):
 ///     pass
@@ -235,7 +235,7 @@ fn type_hint_explicitly_allows_none<'a>(
     match target {
         // Short circuit on top level `None`, `Any` or `Optional`
         TypingTarget::None | TypingTarget::Optional | TypingTarget::Any => None,
-        // Top level `Annotated` node should check for the inner type and
+        // Top-level `Annotated` node should check for the inner type and
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should
         // be returned.
@@ -327,6 +327,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             continue;
         };
         let conversion_type = checker.settings.target_version.into();
+
         let mut diagnostic = Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
