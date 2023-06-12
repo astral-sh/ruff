@@ -114,12 +114,7 @@ def example8():
  
  
  def example4():
-@@ -46,39 +34,15 @@
- 
- 
- def example5():
--    return ()
-+    return (1, 2)
+@@ -50,35 +38,11 @@
  
  
  def example6():
@@ -198,7 +193,7 @@ def example4():
 
 
 def example5():
-    return (1, 2)
+    return ()
 
 
 def example6():

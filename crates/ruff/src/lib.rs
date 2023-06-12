@@ -34,6 +34,7 @@ mod rule_redirects;
 mod rule_selector;
 pub mod rules;
 pub mod settings;
+pub mod source_kind;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;

@@ -207,10 +207,10 @@ d={'a':1,
 +NOT_YET_IMPLEMENTED_StmtImport
  
 -from third_party import X, Y, Z
--
--from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
+-from library import some_connection, some_decorator
+-
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  # fmt: off
 -from third_party import (X,
@@ -281,7 +281,7 @@ d={'a':1,
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
 +def spaces(
 +    a=1,
-+    b=(1, 2),
++    b=(),
 +    c=[],
 +    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
 +    e=True,
@@ -296,8 +296,7 @@ d={'a':1,
  
  def spaces_types(
      a: int = 1,
--    b: tuple = (),
-+    b: tuple = (1, 2),
+     b: tuple = (),
      c: list = [],
 -    d: dict = {},
 +    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
@@ -351,7 +350,7 @@ d={'a':1,
      # fmt: off
 -    a , b = *hello
 -    'unformatted'
-+    (1, 2) = NOT_YET_IMPLEMENTED_ExprStarred
++    a, b = NOT_YET_IMPLEMENTED_ExprStarred
 +    "NOT_YET_IMPLEMENTED_STRING"
      # fmt: on
  
@@ -463,9 +462,8 @@ d={'a':1,
  
  def single_literal_yapf_disable():
 -    """Black does not support this."""
--    BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    BAZ = {(1, 2), (1, 2), (1, 2)}  # yapf: disable
+     BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
  
  
 -cfg.rule(
@@ -561,7 +559,7 @@ def function_signature_stress_test(
 # fmt: on
 def spaces(
     a=1,
-    b=(1, 2),
+    b=(),
     c=[],
     d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
     e=True,
@@ -576,7 +574,7 @@ def spaces(
 
 def spaces_types(
     a: int = 1,
-    b: tuple = (1, 2),
+    b: tuple = (),
     c: list = [],
     d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
     e: bool = True,
@@ -608,7 +606,7 @@ def import_as_names():
 
 def testlist_star_expr():
     # fmt: off
-    (1, 2) = NOT_YET_IMPLEMENTED_ExprStarred
+    a, b = NOT_YET_IMPLEMENTED_ExprStarred
     "NOT_YET_IMPLEMENTED_STRING"
     # fmt: on
 
@@ -668,7 +666,7 @@ def long_lines():
 
 def single_literal_yapf_disable():
     "NOT_YET_IMPLEMENTED_STRING"
-    BAZ = {(1, 2), (1, 2), (1, 2)}  # yapf: disable
+    BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
 
 
 NOT_IMPLEMENTED_call()
