@@ -24,13 +24,19 @@ pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
 const MAGIC_PREFIX: [&str; 3] = ["%", "!", "?"];
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
-pub fn round_trip(path: &Path) -> String {
-    let mut notebook = Notebook::read(path).unwrap();
+pub fn round_trip(path: &Path) -> anyhow::Result<String> {
+    let mut notebook = Notebook::read(path).map_err(|err| {
+        anyhow::anyhow!(
+            "Failed to read notebook file `{}`: {:?}",
+            path.display(),
+            err
+        )
+    })?;
     let code = notebook.content().to_string();
     notebook.update_cell_content(&code);
     let mut buffer = Cursor::new(Vec::new());
-    notebook.write_inner(&mut buffer).unwrap();
-    String::from_utf8(buffer.into_inner()).unwrap()
+    notebook.write_inner(&mut buffer)?;
+    Ok(String::from_utf8(buffer.into_inner())?)
 }
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
