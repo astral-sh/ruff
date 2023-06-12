@@ -65,6 +65,7 @@ schemars = { workspace = true, optional = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_with = { version = "3.0.0" }
 similar = { workspace = true, features = ["inline"] }
 shellexpand = { workspace = true }
 smallvec = { workspace = true }

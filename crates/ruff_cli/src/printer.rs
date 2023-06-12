@@ -178,7 +178,7 @@ impl Printer {
             return Ok(());
         }
 
-        let context = EmitterContext::new(&diagnostics.jupyter_index);
+        let context = EmitterContext::new(&diagnostics.source_kind);
 
         match self.format {
             SerializationFormat::Json => {
@@ -356,7 +356,7 @@ impl Printer {
                 writeln!(stdout)?;
             }
 
-            let context = EmitterContext::new(&diagnostics.jupyter_index);
+            let context = EmitterContext::new(&diagnostics.source_kind);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.autofix_level))
                 .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))

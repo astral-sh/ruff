@@ -15,7 +15,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 use ruff_python_stdlib::path::is_python_stub_file;
 
-use crate::autofix::fix_file;
+use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
@@ -30,6 +30,7 @@ use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
+use crate::source_kind::SourceKind;
 use crate::{directives, fs};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -77,6 +78,7 @@ pub fn check_path(
     directives: &Directives,
     settings: &Settings,
     noqa: flags::Noqa,
+    source_kind: Option<&SourceKind>,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -157,6 +159,7 @@ pub fn check_path(
                         stylist,
                         path,
                         package,
+                        source_kind,
                     );
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);
@@ -285,11 +288,17 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &directives,
         settings,
         flags::Noqa::Disabled,
+        None,
     );
 
     // Log any parse errors.
     if let Some(err) = error {
-        error!("{}", DisplayParseError::new(err, locator.to_source_code()));
+        // TODO(dhruvmanila): This should use `SourceKind`, update when
+        // `--add-noqa` is supported for Jupyter notebooks.
+        error!(
+            "{}",
+            DisplayParseError::new(err, locator.to_source_code(), None)
+        );
     }
 
     // Add any missing `# noqa` pragmas.
@@ -343,6 +352,7 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
+        None,
     );
 
     result.map(|(diagnostics, imports)| {
@@ -388,6 +398,7 @@ pub fn lint_fix<'a>(
     package: Option<&Path>,
     noqa: flags::Noqa,
     settings: &Settings,
+    source_kind: &mut SourceKind,
 ) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(contents);
 
@@ -433,6 +444,7 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
+            Some(source_kind),
         );
 
         if iterations == 0 {
@@ -453,11 +465,20 @@ pub fn lint_fix<'a>(
         }
 
         // Apply autofix.
-        if let Some((fixed_contents, applied)) = fix_file(&result.data.0, &locator) {
+        if let Some(FixResult {
+            code: fixed_contents,
+            fixes: applied,
+            source_map,
+        }) = fix_file(&result.data.0, &locator)
+        {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, count) in applied {
                     *fixed.entry(rule).or_default() += count;
+                }
+
+                if let SourceKind::Jupyter(notebook) = source_kind {
+                    notebook.update(&source_map, &fixed_contents);
                 }
 
                 // Store the fixed contents.
