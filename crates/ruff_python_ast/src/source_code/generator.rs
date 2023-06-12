@@ -183,7 +183,7 @@ impl<'a> Generator<'a> {
         self.buffer
     }
 
-    pub(crate) fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
+    pub fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
         for stmt in suite {
             self.unparse_stmt(stmt);
         }
