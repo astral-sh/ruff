@@ -54,6 +54,8 @@ mod tests {
     #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.pyi"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.pyi"))]
+    #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.py"))]
+    #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.pyi"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.py"))]

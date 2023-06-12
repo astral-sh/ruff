@@ -616,6 +616,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "035") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnassignedSpecialVariableInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::TSuffixedTypeAlias),
+        (Flake8Pyi, "044") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::FutureAnnotationsInStub),
         (Flake8Pyi, "045") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::IterMethodReturnIterable),
         (Flake8Pyi, "048") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StubBodyMultipleStatements),
         (Flake8Pyi, "050") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NoReturnArgumentAnnotationInStub),
