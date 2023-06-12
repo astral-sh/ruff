@@ -30,6 +30,10 @@ mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
+/// TODO(konstin): hook this up to the settings by replacing `SimpleFormatOptions` with a python
+/// specific struct.
+pub(crate) const USE_MAGIC_TRAILING_COMMA: bool = true;
+
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
 

@@ -68,18 +68,19 @@ impl Default for Settings {
     }
 }
 
-impl From<Options> for Settings {
-    fn from(options: Options) -> Self {
-        Self {
-            notice_rgx: options
+impl TryFrom<Options> for Settings {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Options) -> Result<Self, Self::Error> {
+        Ok(Self {
+            notice_rgx: value
                 .notice_rgx
                 .map(|pattern| Regex::new(&pattern))
-                .transpose()
-                .expect("Invalid `notice-rgx`")
+                .transpose()?
                 .unwrap_or_else(|| COPYRIGHT.clone()),
-            author: options.author,
-            min_file_size: options.min_file_size.unwrap_or_default(),
-        }
+            author: value.author,
+            min_file_size: value.min_file_size.unwrap_or_default(),
+        })
     }
 }
 

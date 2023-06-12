@@ -86,7 +86,12 @@ aaaaaaaaaaaaaa + [
     dddddddddddddddd,
     eeeeeee,
 ]
-aaaaaaaaaaaaaa + (1, 2)
+aaaaaaaaaaaaaa + (
+    bbbbbbbbbbbbbbbbbbbbbb,
+    ccccccccccccccccccccc,
+    dddddddddddddddd,
+    eeeeeee,
+)
 aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 aaaaaaaaaaaaaa + {
     bbbbbbbbbbbbbbbbbbbbbb,

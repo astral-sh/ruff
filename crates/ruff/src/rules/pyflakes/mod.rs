@@ -344,6 +344,7 @@ mod tests {
             &directives,
             &settings,
             flags::Noqa::Enabled,
+            None,
         );
         diagnostics.sort_by_key(Diagnostic::start);
         let actual = diagnostics

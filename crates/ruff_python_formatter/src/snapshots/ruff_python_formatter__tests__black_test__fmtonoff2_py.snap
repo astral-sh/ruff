@@ -101,8 +101,8 @@ def test_calculate_fades():
          # one is zero/none
 -        (0, 4, 0, 0, 10,        0, 0, 6, 10),
 -        (None, 4, 0, 0, 10,     0, 0, 6, 10),
-+        (1, 2),
-+        (1, 2),
++        (0, 4, 0, 0, 10, 0, 0, 6, 10),
++        (None, 4, 0, 0, 10, 0, 0, 6, 10),
      ]
  
  # fmt: on
@@ -144,8 +144,8 @@ def verify_fader(test):
 def test_calculate_fades():
     calcs = [
         # one is zero/none
-        (1, 2),
-        (1, 2),
+        (0, 4, 0, 0, 10, 0, 0, 6, 10),
+        (None, 4, 0, 0, 10, 0, 0, 6, 10),
     ]
 
 # fmt: on

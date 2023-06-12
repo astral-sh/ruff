@@ -47,6 +47,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
     "unexpected-indentation-comment",
+    "unnecessary-class-parentheses",
     "useless-semicolon",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",

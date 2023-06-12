@@ -42,8 +42,7 @@ def function(a:int=42):
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
  result = 1  # A simple comment
--result = (1,)  # Another one
-+result = (1, 2)  # Another one
+ result = (1,)  # Another one
  
  result = 1  #  type: ignore
  result = 1  # This comment is talking about type: ignore
@@ -68,7 +67,7 @@ def function(a:int=42):
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
 result = 1  # A simple comment
-result = (1, 2)  # Another one
+result = (1,)  # Another one
 
 result = 1  #  type: ignore
 result = 1  # This comment is talking about type: ignore

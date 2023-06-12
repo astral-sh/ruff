@@ -728,7 +728,10 @@ where
                     pylint::rules::global_statement(self, name);
                 }
                 if self.enabled(Rule::UselessObjectInheritance) {
-                    pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
+                    pyupgrade::rules::useless_object_inheritance(self, class_def, stmt);
+                }
+                if self.enabled(Rule::UnnecessaryClassParentheses) {
+                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def, stmt);
                 }
 
                 if self.enabled(Rule::AmbiguousClassName) {
@@ -792,18 +795,16 @@ where
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
-                if self.any_enabled(&[
-                    Rule::MutableDataclassDefault,
-                    Rule::FunctionCallInDataclassDefaultArgument,
-                ]) && ruff::rules::is_dataclass(&self.semantic_model, decorator_list)
-                {
-                    if self.enabled(Rule::MutableDataclassDefault) {
-                        ruff::rules::mutable_dataclass_default(self, body);
-                    }
+                if self.enabled(Rule::MutableClassDefault) {
+                    ruff::rules::mutable_class_default(self, class_def);
+                }
 
-                    if self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                        ruff::rules::function_call_in_dataclass_defaults(self, body);
-                    }
+                if self.enabled(Rule::MutableDataclassDefault) {
+                    ruff::rules::mutable_dataclass_default(self, class_def);
+                }
+
+                if self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+                    ruff::rules::function_call_in_dataclass_default(self, class_def);
                 }
 
                 if self.enabled(Rule::FStringDocstring) {
@@ -1515,7 +1516,8 @@ where
                     pygrep_hooks::rules::non_existent_mock_method(self, test);
                 }
             }
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body, .. })
+            | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
@@ -4151,6 +4153,10 @@ where
             if self.enabled(Rule::ArgumentDefaultInStub) {
                 flake8_pyi::rules::argument_simple_defaults(self, arguments);
             }
+        }
+
+        if self.settings.rules.enabled(Rule::ImplicitOptional) {
+            ruff::rules::implicit_optional(self, arguments);
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
