@@ -1,23 +1,140 @@
 use ruff_text_size::{TextLen, TextRange};
 
+/// Includes all permutations of `r`, `u`, `f`, and `fr` (`ur` is invalid, as is `uf`). This
+/// includes all possible orders, and all possible casings, for both single and triple quotes.
+///
 /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
+#[rustfmt::skip]
 const TRIPLE_QUOTE_STR_PREFIXES: &[&str] = &[
-    "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
+    "FR\"\"\"",
+    "Fr\"\"\"",
+    "fR\"\"\"",
+    "fr\"\"\"",
+    "RF\"\"\"",
+    "Rf\"\"\"",
+    "rF\"\"\"",
+    "rf\"\"\"",
+    "FR'''",
+    "Fr'''",
+    "fR'''",
+    "fr'''",
+    "RF'''",
+    "Rf'''",
+    "rF'''",
+    "rf'''",
+    "R\"\"\"",
+    "r\"\"\"",
+    "R'''",
+    "r'''",
+    "F\"\"\"",
+    "f\"\"\"",
+    "F'''",
+    "f'''",
+    "U\"\"\"",
+    "u\"\"\"",
+    "U'''",
+    "u'''",
+    "\"\"\"",
+    "'''",
 ];
+
+#[rustfmt::skip]
 const SINGLE_QUOTE_STR_PREFIXES: &[&str] = &[
-    "u\"", "u'", "r\"", "r'", "U\"", "U'", "R\"", "R'", "\"", "'",
+    "FR\"",
+    "Fr\"",
+    "fR\"",
+    "fr\"",
+    "RF\"",
+    "Rf\"",
+    "rF\"",
+    "rf\"",
+    "FR'",
+    "Fr'",
+    "fR'",
+    "fr'",
+    "RF'",
+    "Rf'",
+    "rF'",
+    "rf'",
+    "R\"",
+    "r\"",
+    "R'",
+    "r'",
+    "F\"",
+    "f\"",
+    "F'",
+    "f'",
+    "U\"",
+    "u\"",
+    "U'",
+    "u'",
+    "\"",
+    "'",
 ];
+
+/// Includes all permutations of `b` and `rb`. This includes all possible orders, and all possible
+/// casings, for both single and triple quotes.
+///
+/// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
+#[rustfmt::skip]
 pub const TRIPLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
-    "br'''", "rb'''", "bR'''", "Rb'''", "Br'''", "rB'''", "RB'''", "BR'''", "b'''", "br\"\"\"",
-    "rb\"\"\"", "bR\"\"\"", "Rb\"\"\"", "Br\"\"\"", "rB\"\"\"", "RB\"\"\"", "BR\"\"\"", "b\"\"\"",
+    "BR\"\"\"",
+    "Br\"\"\"",
+    "bR\"\"\"",
+    "br\"\"\"",
+    "RB\"\"\"",
+    "Rb\"\"\"",
+    "rB\"\"\"",
+    "rb\"\"\"",
+    "BR'''",
+    "Br'''",
+    "bR'''",
+    "br'''",
+    "RB'''",
+    "Rb'''",
+    "rB'''",
+    "rb'''",
     "B\"\"\"",
+    "b\"\"\"",
+    "B'''",
+    "b'''",
 ];
+
+#[rustfmt::skip]
 pub const SINGLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
-    "br'", "rb'", "bR'", "Rb'", "Br'", "rB'", "RB'", "BR'", "b'", "br\"", "rb\"", "bR\"", "Rb\"",
-    "Br\"", "rB\"", "RB\"", "BR\"", "b\"", "B\"",
+    "BR\"",
+    "Br\"",
+    "bR\"",
+    "br\"",
+    "RB\"",
+    "Rb\"",
+    "rB\"",
+    "rb\"",
+    "BR'",
+    "Br'",
+    "bR'",
+    "br'",
+    "RB'",
+    "Rb'",
+    "rB'",
+    "rb'",
+    "B\"",
+    "b\"",
+    "B'",
+    "b'",
 ];
-const TRIPLE_QUOTE_SUFFIXES: &[&str] = &["\"\"\"", "'''"];
-const SINGLE_QUOTE_SUFFIXES: &[&str] = &["\"", "'"];
+
+#[rustfmt::skip]
+const TRIPLE_QUOTE_SUFFIXES: &[&str] = &[
+    "\"\"\"",
+    "'''",
+];
+
+#[rustfmt::skip]
+const SINGLE_QUOTE_SUFFIXES: &[&str] = &[
+    "\"",
+    "'",
+];
 
 /// Strip the leading and trailing quotes from a string.
 /// Assumes that the string is a valid string literal, but does not verify that the string
