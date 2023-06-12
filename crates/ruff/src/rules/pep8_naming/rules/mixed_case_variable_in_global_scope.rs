@@ -71,7 +71,7 @@ pub(crate) fn mixed_case_variable_in_global_scope(
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name == name)
+        .any(|ignore_name| ignore_name.is_match(name))
     {
         return;
     }

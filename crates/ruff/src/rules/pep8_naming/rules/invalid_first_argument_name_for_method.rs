@@ -81,7 +81,7 @@ pub(crate) fn invalid_first_argument_name_for_method(
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name == name)
+        .any(|ignore_name| ignore_name.is_match(name))
     {
         return None;
     }

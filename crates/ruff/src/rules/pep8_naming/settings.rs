@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
+use crate::settings::types::IdenifierMatcher;
+
 const IGNORE_NAMES: [&str; 12] = [
     "setUp",
     "tearDown",
@@ -72,7 +74,7 @@ pub struct Options {
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
-    pub ignore_names: Vec<String>,
+    pub ignore_names: Vec<IdenifierMatcher>,
     pub classmethod_decorators: Vec<String>,
     pub staticmethod_decorators: Vec<String>,
 }
@@ -80,7 +82,10 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            ignore_names: IGNORE_NAMES.map(String::from).to_vec(),
+            ignore_names: IGNORE_NAMES
+                .iter()
+                .map(|name| IdenifierMatcher::from(*name))
+                .collect(),
             classmethod_decorators: Vec::new(),
             staticmethod_decorators: Vec::new(),
         }
@@ -90,9 +95,16 @@ impl Default for Settings {
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
-            ignore_names: options
-                .ignore_names
-                .unwrap_or_else(|| IGNORE_NAMES.map(String::from).to_vec()),
+            ignore_names: match options.ignore_names {
+                Some(names) => names
+                    .into_iter()
+                    .map(|name| IdenifierMatcher::from(name))
+                    .collect(),
+                None => IGNORE_NAMES
+                    .into_iter()
+                    .map(|name| IdenifierMatcher::from(name))
+                    .collect(),
+            },
             classmethod_decorators: options.classmethod_decorators.unwrap_or_default(),
             staticmethod_decorators: options.staticmethod_decorators.unwrap_or_default(),
         }
@@ -102,7 +114,13 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
-            ignore_names: Some(settings.ignore_names),
+            ignore_names: Some(
+                settings
+                    .ignore_names
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
+            ),
             classmethod_decorators: Some(settings.classmethod_decorators),
             staticmethod_decorators: Some(settings.staticmethod_decorators),
         }
