@@ -293,7 +293,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
 
     // Log any parse errors.
     if let Some(err) = error {
-        // FIXME(dhruvmanila): This should use `SourceKind`, update when
+        // TODO(dhruvmanila): This should use `SourceKind`, update when
         // `--add-noqa` is supported for Jupyter notebooks.
         error!(
             "{}",

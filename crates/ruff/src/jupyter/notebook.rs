@@ -192,8 +192,8 @@ impl Notebook {
                 SourceValue::StringArray(string_array) => string_array.join(""),
             };
             current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
-            cell_offsets.push(current_offset);
             contents.push(cell_contents);
+            cell_offsets.push(current_offset);
         }
 
         Ok(Self {
@@ -333,7 +333,7 @@ impl Notebook {
     /// Return the notebook content.
     ///
     /// This is the concatenation of all Python code cells.
-    pub fn content(&self) -> &str {
+    pub(crate) fn content(&self) -> &str {
         &self.content
     }
 
@@ -342,18 +342,18 @@ impl Notebook {
     /// The index is built only once when required. This is only used to
     /// report diagnostics, so by that time all of the autofixes must have
     /// been applied if `--fix` was passed.
-    pub fn index(&self) -> &JupyterIndex {
+    pub(crate) fn index(&self) -> &JupyterIndex {
         self.index.get_or_init(|| self.build_index())
     }
 
     /// Return the cell offsets for the concatenated source code corresponding
     /// the Jupyter notebook.
-    pub fn cell_offsets(&self) -> &[TextSize] {
+    pub(crate) fn cell_offsets(&self) -> &[TextSize] {
         &self.cell_offsets
     }
 
     /// Update the notebook with the given sourcemap and transformed content.
-    pub fn update(&mut self, source_map: &SourceMap, transformed: &str) {
+    pub(crate) fn update(&mut self, source_map: &SourceMap, transformed: &str) {
         // Cell offsets must be updated before updating the cell content as
         // it depends on the offsets to extract the cell content.
         self.update_cell_offsets(source_map);
