@@ -137,6 +137,7 @@ impl<'a> Iterator for PEP604UnionIterator<'a> {
 enum TypingTarget<'a> {
     None,
     Any,
+    Object,
     Optional,
     Union(Vec<&'a Expr>),
     Literal(Vec<&'a Expr>),
@@ -170,20 +171,25 @@ impl<'a> TypingTarget<'a> {
                 value: Constant::None,
                 ..
             }) => Some(TypingTarget::None),
-            _ => {
-                if model.match_typing_expr(expr, "Any") {
+            _ => model.resolve_call_path(expr).and_then(|call_path| {
+                if model.match_typing_call_path(&call_path, "Any") {
                     Some(TypingTarget::Any)
+                } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
+                    Some(TypingTarget::Object)
                 } else {
                     None
                 }
-            }
+            }),
         }
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `None`.
     fn contains_none(&self, model: &SemanticModel) -> bool {
         match self {
-            TypingTarget::None | TypingTarget::Optional | TypingTarget::Any => true,
+            TypingTarget::None
+            | TypingTarget::Optional
+            | TypingTarget::Any
+            | TypingTarget::Object => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
                 let Some(new_target) = TypingTarget::try_from_expr(model, element) else {
                 return false;

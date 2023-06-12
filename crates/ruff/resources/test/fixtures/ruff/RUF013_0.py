@@ -14,6 +14,10 @@ def f(arg: Any = None):
     pass
 
 
+def f(arg: object = None):
+    pass
+
+
 def f(arg: int = None):  # RUF011
     pass
 
