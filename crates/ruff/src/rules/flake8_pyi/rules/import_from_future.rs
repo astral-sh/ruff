@@ -11,7 +11,7 @@ pub struct ImportFromFuture;
 impl Violation for ImportFromFuture {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`from __future__` import annotations has no effect in stub files, since type checkers automatically treat stubs as having those semantics")
+        format!("`from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics")
     }
 }
 
@@ -20,10 +20,11 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
     if let StmtImportFrom {
         range,
         module: Some(name),
+        names,
         ..
     } = target
     {
-        if name == "__future__" {
+        if name == "__future__" && names.iter().any(|alias| &*alias.name == "annotations") {
             checker
                 .diagnostics
                 .push(Diagnostic::new(ImportFromFuture, *range));
