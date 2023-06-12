@@ -12,8 +12,7 @@ use ruff_python_semantic::{
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for mutable default values in dataclasses without the use of
-/// `dataclasses.field`.
+/// Checks for mutable default values in dataclasses.
 ///
 /// ## Why is this bad?
 /// Mutable default values share state across all instances of the dataclass,
@@ -21,10 +20,12 @@ use crate::checkers::ast::Checker;
 /// changed in one instance, as those changes will unexpectedly affect all
 /// other instances.
 ///
+/// Instead of sharing mutable defaults, use the `field(default_factory=...)`
+/// pattern.
+///
 /// ## Examples:
 /// ```python
 /// from dataclasses import dataclass
-///
 ///
 /// @dataclass
 /// class A:
@@ -35,23 +36,9 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from dataclasses import dataclass, field
 ///
-///
 /// @dataclass
 /// class A:
 ///     mutable_default: list[int] = field(default_factory=list)
-/// ```
-///
-/// Alternatively, if you _want_ shared behaviour, make it more obvious
-/// by assigning to a module-level variable:
-/// ```python
-/// from dataclasses import dataclass
-///
-/// I_KNOW_THIS_IS_SHARED_STATE = [1, 2, 3, 4]
-///
-///
-/// @dataclass
-/// class A:
-///     mutable_default: list[int] = I_KNOW_THIS_IS_SHARED_STATE
 /// ```
 #[violation]
 pub struct MutableDataclassDefault;
@@ -64,13 +51,16 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// ## What it does
-/// Checks for mutable default values in class attributes not annotated with `ClassVar`.
+/// Checks for mutable default values in class attributes.
 ///
 /// ## Why is this bad?
 /// Mutable default values share state across all instances of the class,
 /// while not being obvious. This can lead to bugs when the attributes are
 /// changed in one instance, as those changes will unexpectedly affect all
 /// other instances.
+///
+/// When mutable value are intended, they should be annotated with
+/// `typing.ClassVar`.
 ///
 /// ## Examples:
 /// ```python
@@ -80,22 +70,11 @@ impl Violation for MutableDataclassDefault {
 ///
 /// Use instead:
 /// ```python
-/// from dataclasses import dataclass, field
+/// from typing import ClassVar
 ///
-///
-/// @dataclass
 /// class A:
-///     mutable_default: list[int] = field(default_factory=list)
+///     mutable_default: ClassVar[list[int]] = []
 /// ```
-///
-/// Alternatively, if you _want_ shared behaviour, make it more obvious
-/// by assigning to a module-level variable:
-/// ```python
-/// I_KNOW_THIS_IS_SHARED_STATE = [1, 2, 3, 4]
-///
-///
-/// class A:
-///     mutable_default: list[int] = I_KNOW_THIS_IS_SHARED_STATE
 #[violation]
 pub struct MutableClassDefault;
 
