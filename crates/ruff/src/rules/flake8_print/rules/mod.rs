@@ -1,3 +1,3 @@
-pub(crate) use print_call::{print_call, PPrint, Print};
+pub(crate) use print_call::*;
 
 mod print_call;
