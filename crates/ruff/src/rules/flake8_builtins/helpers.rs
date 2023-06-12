@@ -1,9 +1,9 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Excepthandler, Expr, Ranged, Stmt};
 
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_stdlib::builtins::BUILTINS;
-use ruff_text_size::TextRange;
 
 pub(super) fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
     BUILTINS.contains(&name) && ignorelist.iter().all(|ignore| ignore != name)
