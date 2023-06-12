@@ -1356,9 +1356,9 @@ where
                         pyflakes::rules::raise_not_implemented(self, expr);
                     }
                 }
-                if self.enabled(Rule::CannotRaiseLiteral) {
+                if self.enabled(Rule::RaiseLiteral) {
                     if let Some(exc) = exc {
-                        flake8_bugbear::rules::cannot_raise_literal(self, exc);
+                        flake8_bugbear::rules::raise_literal(self, exc);
                     }
                 }
                 if self.any_enabled(&[

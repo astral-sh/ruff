@@ -21,9 +21,9 @@ Ruff welcomes contributions in the form of Pull Requests.
 For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
-creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed
-change. You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with
-the community.
+creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
+You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
+community.
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:
 [_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
@@ -31,8 +31,8 @@ pattern-match against the examples in the existing codebase. Many lint rules are
 existing Python plugins, which can be used as a reference implementation.
 
 As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/astral-sh/ruff/issues/848)
-plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi)
-for guidance.
+plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi) for
+guidance.
 
 ### Prerequisites
 
@@ -58,8 +58,8 @@ and that it passes both the lint and test validation checks:
 
 ```shell
 cargo fmt  # Auto-formatting...
-cargo clippy --fix --workspace --all-targets --all-features  # Linting...
 cargo test  # Testing...
+cargo clippy --workspace --all-targets --all-features -- -D warnings  # Linting...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -119,52 +119,63 @@ At time of writing, the repository includes the following crates:
 
 At a high level, the steps involved in adding a new lint rule are as follows:
 
-1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
+1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
+   (e.g., `AssertFalse`, as in, "allow `assert False`").
 
-1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
-1. In that file, define a violation struct. You can grep for `#[violation]` to see examples.
+1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
+   `#[violation]` to see examples.
 
-1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `E402`).
+1. In that file, define a function that adds the violation to the diagnostic list as appropriate
+   (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
+   an `ast::StmtAssert` node).
 
 1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for
    AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
    `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
 
+1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `B011`).
+
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
 1. Update the generated files (documentation and generated code).
 
-To define the violation, start by creating a dedicated file for your rule under the appropriate
-rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
-contain a struct defined via `#[violation]`, along with a function that creates the violation
-based on any required inputs.
-
-To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`,
-which defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
-collecting diagnostics as it goes.
+To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`
+to call your new function at the appropriate time and with the appropriate inputs. The `Checker`
+defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
+and calling out to lint rule analyzer functions as it goes.
 
 If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
-for the `Check::new` invocations to understand how other, similar rules are implemented.
+for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
 
 Once you're satisfied with your code, add tests for your rule. See [rule testing](#rule-testing-fixtures-and-snapshots)
 for more details.
 
-Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
+Finally, regenerate the documentation and other generated assets (like our JSON Schema) with:
+`cargo dev generate-all`.
 
 #### Rule naming convention
 
-The rule name should make sense when read as "allow _rule-name_" or "allow _rule-name_ items".
+Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
+${rule}" or "allow ${rule} items", as in the context of suppression comments.
 
-This implies that rule names:
+For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
+suppression comment would be framed as "allow `assert False`".
 
-- should state the bad thing being checked for
+As such, rule names should...
 
-- should not contain instructions on what you should use instead
-  (these belong in the rule documentation and the `autofix_title` for rules that have autofix)
+- Highlight the pattern that is being linted against, rather than the preferred alternative.
+  For example, `AssertFalse` guards against `assert False` statements.
 
-When re-implementing rules from other linters, this convention is given more importance than
+- _Not_ contain instructions on how to fix the violation, which instead belong in the rule
+  documentation and the `autofix_title`.
+
+- _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
+  convention.
+
+When re-implementing rules from other linters, we prioritize adhering to this convention over
 preserving the original rule name.
 
 #### Rule testing: fixtures and snapshots

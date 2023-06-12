@@ -6,7 +6,6 @@ pub(crate) use assert_false::{assert_false, AssertFalse};
 pub(crate) use assert_raises_exception::{assert_raises_exception, AssertRaisesException};
 pub(crate) use assignment_to_os_environ::{assignment_to_os_environ, AssignmentToOsEnviron};
 pub(crate) use cached_instance_method::{cached_instance_method, CachedInstanceMethod};
-pub(crate) use cannot_raise_literal::{cannot_raise_literal, CannotRaiseLiteral};
 pub(crate) use duplicate_exceptions::{
     duplicate_exceptions, DuplicateHandlerException, DuplicateTryBlockException,
 };
@@ -29,6 +28,7 @@ pub(crate) use loop_variable_overrides_iterator::{
 };
 pub(crate) use mutable_argument_default::{mutable_argument_default, MutableArgumentDefault};
 pub(crate) use no_explicit_stacklevel::{no_explicit_stacklevel, NoExplicitStacklevel};
+pub(crate) use raise_literal::{raise_literal, RaiseLiteral};
 pub(crate) use raise_without_from_inside_except::{
     raise_without_from_inside_except, RaiseWithoutFromInsideExcept,
 };
@@ -65,7 +65,6 @@ mod assert_false;
 mod assert_raises_exception;
 mod assignment_to_os_environ;
 mod cached_instance_method;
-mod cannot_raise_literal;
 mod duplicate_exceptions;
 mod duplicate_value;
 mod except_with_empty_tuple;
@@ -78,6 +77,7 @@ mod jump_statement_in_finally;
 mod loop_variable_overrides_iterator;
 mod mutable_argument_default;
 mod no_explicit_stacklevel;
+mod raise_literal;
 mod raise_without_from_inside_except;
 mod redundant_tuple_in_exception_handler;
 mod reuse_of_groupby_generator;

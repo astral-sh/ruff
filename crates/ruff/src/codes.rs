@@ -232,7 +232,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "013") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::RedundantTupleInExceptionHandler),
         (Flake8Bugbear, "014") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::DuplicateHandlerException),
         (Flake8Bugbear, "015") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UselessComparison),
-        (Flake8Bugbear, "016") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::CannotRaiseLiteral),
+        (Flake8Bugbear, "016") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::RaiseLiteral),
         (Flake8Bugbear, "017") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::AssertRaisesException),
         (Flake8Bugbear, "018") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UselessExpression),
         (Flake8Bugbear, "019") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::CachedInstanceMethod),
