@@ -79,6 +79,21 @@ If it doesn't, we get something like
 )
 ```
 
+For a list of expression, you don't need to format it manually but can use the `JoinBuilder` util,
+accessible through `.join_with`. Finish will write to the formatter internally.
+
+```rust
+f.join_with(&format_args!(text(","), soft_line_break_or_space()))
+    .entries(self.elts.iter().formatted())
+    .finish()?;
+// Here we need a trailing comma on the last entry of an expanded group since we have more
+// than one element
+write!(f, [if_group_breaks(&text(","))])
+```
+
+If you need avoid second mutable borrows with a builder, you can use `format_with(|f| { ... })` as
+a formattable element similar to `text()` or `group()`.
+
 The generic comment formatting in `FormatNodeRule` handles comments correctly for most nodes, e.g.
 preceding and end-of-line comments depending on the node range. Sometimes however, you may have
 dangling comments that are not before or after a node but inside of it, e.g.
