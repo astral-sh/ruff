@@ -192,51 +192,97 @@ impl Settings {
             // Plugins
             flake8_annotations: config
                 .flake8_annotations
-                .map(Into::into)
+                .map(flake8_annotations::settings::Settings::from)
                 .unwrap_or_default(),
-            flake8_bandit: config.flake8_bandit.map(Into::into).unwrap_or_default(),
-            flake8_bugbear: config.flake8_bugbear.map(Into::into).unwrap_or_default(),
-            flake8_builtins: config.flake8_builtins.map(Into::into).unwrap_or_default(),
+            flake8_bandit: config
+                .flake8_bandit
+                .map(flake8_bandit::settings::Settings::from)
+                .unwrap_or_default(),
+            flake8_bugbear: config
+                .flake8_bugbear
+                .map(flake8_bugbear::settings::Settings::from)
+                .unwrap_or_default(),
+            flake8_builtins: config
+                .flake8_builtins
+                .map(flake8_builtins::settings::Settings::from)
+                .unwrap_or_default(),
             flake8_comprehensions: config
                 .flake8_comprehensions
-                .map(Into::into)
+                .map(flake8_comprehensions::settings::Settings::from)
                 .unwrap_or_default(),
-            copyright: config.copyright.map(Into::into).unwrap_or_default(),
-            flake8_errmsg: config.flake8_errmsg.map(Into::into).unwrap_or_default(),
+            copyright: config
+                .copyright
+                .map(copyright::settings::Settings::try_from)
+                .transpose()?
+                .unwrap_or_default(),
+            flake8_errmsg: config
+                .flake8_errmsg
+                .map(flake8_errmsg::settings::Settings::from)
+                .unwrap_or_default(),
             flake8_implicit_str_concat: config
                 .flake8_implicit_str_concat
-                .map(Into::into)
+                .map(flake8_implicit_str_concat::settings::Settings::from)
                 .unwrap_or_default(),
             flake8_import_conventions: config
                 .flake8_import_conventions
-                .map(Into::into)
+                .map(flake8_import_conventions::settings::Settings::from)
                 .unwrap_or_default(),
             flake8_pytest_style: config
                 .flake8_pytest_style
-                .map(Into::into)
+                .map(flake8_pytest_style::settings::Settings::from)
                 .unwrap_or_default(),
-            flake8_quotes: config.flake8_quotes.map(Into::into).unwrap_or_default(),
-            flake8_self: config.flake8_self.map(Into::into).unwrap_or_default(),
+            flake8_quotes: config
+                .flake8_quotes
+                .map(flake8_quotes::settings::Settings::from)
+                .unwrap_or_default(),
+            flake8_self: config
+                .flake8_self
+                .map(flake8_self::settings::Settings::from)
+                .unwrap_or_default(),
             flake8_tidy_imports: config
                 .flake8_tidy_imports
-                .map(Into::into)
+                .map(flake8_tidy_imports::settings::Settings::from)
                 .unwrap_or_default(),
             flake8_type_checking: config
                 .flake8_type_checking
-                .map(Into::into)
+                .map(flake8_type_checking::settings::Settings::from)
                 .unwrap_or_default(),
             flake8_unused_arguments: config
                 .flake8_unused_arguments
-                .map(Into::into)
+                .map(flake8_unused_arguments::settings::Settings::from)
                 .unwrap_or_default(),
-            flake8_gettext: config.flake8_gettext.map(Into::into).unwrap_or_default(),
-            isort: config.isort.map(Into::into).unwrap_or_default(),
-            mccabe: config.mccabe.map(Into::into).unwrap_or_default(),
-            pep8_naming: config.pep8_naming.map(Into::into).unwrap_or_default(),
-            pycodestyle: config.pycodestyle.map(Into::into).unwrap_or_default(),
-            pydocstyle: config.pydocstyle.map(Into::into).unwrap_or_default(),
-            pyflakes: config.pyflakes.map(Into::into).unwrap_or_default(),
-            pylint: config.pylint.map(Into::into).unwrap_or_default(),
+            flake8_gettext: config
+                .flake8_gettext
+                .map(flake8_gettext::settings::Settings::from)
+                .unwrap_or_default(),
+            isort: config
+                .isort
+                .map(isort::settings::Settings::from)
+                .unwrap_or_default(),
+            mccabe: config
+                .mccabe
+                .map(mccabe::settings::Settings::from)
+                .unwrap_or_default(),
+            pep8_naming: config
+                .pep8_naming
+                .map(pep8_naming::settings::Settings::from)
+                .unwrap_or_default(),
+            pycodestyle: config
+                .pycodestyle
+                .map(pycodestyle::settings::Settings::from)
+                .unwrap_or_default(),
+            pydocstyle: config
+                .pydocstyle
+                .map(pydocstyle::settings::Settings::from)
+                .unwrap_or_default(),
+            pyflakes: config
+                .pyflakes
+                .map(pyflakes::settings::Settings::from)
+                .unwrap_or_default(),
+            pylint: config
+                .pylint
+                .map(pylint::settings::Settings::from)
+                .unwrap_or_default(),
         })
     }
 
