@@ -93,13 +93,27 @@ The vast majority of the code, including all lint rules, lives in the `ruff` cra
 At time of writing, the repository includes the following crates:
 
 - `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+- `crates/ruff_benchmark`: binary crate for running micro-benchmarks.
+- `crates/ruff_cache`: library crate for caching lint results.
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
 - `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
   `cargo dev generate-all`).
+- `crates/ruff_diagnostics`: library crate for the lint diagnostics APIs.
+- `crates/ruff_formatter`: library crate for generic code formatting logic based on an intermediate
+  representation.
+- `crates/ruff_index`: library crate inspired by `rustc_index`.
 - `crates/ruff_macros`: library crate containing macros used by Ruff.
-- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of
-  standard library modules by version).
-- `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
+- `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
+- `crates/ruff_python_formatter`: library crate containing Python-specific code formatting logic.
+- `crates/ruff_python_semantic`: library crate containing Python-specific semantic analysis logic,
+  including Ruff's semantic model.
+- `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data.
+- `crates/ruff_python_whitespace`: library crate containing Python-specific whitespace analysis
+  logic.
+- `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
+- `crates/ruff_testing_macros`: library crate containing macros used for testing Ruff.
+- `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
+- `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module.
 
 ### Example: Adding a new lint rule
 
