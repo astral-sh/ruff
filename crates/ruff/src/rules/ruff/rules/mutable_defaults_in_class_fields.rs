@@ -23,9 +23,10 @@ use crate::checkers::ast::Checker;
 /// Instead of sharing mutable defaults, use the `field(default_factory=...)`
 /// pattern.
 ///
-/// ## Examples:
+/// ## Examples
 /// ```python
 /// from dataclasses import dataclass
+///
 ///
 /// @dataclass
 /// class A:
@@ -35,6 +36,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// from dataclasses import dataclass, field
+///
 ///
 /// @dataclass
 /// class A:
@@ -62,7 +64,7 @@ impl Violation for MutableDataclassDefault {
 /// When mutable value are intended, they should be annotated with
 /// `typing.ClassVar`.
 ///
-/// ## Examples:
+/// ## Examples
 /// ```python
 /// class A:
 ///     mutable_default: list[int] = []
@@ -71,6 +73,7 @@ impl Violation for MutableDataclassDefault {
 /// Use instead:
 /// ```python
 /// from typing import ClassVar
+///
 ///
 /// class A:
 ///     mutable_default: ClassVar[list[int]] = []
@@ -95,7 +98,7 @@ impl Violation for MutableClassDefault {
 /// ## Options
 /// - `flake8-bugbear.extend-immutable-calls`
 ///
-/// ## Examples:
+/// ## Examples
 /// ```python
 /// from dataclasses import dataclass
 ///
