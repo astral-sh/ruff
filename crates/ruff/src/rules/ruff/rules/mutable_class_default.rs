@@ -45,10 +45,6 @@ impl Violation for MutableClassDefault {
 
 /// RUF012
 pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
-    if is_dataclass(checker.semantic_model(), class_def) {
-        return;
-    }
-
     for statement in &class_def.body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -59,6 +55,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                 if is_mutable_expr(value)
                     && !is_class_var_annotation(checker.semantic_model(), annotation)
                     && !is_immutable_annotation(checker.semantic_model(), annotation)
+                    && !is_dataclass(checker.semantic_model(), class_def)
                 {
                     checker
                         .diagnostics
