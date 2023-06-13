@@ -39,4 +39,51 @@ E714.py:5:8: E714 [*] Test for object identity should be `is not`
 7 7 | 
 8 8 | #: Okay
 
+E714.py:41:6: E714 [*] Test for object identity should be `is not`
+   |
+40 | # Preserve raw strings.
+41 | not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E714
+42 | 
+43 | # Preserve comments
+   |
+   = help: Convert to `is not`
+
+ℹ Suggested fix
+38 38 | assert [42, not foo] in bar
+39 39 | 
+40 40 | # Preserve raw strings.
+41    |-not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
+   41 |+re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is not None
+42 42 | 
+43 43 | # Preserve comments
+44 44 | not (
+
+E714.py:45:5: E714 [*] Test for object identity should be `is not`
+   |
+43 |   # Preserve comments
+44 |   not (
+45 |       re.search(  # Comment
+   |  _____^
+46 | |         r"^.:\\Users\\[^\\]*\\Downloads\\.*",
+47 | |     )
+48 | |     is None
+   | |___________^ E714
+49 |   )
+   |
+   = help: Convert to `is not`
+
+ℹ Suggested fix
+41 41 | not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
+42 42 | 
+43 43 | # Preserve comments
+44    |-not (
+45    |-    re.search(  # Comment
+   44 |+re.search(  # Comment
+46 45 |         r"^.:\\Users\\[^\\]*\\Downloads\\.*",
+47    |-    )
+48    |-    is None
+49    |-)
+   46 |+    ) is not None
+
 

@@ -146,7 +146,7 @@ impl<'a> Checker<'a> {
         )
     }
 
-    /// Create a [`Generator`] to generate source code based on the current AST state.
+    /// Create a [`VerbatimGenerator`] to generate source code based on the current AST state.
     pub(crate) fn verbatim_generator(&self) -> VerbatimGenerator {
         VerbatimGenerator::new(
             self.locator,

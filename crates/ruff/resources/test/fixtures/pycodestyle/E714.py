@@ -36,3 +36,14 @@ if (True) == TrueElement or x == TrueElement:
 assert (not foo) in bar
 assert {"x": not foo} in bar
 assert [42, not foo] in bar
+
+# Preserve raw strings.
+not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
+
+# Preserve comments
+not (
+    re.search(  # Comment
+        r"^.:\\Users\\[^\\]*\\Downloads\\.*",
+    )
+    is None
+)

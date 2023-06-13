@@ -8,7 +8,7 @@ use ruff_python_whitespace::LineEnding;
 
 use crate::source_code::stylist::{Indentation, Quote};
 use crate::source_code::Locator;
-use crate::verbatim_ast::{
+use crate::verbatim::{
     self as ast, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     Expr, MatchCase, Operator, Pattern, Stmt, Unaryop, Withitem,
 };
@@ -187,7 +187,7 @@ impl<'a> VerbatimGenerator<'a> {
         match ast {
             Stmt::Verbatim(ast::StmtVerbatim { range }) => {
                 statement!({
-                    self.p(&self.locator.slice(*range).to_string());
+                    self.p(self.locator.slice(*range));
                 });
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -196,7 +196,6 @@ impl<'a> VerbatimGenerator<'a> {
                 body,
                 returns,
                 decorator_list,
-                ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
@@ -228,7 +227,6 @@ impl<'a> VerbatimGenerator<'a> {
                 body,
                 returns,
                 decorator_list,
-                ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
@@ -316,7 +314,7 @@ impl<'a> VerbatimGenerator<'a> {
                     }
                 });
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            Stmt::Assign(ast::StmtAssign { targets, value }) => {
                 statement!({
                     for target in targets {
                         self.unparse_expr(target, precedence::ASSIGN);
@@ -372,7 +370,6 @@ impl<'a> VerbatimGenerator<'a> {
                 iter,
                 body,
                 orelse,
-                ..
             }) => {
                 statement!({
                     self.p("for ");
@@ -394,7 +391,6 @@ impl<'a> VerbatimGenerator<'a> {
                 iter,
                 body,
                 orelse,
-                ..
             }) => {
                 statement!({
                     self.p("async for ");
@@ -456,7 +452,7 @@ impl<'a> VerbatimGenerator<'a> {
                     }
                 }
             }
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body }) => {
                 statement!({
                     self.p("with ");
                     let mut first = true;
@@ -468,7 +464,7 @@ impl<'a> VerbatimGenerator<'a> {
                 });
                 self.body(body);
             }
-            Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+            Stmt::AsyncWith(ast::StmtAsyncWith { items, body }) => {
                 statement!({
                     self.p("async with ");
                     let mut first = true;
@@ -652,24 +648,24 @@ impl<'a> VerbatimGenerator<'a> {
     }
 
     fn unparse_excepthandler(&mut self, ast: &Excepthandler, star: bool) {
-        // match ast {
-        //     Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, name, body }) => {
-        //         self.p("except");
-        //         if star {
-        //             self.p("*");
-        //         }
-        //         if let Some(type_) = type_ {
-        //             self.p(" ");
-        //             self.unparse_expr(type_, precedence::MAX);
-        //         }
-        //         if let Some(name) = name {
-        //             self.p(" as ");
-        //             self.p(name);
-        //         }
-        //         self.p(":");
-        //         self.body(body);
-        //     }
-        // }
+        match ast {
+            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, name, body }) => {
+                self.p("except");
+                if star {
+                    self.p("*");
+                }
+                if let Some(type_) = type_ {
+                    self.p(" ");
+                    self.unparse_expr(type_, precedence::MAX);
+                }
+                if let Some(name) = name {
+                    self.p(" as ");
+                    self.p(name);
+                }
+                self.p(":");
+                self.body(body);
+            }
+        }
     }
 
     fn unparse_pattern(&mut self, ast: &Pattern) {
@@ -775,7 +771,7 @@ impl<'a> VerbatimGenerator<'a> {
         }
         match ast {
             Expr::Verbatim(ast::ExprVerbatim { range }) => {
-                self.p(&self.locator.slice(*range).to_string());
+                self.p(self.locator.slice(*range));
             }
             Expr::BoolOp(ast::ExprBoolOp { op, values }) => {
                 let (op, prec) = opprec!(bin, op, Boolop, And("and", AND), Or("or", OR));
@@ -1006,10 +1002,10 @@ impl<'a> VerbatimGenerator<'a> {
                 }
                 self.unparse_constant(value);
             }
-            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            Expr::Attribute(ast::ExprAttribute { value, attr }) => {
                 if let Expr::Constant(ast::ExprConstant {
                     value: Constant::Int(_),
-                    ..
+                    kind: _,
                 }) = value.as_ref()
                 {
                     self.p("(");
@@ -1021,18 +1017,18 @@ impl<'a> VerbatimGenerator<'a> {
                 };
                 self.p(attr);
             }
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            Expr::Subscript(ast::ExprSubscript { value, slice }) => {
                 self.unparse_expr(value, precedence::MAX);
                 self.p("[");
                 self.unparse_expr(slice, precedence::SUBSCRIPT);
                 self.p("]");
             }
-            Expr::Starred(ast::ExprStarred { value, .. }) => {
+            Expr::Starred(ast::ExprStarred { value }) => {
                 self.p("*");
                 self.unparse_expr(value, precedence::MAX);
             }
-            Expr::Name(ast::ExprName { id, .. }) => self.p(id),
-            Expr::List(ast::ExprList { elts, .. }) => {
+            Expr::Name(ast::ExprName { id }) => self.p(id),
+            Expr::List(ast::ExprList { elts }) => {
                 self.p("[");
                 let mut first = true;
                 for elt in elts {
@@ -1041,7 +1037,7 @@ impl<'a> VerbatimGenerator<'a> {
                 }
                 self.p("]");
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            Expr::Tuple(ast::ExprTuple { elts }) => {
                 if elts.is_empty() {
                     self.p("()");
                 } else {
@@ -1163,7 +1159,7 @@ impl<'a> VerbatimGenerator<'a> {
     }
 
     fn unparse_arg(&mut self, arg: &Arg) {
-        self.p(&arg.arg);
+        self.p(arg.arg);
         if let Some(ann) = &arg.annotation {
             self.p(": ");
             self.unparse_expr(ann, precedence::COMMA);
@@ -1227,7 +1223,7 @@ impl<'a> VerbatimGenerator<'a> {
 
     fn unparse_fstring_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
-            Expr::Constant(ast::ExprConstant { value, .. }) => {
+            Expr::Constant(ast::ExprConstant { value, kind: _ }) => {
                 if let Constant::Str(s) = value {
                     self.unparse_fstring_str(s);
                 } else {
@@ -1272,7 +1268,7 @@ impl<'a> VerbatimGenerator<'a> {
     }
 
     fn unparse_alias(&mut self, alias: &Alias) {
-        self.p(&alias.name);
+        self.p(alias.name);
         if let Some(asname) = &alias.asname {
             self.p(" as ");
             self.p(asname);
@@ -1290,21 +1286,24 @@ impl<'a> VerbatimGenerator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::Stmt;
+    use crate::verbatim::Stmt;
+    use rustpython_ast::{self as ast};
     use rustpython_parser::Parse;
 
     use ruff_python_whitespace::LineEnding;
 
     use crate::source_code::stylist::{Indentation, Quote};
-    use crate::source_code::VerbatimGenerator;
+    use crate::source_code::{Locator, VerbatimGenerator};
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let stmt = Stmt::parse(contents, "<filename>").unwrap();
-        let mut generator = VerbatimGenerator::new(&indentation, quote, line_ending);
-        generator.unparse_stmt(&stmt);
+        let locator = Locator::new(contents);
+        let mut generator = VerbatimGenerator::new(&locator, &indentation, quote, line_ending);
+
+        let stmt = ast::Stmt::parse(contents, "<filename>").unwrap();
+        generator.unparse_stmt(&Stmt::from(&stmt));
         generator.generate()
     }
 
@@ -1314,9 +1313,11 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let stmt = Stmt::parse(contents, "<filename>").unwrap();
-        let mut generator = VerbatimGenerator::new(indentation, quote, line_ending);
-        generator.unparse_stmt(&stmt);
+        let locator = Locator::new(contents);
+        let mut generator = VerbatimGenerator::new(&locator, indentation, quote, line_ending);
+
+        let stmt = ast::Stmt::parse(contents, "<filename>").unwrap();
+        generator.unparse_stmt(&Stmt::from(&stmt));
         generator.generate()
     }
 

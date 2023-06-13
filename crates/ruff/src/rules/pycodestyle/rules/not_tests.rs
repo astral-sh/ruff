@@ -2,10 +2,11 @@ use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::VerbatimGenerator;
+use ruff_python_ast::verbatim;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::compare;
 
 /// ## What it does
 /// Checks for negative comparison using `not {foo} in {bar}`.
@@ -99,13 +100,12 @@ pub(crate) fn not_tests(
                         if check_not_in {
                             let mut diagnostic = Diagnostic::new(NotInTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                    compare(
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                    create_comparison(
                                         left,
-                                        &[Cmpop::NotIn],
+                                        Cmpop::NotIn,
                                         comparators,
-                                        checker.generator(),
+                                        checker.verbatim_generator(),
                                     ),
                                     expr.range(),
                                 )));
@@ -117,13 +117,12 @@ pub(crate) fn not_tests(
                         if check_not_is {
                             let mut diagnostic = Diagnostic::new(NotIsTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                    compare(
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                    create_comparison(
                                         left,
-                                        &[Cmpop::IsNot],
+                                        Cmpop::IsNot,
                                         comparators,
-                                        checker.generator(),
+                                        checker.verbatim_generator(),
                                     ),
                                     expr.range(),
                                 )));
@@ -136,4 +135,17 @@ pub(crate) fn not_tests(
             }
         }
     }
+}
+
+fn create_comparison(
+    left: &Expr,
+    op: Cmpop,
+    comparators: &[Expr],
+    generator: VerbatimGenerator,
+) -> String {
+    generator.expr(&verbatim::Expr::Compare(verbatim::ExprCompare {
+        left: Box::new(verbatim::Expr::verbatim(left)),
+        ops: vec![verbatim::Cmpop::from(op)],
+        comparators: comparators.iter().map(verbatim::Expr::verbatim).collect(),
+    }))
 }
