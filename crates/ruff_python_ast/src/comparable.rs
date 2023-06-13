@@ -359,7 +359,7 @@ impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
             vararg: arguments.vararg.as_ref().map(Into::into),
             kwonlyargs: arguments.kwonlyargs.iter().map(Into::into).collect(),
             kw_defaults: arguments.kw_defaults.iter().map(Into::into).collect(),
-            kwarg: arguments.vararg.as_ref().map(Into::into),
+            kwarg: arguments.kwarg.as_ref().map(Into::into),
             defaults: arguments.defaults.iter().map(Into::into).collect(),
         }
     }
