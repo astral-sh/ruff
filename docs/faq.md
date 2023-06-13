@@ -74,6 +74,7 @@ natively, including:
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
+- [perflint](https://pypi.org/project/perflint/) ([#4789](https://github.com/astral-sh/ruff/issues/4789))
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
@@ -175,6 +176,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
+- [perflint](https://pypi.org/project/perflint/) ([#4789](https://github.com/astral-sh/ruff/issues/4789))
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
 
