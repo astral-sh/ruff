@@ -405,7 +405,7 @@ impl<'a> SemanticModel<'a> {
                                 if self
                                     .scopes()
                                     .take(scope_index)
-                                    .all(|scope| scope.get(name).is_none())
+                                    .all(|scope| !scope.has(name))
                                 {
                                     return Some(ImportedName {
                                         name: format!("{name}.{member}"),
@@ -428,7 +428,7 @@ impl<'a> SemanticModel<'a> {
                                     if self
                                         .scopes()
                                         .take(scope_index)
-                                        .all(|scope| scope.get(name).is_none())
+                                        .all(|scope| !scope.has(name))
                                     {
                                         return Some(ImportedName {
                                             name: (*name).to_string(),
@@ -449,7 +449,7 @@ impl<'a> SemanticModel<'a> {
                                 if self
                                     .scopes()
                                     .take(scope_index)
-                                    .all(|scope| scope.get(name).is_none())
+                                    .all(|scope| !scope.has(name))
                                 {
                                     return Some(ImportedName {
                                         name: format!("{name}.{member}"),
