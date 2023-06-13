@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Arg, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::settings::types::IdenifierMatcher;
+use crate::settings::types::IdentifierPattern;
 
 /// ## What it does
 /// Checks for argument names that do not follow the `snake_case` convention.
@@ -50,11 +50,11 @@ impl Violation for InvalidArgumentName {
 pub(crate) fn invalid_argument_name(
     name: &str,
     arg: &Arg,
-    ignore_names: &[IdenifierMatcher],
+    ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
     if ignore_names
         .iter()
-        .any(|ignore_name| ignore_name.is_match(name))
+        .any(|ignore_name| ignore_name.matches(name))
     {
         return None;
     }

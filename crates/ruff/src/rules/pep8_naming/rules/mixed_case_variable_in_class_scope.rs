@@ -62,7 +62,7 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name.is_match(name))
+        .any(|ignore_name| ignore_name.matches(name))
     {
         return;
     }

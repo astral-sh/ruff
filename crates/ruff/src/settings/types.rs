@@ -5,7 +5,6 @@ use std::str::FromStr;
 use std::string::ToString;
 
 use anyhow::{bail, Result};
-use glob::Pattern;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -251,56 +250,15 @@ impl Deref for Version {
     }
 }
 
-/// Match an identifier exactly or by pattern.
-#[derive(Clone, Debug, CacheKey)]
-pub enum IdenifierMatcher {
-    Exact(String),
-    /// # Notes
-    ///
-    /// [`Pattern`] matches a little differently than we ideally want to.
-    /// Specifically it uses `**` to match an arbitrary number of
-    /// subdirectories, luckily this not relevant since identifiers don't
-    /// contains slashes.
-    ///
-    /// For reference pep8-naming uses
-    /// [`fnmatch`](https://docs.python.org/3.11/library/fnmatch.html) for
-    /// pattern matching.
-    Pattern(Pattern),
-}
-
-impl IdenifierMatcher {
-    /// Returns true if `name` matches the pattern in `self`.
-    pub fn is_match(&self, name: &str) -> bool {
-        match self {
-            IdenifierMatcher::Exact(n) => n == name,
-            IdenifierMatcher::Pattern(pattern) => pattern.matches(name),
-        }
-    }
-}
-
-impl From<String> for IdenifierMatcher {
-    fn from(name: String) -> Self {
-        match Pattern::new(&name) {
-            Ok(pattern) => IdenifierMatcher::Pattern(pattern),
-            Err(_) => IdenifierMatcher::Exact(name),
-        }
-    }
-}
-
-impl From<&str> for IdenifierMatcher {
-    fn from(name: &str) -> Self {
-        match Pattern::new(name) {
-            Ok(pattern) => IdenifierMatcher::Pattern(pattern),
-            Err(_) => IdenifierMatcher::Exact(name.to_owned()),
-        }
-    }
-}
-
-impl From<IdenifierMatcher> for String {
-    fn from(name: IdenifierMatcher) -> Self {
-        match name {
-            IdenifierMatcher::Exact(name) => name,
-            IdenifierMatcher::Pattern(pattern) => pattern.as_str().to_owned(),
-        }
-    }
-}
+/// Pattern to match an identifier.
+///
+/// # Notes
+///
+/// [`glob::Pattern`] matches a little differently than we ideally want to.
+/// Specifically it uses `**` to match an arbitrary number of subdirectories,
+/// luckily this not relevant since identifiers don't contains slashes.
+///
+/// For reference pep8-naming uses
+/// [`fnmatch`](https://docs.python.org/3.11/library/fnmatch.html) for
+/// pattern matching.
+pub type IdentifierPattern = glob::Pattern;

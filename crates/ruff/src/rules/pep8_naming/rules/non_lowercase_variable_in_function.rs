@@ -60,7 +60,7 @@ pub(crate) fn non_lowercase_variable_in_function(
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name.is_match(name))
+        .any(|ignore_name| ignore_name.matches(name))
     {
         return;
     }
