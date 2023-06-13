@@ -6,7 +6,9 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ruff::logging::{set_up_logging, LogLevel};
 use ruff_cli::check;
+use std::process::ExitCode;
 
+mod check_formatter_stability;
 mod generate_all;
 mod generate_cli_help;
 mod generate_docs;
@@ -61,33 +63,40 @@ enum Command {
         #[clap(long, short = 'n')]
         repeat: usize,
     },
+    /// Format a repository twice and ensure that it looks that the first and second formatting
+    /// look the same. Same arguments as `ruff check`
+    CheckFormatterStability(check_formatter_stability::Args),
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<ExitCode> {
     let args = Args::parse();
     #[allow(clippy::print_stdout)]
-    match &args.command {
-        Command::GenerateAll(args) => generate_all::main(args)?,
-        Command::GenerateJSONSchema(args) => generate_json_schema::main(args)?,
+    match args.command {
+        Command::GenerateAll(args) => generate_all::main(&args)?,
+        Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
         Command::GenerateOptions => println!("{}", generate_options::generate()),
-        Command::GenerateCliHelp(args) => generate_cli_help::main(args)?,
-        Command::GenerateDocs(args) => generate_docs::main(args)?,
-        Command::PrintAST(args) => print_ast::main(args)?,
-        Command::PrintCST(args) => print_cst::main(args)?,
-        Command::PrintTokens(args) => print_tokens::main(args)?,
-        Command::RoundTrip(args) => round_trip::main(args)?,
+        Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
+        Command::GenerateDocs(args) => generate_docs::main(&args)?,
+        Command::PrintAST(args) => print_ast::main(&args)?,
+        Command::PrintCST(args) => print_cst::main(&args)?,
+        Command::PrintTokens(args) => print_tokens::main(&args)?,
+        Command::RoundTrip(args) => round_trip::main(&args)?,
         Command::Repeat {
             args,
             repeat,
             log_level_args,
         } => {
-            let log_level = LogLevel::from(log_level_args);
+            let log_level = LogLevel::from(&log_level_args);
             set_up_logging(&log_level)?;
-            for _ in 0..*repeat {
+            for _ in 0..repeat {
                 check(args.clone(), log_level)?;
             }
         }
+        Command::CheckFormatterStability(args) => {
+            let exit_code = check_formatter_stability::main(&args)?;
+            return Ok(exit_code);
+        }
     }
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }

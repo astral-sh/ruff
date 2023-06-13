@@ -24,7 +24,7 @@ mod commands;
 mod diagnostics;
 mod panic;
 mod printer;
-mod resolve;
+pub mod resolve;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
