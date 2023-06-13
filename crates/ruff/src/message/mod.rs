@@ -6,7 +6,7 @@ use std::ops::Deref;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::jupyter::JupyterIndex;
+use crate::source_kind::SourceKind;
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
@@ -126,22 +126,23 @@ pub trait Emitter {
 
 /// Context passed to [`Emitter`].
 pub struct EmitterContext<'a> {
-    jupyter_indices: &'a FxHashMap<String, JupyterIndex>,
+    source_kind: &'a FxHashMap<String, SourceKind>,
 }
 
 impl<'a> EmitterContext<'a> {
-    pub fn new(jupyter_indices: &'a FxHashMap<String, JupyterIndex>) -> Self {
-        Self { jupyter_indices }
+    pub fn new(source_kind: &'a FxHashMap<String, SourceKind>) -> Self {
+        Self { source_kind }
     }
 
     /// Tests if the file with `name` is a jupyter notebook.
     pub fn is_jupyter_notebook(&self, name: &str) -> bool {
-        self.jupyter_indices.contains_key(name)
+        self.source_kind
+            .get(name)
+            .map_or(false, SourceKind::is_jupyter)
     }
 
-    /// Returns the file's [`JupyterIndex`] if the file `name` is a jupyter notebook.
-    pub fn jupyter_index(&self, name: &str) -> Option<&JupyterIndex> {
-        self.jupyter_indices.get(name)
+    pub fn source_kind(&self, name: &str) -> Option<&SourceKind> {
+        self.source_kind.get(name)
     }
 }
 
@@ -150,11 +151,10 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
     use rustc_hash::FxHashMap;
 
-    use ruff_diagnostics::{Diagnostic, Edit, Fix};
+    use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_python_ast::source_code::SourceFileBuilder;
 
     use crate::message::{Emitter, EmitterContext, Message};
-    use crate::rules::pyflakes::rules::{UndefinedName, UnusedImport, UnusedVariable};
 
     pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os
@@ -172,10 +172,10 @@ def fibonacci(n):
 "#;
 
         let unused_import = Diagnostic::new(
-            UnusedImport {
-                name: "os".to_string(),
-                context: None,
-                multiple: false,
+            DiagnosticKind {
+                name: "UnusedImport".to_string(),
+                body: "`os` imported but unused".to_string(),
+                suggestion: Some("Remove unused import: `os`".to_string()),
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         )
@@ -187,8 +187,10 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_variable = Diagnostic::new(
-            UnusedVariable {
-                name: "x".to_string(),
+            DiagnosticKind {
+                name: "UnusedVariable".to_string(),
+                body: "Local variable `x` is assigned to but never used".to_string(),
+                suggestion: Some("Remove assignment to unused variable `x`".to_string()),
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
@@ -200,8 +202,10 @@ def fibonacci(n):
         let file_2 = r#"if a == 1: pass"#;
 
         let undefined_name = Diagnostic::new(
-            UndefinedName {
-                name: "a".to_string(),
+            DiagnosticKind {
+                name: "UndefinedName".to_string(),
+                body: "Undefined name `a`".to_string(),
+                suggestion: None,
             },
             TextRange::new(TextSize::from(3), TextSize::from(4)),
         );
@@ -222,8 +226,8 @@ def fibonacci(n):
         emitter: &mut dyn Emitter,
         messages: &[Message],
     ) -> String {
-        let indices = FxHashMap::default();
-        let context = EmitterContext::new(&indices);
+        let source_kinds = FxHashMap::default();
+        let context = EmitterContext::new(&source_kinds);
         let mut output: Vec<u8> = Vec::new();
         emitter.emit(&mut output, messages, &context).unwrap();
 

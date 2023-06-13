@@ -5,6 +5,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged,
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_semantic::model::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -66,19 +67,21 @@ fn create_property_assignment_stmt(
     annotation: &Expr,
     value: Option<&Expr>,
 ) -> Stmt {
-    let node = ast::ExprName {
-        id: property.into(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-    };
-    let node1 = ast::StmtAnnAssign {
-        target: Box::new(node.into()),
+    ast::StmtAnnAssign {
+        target: Box::new(
+            ast::ExprName {
+                id: property.into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }
+            .into(),
+        ),
         annotation: Box::new(annotation.clone()),
         value: value.map(|value| Box::new(value.clone())),
         simple: true,
         range: TextRange::default(),
-    };
-    node1.into()
+    }
+    .into()
 }
 
 /// Match the `defaults` keyword in a `NamedTuple(...)` call.
@@ -140,6 +143,9 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
             if !is_identifier(property) {
                 bail!("Invalid property name: {}", property)
             }
+            if is_dunder(property) {
+                bail!("Cannot use dunder property name: {}", property)
+            }
             Ok(create_property_assignment_stmt(
                 property, annotation, default,
             ))
@@ -150,15 +156,15 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
-    let node = ast::StmtClassDef {
+    ast::StmtClassDef {
         name: typename.into(),
         bases: vec![base_class.clone()],
         keywords: vec![],
         body,
         decorator_list: vec![],
         range: TextRange::default(),
-    };
-    node.into()
+    }
+    .into()
 }
 
 /// Generate a `Fix` to convert a `NamedTuple` assignment to a class definition.
@@ -169,8 +175,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    #[allow(deprecated)]
-    Fix::unspecified(Edit::range_replacement(
+    Fix::suggested(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(typename, body, base_class)),
         stmt.range(),
     ))
@@ -198,22 +203,24 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             return;
         }
     };
-    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-    let fixable = checker.locator.is_at_start_of_line(stmt.start());
+
     let mut diagnostic = Diagnostic::new(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(convert_to_class(
-            stmt,
-            typename,
-            properties,
-            base_class,
-            checker.generator(),
-        ));
+    if checker.patch(diagnostic.kind.rule()) {
+        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+        if checker.locator.is_at_start_of_line(stmt.start()) {
+            diagnostic.set_fix(convert_to_class(
+                stmt,
+                typename,
+                properties,
+                base_class,
+                checker.generator(),
+            ));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

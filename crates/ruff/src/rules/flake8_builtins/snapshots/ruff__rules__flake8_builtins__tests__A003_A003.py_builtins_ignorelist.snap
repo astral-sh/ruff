@@ -3,20 +3,20 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 ---
 A003.py:2:5: A003 Class attribute `ImportError` is shadowing a Python builtin
   |
-2 | class MyClass:
-3 |     ImportError = 4
+1 | class MyClass:
+2 |     ImportError = 4
   |     ^^^^^^^^^^^ A003
-4 |     id = 5
-5 |     dir = "/"
+3 |     id: int
+4 |     dir = "/"
   |
 
 A003.py:11:9: A003 Class attribute `str` is shadowing a Python builtin
    |
-11 |         self.dir = "."
-12 | 
-13 |     def str(self):
+ 9 |         self.dir = "."
+10 | 
+11 |     def str(self):
    |         ^^^ A003
-14 |         pass
+12 |         pass
    |
 
 

@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E712.py:2:11: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
   |
-2 | #: E712
-3 | if res == True:
+1 | #: E712
+2 | if res == True:
   |           ^^^^ E712
-4 |     pass
-5 | #: E712
+3 |     pass
+4 | #: E712
   |
   = help: Replace with `cond is True`
 
@@ -21,12 +21,12 @@ E712.py:2:11: E712 [*] Comparison to `True` should be `cond is True` or `if cond
 
 E712.py:5:11: E712 [*] Comparison to `False` should be `cond is not False` or `if cond:`
   |
-5 |     pass
-6 | #: E712
-7 | if res != False:
+3 |     pass
+4 | #: E712
+5 | if res != False:
   |           ^^^^^ E712
-8 |     pass
-9 | #: E712
+6 |     pass
+7 | #: E712
   |
   = help: Replace with `cond is not False`
 
@@ -42,12 +42,12 @@ E712.py:5:11: E712 [*] Comparison to `False` should be `cond is not False` or `i
 
 E712.py:8:4: E712 [*] Comparison to `True` should be `cond is not True` or `if not cond:`
    |
- 8 |     pass
- 9 | #: E712
-10 | if True != res:
+ 6 |     pass
+ 7 | #: E712
+ 8 | if True != res:
    |    ^^^^ E712
-11 |     pass
-12 | #: E712
+ 9 |     pass
+10 | #: E712
    |
    = help: Replace with `cond is not True`
 
@@ -63,12 +63,12 @@ E712.py:8:4: E712 [*] Comparison to `True` should be `cond is not True` or `if n
 
 E712.py:11:4: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
    |
-11 |     pass
-12 | #: E712
-13 | if False == res:
+ 9 |     pass
+10 | #: E712
+11 | if False == res:
    |    ^^^^^ E712
-14 |     pass
-15 | #: E712
+12 |     pass
+13 | #: E712
    |
    = help: Replace with `cond is False`
 
@@ -84,12 +84,12 @@ E712.py:11:4: E712 [*] Comparison to `False` should be `cond is False` or `if no
 
 E712.py:14:14: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
    |
-14 |     pass
-15 | #: E712
-16 | if res[1] == True:
+12 |     pass
+13 | #: E712
+14 | if res[1] == True:
    |              ^^^^ E712
-17 |     pass
-18 | #: E712
+15 |     pass
+16 | #: E712
    |
    = help: Replace with `cond is True`
 
@@ -105,12 +105,12 @@ E712.py:14:14: E712 [*] Comparison to `True` should be `cond is True` or `if con
 
 E712.py:17:14: E712 [*] Comparison to `False` should be `cond is not False` or `if cond:`
    |
-17 |     pass
-18 | #: E712
-19 | if res[1] != False:
+15 |     pass
+16 | #: E712
+17 | if res[1] != False:
    |              ^^^^^ E712
-20 |     pass
-21 | #: E712
+18 |     pass
+19 | #: E712
    |
    = help: Replace with `cond is not False`
 
@@ -126,12 +126,12 @@ E712.py:17:14: E712 [*] Comparison to `False` should be `cond is not False` or `
 
 E712.py:20:20: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
    |
-20 |     pass
-21 | #: E712
-22 | var = 1 if cond == True else -1 if cond == False else cond
+18 |     pass
+19 | #: E712
+20 | var = 1 if cond == True else -1 if cond == False else cond
    |                    ^^^^ E712
-23 | #: E712
-24 | if (True) == TrueElement or x == TrueElement:
+21 | #: E712
+22 | if (True) == TrueElement or x == TrueElement:
    |
    = help: Replace with `cond is True`
 
@@ -147,12 +147,12 @@ E712.py:20:20: E712 [*] Comparison to `True` should be `cond is True` or `if con
 
 E712.py:20:44: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
    |
-20 |     pass
-21 | #: E712
-22 | var = 1 if cond == True else -1 if cond == False else cond
+18 |     pass
+19 | #: E712
+20 | var = 1 if cond == True else -1 if cond == False else cond
    |                                            ^^^^^ E712
-23 | #: E712
-24 | if (True) == TrueElement or x == TrueElement:
+21 | #: E712
+22 | if (True) == TrueElement or x == TrueElement:
    |
    = help: Replace with `cond is False`
 
@@ -168,11 +168,11 @@ E712.py:20:44: E712 [*] Comparison to `False` should be `cond is False` or `if n
 
 E712.py:22:5: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
    |
-22 | var = 1 if cond == True else -1 if cond == False else cond
-23 | #: E712
-24 | if (True) == TrueElement or x == TrueElement:
+20 | var = 1 if cond == True else -1 if cond == False else cond
+21 | #: E712
+22 | if (True) == TrueElement or x == TrueElement:
    |     ^^^^ E712
-25 |     pass
+23 |     pass
    |
    = help: Replace with `cond is True`
 
@@ -188,11 +188,11 @@ E712.py:22:5: E712 [*] Comparison to `True` should be `cond is True` or `if cond
 
 E712.py:25:11: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
    |
-25 |     pass
-26 | 
-27 | if res == True != False:
+23 |     pass
+24 | 
+25 | if res == True != False:
    |           ^^^^ E712
-28 |     pass
+26 |     pass
    |
    = help: Replace with `cond is True`
 
@@ -208,11 +208,11 @@ E712.py:25:11: E712 [*] Comparison to `True` should be `cond is True` or `if con
 
 E712.py:25:19: E712 [*] Comparison to `False` should be `cond is not False` or `if cond:`
    |
-25 |     pass
-26 | 
-27 | if res == True != False:
+23 |     pass
+24 | 
+25 | if res == True != False:
    |                   ^^^^^ E712
-28 |     pass
+26 |     pass
    |
    = help: Replace with `cond is not False`
 

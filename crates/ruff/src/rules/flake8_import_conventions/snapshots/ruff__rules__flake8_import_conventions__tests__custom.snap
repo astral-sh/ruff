@@ -3,278 +3,278 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 ---
 custom.py:3:1: ICN001 `altair` should be imported as `alt`
   |
-3 | import math  # not checked
-4 | 
-5 | import altair  # unconventional
+1 | import math  # not checked
+2 | 
+3 | import altair  # unconventional
   | ^^^^^^^^^^^^^ ICN001
-6 | import dask.array  # unconventional
-7 | import dask.dataframe  # unconventional
+4 | import dask.array  # unconventional
+5 | import dask.dataframe  # unconventional
   |
 
 custom.py:4:1: ICN001 `dask.array` should be imported as `da`
   |
-4 | import altair  # unconventional
-5 | import dask.array  # unconventional
+3 | import altair  # unconventional
+4 | import dask.array  # unconventional
   | ^^^^^^^^^^^^^^^^^ ICN001
-6 | import dask.dataframe  # unconventional
-7 | import matplotlib.pyplot  # unconventional
+5 | import dask.dataframe  # unconventional
+6 | import matplotlib.pyplot  # unconventional
   |
 
 custom.py:5:1: ICN001 `dask.dataframe` should be imported as `dd`
   |
-5 | import altair  # unconventional
-6 | import dask.array  # unconventional
-7 | import dask.dataframe  # unconventional
+3 | import altair  # unconventional
+4 | import dask.array  # unconventional
+5 | import dask.dataframe  # unconventional
   | ^^^^^^^^^^^^^^^^^^^^^ ICN001
-8 | import matplotlib.pyplot  # unconventional
-9 | import numpy  # unconventional
+6 | import matplotlib.pyplot  # unconventional
+7 | import numpy  # unconventional
   |
 
 custom.py:6:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
-   |
- 6 | import dask.array  # unconventional
- 7 | import dask.dataframe  # unconventional
- 8 | import matplotlib.pyplot  # unconventional
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
- 9 | import numpy  # unconventional
-10 | import pandas  # unconventional
-   |
+  |
+4 | import dask.array  # unconventional
+5 | import dask.dataframe  # unconventional
+6 | import matplotlib.pyplot  # unconventional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+7 | import numpy  # unconventional
+8 | import pandas  # unconventional
+  |
 
 custom.py:7:1: ICN001 `numpy` should be imported as `np`
-   |
- 7 | import dask.dataframe  # unconventional
- 8 | import matplotlib.pyplot  # unconventional
- 9 | import numpy  # unconventional
-   | ^^^^^^^^^^^^ ICN001
-10 | import pandas  # unconventional
-11 | import seaborn  # unconventional
-   |
+  |
+5 | import dask.dataframe  # unconventional
+6 | import matplotlib.pyplot  # unconventional
+7 | import numpy  # unconventional
+  | ^^^^^^^^^^^^ ICN001
+8 | import pandas  # unconventional
+9 | import seaborn  # unconventional
+  |
 
 custom.py:8:1: ICN001 `pandas` should be imported as `pd`
    |
- 8 | import matplotlib.pyplot  # unconventional
- 9 | import numpy  # unconventional
-10 | import pandas  # unconventional
+ 6 | import matplotlib.pyplot  # unconventional
+ 7 | import numpy  # unconventional
+ 8 | import pandas  # unconventional
    | ^^^^^^^^^^^^^ ICN001
-11 | import seaborn  # unconventional
-12 | import tensorflow  # unconventional
+ 9 | import seaborn  # unconventional
+10 | import tensorflow  # unconventional
    |
 
 custom.py:9:1: ICN001 `seaborn` should be imported as `sns`
    |
- 9 | import numpy  # unconventional
-10 | import pandas  # unconventional
-11 | import seaborn  # unconventional
+ 7 | import numpy  # unconventional
+ 8 | import pandas  # unconventional
+ 9 | import seaborn  # unconventional
    | ^^^^^^^^^^^^^^ ICN001
-12 | import tensorflow  # unconventional
-13 | import holoviews  # unconventional
+10 | import tensorflow  # unconventional
+11 | import holoviews  # unconventional
    |
 
 custom.py:10:1: ICN001 `tensorflow` should be imported as `tf`
    |
-10 | import pandas  # unconventional
-11 | import seaborn  # unconventional
-12 | import tensorflow  # unconventional
+ 8 | import pandas  # unconventional
+ 9 | import seaborn  # unconventional
+10 | import tensorflow  # unconventional
    | ^^^^^^^^^^^^^^^^^ ICN001
-13 | import holoviews  # unconventional
-14 | import panel  # unconventional
+11 | import holoviews  # unconventional
+12 | import panel  # unconventional
    |
 
 custom.py:11:1: ICN001 `holoviews` should be imported as `hv`
    |
-11 | import seaborn  # unconventional
-12 | import tensorflow  # unconventional
-13 | import holoviews  # unconventional
+ 9 | import seaborn  # unconventional
+10 | import tensorflow  # unconventional
+11 | import holoviews  # unconventional
    | ^^^^^^^^^^^^^^^^ ICN001
-14 | import panel  # unconventional
-15 | import plotly.express  # unconventional
+12 | import panel  # unconventional
+13 | import plotly.express  # unconventional
    |
 
 custom.py:12:1: ICN001 `panel` should be imported as `pn`
    |
-12 | import tensorflow  # unconventional
-13 | import holoviews  # unconventional
-14 | import panel  # unconventional
+10 | import tensorflow  # unconventional
+11 | import holoviews  # unconventional
+12 | import panel  # unconventional
    | ^^^^^^^^^^^^ ICN001
-15 | import plotly.express  # unconventional
-16 | import matplotlib  # unconventional
+13 | import plotly.express  # unconventional
+14 | import matplotlib  # unconventional
    |
 
 custom.py:13:1: ICN001 `plotly.express` should be imported as `px`
    |
-13 | import holoviews  # unconventional
-14 | import panel  # unconventional
-15 | import plotly.express  # unconventional
+11 | import holoviews  # unconventional
+12 | import panel  # unconventional
+13 | import plotly.express  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^ ICN001
-16 | import matplotlib  # unconventional
-17 | import polars  # unconventional
+14 | import matplotlib  # unconventional
+15 | import polars  # unconventional
    |
 
 custom.py:14:1: ICN001 `matplotlib` should be imported as `mpl`
    |
-14 | import panel  # unconventional
-15 | import plotly.express  # unconventional
-16 | import matplotlib  # unconventional
+12 | import panel  # unconventional
+13 | import plotly.express  # unconventional
+14 | import matplotlib  # unconventional
    | ^^^^^^^^^^^^^^^^^ ICN001
-17 | import polars  # unconventional
-18 | import pyarrow  # unconventional
+15 | import polars  # unconventional
+16 | import pyarrow  # unconventional
    |
 
 custom.py:15:1: ICN001 `polars` should be imported as `pl`
    |
-15 | import plotly.express  # unconventional
-16 | import matplotlib  # unconventional
-17 | import polars  # unconventional
+13 | import plotly.express  # unconventional
+14 | import matplotlib  # unconventional
+15 | import polars  # unconventional
    | ^^^^^^^^^^^^^ ICN001
-18 | import pyarrow  # unconventional
+16 | import pyarrow  # unconventional
    |
 
 custom.py:16:1: ICN001 `pyarrow` should be imported as `pa`
    |
-16 | import matplotlib  # unconventional
-17 | import polars  # unconventional
-18 | import pyarrow  # unconventional
+14 | import matplotlib  # unconventional
+15 | import polars  # unconventional
+16 | import pyarrow  # unconventional
    | ^^^^^^^^^^^^^^ ICN001
-19 | 
-20 | import altair as altr  # unconventional
+17 | 
+18 | import altair as altr  # unconventional
    |
 
 custom.py:18:1: ICN001 `altair` should be imported as `alt`
    |
-18 | import pyarrow  # unconventional
-19 | 
-20 | import altair as altr  # unconventional
+16 | import pyarrow  # unconventional
+17 | 
+18 | import altair as altr  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^ ICN001
-21 | import matplotlib.pyplot as plot  # unconventional
-22 | import dask.array as darray  # unconventional
+19 | import matplotlib.pyplot as plot  # unconventional
+20 | import dask.array as darray  # unconventional
    |
 
 custom.py:19:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
-19 | import altair as altr  # unconventional
-20 | import matplotlib.pyplot as plot  # unconventional
+18 | import altair as altr  # unconventional
+19 | import matplotlib.pyplot as plot  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-21 | import dask.array as darray  # unconventional
-22 | import dask.dataframe as ddf  # unconventional
+20 | import dask.array as darray  # unconventional
+21 | import dask.dataframe as ddf  # unconventional
    |
 
 custom.py:20:1: ICN001 `dask.array` should be imported as `da`
    |
-20 | import altair as altr  # unconventional
-21 | import matplotlib.pyplot as plot  # unconventional
-22 | import dask.array as darray  # unconventional
+18 | import altair as altr  # unconventional
+19 | import matplotlib.pyplot as plot  # unconventional
+20 | import dask.array as darray  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-23 | import dask.dataframe as ddf  # unconventional
-24 | import numpy as nmp  # unconventional
+21 | import dask.dataframe as ddf  # unconventional
+22 | import numpy as nmp  # unconventional
    |
 
 custom.py:21:1: ICN001 `dask.dataframe` should be imported as `dd`
    |
-21 | import matplotlib.pyplot as plot  # unconventional
-22 | import dask.array as darray  # unconventional
-23 | import dask.dataframe as ddf  # unconventional
+19 | import matplotlib.pyplot as plot  # unconventional
+20 | import dask.array as darray  # unconventional
+21 | import dask.dataframe as ddf  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-24 | import numpy as nmp  # unconventional
-25 | import pandas as pdas  # unconventional
+22 | import numpy as nmp  # unconventional
+23 | import pandas as pdas  # unconventional
    |
 
 custom.py:22:1: ICN001 `numpy` should be imported as `np`
    |
-22 | import dask.array as darray  # unconventional
-23 | import dask.dataframe as ddf  # unconventional
-24 | import numpy as nmp  # unconventional
+20 | import dask.array as darray  # unconventional
+21 | import dask.dataframe as ddf  # unconventional
+22 | import numpy as nmp  # unconventional
    | ^^^^^^^^^^^^^^^^^^^ ICN001
-25 | import pandas as pdas  # unconventional
-26 | import seaborn as sbrn  # unconventional
+23 | import pandas as pdas  # unconventional
+24 | import seaborn as sbrn  # unconventional
    |
 
 custom.py:23:1: ICN001 `pandas` should be imported as `pd`
    |
-23 | import dask.dataframe as ddf  # unconventional
-24 | import numpy as nmp  # unconventional
-25 | import pandas as pdas  # unconventional
+21 | import dask.dataframe as ddf  # unconventional
+22 | import numpy as nmp  # unconventional
+23 | import pandas as pdas  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^ ICN001
-26 | import seaborn as sbrn  # unconventional
-27 | import tensorflow as tfz  # unconventional
+24 | import seaborn as sbrn  # unconventional
+25 | import tensorflow as tfz  # unconventional
    |
 
 custom.py:24:1: ICN001 `seaborn` should be imported as `sns`
    |
-24 | import numpy as nmp  # unconventional
-25 | import pandas as pdas  # unconventional
-26 | import seaborn as sbrn  # unconventional
+22 | import numpy as nmp  # unconventional
+23 | import pandas as pdas  # unconventional
+24 | import seaborn as sbrn  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^ ICN001
-27 | import tensorflow as tfz  # unconventional
-28 | import holoviews as hsv  # unconventional
+25 | import tensorflow as tfz  # unconventional
+26 | import holoviews as hsv  # unconventional
    |
 
 custom.py:25:1: ICN001 `tensorflow` should be imported as `tf`
    |
-25 | import pandas as pdas  # unconventional
-26 | import seaborn as sbrn  # unconventional
-27 | import tensorflow as tfz  # unconventional
+23 | import pandas as pdas  # unconventional
+24 | import seaborn as sbrn  # unconventional
+25 | import tensorflow as tfz  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-28 | import holoviews as hsv  # unconventional
-29 | import panel as pns  # unconventional
+26 | import holoviews as hsv  # unconventional
+27 | import panel as pns  # unconventional
    |
 
 custom.py:26:1: ICN001 `holoviews` should be imported as `hv`
    |
-26 | import seaborn as sbrn  # unconventional
-27 | import tensorflow as tfz  # unconventional
-28 | import holoviews as hsv  # unconventional
+24 | import seaborn as sbrn  # unconventional
+25 | import tensorflow as tfz  # unconventional
+26 | import holoviews as hsv  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-29 | import panel as pns  # unconventional
-30 | import plotly.express as pltx  # unconventional
+27 | import panel as pns  # unconventional
+28 | import plotly.express as pltx  # unconventional
    |
 
 custom.py:27:1: ICN001 `panel` should be imported as `pn`
    |
-27 | import tensorflow as tfz  # unconventional
-28 | import holoviews as hsv  # unconventional
-29 | import panel as pns  # unconventional
+25 | import tensorflow as tfz  # unconventional
+26 | import holoviews as hsv  # unconventional
+27 | import panel as pns  # unconventional
    | ^^^^^^^^^^^^^^^^^^^ ICN001
-30 | import plotly.express as pltx  # unconventional
-31 | import matplotlib as ml  # unconventional
+28 | import plotly.express as pltx  # unconventional
+29 | import matplotlib as ml  # unconventional
    |
 
 custom.py:28:1: ICN001 `plotly.express` should be imported as `px`
    |
-28 | import holoviews as hsv  # unconventional
-29 | import panel as pns  # unconventional
-30 | import plotly.express as pltx  # unconventional
+26 | import holoviews as hsv  # unconventional
+27 | import panel as pns  # unconventional
+28 | import plotly.express as pltx  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-31 | import matplotlib as ml  # unconventional
-32 | import polars as ps # unconventional
+29 | import matplotlib as ml  # unconventional
+30 | import polars as ps # unconventional
    |
 
 custom.py:29:1: ICN001 `matplotlib` should be imported as `mpl`
    |
-29 | import panel as pns  # unconventional
-30 | import plotly.express as pltx  # unconventional
-31 | import matplotlib as ml  # unconventional
+27 | import panel as pns  # unconventional
+28 | import plotly.express as pltx  # unconventional
+29 | import matplotlib as ml  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^^^ ICN001
-32 | import polars as ps # unconventional
-33 | import pyarrow as arr  # unconventional
+30 | import polars as ps # unconventional
+31 | import pyarrow as arr  # unconventional
    |
 
 custom.py:30:1: ICN001 `polars` should be imported as `pl`
    |
-30 | import plotly.express as pltx  # unconventional
-31 | import matplotlib as ml  # unconventional
-32 | import polars as ps # unconventional
+28 | import plotly.express as pltx  # unconventional
+29 | import matplotlib as ml  # unconventional
+30 | import polars as ps # unconventional
    | ^^^^^^^^^^^^^^^^^^^ ICN001
-33 | import pyarrow as arr  # unconventional
+31 | import pyarrow as arr  # unconventional
    |
 
 custom.py:31:1: ICN001 `pyarrow` should be imported as `pa`
    |
-31 | import matplotlib as ml  # unconventional
-32 | import polars as ps # unconventional
-33 | import pyarrow as arr  # unconventional
+29 | import matplotlib as ml  # unconventional
+30 | import polars as ps # unconventional
+31 | import pyarrow as arr  # unconventional
    | ^^^^^^^^^^^^^^^^^^^^^ ICN001
-34 | 
-35 | import altair as alt  # conventional
+32 | 
+33 | import altair as alt  # conventional
    |
 
 

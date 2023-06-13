@@ -2,6 +2,7 @@
 
 pub mod preorder;
 
+use rustpython_ast::Decorator;
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler, Expr,
     ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, Unaryop, Withitem,
@@ -20,6 +21,9 @@ pub trait Visitor<'a> {
     }
     fn visit_annotation(&mut self, expr: &'a Expr) {
         walk_expr(self, expr);
+    }
+    fn visit_decorator(&mut self, decorator: &'a Decorator) {
+        walk_decorator(self, decorator);
     }
     fn visit_expr(&mut self, expr: &'a Expr) {
         walk_expr(self, expr);
@@ -93,8 +97,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             ..
         }) => {
             visitor.visit_arguments(args);
-            for expr in decorator_list {
-                visitor.visit_expr(expr);
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
             }
             for expr in returns {
                 visitor.visit_annotation(expr);
@@ -109,8 +113,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             ..
         }) => {
             visitor.visit_arguments(args);
-            for expr in decorator_list {
-                visitor.visit_expr(expr);
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
             }
             for expr in returns {
                 visitor.visit_annotation(expr);
@@ -130,8 +134,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for keyword in keywords {
                 visitor.visit_keyword(keyword);
             }
-            for expr in decorator_list {
-                visitor.visit_expr(expr);
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
             }
             visitor.visit_body(body);
         }
@@ -316,6 +320,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         }) => visitor.visit_expr(value),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => {}
     }
+}
+
+pub fn walk_decorator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, decorator: &'a Decorator) {
+    visitor.visit_expr(&decorator.expression);
 }
 
 pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {

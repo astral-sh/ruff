@@ -3,28 +3,28 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
 N805.py:7:20: N805 First argument of a method should be named `self`
   |
-7 | class Class:
-8 |     def bad_method(this):
+6 | class Class:
+7 |     def bad_method(this):
   |                    ^^^^ N805
-9 |         pass
+8 |         pass
   |
 
 N805.py:12:30: N805 First argument of a method should be named `self`
    |
-12 |     if False:
-13 | 
-14 |         def extra_bad_method(this):
+10 |     if False:
+11 | 
+12 |         def extra_bad_method(this):
    |                              ^^^^ N805
-15 |             pass
+13 |             pass
    |
 
 N805.py:60:29: N805 First argument of a method should be named `self`
    |
-60 |         pass
-61 | 
-62 |     def bad_method_pos_only(this, blah, /, self, something: str):
+58 |         pass
+59 | 
+60 |     def bad_method_pos_only(this, blah, /, self, something: str):
    |                             ^^^^ N805
-63 |         pass
+61 |         pass
    |
 
 

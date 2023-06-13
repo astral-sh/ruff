@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
-288 | @expect('D210: No whitespaces allowed surrounding docstring text')
-289 | def endswith():
-290 |     """Whitespace at the end. """
+286 | @expect('D210: No whitespaces allowed surrounding docstring text')
+287 | def endswith():
+288 |     """Whitespace at the end. """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
     |
     = help: Trim surrounding whitespace
@@ -22,9 +22,9 @@ D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
 
 D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
-293 | @expect('D210: No whitespaces allowed surrounding docstring text')
-294 | def around():
-295 |     """ Whitespace at everywhere. """
+291 | @expect('D210: No whitespaces allowed surrounding docstring text')
+292 | def around():
+293 |     """ Whitespace at everywhere. """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
     |
     = help: Trim surrounding whitespace
@@ -41,13 +41,13 @@ D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
 
 D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
-299 |   @expect('D213: Multi-line docstring summary should start at the second line')
-300 |   def multiline():
-301 |       """ Whitespace at the beginning.
+297 |   @expect('D213: Multi-line docstring summary should start at the second line')
+298 |   def multiline():
+299 |       """ Whitespace at the beginning.
     |  _____^
-302 | | 
-303 | |     This is the end.
-304 | |     """
+300 | | 
+301 | |     This is the end.
+302 | |     """
     | |_______^ D210
     |
     = help: Trim surrounding whitespace
@@ -64,9 +64,9 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
 
 D.py:581:5: D210 No whitespaces allowed surrounding docstring text
     |
-581 |         "or exclamation point (not '\"')")
-582 | def endswith_quote():
-583 |     """Whitespace at the end, but also a quote" """
+579 |         "or exclamation point (not '\"')")
+580 | def endswith_quote():
+581 |     """Whitespace at the end, but also a quote" """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
     |
     = help: Trim surrounding whitespace

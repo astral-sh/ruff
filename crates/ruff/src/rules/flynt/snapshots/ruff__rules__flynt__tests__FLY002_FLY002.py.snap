@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flynt/mod.rs
 ---
 FLY002.py:5:7: FLY002 [*] Consider `f"{a}  World"` instead of string join
   |
-5 | a = "Hello"
-6 | ok1 = " ".join([a, " World"])  # OK
+4 | a = "Hello"
+5 | ok1 = " ".join([a, " World"])  # OK
   |       ^^^^^^^^^^^^^^^^^^^^^^^ FLY002
-7 | ok2 = "".join(["Finally, ", a, " World"])  # OK
-8 | ok3 = "x".join(("1", "2", "3"))  # OK
+6 | ok2 = "".join(["Finally, ", a, " World"])  # OK
+7 | ok3 = "x".join(("1", "2", "3"))  # OK
   |
   = help: Replace with `f"{a}  World"`
 
@@ -22,15 +22,15 @@ FLY002.py:5:7: FLY002 [*] Consider `f"{a}  World"` instead of string join
 8 8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
 
 FLY002.py:6:7: FLY002 [*] Consider `f"Finally, {a} World"` instead of string join
-   |
- 6 | a = "Hello"
- 7 | ok1 = " ".join([a, " World"])  # OK
- 8 | ok2 = "".join(["Finally, ", a, " World"])  # OK
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
- 9 | ok3 = "x".join(("1", "2", "3"))  # OK
-10 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
-   |
-   = help: Replace with `f"Finally, {a} World"`
+  |
+4 | a = "Hello"
+5 | ok1 = " ".join([a, " World"])  # OK
+6 | ok2 = "".join(["Finally, ", a, " World"])  # OK
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
+7 | ok3 = "x".join(("1", "2", "3"))  # OK
+8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
+  |
+  = help: Replace with `f"Finally, {a} World"`
 
 ℹ Suggested fix
 3 3 | 
@@ -42,35 +42,35 @@ FLY002.py:6:7: FLY002 [*] Consider `f"Finally, {a} World"` instead of string joi
 8 8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
 9 9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
 
-FLY002.py:7:7: FLY002 [*] Consider `f"1x2x3"` instead of string join
-   |
- 7 | ok1 = " ".join([a, " World"])  # OK
- 8 | ok2 = "".join(["Finally, ", a, " World"])  # OK
- 9 | ok3 = "x".join(("1", "2", "3"))  # OK
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
-10 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
-11 | ok5 = "a".join([random(), random()])  # OK (simple calls)
-   |
-   = help: Replace with `f"1x2x3"`
+FLY002.py:7:7: FLY002 [*] Consider `"1x2x3"` instead of string join
+  |
+5 | ok1 = " ".join([a, " World"])  # OK
+6 | ok2 = "".join(["Finally, ", a, " World"])  # OK
+7 | ok3 = "x".join(("1", "2", "3"))  # OK
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
+8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
+9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
+  |
+  = help: Replace with `"1x2x3"`
 
 ℹ Suggested fix
 4 4 | a = "Hello"
 5 5 | ok1 = " ".join([a, " World"])  # OK
 6 6 | ok2 = "".join(["Finally, ", a, " World"])  # OK
 7   |-ok3 = "x".join(("1", "2", "3"))  # OK
-  7 |+ok3 = f"1x2x3"  # OK
+  7 |+ok3 = "1x2x3"  # OK
 8 8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
 9 9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
 10 10 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
 
 FLY002.py:8:7: FLY002 [*] Consider `f"{1}y{2}y{3}"` instead of string join
    |
- 8 | ok2 = "".join(["Finally, ", a, " World"])  # OK
- 9 | ok3 = "x".join(("1", "2", "3"))  # OK
-10 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
+ 6 | ok2 = "".join(["Finally, ", a, " World"])  # OK
+ 7 | ok3 = "x".join(("1", "2", "3"))  # OK
+ 8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
    |       ^^^^^^^^^^^^^^^^^^^ FLY002
-11 | ok5 = "a".join([random(), random()])  # OK (simple calls)
-12 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
+ 9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
+10 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
    |
    = help: Replace with `f"{1}y{2}y{3}"`
 
@@ -86,11 +86,11 @@ FLY002.py:8:7: FLY002 [*] Consider `f"{1}y{2}y{3}"` instead of string join
 
 FLY002.py:9:7: FLY002 [*] Consider `f"{random()}a{random()}"` instead of string join
    |
- 9 | ok3 = "x".join(("1", "2", "3"))  # OK
-10 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
-11 | ok5 = "a".join([random(), random()])  # OK (simple calls)
+ 7 | ok3 = "x".join(("1", "2", "3"))  # OK
+ 8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
+ 9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
-12 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
+10 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
    |
    = help: Replace with `f"{random()}a{random()}"`
 
@@ -106,12 +106,12 @@ FLY002.py:9:7: FLY002 [*] Consider `f"{random()}a{random()}"` instead of string 
 
 FLY002.py:10:7: FLY002 [*] Consider `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"` instead of string join
    |
-10 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
-11 | ok5 = "a".join([random(), random()])  # OK (simple calls)
-12 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
+ 8 | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
+ 9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
+10 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002
-13 | 
-14 | nok1 = "x".join({"4", "5", "yee"})  # Not OK (set)
+11 | 
+12 | nok1 = "x".join({"4", "5", "yee"})  # Not OK (set)
    |
    = help: Replace with `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"`
 

@@ -8,6 +8,7 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
   - [Project Structure](#project-structure)
   - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
     - [Rule naming convention](#rule-naming-convention)
+    - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
   - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
 - [MkDocs](#mkdocs)
 - [Release Process](#release-process)
@@ -20,18 +21,18 @@ Ruff welcomes contributions in the form of Pull Requests.
 For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
-creating an [**issue**](https://github.com/charliermarsh/ruff/issues) outlining your proposed
-change. You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with
-the community.
+creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
+You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
+community.
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:
 [_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
 pattern-match against the examples in the existing codebase. Many lint rules are inspired by
 existing Python plugins, which can be used as a reference implementation.
 
-As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
-plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi)
-for guidance.
+As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/astral-sh/ruff/issues/848)
+plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi) for
+guidance.
 
 ### Prerequisites
 
@@ -57,8 +58,8 @@ and that it passes both the lint and test validation checks:
 
 ```shell
 cargo fmt  # Auto-formatting...
-cargo clippy --fix --workspace --all-targets --all-features  # Linting...
 cargo test  # Testing...
+cargo clippy --workspace --all-targets --all-features -- -D warnings  # Linting...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -92,67 +93,122 @@ The vast majority of the code, including all lint rules, lives in the `ruff` cra
 At time of writing, the repository includes the following crates:
 
 - `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+- `crates/ruff_benchmark`: binary crate for running micro-benchmarks.
+- `crates/ruff_cache`: library crate for caching lint results.
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
-- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
+- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
+  `cargo dev generate-all`).
+- `crates/ruff_diagnostics`: library crate for the lint diagnostics APIs.
+- `crates/ruff_formatter`: library crate for generic code formatting logic based on an intermediate
+  representation.
+- `crates/ruff_index`: library crate inspired by `rustc_index`.
 - `crates/ruff_macros`: library crate containing macros used by Ruff.
-- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
-- `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
+- `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
+- `crates/ruff_python_formatter`: library crate containing Python-specific code formatting logic.
+- `crates/ruff_python_semantic`: library crate containing Python-specific semantic analysis logic,
+  including Ruff's semantic model.
+- `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data.
+- `crates/ruff_python_whitespace`: library crate containing Python-specific whitespace analysis
+  logic.
+- `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
+- `crates/ruff_testing_macros`: library crate containing macros used for testing Ruff.
+- `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
+- `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module.
 
 ### Example: Adding a new lint rule
 
 At a high level, the steps involved in adding a new lint rule are as follows:
 
-1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
-1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
-1. In that file, define a violation struct. You can grep for `#[violation]` to see examples.
-1. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
-1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for AST-based
-   checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
-   (for text-based checks), or `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based
-   checks).
-1. Add a test fixture.
+1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
+   (e.g., `AssertFalse`, as in, "allow `assert False`").
+
+1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/assert_false.rs`).
+
+1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
+   `#[violation]` to see examples.
+
+1. In that file, define a function that adds the violation to the diagnostic list as appropriate
+   (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
+   an `ast::StmtAssert` node).
+
+1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for
+   AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
+   `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
+   `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
+
+1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `B011`).
+
+1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
+
 1. Update the generated files (documentation and generated code).
 
-To define the violation, start by creating a dedicated file for your rule under the appropriate
-rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
-contain a struct defined via `#[violation]`, along with a function that creates the violation
-based on any required inputs.
-
-To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`,
-which defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
-collecting diagnostics as it goes.
+To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`
+to call your new function at the appropriate time and with the appropriate inputs. The `Checker`
+defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
+and calling out to lint rule analyzer functions as it goes.
 
 If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
-for the `Check::new` invocations to understand how other, similar rules are implemented.
+for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
 
-To add a test fixture, create a file under `crates/ruff/resources/test/fixtures/[linter]`, named to match
-the code you defined earlier (e.g., `crates/ruff/resources/test/fixtures/pycodestyle/E402.py`). This file should
-contain a variety of violations and non-violations designed to evaluate and demonstrate the behavior
-of your lint rule.
+Once you're satisfied with your code, add tests for your rule. See [rule testing](#rule-testing-fixtures-and-snapshots)
+for more details.
 
-Run `cargo dev generate-all` to generate the code for your new fixture. Then run Ruff
-locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
-
-Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. Then, run `cargo test`.
-Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
-generated snapshot, then commit the snapshot file alongside the rest of your changes.
-
-Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
+Finally, regenerate the documentation and other generated assets (like our JSON Schema) with:
+`cargo dev generate-all`.
 
 #### Rule naming convention
 
-The rule name should make sense when read as "allow _rule-name_" or "allow _rule-name_ items".
+Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
+${rule}" or "allow ${rule} items", as in the context of suppression comments.
 
-This implies that rule names:
+For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
+suppression comment would be framed as "allow `assert False`".
 
-- should state the bad thing being checked for
+As such, rule names should...
 
-- should not contain instructions on what you should use instead
-  (these belong in the rule documentation and the `autofix_title` for rules that have autofix)
+- Highlight the pattern that is being linted against, rather than the preferred alternative.
+  For example, `AssertFalse` guards against `assert False` statements.
 
-When re-implementing rules from other linters, this convention is given more importance than
+- _Not_ contain instructions on how to fix the violation, which instead belong in the rule
+  documentation and the `autofix_title`.
+
+- _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
+  convention.
+
+When re-implementing rules from other linters, we prioritize adhering to this convention over
 preserving the original rule name.
+
+#### Rule testing: fixtures and snapshots
+
+To test rules, Ruff uses snapshots of Ruff's output for a given file (fixture). Generally, there
+will be one file per rule (e.g., `E402.py`), and each file will contain all necessary examples of
+both violations and non-violations. `cargo insta review` will generate a snapshot file containing
+Ruff's output for each fixture, which you can then commit alongside your changes.
+
+Once you've completed the code for the rule itself, you can define tests with the following steps:
+
+1. Add a Python file to `crates/ruff/resources/test/fixtures/[linter]` that contains the code you
+   want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
+   examples of both violations and non-violations.
+
+1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
+   with the output (you see the violations you expect, and no others), proceed to the next step.
+   For example, if you're adding a new rule named `E402`, you would run:
+
+   ```shell
+   cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
+   ```
+
+1. Add the test to the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. If you're contributing
+   a rule to a pre-existing set, you should be able to find a similar example to pattern-match
+   against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
+   e.g., `crates/ruff/src/rules/flake8_bugbear/mod.rs`)
+
+1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
+   with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
+   then commit the snapshot file alongside the rest of your changes.
+
+1. Run `cargo test` again to ensure that your test passes.
 
 ### Example: Adding a new configuration option
 
@@ -183,6 +239,8 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 ## MkDocs
 
 To preview any changes to the documentation locally:
+
+1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
 
 1. Install MkDocs and Material for MkDocs with:
 
@@ -225,7 +283,7 @@ python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
 
 You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
 downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
-as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/charliermarsh/ruff/blob/main/scripts/Dockerfile.ecosystem).
+as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/astral-sh/ruff/blob/main/scripts/Dockerfile.ecosystem).
 Note that this check will take a while to run.
 
 ## Benchmarks

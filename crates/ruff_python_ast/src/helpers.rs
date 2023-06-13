@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ops::{Add, Sub};
 use std::path::Path;
 
 use itertools::Itertools;
@@ -13,8 +14,9 @@ use rustpython_parser::ast::{
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator};
+
 use crate::call_path::CallPath;
-use crate::newlines::UniversalNewlineIterator;
 use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 
@@ -363,7 +365,9 @@ where
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
                 || returns
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
@@ -380,7 +384,9 @@ where
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
         }
         Stmt::Return(ast::StmtReturn {
             value,
@@ -540,7 +546,7 @@ where
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
-fn is_dunder(id: &str) -> bool {
+pub fn is_dunder(id: &str) -> bool {
     id.starts_with("__") && id.ends_with("__")
 }
 
@@ -684,9 +690,24 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 /// callable.
 pub fn map_callable(decorator: &Expr) -> &Expr {
     if let Expr::Call(ast::ExprCall { func, .. }) = decorator {
+        // Ex) `@decorator()`
         func
     } else {
+        // Ex) `@decorator`
         decorator
+    }
+}
+
+/// Given an [`Expr`] that can be callable or not (like a decorator, which could
+/// be used with or without explicit call syntax), return the underlying
+/// callable.
+pub fn map_subscript(expr: &Expr) -> &Expr {
+    if let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr {
+        // Ex) `Iterable[T]`
+        value
+    } else {
+        // Ex) `Iterable`
+        expr
     }
 }
 
@@ -785,7 +806,7 @@ pub fn format_import_from(level: Option<u32>, module: Option<&str>) -> String {
 /// assert_eq!(format_import_from_member(Some(1), Some("foo"), "bar"), ".foo.bar".to_string());
 /// ```
 pub fn format_import_from_member(level: Option<u32>, module: Option<&str>, member: &str) -> String {
-    let mut full_name = String::with_capacity(
+    let mut qualified_name = String::with_capacity(
         (level.unwrap_or(0) as usize)
             + module.as_ref().map_or(0, |module| module.len())
             + 1
@@ -793,15 +814,15 @@ pub fn format_import_from_member(level: Option<u32>, module: Option<&str>, membe
     );
     if let Some(level) = level {
         for _ in 0..level {
-            full_name.push('.');
+            qualified_name.push('.');
         }
     }
     if let Some(module) = module {
-        full_name.push_str(module);
-        full_name.push('.');
+        qualified_name.push_str(module);
+        qualified_name.push('.');
     }
-    full_name.push_str(member);
-    full_name
+    qualified_name.push_str(member);
+    qualified_name
 }
 
 /// Create a module path from a (package, path) pair.
@@ -892,7 +913,7 @@ pub fn resolve_imported_module_path<'a>(
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
-    pub returns: Vec<Option<&'a Expr>>,
+    pub returns: Vec<&'a ast::StmtReturn>,
 }
 
 impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
@@ -904,10 +925,7 @@ where
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 // Don't recurse.
             }
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _range,
-            }) => self.returns.push(value.as_deref()),
+            Stmt::Return(stmt) => self.returns.push(stmt),
             _ => walk_stmt(self, stmt),
         }
     }
@@ -1015,7 +1033,7 @@ pub fn trailing_lines_end(stmt: &Stmt, locator: &Locator) -> TextSize {
     let rest = &locator.contents()[usize::from(line_end)..];
 
     UniversalNewlineIterator::with_offset(rest, line_end)
-        .take_while(|line| line.trim().is_empty())
+        .take_while(|line| line.trim_whitespace().is_empty())
         .last()
         .map_or(line_end, |l| l.full_end())
 }
@@ -1026,7 +1044,7 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 
     let mut fix_start = None;
     let mut fix_end = None;
-    let mut count: usize = 0;
+    let mut count = 0u32;
 
     for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, start).flatten() {
         match tok {
@@ -1034,10 +1052,10 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
                 if count == 0 {
                     fix_start = Some(range.start());
                 }
-                count += 1;
+                count = count.saturating_add(1);
             }
             Tok::Rpar => {
-                count -= 1;
+                count = count.saturating_sub(1);
                 if count == 0 {
                     fix_end = Some(range.end());
                     break;
@@ -1051,6 +1069,21 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
         (Some(start), Some(end)) => Some(TextRange::new(start, end)),
         _ => None,
     }
+}
+
+/// Return `true` if the given character is a valid identifier character.
+fn is_identifier(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+#[derive(Debug)]
+enum IdentifierState {
+    /// We're in a comment, awaiting the identifier at the given index.
+    InComment { index: usize },
+    /// We're looking for the identifier at the given index.
+    AwaitingIdentifier { index: usize },
+    /// We're in the identifier at the given index, starting at the given character.
+    InIdentifier { index: usize, start: TextSize },
 }
 
 /// Return the appropriate visual `Range` for any message that spans a `Stmt`.
@@ -1077,17 +1110,59 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
                 TextRange::new(last_decorator.end(), range.end())
             });
 
-            let contents = locator.slice(header_range);
+            // If the statement is an async function, we're looking for the third
+            // keyword-or-identifier (`foo` in `async def foo()`). Otherwise, it's the
+            // second keyword-or-identifier (`foo` in `def foo()` or `Foo` in `class Foo`).
+            let name_index = if stmt.is_async_function_def_stmt() {
+                2
+            } else {
+                1
+            };
 
-            let mut tokens =
-                lexer::lex_starts_at(contents, Mode::Module, header_range.start()).flatten();
-            tokens
-                .find_map(|(t, range)| t.is_name().then_some(range))
-                .unwrap_or_else(|| {
-                    error!("Failed to find identifier for {:?}", stmt);
+            let mut state = IdentifierState::AwaitingIdentifier { index: 0 };
+            for (char_index, char) in locator.slice(header_range).char_indices() {
+                match state {
+                    IdentifierState::InComment { index } => match char {
+                        // Read until the end of the comment.
+                        '\r' | '\n' => {
+                            state = IdentifierState::AwaitingIdentifier { index };
+                        }
+                        _ => {}
+                    },
+                    IdentifierState::AwaitingIdentifier { index } => match char {
+                        // Read until we hit an identifier.
+                        '#' => {
+                            state = IdentifierState::InComment { index };
+                        }
+                        c if is_identifier(c) => {
+                            state = IdentifierState::InIdentifier {
+                                index,
+                                start: TextSize::try_from(char_index).unwrap(),
+                            };
+                        }
+                        _ => {}
+                    },
+                    IdentifierState::InIdentifier { index, start } => {
+                        // We've reached the end of the identifier.
+                        if !is_identifier(char) {
+                            if index == name_index {
+                                // We've found the identifier we're looking for.
+                                let end = TextSize::try_from(char_index).unwrap();
+                                return TextRange::new(
+                                    header_range.start().add(start),
+                                    header_range.start().add(end),
+                                );
+                            }
 
-                    header_range
-                })
+                            // We're looking for a different identifier.
+                            state = IdentifierState::AwaitingIdentifier { index: index + 1 };
+                        }
+                    }
+                }
+            }
+
+            error!("Failed to find identifier for {:?}", stmt);
+            header_range
         }
         _ => stmt.range(),
     }
@@ -1186,10 +1261,8 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
 }
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    let Stmt::If(ast::StmtIf { body, orelse, .. } )= stmt else {
-        return None;
-    };
+pub fn elif_else_range(stmt: &ast::StmtIf, locator: &Locator) -> Option<TextRange> {
+    let ast::StmtIf { body, orelse, .. } = stmt;
 
     let start = body.last().expect("Expected body to be non-empty").end();
 
@@ -1424,25 +1497,35 @@ impl LocatedCmpop {
     }
 }
 
-/// Extract all [`Cmpop`] operators from a source code snippet, with appropriate
+/// Extract all [`Cmpop`] operators from an expression snippet, with appropriate
 /// ranges.
 ///
 /// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
 /// `CPython` doesn't either. This method iterates over the token stream and
 /// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
-pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
-    let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
+pub fn locate_cmpops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpop> {
+    // If `Expr` is a multi-line expression, we need to parenthesize it to
+    // ensure that it's lexed correctly.
+    let contents = locator.slice(expr.range());
+    let parenthesized_contents = format!("({contents})");
+    let mut tok_iter = lexer::lex(&parenthesized_contents, Mode::Expression)
+        .flatten()
+        .skip(1)
+        .map(|(tok, range)| (tok, range.sub(TextSize::from(1))))
+        .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment(_)))
+        .peekable();
+
     let mut ops: Vec<LocatedCmpop> = vec![];
-    let mut count: usize = 0;
+    let mut count = 0u32;
     loop {
         let Some((tok, range)) = tok_iter.next() else {
             break;
         };
         if matches!(tok, Tok::Lpar) {
-            count += 1;
+            count = count.saturating_add(1);
             continue;
         } else if matches!(tok, Tok::Rpar) {
-            count -= 1;
+            count = count.saturating_sub(1);
             continue;
         }
         if count == 0 {
@@ -1596,8 +1679,9 @@ mod tests {
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_parser as parser;
+    use rustpython_ast::{Expr, Stmt, Suite};
     use rustpython_parser::ast::Cmpop;
+    use rustpython_parser::Parse;
 
     use crate::helpers::{
         elif_else_range, else_range, first_colon_range, has_trailing_content, identifier_range,
@@ -1608,25 +1692,25 @@ mod tests {
     #[test]
     fn trailing_content() -> Result<()> {
         let contents = "x = 1";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
 
         let contents = "x = 1; y = 2";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(has_trailing_content(stmt, &locator));
 
         let contents = "x = 1  ";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
 
         let contents = "x = 1  # Comment";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
@@ -1636,7 +1720,7 @@ x = 1
 y = 2
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
@@ -1647,12 +1731,19 @@ y = 2
     #[test]
     fn extract_identifier_range() -> Result<()> {
         let contents = "def f(): pass".trim();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(4), TextSize::from(5))
+        );
+
+        let contents = "async def f(): pass".trim();
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            identifier_range(&stmt, &locator),
+            TextRange::new(TextSize::from(10), TextSize::from(11))
         );
 
         let contents = r#"
@@ -1661,29 +1752,26 @@ def \
   pass
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(8), TextSize::from(9))
         );
 
         let contents = "class Class(): pass".trim();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
         let contents = "class Class: pass".trim();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
@@ -1693,20 +1781,31 @@ class Class():
   pass
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(19), TextSize::from(24))
         );
 
-        let contents = r#"x = y + 1"#.trim();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let contents = r#"
+@decorator()  # Comment
+class Class():
+  pass
+"#
+        .trim();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier_range(stmt, &locator),
+            identifier_range(&stmt, &locator),
+            TextRange::new(TextSize::from(30), TextSize::from(35))
+        );
+
+        let contents = r#"x = y + 1"#.trim();
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            identifier_range(&stmt, &locator),
             TextRange::new(TextSize::from(0), TextSize::from(9))
         );
 
@@ -1759,10 +1858,9 @@ else:
     pass
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
-        let range = else_range(stmt, &locator).unwrap();
+        let range = else_range(&stmt, &locator).unwrap();
         assert_eq!(&contents[range], "else");
         assert_eq!(
             range,
@@ -1786,29 +1884,25 @@ else:
 
     #[test]
     fn extract_elif_else_range() -> Result<()> {
-        let contents = "
-if a:
+        let contents = "if a:
     ...
 elif b:
     ...
-"
-        .trim_start();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+";
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
         assert_eq!(range.end(), TextSize::from(18));
 
-        let contents = "
-if a:
+        let contents = "if a:
     ...
 else:
     ...
-"
-        .trim_start();
-        let program = parser::parse_program(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
+";
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
@@ -1818,61 +1912,84 @@ else:
     }
 
     #[test]
-    fn extract_cmpop_location() {
+    fn extract_cmpop_location() -> Result<()> {
+        let contents = "x == 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x == 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::Eq
             )]
         );
 
+        let contents = "x != 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x != 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::NotEq
             )]
         );
 
+        let contents = "x is 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x is 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::Is
             )]
         );
 
+        let contents = "x is not 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x is not 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(8),
                 Cmpop::IsNot
             )]
         );
 
+        let contents = "x in 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x in 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::In
             )]
         );
 
+        let contents = "x not in 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x not in 1"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(8),
                 Cmpop::NotIn
             )]
         );
 
+        let contents = "x != (1 is not 2)";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops("x != (1 is not 2)"),
+            locate_cmpops(&expr, &locator),
             vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::NotEq
             )]
         );
+
+        Ok(())
     }
 }

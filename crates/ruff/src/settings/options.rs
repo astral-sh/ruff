@@ -8,10 +8,11 @@ use ruff_macros::ConfigurationOptions;
 use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
+    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -216,7 +217,7 @@ pub struct Options {
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     pub fix_only: Option<bool>,
     #[option(
-        default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]"#,
+        default = r#"["ALL"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
             # Only allow autofix behavior for `E` and `F` rules.
@@ -407,11 +408,15 @@ pub struct Options {
     /// (e.g., `src = ["src"]`), such that when resolving imports,
     /// `my_package.foo` is considered a first-party import.
     ///
+    /// When omitted, the `src` directory will typically default to the
+    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
+    /// `.ruff.toml` file (the "project root"), unless a configuration file
+    /// is explicitly provided (e.g., via the `--config` command-line flag).
+    ///
     /// This field supports globs. For example, if you have a series of Python
     /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
-    /// would expand to incorporate all of the
-    /// packages in that directory. User home directory and environment
-    /// variables will also be expanded.
+    /// would expand to incorporate all of the packages in that directory. User
+    /// home directory and environment variables will also be expanded.
     pub src: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -432,12 +437,13 @@ pub struct Options {
             target-version = "py37"
         "#
     )]
-    /// The Python version to target, e.g., when considering automatic code
-    /// upgrades, like rewriting type annotations.
+    /// The minimum Python version to target, e.g., when considering automatic
+    /// code upgrades, like rewriting type annotations.
     ///
-    /// If omitted, the target version will be inferred from the
-    /// `project.requires-python` field in the relevant `pyproject.toml`
-    /// (e.g., `requires-python = ">=3.8"`), if present.
+    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
+    /// target version will be inferred from its `project.requires-python`
+    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
+    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
     pub target_version: Option<PythonVersion>,
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
@@ -490,6 +496,9 @@ pub struct Options {
     /// Options for the `flake8-comprehensions` plugin.
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     #[option_group]
+    /// Options for the `copyright` plugin.
+    pub copyright: Option<copyright::settings::Options>,
+    #[option_group]
     /// Options for the `flake8-errmsg` plugin.
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     #[option_group]
@@ -534,6 +543,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pydocstyle` plugin.
     pub pydocstyle: Option<pydocstyle::settings::Options>,
+    #[option_group]
+    /// Options for the `pyflakes` plugin.
+    pub pyflakes: Option<pyflakes::settings::Options>,
     #[option_group]
     /// Options for the `pylint` plugin.
     pub pylint: Option<pylint::settings::Options>,

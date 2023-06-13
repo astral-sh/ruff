@@ -3,13 +3,13 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
   |
-2 | class A:
-3 |     __metaclass__ = type
+1 | class A:
+2 |     __metaclass__ = type
   |     ^^^^^^^^^^^^^^^^^^^^ UP001
   |
   = help: Remove `metaclass = type`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | class A:
 2   |-    __metaclass__ = type
   2 |+    pass
@@ -19,15 +19,15 @@ UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
 
 UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
   |
-6 | class B:
-7 |     __metaclass__ = type
+5 | class B:
+6 |     __metaclass__ = type
   |     ^^^^^^^^^^^^^^^^^^^^ UP001
-8 | 
-9 |     def __init__(self) -> None:
+7 | 
+8 |     def __init__(self) -> None:
   |
   = help: Remove `metaclass = type`
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | 
 4 4 | 
 5 5 | class B:

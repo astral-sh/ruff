@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F541.py:6:5: F541 [*] f-string without any placeholders
   |
-6 | # Errors
-7 | c = f"def"
+5 | # Errors
+6 | c = f"def"
   |     ^^^^^^ F541
-8 | d = f"def" + "ghi"
-9 | e = (
+7 | d = f"def" + "ghi"
+8 | e = (
   |
   = help: Remove extraneous `f` prefix
 
@@ -22,15 +22,15 @@ F541.py:6:5: F541 [*] f-string without any placeholders
 9 9 |     f"def" +
 
 F541.py:7:5: F541 [*] f-string without any placeholders
-   |
- 7 | # Errors
- 8 | c = f"def"
- 9 | d = f"def" + "ghi"
-   |     ^^^^^^ F541
-10 | e = (
-11 |     f"def" +
-   |
-   = help: Remove extraneous `f` prefix
+  |
+5 | # Errors
+6 | c = f"def"
+7 | d = f"def" + "ghi"
+  |     ^^^^^^ F541
+8 | e = (
+9 |     f"def" +
+  |
+  = help: Remove extraneous `f` prefix
 
 ℹ Suggested fix
 4 4 | 
@@ -44,12 +44,12 @@ F541.py:7:5: F541 [*] f-string without any placeholders
 
 F541.py:9:5: F541 [*] f-string without any placeholders
    |
- 9 | d = f"def" + "ghi"
-10 | e = (
-11 |     f"def" +
+ 7 | d = f"def" + "ghi"
+ 8 | e = (
+ 9 |     f"def" +
    |     ^^^^^^ F541
-12 |     "ghi"
-13 | )
+10 |     "ghi"
+11 | )
    |
    = help: Remove extraneous `f` prefix
 
@@ -65,12 +65,12 @@ F541.py:9:5: F541 [*] f-string without any placeholders
 
 F541.py:13:5: F541 [*] f-string without any placeholders
    |
-13 | )
-14 | f = (
-15 |     f"a"
+11 | )
+12 | f = (
+13 |     f"a"
    |     ^^^^ F541
-16 |     F"b"
-17 |     "c"
+14 |     F"b"
+15 |     "c"
    |
    = help: Remove extraneous `f` prefix
 
@@ -86,12 +86,12 @@ F541.py:13:5: F541 [*] f-string without any placeholders
 
 F541.py:14:5: F541 [*] f-string without any placeholders
    |
-14 | f = (
-15 |     f"a"
-16 |     F"b"
+12 | f = (
+13 |     f"a"
+14 |     F"b"
    |     ^^^^ F541
-17 |     "c"
-18 |     rf"d"
+15 |     "c"
+16 |     rf"d"
    |
    = help: Remove extraneous `f` prefix
 
@@ -107,12 +107,12 @@ F541.py:14:5: F541 [*] f-string without any placeholders
 
 F541.py:16:5: F541 [*] f-string without any placeholders
    |
-16 |     F"b"
-17 |     "c"
-18 |     rf"d"
+14 |     F"b"
+15 |     "c"
+16 |     rf"d"
    |     ^^^^^ F541
-19 |     fr"e"
-20 | )
+17 |     fr"e"
+18 | )
    |
    = help: Remove extraneous `f` prefix
 
@@ -128,12 +128,12 @@ F541.py:16:5: F541 [*] f-string without any placeholders
 
 F541.py:17:5: F541 [*] f-string without any placeholders
    |
-17 |     "c"
-18 |     rf"d"
-19 |     fr"e"
+15 |     "c"
+16 |     rf"d"
+17 |     fr"e"
    |     ^^^^^ F541
-20 | )
-21 | g = f""
+18 | )
+19 | g = f""
    |
    = help: Remove extraneous `f` prefix
 
@@ -149,12 +149,12 @@ F541.py:17:5: F541 [*] f-string without any placeholders
 
 F541.py:19:5: F541 [*] f-string without any placeholders
    |
-19 |     fr"e"
-20 | )
-21 | g = f""
+17 |     fr"e"
+18 | )
+19 | g = f""
    |     ^^^ F541
-22 | 
-23 | # OK
+20 | 
+21 | # OK
    |
    = help: Remove extraneous `f` prefix
 
@@ -170,11 +170,11 @@ F541.py:19:5: F541 [*] f-string without any placeholders
 
 F541.py:25:13: F541 [*] f-string without any placeholders
    |
-25 | # Error
-26 | h = "x" "y" f"z"
+24 | # Error
+25 | h = "x" "y" f"z"
    |             ^^^^ F541
-27 | 
-28 | v = 23.234234
+26 | 
+27 | v = 23.234234
    |
    = help: Remove extraneous `f` prefix
 
@@ -190,11 +190,11 @@ F541.py:25:13: F541 [*] f-string without any placeholders
 
 F541.py:34:7: F541 [*] f-string without any placeholders
    |
-34 | # Errors
-35 | f"{v:{f'0.2f'}}"
+33 | # Errors
+34 | f"{v:{f'0.2f'}}"
    |       ^^^^^^^ F541
-36 | f"{f''}"
-37 | f"{{test}}"
+35 | f"{f''}"
+36 | f"{{test}}"
    |
    = help: Remove extraneous `f` prefix
 
@@ -210,12 +210,12 @@ F541.py:34:7: F541 [*] f-string without any placeholders
 
 F541.py:35:4: F541 [*] f-string without any placeholders
    |
-35 | # Errors
-36 | f"{v:{f'0.2f'}}"
-37 | f"{f''}"
+33 | # Errors
+34 | f"{v:{f'0.2f'}}"
+35 | f"{f''}"
    |    ^^^ F541
-38 | f"{{test}}"
-39 | f'{{ 40 }}'
+36 | f"{{test}}"
+37 | f'{{ 40 }}'
    |
    = help: Remove extraneous `f` prefix
 
@@ -231,12 +231,12 @@ F541.py:35:4: F541 [*] f-string without any placeholders
 
 F541.py:36:1: F541 [*] f-string without any placeholders
    |
-36 | f"{v:{f'0.2f'}}"
-37 | f"{f''}"
-38 | f"{{test}}"
+34 | f"{v:{f'0.2f'}}"
+35 | f"{f''}"
+36 | f"{{test}}"
    | ^^^^^^^^^^^ F541
-39 | f'{{ 40 }}'
-40 | f"{{a {{x}}"
+37 | f'{{ 40 }}'
+38 | f"{{a {{x}}"
    |
    = help: Remove extraneous `f` prefix
 
@@ -252,12 +252,12 @@ F541.py:36:1: F541 [*] f-string without any placeholders
 
 F541.py:37:1: F541 [*] f-string without any placeholders
    |
-37 | f"{f''}"
-38 | f"{{test}}"
-39 | f'{{ 40 }}'
+35 | f"{f''}"
+36 | f"{{test}}"
+37 | f'{{ 40 }}'
    | ^^^^^^^^^^^ F541
-40 | f"{{a {{x}}"
-41 | f"{{{{x}}}}"
+38 | f"{{a {{x}}"
+39 | f"{{{{x}}}}"
    |
    = help: Remove extraneous `f` prefix
 
@@ -273,11 +273,11 @@ F541.py:37:1: F541 [*] f-string without any placeholders
 
 F541.py:38:1: F541 [*] f-string without any placeholders
    |
-38 | f"{{test}}"
-39 | f'{{ 40 }}'
-40 | f"{{a {{x}}"
+36 | f"{{test}}"
+37 | f'{{ 40 }}'
+38 | f"{{a {{x}}"
    | ^^^^^^^^^^^^ F541
-41 | f"{{{{x}}}}"
+39 | f"{{{{x}}}}"
    |
    = help: Remove extraneous `f` prefix
 
@@ -293,12 +293,12 @@ F541.py:38:1: F541 [*] f-string without any placeholders
 
 F541.py:39:1: F541 [*] f-string without any placeholders
    |
-39 | f'{{ 40 }}'
-40 | f"{{a {{x}}"
-41 | f"{{{{x}}}}"
+37 | f'{{ 40 }}'
+38 | f"{{a {{x}}"
+39 | f"{{{{x}}}}"
    | ^^^^^^^^^^^^ F541
-42 | 
-43 | # To be fixed
+40 | 
+41 | # To be fixed
    |
    = help: Remove extraneous `f` prefix
 

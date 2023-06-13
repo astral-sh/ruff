@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 ---
 simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for special method `__str__`
   |
-2 | class Foo:
-3 |     def __str__(self):
+1 | class Foo:
+2 |     def __str__(self):
   |         ^^^^^^^ ANN204
-4 |         ...
+3 |         ...
   |
   = help: Add `None` return type
 
@@ -20,11 +20,11 @@ simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for speci
 
 simple_magic_methods.py:5:9: ANN204 [*] Missing return type annotation for special method `__repr__`
   |
-5 |         ...
-6 | 
-7 |     def __repr__(self):
+3 |         ...
+4 | 
+5 |     def __repr__(self):
   |         ^^^^^^^^ ANN204
-8 |         ...
+6 |         ...
   |
   = help: Add `None` return type
 
@@ -39,14 +39,14 @@ simple_magic_methods.py:5:9: ANN204 [*] Missing return type annotation for speci
 8 8 |     def __len__(self):
 
 simple_magic_methods.py:8:9: ANN204 [*] Missing return type annotation for special method `__len__`
-   |
- 8 |         ...
- 9 | 
-10 |     def __len__(self):
-   |         ^^^^^^^ ANN204
-11 |         ...
-   |
-   = help: Add `None` return type
+  |
+6 |         ...
+7 | 
+8 |     def __len__(self):
+  |         ^^^^^^^ ANN204
+9 |         ...
+  |
+  = help: Add `None` return type
 
 ℹ Suggested fix
 5 5 |     def __repr__(self):
@@ -60,11 +60,11 @@ simple_magic_methods.py:8:9: ANN204 [*] Missing return type annotation for speci
 
 simple_magic_methods.py:11:9: ANN204 [*] Missing return type annotation for special method `__length_hint__`
    |
-11 |         ...
-12 | 
-13 |     def __length_hint__(self):
+ 9 |         ...
+10 | 
+11 |     def __length_hint__(self):
    |         ^^^^^^^^^^^^^^^ ANN204
-14 |         ...
+12 |         ...
    |
    = help: Add `None` return type
 
@@ -80,11 +80,11 @@ simple_magic_methods.py:11:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:14:9: ANN204 [*] Missing return type annotation for special method `__init__`
    |
-14 |         ...
-15 | 
-16 |     def __init__(self):
+12 |         ...
+13 | 
+14 |     def __init__(self):
    |         ^^^^^^^^ ANN204
-17 |         ...
+15 |         ...
    |
    = help: Add `None` return type
 
@@ -100,11 +100,11 @@ simple_magic_methods.py:14:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:17:9: ANN204 [*] Missing return type annotation for special method `__del__`
    |
-17 |         ...
-18 | 
-19 |     def __del__(self):
+15 |         ...
+16 | 
+17 |     def __del__(self):
    |         ^^^^^^^ ANN204
-20 |         ...
+18 |         ...
    |
    = help: Add `None` return type
 
@@ -120,11 +120,11 @@ simple_magic_methods.py:17:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:20:9: ANN204 [*] Missing return type annotation for special method `__bool__`
    |
-20 |         ...
-21 | 
-22 |     def __bool__(self):
+18 |         ...
+19 | 
+20 |     def __bool__(self):
    |         ^^^^^^^^ ANN204
-23 |         ...
+21 |         ...
    |
    = help: Add `None` return type
 
@@ -140,11 +140,11 @@ simple_magic_methods.py:20:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:23:9: ANN204 [*] Missing return type annotation for special method `__bytes__`
    |
-23 |         ...
-24 | 
-25 |     def __bytes__(self):
+21 |         ...
+22 | 
+23 |     def __bytes__(self):
    |         ^^^^^^^^^ ANN204
-26 |         ...
+24 |         ...
    |
    = help: Add `None` return type
 
@@ -160,11 +160,11 @@ simple_magic_methods.py:23:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:26:9: ANN204 [*] Missing return type annotation for special method `__format__`
    |
-26 |         ...
-27 | 
-28 |     def __format__(self, format_spec):
+24 |         ...
+25 | 
+26 |     def __format__(self, format_spec):
    |         ^^^^^^^^^^ ANN204
-29 |         ...
+27 |         ...
    |
    = help: Add `None` return type
 
@@ -180,11 +180,11 @@ simple_magic_methods.py:26:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:29:9: ANN204 [*] Missing return type annotation for special method `__contains__`
    |
-29 |         ...
-30 | 
-31 |     def __contains__(self, item):
+27 |         ...
+28 | 
+29 |     def __contains__(self, item):
    |         ^^^^^^^^^^^^ ANN204
-32 |         ...
+30 |         ...
    |
    = help: Add `None` return type
 
@@ -200,11 +200,11 @@ simple_magic_methods.py:29:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:32:9: ANN204 [*] Missing return type annotation for special method `__complex__`
    |
-32 |         ...
-33 | 
-34 |     def __complex__(self):
+30 |         ...
+31 | 
+32 |     def __complex__(self):
    |         ^^^^^^^^^^^ ANN204
-35 |         ...
+33 |         ...
    |
    = help: Add `None` return type
 
@@ -220,11 +220,11 @@ simple_magic_methods.py:32:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:35:9: ANN204 [*] Missing return type annotation for special method `__int__`
    |
-35 |         ...
-36 | 
-37 |     def __int__(self):
+33 |         ...
+34 | 
+35 |     def __int__(self):
    |         ^^^^^^^ ANN204
-38 |         ...
+36 |         ...
    |
    = help: Add `None` return type
 
@@ -240,11 +240,11 @@ simple_magic_methods.py:35:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:38:9: ANN204 [*] Missing return type annotation for special method `__float__`
    |
-38 |         ...
-39 | 
-40 |     def __float__(self):
+36 |         ...
+37 | 
+38 |     def __float__(self):
    |         ^^^^^^^^^ ANN204
-41 |         ...
+39 |         ...
    |
    = help: Add `None` return type
 
@@ -260,11 +260,11 @@ simple_magic_methods.py:38:9: ANN204 [*] Missing return type annotation for spec
 
 simple_magic_methods.py:41:9: ANN204 [*] Missing return type annotation for special method `__index__`
    |
-41 |         ...
-42 | 
-43 |     def __index__(self):
+39 |         ...
+40 | 
+41 |     def __index__(self):
    |         ^^^^^^^^^ ANN204
-44 |         ...
+42 |         ...
    |
    = help: Add `None` return type
 

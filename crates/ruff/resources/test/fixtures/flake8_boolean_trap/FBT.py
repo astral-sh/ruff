@@ -57,12 +57,16 @@ dict.fromkeys(("world",), True)
 {}.deploy(True, False)
 getattr(someobj, attrname, False)
 mylist.index(True)
+bool(False)
 int(True)
 str(int(False))
 cfg.get("hello", True)
 cfg.getint("hello", True)
 cfg.getfloat("hello", True)
 cfg.getboolean("hello", True)
+os.set_blocking(0, False)
+g_action.set_enabled(True)
+settings.set_enable_developer_extras(True)
 
 
 class Registry:
@@ -80,3 +84,6 @@ class Registry:
     # FBT001: Boolean positional arg in function definition
     def foo(self, value: bool) -> None:
         pass
+
+    def foo(self) -> None:
+        object.__setattr__(self, "flag", True)

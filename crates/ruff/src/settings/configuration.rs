@@ -16,10 +16,11 @@ use crate::fs;
 use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
+    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -74,6 +75,7 @@ pub struct Configuration {
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     pub flake8_builtins: Option<flake8_builtins::settings::Options>,
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
+    pub copyright: Option<copyright::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     pub flake8_implicit_str_concat: Option<flake8_implicit_str_concat::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
@@ -89,6 +91,7 @@ pub struct Configuration {
     pub pep8_naming: Option<pep8_naming::settings::Options>,
     pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
+    pub pyflakes: Option<pyflakes::settings::Options>,
     pub pylint: Option<pylint::settings::Options>,
 }
 
@@ -226,6 +229,7 @@ impl Configuration {
             flake8_bugbear: options.flake8_bugbear,
             flake8_builtins: options.flake8_builtins,
             flake8_comprehensions: options.flake8_comprehensions,
+            copyright: options.copyright,
             flake8_errmsg: options.flake8_errmsg,
             flake8_gettext: options.flake8_gettext,
             flake8_implicit_str_concat: options.flake8_implicit_str_concat,
@@ -241,6 +245,7 @@ impl Configuration {
             pep8_naming: options.pep8_naming,
             pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
+            pyflakes: options.pyflakes,
             pylint: options.pylint,
         })
     }
@@ -303,6 +308,7 @@ impl Configuration {
             flake8_comprehensions: self
                 .flake8_comprehensions
                 .combine(config.flake8_comprehensions),
+            copyright: self.copyright.combine(config.copyright),
             flake8_errmsg: self.flake8_errmsg.combine(config.flake8_errmsg),
             flake8_gettext: self.flake8_gettext.combine(config.flake8_gettext),
             flake8_implicit_str_concat: self
@@ -326,6 +332,7 @@ impl Configuration {
             pep8_naming: self.pep8_naming.combine(config.pep8_naming),
             pycodestyle: self.pycodestyle.combine(config.pycodestyle),
             pydocstyle: self.pydocstyle.combine(config.pydocstyle),
+            pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
         }
     }

@@ -3,15 +3,15 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
   |
-2 | """Test: removal of multi-segment and aliases imports."""
-3 | from a.b import c
+1 | """Test: removal of multi-segment and aliases imports."""
+2 | from a.b import c
   |                 ^ F401
-4 | from d.e import f as g
-5 | import h.i
+3 | from d.e import f as g
+4 | import h.i
   |
   = help: Remove unused import: `a.b.c`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """Test: removal of multi-segment and aliases imports."""
 2   |-from a.b import c
 3 2 | from d.e import f as g
@@ -20,16 +20,16 @@ F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
 
 F401_5.py:3:17: F401 [*] `d.e.f` imported but unused
   |
-3 | """Test: removal of multi-segment and aliases imports."""
-4 | from a.b import c
-5 | from d.e import f as g
+1 | """Test: removal of multi-segment and aliases imports."""
+2 | from a.b import c
+3 | from d.e import f as g
   |                 ^^^^^^ F401
-6 | import h.i
-7 | import j.k as l
+4 | import h.i
+5 | import j.k as l
   |
   = help: Remove unused import: `d.e.f`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """Test: removal of multi-segment and aliases imports."""
 2 2 | from a.b import c
 3   |-from d.e import f as g
@@ -38,15 +38,15 @@ F401_5.py:3:17: F401 [*] `d.e.f` imported but unused
 
 F401_5.py:4:8: F401 [*] `h.i` imported but unused
   |
-4 | from a.b import c
-5 | from d.e import f as g
-6 | import h.i
+2 | from a.b import c
+3 | from d.e import f as g
+4 | import h.i
   |        ^^^ F401
-7 | import j.k as l
+5 | import j.k as l
   |
   = help: Remove unused import: `h.i`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """Test: removal of multi-segment and aliases imports."""
 2 2 | from a.b import c
 3 3 | from d.e import f as g
@@ -55,14 +55,14 @@ F401_5.py:4:8: F401 [*] `h.i` imported but unused
 
 F401_5.py:5:8: F401 [*] `j.k` imported but unused
   |
-5 | from d.e import f as g
-6 | import h.i
-7 | import j.k as l
+3 | from d.e import f as g
+4 | import h.i
+5 | import j.k as l
   |        ^^^^^^^^ F401
   |
   = help: Remove unused import: `j.k`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | from a.b import c
 3 3 | from d.e import f as g
 4 4 | import h.i

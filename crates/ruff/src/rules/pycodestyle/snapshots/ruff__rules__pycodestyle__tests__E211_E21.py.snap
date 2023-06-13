@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E21.py:2:5: E211 [*] Whitespace before '('
   |
-2 | #: E211
-3 | spam (1)
+1 | #: E211
+2 | spam (1)
   |     ^ E211
-4 | #: E211 E211
-5 | dict ['key'] = list [index]
+3 | #: E211 E211
+4 | dict ['key'] = list [index]
   |
   = help: Removed whitespace before '('
 
@@ -21,12 +21,12 @@ E21.py:2:5: E211 [*] Whitespace before '('
 
 E21.py:4:5: E211 [*] Whitespace before '['
   |
-4 | spam (1)
-5 | #: E211 E211
-6 | dict ['key'] = list [index]
+2 | spam (1)
+3 | #: E211 E211
+4 | dict ['key'] = list [index]
   |     ^ E211
-7 | #: E211
-8 | dict['key'] ['subkey'] = list[index]
+5 | #: E211
+6 | dict['key'] ['subkey'] = list[index]
   |
   = help: Removed whitespace before '['
 
@@ -42,12 +42,12 @@ E21.py:4:5: E211 [*] Whitespace before '['
 
 E21.py:4:20: E211 [*] Whitespace before '['
   |
-4 | spam (1)
-5 | #: E211 E211
-6 | dict ['key'] = list [index]
+2 | spam (1)
+3 | #: E211 E211
+4 | dict ['key'] = list [index]
   |                    ^ E211
-7 | #: E211
-8 | dict['key'] ['subkey'] = list[index]
+5 | #: E211
+6 | dict['key'] ['subkey'] = list[index]
   |
   = help: Removed whitespace before '['
 
@@ -62,15 +62,15 @@ E21.py:4:20: E211 [*] Whitespace before '['
 7 7 | #: Okay
 
 E21.py:6:12: E211 [*] Whitespace before '['
-   |
- 6 | dict ['key'] = list [index]
- 7 | #: E211
- 8 | dict['key'] ['subkey'] = list[index]
-   |            ^ E211
- 9 | #: Okay
-10 | spam(1)
-   |
-   = help: Removed whitespace before '['
+  |
+4 | dict ['key'] = list [index]
+5 | #: E211
+6 | dict['key'] ['subkey'] = list[index]
+  |            ^ E211
+7 | #: Okay
+8 | spam(1)
+  |
+  = help: Removed whitespace before '['
 
 ℹ Suggested fix
 3 3 | #: E211 E211

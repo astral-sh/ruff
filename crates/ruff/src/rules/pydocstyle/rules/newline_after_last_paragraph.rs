@@ -3,8 +3,8 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
-use ruff_python_ast::whitespace;
+use ruff_python_ast::docstrings::clean_space;
+use ruff_python_whitespace::{NewlineWithTrailingNewline, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -56,7 +56,7 @@ pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Do
                         let content = format!(
                             "{}{}",
                             checker.stylist.line_ending().as_str(),
-                            whitespace::clean(docstring.indentation)
+                            clean_space(docstring.indentation)
                         );
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::replacement(

@@ -1,14 +1,15 @@
 [package]
 name = "ruff_cli"
-version = "0.0.270"
-authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
+version = "0.0.272"
+publish = false
+authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
-documentation = "https://github.com/charliermarsh/ruff"
-homepage = "https://github.com/charliermarsh/ruff"
-repository = "https://github.com/charliermarsh/ruff"
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 readme = "../../README.md"
-license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -26,7 +27,9 @@ ruff = { path = "../ruff", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_text_size = { workspace = true }
+ruff_textwrap = { path = "../ruff_textwrap" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
@@ -56,7 +59,6 @@ serde_json = { workspace = true }
 shellexpand = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true, features = [] }
-textwrap = { workspace = true }
 walkdir = { version = "2.3.2" }
 wild = { version = "2" }
 

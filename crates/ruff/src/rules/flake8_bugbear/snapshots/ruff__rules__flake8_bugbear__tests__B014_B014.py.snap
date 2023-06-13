@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
    |
-17 | try:
-18 |     pass
-19 | except (OSError, OSError) as err:
+15 | try:
+16 |     pass
+17 | except (OSError, OSError) as err:
    |        ^^^^^^^^^^^^^^^^^^ B014
-20 |     # Duplicate exception types are useless
-21 |     pass
+18 |     # Duplicate exception types are useless
+19 |     pass
    |
    = help: De-duplicate exceptions
 
@@ -24,12 +24,12 @@ B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
 
 B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
    |
-28 | try:
-29 |     pass
-30 | except (MyError, MyError):
+26 | try:
+27 |     pass
+28 | except (MyError, MyError):
    |        ^^^^^^^^^^^^^^^^^^ B014
-31 |     # Detect duplicate non-builtin errors
-32 |     pass
+29 |     # Detect duplicate non-builtin errors
+30 |     pass
    |
    = help: De-duplicate exceptions
 
@@ -45,12 +45,12 @@ B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
 
 B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
    |
-49 | try:
-50 |     pass
-51 | except (re.error, re.error):
+47 | try:
+48 |     pass
+49 | except (re.error, re.error):
    |        ^^^^^^^^^^^^^^^^^^^^ B014
-52 |     # Duplicate exception types as attributes
-53 |     pass
+50 |     # Duplicate exception types as attributes
+51 |     pass
    |
    = help: De-duplicate exceptions
 

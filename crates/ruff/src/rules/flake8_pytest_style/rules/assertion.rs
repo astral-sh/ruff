@@ -3,12 +3,13 @@ use std::borrow::Cow;
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
-    Assert, BooleanOp, Codegen, CodegenState, CompoundStatement, Expression,
-    ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
-    SmallStatement, Statement, TrailingWhitespace, UnaryOp, UnaryOperation,
+    Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace, ParenthesizedNode,
+    SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace, UnaryOp,
+    UnaryOperation,
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, Truthiness};
@@ -184,25 +185,27 @@ pub(crate) fn unittest_assertion(
     match func {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
-                // We're converting an expression to a statement, so avoid applying the fix if
-                // the assertion is part of a larger expression.
-                let fixable = checker.semantic_model().stmt().is_expr_stmt()
-                    && checker.semantic_model().expr_parent().is_none()
-                    && !checker.semantic_model().scope().kind.is_lambda()
-                    && !has_comments_in(expr.range(), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {
                         assertion: unittest_assert.to_string(),
                     },
                     func.range(),
                 );
-                if fixable && checker.patch(diagnostic.kind.rule()) {
-                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            checker.generator().stmt(&stmt),
-                            expr.range(),
-                        )));
+                if checker.patch(diagnostic.kind.rule()) {
+                    // We're converting an expression to a statement, so avoid applying the fix if
+                    // the assertion is part of a larger expression.
+                    if checker.semantic_model().stmt().is_expr_stmt()
+                        && checker.semantic_model().expr_parent().is_none()
+                        && !checker.semantic_model().scope().kind.is_lambda()
+                        && !has_comments_in(expr.range(), checker.locator)
+                    {
+                        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                checker.generator().stmt(&stmt),
+                                expr.range(),
+                            )));
+                        }
                     }
                 }
                 Some(diagnostic)
@@ -408,15 +411,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }));
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
     // Reconstruct and reformat the code.
-    let module_text = state.to_string();
+    let module_text = tree.codegen_stylist(stylist);
     let contents = if outer_indent.is_empty() {
         module_text
     } else {
@@ -440,15 +436,17 @@ pub(crate) fn composite_condition(
 ) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
-        let fixable = matches!(composite, CompositionKind::Simple)
-            && msg.is_none()
-            && !has_comments_in(stmt.range(), checker.locator);
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
-        if fixable && checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
-                fix_composite_condition(stmt, checker.locator, checker.stylist)
-            });
+        if checker.patch(diagnostic.kind.rule()) {
+            if matches!(composite, CompositionKind::Simple)
+                && msg.is_none()
+                && !has_comments_in(stmt.range(), checker.locator)
+            {
+                #[allow(deprecated)]
+                diagnostic.try_set_fix_from_edit(|| {
+                    fix_composite_condition(stmt, checker.locator, checker.stylist)
+                });
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

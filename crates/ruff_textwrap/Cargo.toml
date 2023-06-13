@@ -1,0 +1,15 @@
+[package]
+name = "ruff_textwrap"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_python_whitespace = { path = "../ruff_python_whitespace" }
+ruff_text_size = { workspace = true }

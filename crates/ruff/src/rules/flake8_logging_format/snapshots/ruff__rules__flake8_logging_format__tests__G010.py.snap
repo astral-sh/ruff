@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
 G010.py:4:9: G010 [*] Logging statement uses `warn` instead of `warning`
   |
-4 | from distutils import log
-5 | 
-6 | logging.warn("Hello World!")
+2 | from distutils import log
+3 | 
+4 | logging.warn("Hello World!")
   |         ^^^^ G010
-7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
+5 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
   |
   = help: Convert to `warn`
 

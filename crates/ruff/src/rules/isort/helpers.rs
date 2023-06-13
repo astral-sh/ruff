@@ -1,23 +1,23 @@
 use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
 
 use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub(crate) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
+pub(super) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice(stmt.range());
-    let mut count: usize = 0;
+    let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
     for (tok, _) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
         if matches!(tok, Tok::Lpar) {
-            count += 1;
+            count = count.saturating_add(1);
         }
         if matches!(tok, Tok::Rpar) {
-            count -= 1;
+            count = count.saturating_sub(1);
         }
         if count == 1 {
             if matches!(
@@ -36,7 +36,7 @@ pub(crate) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
 }
 
 /// Return `true` if a [`Stmt`] is preceded by a "comment break"
-pub(crate) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
+pub(super) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     // Starting from the `Stmt` (`def f(): pass`), we want to detect patterns like
     // this:
     //
@@ -63,7 +63,7 @@ pub(crate) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     //   def f(): pass
     let mut seen_blank = false;
     for line in locator.up_to(stmt.start()).universal_newlines().rev() {
-        let line = line.trim();
+        let line = line.trim_whitespace();
         if seen_blank {
             if line.starts_with('#') {
                 return true;

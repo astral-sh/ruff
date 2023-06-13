@@ -2,58 +2,58 @@
 source: crates/ruff/src/rules/flake8_pie/mod.rs
 ---
 PIE796.py:8:5: PIE796 Enum contains duplicate value: `"B"`
-   |
- 8 |     A = "A"
- 9 |     B = "B"
-10 |     C = "B"  # PIE796
-   |     ^^^^^^^ PIE796
-   |
+  |
+6 |     A = "A"
+7 |     B = "B"
+8 |     C = "B"  # PIE796
+  |     ^^^^^^^ PIE796
+  |
 
 PIE796.py:14:5: PIE796 Enum contains duplicate value: `2`
    |
-14 |     A = 1
-15 |     B = 2
-16 |     C = 2  # PIE796
+12 |     A = 1
+13 |     B = 2
+14 |     C = 2  # PIE796
    |     ^^^^^ PIE796
    |
 
 PIE796.py:20:5: PIE796 Enum contains duplicate value: `"2"`
    |
-20 |     A = "1"
-21 |     B = "2"
-22 |     C = "2"  # PIE796
+18 |     A = "1"
+19 |     B = "2"
+20 |     C = "2"  # PIE796
    |     ^^^^^^^ PIE796
    |
 
 PIE796.py:26:5: PIE796 Enum contains duplicate value: `2.5`
    |
-26 |     A = 1.0
-27 |     B = 2.5
-28 |     C = 2.5  # PIE796
+24 |     A = 1.0
+25 |     B = 2.5
+26 |     C = 2.5  # PIE796
    |     ^^^^^^^ PIE796
    |
 
 PIE796.py:33:5: PIE796 Enum contains duplicate value: `False`
    |
-33 |     B = True
-34 |     C = False
-35 |     D = False  # PIE796
+31 |     B = True
+32 |     C = False
+33 |     D = False  # PIE796
    |     ^^^^^^^^^ PIE796
    |
 
 PIE796.py:40:5: PIE796 Enum contains duplicate value: `None`
    |
-40 |     B = 2
-41 |     C = None
-42 |     D = None  # PIE796
+38 |     B = 2
+39 |     C = None
+40 |     D = None  # PIE796
    |     ^^^^^^^^ PIE796
    |
 
 PIE796.py:54:5: PIE796 Enum contains duplicate value: `2`
    |
-54 |     A = 1
-55 |     B = 2
-56 |     C = 2  # PIE796
+52 |     A = 1
+53 |     B = 2
+54 |     C = 2  # PIE796
    |     ^^^^^ PIE796
    |
 

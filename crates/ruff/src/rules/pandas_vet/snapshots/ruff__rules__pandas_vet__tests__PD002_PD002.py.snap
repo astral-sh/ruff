@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pandas_vet/mod.rs
 ---
 PD002.py:5:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   |
-5 | x = pd.DataFrame()
+3 | x = pd.DataFrame()
+4 | 
+5 | x.drop(["a"], axis=1, inplace=True)
+  |                       ^^^^^^^^^^^^ PD002
 6 | 
 7 | x.drop(["a"], axis=1, inplace=True)
-  |                       ^^^^^^^^^^^^ PD002
-8 | 
-9 | x.drop(["a"], axis=1, inplace=True)
   |
   = help: Assign to variable; remove `inplace` arg
 
@@ -23,15 +23,15 @@ PD002.py:5:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 8 8 | 
 
 PD002.py:7:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
-   |
- 7 | x.drop(["a"], axis=1, inplace=True)
- 8 | 
- 9 | x.drop(["a"], axis=1, inplace=True)
-   |                       ^^^^^^^^^^^^ PD002
-10 | 
-11 | x.drop(
-   |
-   = help: Assign to variable; remove `inplace` arg
+  |
+5 | x.drop(["a"], axis=1, inplace=True)
+6 | 
+7 | x.drop(["a"], axis=1, inplace=True)
+  |                       ^^^^^^^^^^^^ PD002
+8 | 
+9 | x.drop(
+  |
+  = help: Assign to variable; remove `inplace` arg
 
 ℹ Suggested fix
 4 4 | 
@@ -45,11 +45,11 @@ PD002.py:7:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 
 PD002.py:10:5: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
-10 | x.drop(
-11 |     inplace=True,
+ 9 | x.drop(
+10 |     inplace=True,
    |     ^^^^^^^^^^^^ PD002
-12 |     columns=["a"],
-13 |     axis=1,
+11 |     columns=["a"],
+12 |     axis=1,
    |
    = help: Assign to variable; remove `inplace` arg
 
@@ -66,12 +66,12 @@ PD002.py:10:5: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 
 PD002.py:17:9: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
-17 | if True:
-18 |     x.drop(
-19 |         inplace=True,
+15 | if True:
+16 |     x.drop(
+17 |         inplace=True,
    |         ^^^^^^^^^^^^ PD002
-20 |         columns=["a"],
-21 |         axis=1,
+18 |         columns=["a"],
+19 |         axis=1,
    |
    = help: Assign to variable; remove `inplace` arg
 
@@ -88,12 +88,12 @@ PD002.py:17:9: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 
 PD002.py:22:33: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
-22 |     )
-23 | 
-24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
+20 |     )
+21 | 
+22 | x.drop(["a"], axis=1, **kwargs, inplace=True)
    |                                 ^^^^^^^^^^^^ PD002
-25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
-26 | f(x.drop(["a"], axis=1, inplace=True))
+23 | x.drop(["a"], axis=1, inplace=True, **kwargs)
+24 | f(x.drop(["a"], axis=1, inplace=True))
    |
    = help: Assign to variable; remove `inplace` arg
 
@@ -109,32 +109,32 @@ PD002.py:22:33: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
 
 PD002.py:23:23: PD002 `inplace=True` should be avoided; it has inconsistent behavior
    |
-23 | x.drop(["a"], axis=1, **kwargs, inplace=True)
-24 | x.drop(["a"], axis=1, inplace=True, **kwargs)
+22 | x.drop(["a"], axis=1, **kwargs, inplace=True)
+23 | x.drop(["a"], axis=1, inplace=True, **kwargs)
    |                       ^^^^^^^^^^^^ PD002
-25 | f(x.drop(["a"], axis=1, inplace=True))
+24 | f(x.drop(["a"], axis=1, inplace=True))
    |
    = help: Assign to variable; remove `inplace` arg
 
 PD002.py:24:25: PD002 `inplace=True` should be avoided; it has inconsistent behavior
    |
-24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
-25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
-26 | f(x.drop(["a"], axis=1, inplace=True))
+22 | x.drop(["a"], axis=1, **kwargs, inplace=True)
+23 | x.drop(["a"], axis=1, inplace=True, **kwargs)
+24 | f(x.drop(["a"], axis=1, inplace=True))
    |                         ^^^^^^^^^^^^ PD002
-27 | 
-28 | x.apply(lambda x: x.sort_values('a', inplace=True))
+25 | 
+26 | x.apply(lambda x: x.sort_values('a', inplace=True))
    |
    = help: Assign to variable; remove `inplace` arg
 
 PD002.py:26:38: PD002 `inplace=True` should be avoided; it has inconsistent behavior
    |
-26 | f(x.drop(["a"], axis=1, inplace=True))
-27 | 
-28 | x.apply(lambda x: x.sort_values('a', inplace=True))
+24 | f(x.drop(["a"], axis=1, inplace=True))
+25 | 
+26 | x.apply(lambda x: x.sort_values('a', inplace=True))
    |                                      ^^^^^^^^^^^^ PD002
-29 | import torch
-30 | torch.m.ReLU(inplace=True) # safe because this isn't a pandas call
+27 | import torch
+28 | torch.m.ReLU(inplace=True) # safe because this isn't a pandas call
    |
    = help: Assign to variable; remove `inplace` arg
 

@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtFunctionDef,
+        range: 28..212,
+        source: `def test(x, y):⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# Function Leading comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtIf,
+        range: 48..212,
+        source: `if x == y: # if statement e...ne comment⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# if statement end of line comment",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtIf,
+        range: 144..212,
+        source: `elif x < y:⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# Leading comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtExpr,
+        range: 234..246,
+        source: `test(10, 20)`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# own line comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+}

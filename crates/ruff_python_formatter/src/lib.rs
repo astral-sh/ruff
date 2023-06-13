@@ -1,97 +1,309 @@
-use anyhow::Result;
-use rustpython_parser::lexer::LexResult;
+use anyhow::{anyhow, Context, Result};
+use ruff_formatter::prelude::*;
+use ruff_formatter::{format, write};
+use ruff_formatter::{Formatted, IndentStyle, Printed, SimpleFormatOptions, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
+use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
+use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast::{Mod, Ranged};
+use rustpython_parser::lexer::lex;
+use rustpython_parser::{parse_tokens, Mode};
+use std::borrow::Cow;
 
-use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
-use ruff_python_ast::source_code::Locator;
+use crate::comments::{
+    dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
+};
+use crate::context::PyFormatContext;
 
-use crate::attachment::attach;
-use crate::context::ASTFormatContext;
-use crate::cst::Stmt;
-use crate::newlines::normalize_newlines;
-use crate::parentheses::normalize_parentheses;
-
-mod attachment;
+pub(crate) mod builders;
 pub mod cli;
-pub mod context;
-mod cst;
-mod format;
-mod newlines;
-mod parentheses;
+mod comments;
+pub(crate) mod context;
+pub(crate) mod expression;
+mod generated;
+pub(crate) mod module;
+pub(crate) mod other;
+pub(crate) mod pattern;
 mod prelude;
+pub(crate) mod statement;
 mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
-pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
-    // Create a reusable locator.
-    let locator = Locator::new(contents);
+/// TODO(konstin): hook this up to the settings by replacing `SimpleFormatOptions` with a python
+/// specific struct.
+pub(crate) const USE_MAGIC_TRAILING_COMMA: bool = true;
 
-    // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+/// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
+pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
 
-    // Extract trivia.
-    let trivia = trivia::extract_trivia_tokens(&tokens);
+/// Rule for formatting a JavaScript [`AstNode`].
+pub(crate) trait FormatNodeRule<N>
+where
+    N: AstNode,
+{
+    fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        self.fmt_leading_comments(node, f)?;
+        self.fmt_node(node, f)?;
+        self.fmt_dangling_comments(node, f)?;
+        self.fmt_trailing_comments(node, f)
+    }
+
+    /// Formats the node without comments. Ignores any suppression comments.
+    fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [source_position(node.start())])?;
+        self.fmt_fields(node, f)?;
+        write!(f, [source_position(node.end())])
+    }
+
+    /// Formats the node's fields.
+    fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
+
+    /// Formats the [leading comments](comments#leading-comments) of the node.
+    ///
+    /// You may want to override this method if you want to manually handle the formatting of comments
+    /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
+    fn fmt_leading_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        leading_node_comments(node).fmt(f)
+    }
+
+    /// Formats the [dangling comments](comments#dangling-comments) of the node.
+    ///
+    /// You should override this method if the node handled by this rule can have dangling comments because the
+    /// default implementation formats the dangling comments at the end of the node, which isn't ideal but ensures that
+    /// no comments are dropped.
+    ///
+    /// A node can have dangling comments if all its children are tokens or if all node childrens are optional.
+    fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        dangling_node_comments(node).fmt(f)
+    }
+
+    /// Formats the [trailing comments](comments#trailing-comments) of the node.
+    ///
+    /// You may want to override this method if you want to manually handle the formatting of comments
+    /// inside of the `fmt_fields` method or customize the formatting of the trailing comments.
+    fn fmt_trailing_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        trailing_node_comments(node).fmt(f)
+    }
+}
+
+pub fn format_module(contents: &str) -> Result<Printed> {
+    // Tokenize once
+    let mut tokens = Vec::new();
+    let mut comment_ranges = CommentRangesBuilder::default();
+
+    for result in lex(contents, Mode::Module) {
+        let (token, range) = match result {
+            Ok((token, range)) => (token, range),
+            Err(err) => return Err(anyhow!("Source contains syntax errors {err:?}")),
+        };
+
+        comment_ranges.visit_token(&token, range);
+        tokens.push(Ok((token, range)));
+    }
+
+    let comment_ranges = comment_ranges.finish();
 
     // Parse the AST.
-    let python_ast = ruff_rustpython::parse_program_tokens(tokens, "<filename>")?;
+    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
+        .with_context(|| "Syntax error in input")?;
 
-    // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = python_ast
-        .into_iter()
-        .map(|stmt| (stmt, &locator).into())
-        .collect();
+    let formatted = format_node(&python_ast, &comment_ranges, contents)?;
 
-    // Attach trivia.
-    attach(&mut python_cst, trivia);
-    normalize_newlines(&mut python_cst);
-    normalize_parentheses(&mut python_cst, &locator);
+    formatted
+        .print()
+        .with_context(|| "Failed to print the formatter IR")
+}
+
+pub fn format_node<'a>(
+    root: &'a Mod,
+    comment_ranges: &'a CommentRanges,
+    source: &'a str,
+) -> FormatResult<Formatted<PyFormatContext<'a>>> {
+    let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
+
+    let locator = Locator::new(source);
 
     format!(
-        ASTFormatContext::new(
+        PyFormatContext::new(
             SimpleFormatOptions {
                 indent_style: IndentStyle::Space(4),
                 line_width: 88.try_into().unwrap(),
             },
             locator.contents(),
+            comments,
         ),
-        [format::builders::statements(&python_cst)]
+        [root.format()]
     )
-    .map_err(Into::into)
+}
+
+pub(crate) struct NotYetImplemented(NodeKind);
+
+/// Formats a placeholder for nodes that have not yet been implemented
+pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    NotYetImplemented(node.into().kind())
+}
+
+impl Format<PyFormatContext<'_>> for NotYetImplemented {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0);
+
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
+                length: text.text_len(),
+            },
+        )))?;
+
+        f.write_element(FormatElement::DynamicText {
+            text: Box::from(text),
+        })?;
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        Ok(())
+    }
+}
+
+pub(crate) struct NotYetImplementedCustomText(&'static str);
+
+/// Formats a placeholder for nodes that have not yet been implemented
+pub(crate) const fn not_yet_implemented_custom_text(
+    text: &'static str,
+) -> NotYetImplementedCustomText {
+    NotYetImplementedCustomText(text)
+}
+
+impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
+                length: self.0.text_len(),
+            },
+        )))?;
+
+        text(self.0).fmt(f)?;
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))
+    }
+}
+
+pub(crate) struct VerbatimText(TextRange);
+
+#[allow(unused)]
+pub(crate) fn verbatim_text<T>(item: &T) -> VerbatimText
+where
+    T: Ranged,
+{
+    VerbatimText(item.range())
+}
+
+impl Format<PyFormatContext<'_>> for VerbatimText {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
+                length: self.0.len(),
+            },
+        )))?;
+
+        match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
+            Cow::Borrowed(_) => {
+                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
+            }
+            Cow::Owned(cleaned) => {
+                write!(
+                    f,
+                    [
+                        dynamic_text(&cleaned, Some(self.0.start())),
+                        source_position(self.0.end())
+                    ]
+                )?;
+            }
+        }
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Result;
+    use insta::assert_snapshot;
+    use ruff_python_ast::source_code::CommentRangesBuilder;
+    use ruff_testing_macros::fixture;
+    use rustpython_parser::lexer::lex;
+    use rustpython_parser::{parse_tokens, Mode};
+    use similar::TextDiff;
     use std::fmt::{Formatter, Write};
     use std::fs;
     use std::path::Path;
 
-    use anyhow::Result;
-    use insta::assert_snapshot;
+    use crate::{format_module, format_node};
 
-    use ruff_testing_macros::fixture;
-    use similar::TextDiff;
+    /// Very basic test intentionally kept very similar to the CLI
+    #[test]
+    fn basic() -> Result<()> {
+        let input = r#"
+# preceding
+if    True:
+    print( "hi" )
+# trailing
+"#;
+        let expected = r#"# preceding
+if True:
+    NOT_IMPLEMENTED_call()
+# trailing
+"#;
+        let actual = format_module(input)?.as_code().to_string();
+        assert_eq!(expected, actual);
+        Ok(())
+    }
 
-    use crate::fmt;
-
-    #[fixture(
-        pattern = "resources/test/fixtures/black/**/*.py",
-        // Excluded tests because they reach unreachable when attaching tokens
-        exclude = [
-            "*comments8.py",
-        ])
-    ]
+    #[fixture(pattern = "resources/test/fixtures/black/**/*.py")]
     #[test]
     fn black_test(input_path: &Path) -> Result<()> {
         let content = fs::read_to_string(input_path)?;
 
-        let formatted = fmt(&content)?;
+        let printed = format_module(&content)?;
 
         let expected_path = input_path.with_extension("py.expect");
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
-        let printed = formatted.print()?;
         let formatted_code = printed.as_code();
+
+        let reformatted = match format_module(formatted_code) {
+            Ok(reformatted) => reformatted,
+            Err(err) => {
+                panic!(
+                    "Expected formatted code to be valid syntax: {err}:\
+                    \n---\n{formatted_code}---\n",
+                );
+            }
+        };
+
+        if reformatted.as_code() != formatted_code {
+            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
+                .unified_diff()
+                .header("Formatted once", "Formatted twice")
+                .to_string();
+            panic!(
+                r#"Reformatting the formatted code a second time resulted in formatting changes.
+---
+{diff}---
+
+Formatted once:
+---
+{formatted_code}---
+
+Formatted twice:
+---
+{}---"#,
+                reformatted.as_code()
+            );
+        }
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -152,30 +364,96 @@ mod tests {
         Ok(())
     }
 
+    #[fixture(pattern = "resources/test/fixtures/ruff/**/*.py")]
+    #[test]
+    fn ruff_test(input_path: &Path) -> Result<()> {
+        let content = fs::read_to_string(input_path)?;
+
+        let printed = format_module(&content)?;
+        let formatted_code = printed.as_code();
+
+        let reformatted =
+            format_module(formatted_code).unwrap_or_else(|err| panic!("Expected formatted code to be valid syntax but it contains syntax errors: {err}\n{formatted_code}"));
+
+        if reformatted.as_code() != formatted_code {
+            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
+                .unified_diff()
+                .header("Formatted once", "Formatted twice")
+                .to_string();
+            panic!(
+                r#"Reformatting the formatted code a second time resulted in formatting changes.
+{diff}
+
+Formatted once:
+{formatted_code}
+
+Formatted twice:
+{}"#,
+                reformatted.as_code()
+            );
+        }
+
+        let snapshot = format!(
+            r#"## Input
+{}
+
+## Output
+{}"#,
+            CodeFrame::new("py", &content),
+            CodeFrame::new("py", formatted_code)
+        );
+        assert_snapshot!(snapshot);
+
+        Ok(())
+    }
+
     /// Use this test to debug the formatting of some snipped
     #[ignore]
     #[test]
     fn quick_test() {
         let src = r#"
-{
-    k: v for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
-}
+def test(): ...
+
+# Comment
+def with_leading_comment(): ...
 "#;
-        let formatted = fmt(src).unwrap();
+        // Tokenize once
+        let mut tokens = Vec::new();
+        let mut comment_ranges = CommentRangesBuilder::default();
+
+        for result in lex(src, Mode::Module) {
+            let (token, range) = result.unwrap();
+            comment_ranges.visit_token(&token, range);
+            tokens.push(Ok((token, range)));
+        }
+
+        let comment_ranges = comment_ranges.finish();
+
+        // Parse the AST.
+        let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
+
+        let formatted = format_node(&python_ast, &comment_ranges, src).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
-        // dbg!(formatted.document());
+        // dbg!(formatted
+        //     .document()
+        //     .display(formatted.context().source_code()));
+
+        // dbg!(formatted
+        //     .context()
+        //     .comments()
+        //     .debug(formatted.context().source_code()));
 
         let printed = formatted.print().unwrap();
 
         assert_eq!(
             printed.as_code(),
-            r#"{
-    k: v
-    for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
-}"#
+            r#"while True:
+    if something.changed:
+        do.stuff()  # trailing comment
+"#
         );
     }
 

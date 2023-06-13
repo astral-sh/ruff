@@ -1,9 +1,10 @@
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState, ParenthesizableWhitespace};
+use libcst_native::ParenthesizableWhitespace;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 
@@ -29,14 +30,7 @@ pub(crate) fn adjust_indentation(
     let indented_block = match_indented_block(&mut embedding.body)?;
     indented_block.indent = Some(indentation);
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..Default::default()
-    };
-    indented_block.codegen(&mut state);
-
-    let module_text = state.to_string();
+    let module_text = indented_block.codegen_stylist(stylist);
     let module_text = module_text
         .strip_prefix(stylist.line_ending().as_str())
         .unwrap()
@@ -61,14 +55,10 @@ pub(crate) fn remove_super_arguments(
     body.whitespace_before_args = ParenthesizableWhitespace::default();
     body.whitespace_after_func = ParenthesizableWhitespace::default();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Some(Edit::range_replacement(state.to_string(), range))
+    Some(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        range,
+    ))
 }
 
 /// Remove any imports matching `members` from an import-from statement.

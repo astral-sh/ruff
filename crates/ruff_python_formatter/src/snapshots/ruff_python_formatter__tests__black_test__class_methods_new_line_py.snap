@@ -1,0 +1,541 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/class_methods_new_line.py
+---
+## Input
+
+```py
+class ClassSimplest:
+    pass
+class ClassWithSingleField:
+    a = 1
+class ClassWithJustTheDocstring:
+    """Just a docstring."""
+class ClassWithInit:
+    def __init__(self):
+        pass
+class ClassWithTheDocstringAndInit:
+    """Just a docstring."""
+    def __init__(self):
+        pass
+class ClassWithInitAndVars:
+    cls_var = 100
+    def __init__(self):
+        pass
+class ClassWithInitAndVarsAndDocstring:
+    """Test class"""
+    cls_var = 100
+    def __init__(self):
+        pass
+class ClassWithDecoInit:
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVars:
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsAndDocstring:
+    """Test class"""
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+class ClassSimplestWithInner:
+    class Inner:
+        pass
+class ClassSimplestWithInnerWithDocstring:
+    class Inner:
+        """Just a docstring."""
+        def __init__(self):
+            pass
+class ClassWithSingleFieldWithInner:
+    a = 1
+    class Inner:
+        pass
+class ClassWithJustTheDocstringWithInner:
+    """Just a docstring."""
+    class Inner:
+        pass
+class ClassWithInitWithInner:
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+class ClassWithInitAndVarsWithInner:
+    cls_var = 100
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+class ClassWithInitAndVarsAndDocstringWithInner:
+    """Test class"""
+    cls_var = 100
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+class ClassWithDecoInitWithInner:
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsWithInner:
+    cls_var = 100
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsAndDocstringWithInner:
+    """Test class"""
+    cls_var = 100
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsAndDocstringWithInner2:
+    """Test class"""
+    class Inner:
+        pass
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,165 +1,61 @@
+-class ClassSimplest:
+-    pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithSingleField:
+-    a = 1
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithJustTheDocstring:
+-    """Just a docstring."""
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithInit:
+-    def __init__(self):
+-        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithTheDocstringAndInit:
+-    """Just a docstring."""
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-    def __init__(self):
+-        pass
+ 
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-class ClassWithInitAndVars:
+-    cls_var = 100
+ 
+-    def __init__(self):
+-        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithInitAndVarsAndDocstring:
+-    """Test class"""
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-    cls_var = 100
+ 
+-    def __init__(self):
+-        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithDecoInit:
+-    @deco
+-    def __init__(self):
+-        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithDecoInitAndVars:
+-    cls_var = 100
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-    @deco
+-    def __init__(self):
+-        pass
+ 
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-class ClassWithDecoInitAndVarsAndDocstring:
+-    """Test class"""
+ 
+-    cls_var = 100
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-    @deco
+-    def __init__(self):
+-        pass
+ 
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-class ClassSimplestWithInner:
+-    class Inner:
+-        pass
+ 
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-class ClassSimplestWithInnerWithDocstring:
+-    class Inner:
+-        """Just a docstring."""
+ 
+-        def __init__(self):
+-            pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithSingleFieldWithInner:
+-    a = 1
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-    class Inner:
+-        pass
+ 
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+-class ClassWithJustTheDocstringWithInner:
+-    """Just a docstring."""
+ 
+-    class Inner:
+-        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithInitWithInner:
+-    class Inner:
+-        pass
+-
+-    def __init__(self):
+-        pass
+-
+-
+-class ClassWithInitAndVarsWithInner:
+-    cls_var = 100
+-
+-    class Inner:
+-        pass
+-
+-    def __init__(self):
+-        pass
+-
+-
+-class ClassWithInitAndVarsAndDocstringWithInner:
+-    """Test class"""
+-
+-    cls_var = 100
+-
+-    class Inner:
+-        pass
+-
+-    def __init__(self):
+-        pass
+-
+-
+-class ClassWithDecoInitWithInner:
+-    class Inner:
+-        pass
+-
+-    @deco
+-    def __init__(self):
+-        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+-class ClassWithDecoInitAndVarsWithInner:
+-    cls_var = 100
+-
+-    class Inner:
+-        pass
+-
+-    @deco
+-    def __init__(self):
+-        pass
+-
+-
+-class ClassWithDecoInitAndVarsAndDocstringWithInner:
+-    """Test class"""
+-
+-    cls_var = 100
+-
+-    class Inner:
+-        pass
+-
+-    @deco
+-    def __init__(self):
+-        pass
+-
+-
+-class ClassWithDecoInitAndVarsAndDocstringWithInner2:
+-    """Test class"""
+-
+-    class Inner:
+-        pass
+-
+-    cls_var = 100
+-
+-    @deco
+-    def __init__(self):
+-        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+```
+
+## Ruff Output
+
+```py
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+```
+
+## Black Output
+
+```py
+class ClassSimplest:
+    pass
+
+
+class ClassWithSingleField:
+    a = 1
+
+
+class ClassWithJustTheDocstring:
+    """Just a docstring."""
+
+
+class ClassWithInit:
+    def __init__(self):
+        pass
+
+
+class ClassWithTheDocstringAndInit:
+    """Just a docstring."""
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVars:
+    cls_var = 100
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsAndDocstring:
+    """Test class"""
+
+    cls_var = 100
+
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInit:
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVars:
+    cls_var = 100
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstring:
+    """Test class"""
+
+    cls_var = 100
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassSimplestWithInner:
+    class Inner:
+        pass
+
+
+class ClassSimplestWithInnerWithDocstring:
+    class Inner:
+        """Just a docstring."""
+
+        def __init__(self):
+            pass
+
+
+class ClassWithSingleFieldWithInner:
+    a = 1
+
+    class Inner:
+        pass
+
+
+class ClassWithJustTheDocstringWithInner:
+    """Just a docstring."""
+
+    class Inner:
+        pass
+
+
+class ClassWithInitWithInner:
+    class Inner:
+        pass
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsWithInner:
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsAndDocstringWithInner:
+    """Test class"""
+
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitWithInner:
+    class Inner:
+        pass
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsWithInner:
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstringWithInner:
+    """Test class"""
+
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstringWithInner2:
+    """Test class"""
+
+    class Inner:
+        pass
+
+    cls_var = 100
+
+    @deco
+    def __init__(self):
+        pass
+```
+
+

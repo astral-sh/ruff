@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/flake8_errmsg/mod.rs
 ---
 EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variable first
   |
-5 | def f_a():
-6 |     raise RuntimeError("This is an example exception")
+4 | def f_a():
+5 |     raise RuntimeError("This is an example exception")
   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
   |
   = help: Assign to variable; remove string literal
@@ -20,159 +20,159 @@ EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variabl
 7 8 | 
 8 9 | def f_a_short():
 
-EM.py:14:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
    |
-14 | def f_b():
-15 |     example = "example"
-16 |     raise RuntimeError(f"This is an {example} exception")
+16 | def f_b():
+17 |     example = "example"
+18 |     raise RuntimeError(f"This is an {example} exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
    |
    = help: Assign to variable; remove f-string literal
 
 ℹ Suggested fix
-11 11 | 
-12 12 | def f_b():
-13 13 |     example = "example"
-14    |-    raise RuntimeError(f"This is an {example} exception")
-   14 |+    msg = f"This is an {example} exception"
-   15 |+    raise RuntimeError(msg)
-15 16 | 
-16 17 | 
-17 18 | def f_c():
+15 15 | 
+16 16 | def f_b():
+17 17 |     example = "example"
+18    |-    raise RuntimeError(f"This is an {example} exception")
+   18 |+    msg = f"This is an {example} exception"
+   19 |+    raise RuntimeError(msg)
+19 20 | 
+20 21 | 
+21 22 | def f_c():
 
-EM.py:18:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
-18 | def f_c():
-19 |     raise RuntimeError("This is an {example} exception".format(example="example"))
+21 | def f_c():
+22 |     raise RuntimeError("This is an {example} exception".format(example="example"))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103
    |
    = help: Assign to variable; remove `.format()` string
 
 ℹ Suggested fix
-15 15 | 
-16 16 | 
-17 17 | def f_c():
-18    |-    raise RuntimeError("This is an {example} exception".format(example="example"))
-   18 |+    msg = "This is an {example} exception".format(example="example")
-   19 |+    raise RuntimeError(msg)
-19 20 | 
-20 21 | 
-21 22 | def f_ok():
+19 19 | 
+20 20 | 
+21 21 | def f_c():
+22    |-    raise RuntimeError("This is an {example} exception".format(example="example"))
+   22 |+    msg = "This is an {example} exception".format(example="example")
+   23 |+    raise RuntimeError(msg)
+23 24 | 
+24 25 | 
+25 26 | def f_ok():
 
-EM.py:28:24: EM101 Exception must not use a string literal, assign to variable first
+EM.py:32:24: EM101 Exception must not use a string literal, assign to variable first
    |
-28 | def f_unfixable():
-29 |     msg = "hello"
-30 |     raise RuntimeError("This is an example exception")
+30 | def f_unfixable():
+31 |     msg = "hello"
+32 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
 
-EM.py:35:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
-35 |         msg = "hello"
-36 | 
-37 |     raise RuntimeError("This is an example exception")
+37 |         msg = "hello"
+38 | 
+39 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
 
 ℹ Suggested fix
-32 32 |     def nested():
-33 33 |         msg = "hello"
-34 34 | 
-35    |-    raise RuntimeError("This is an example exception")
-   35 |+    msg = "This is an example exception"
-   36 |+    raise RuntimeError(msg)
-36 37 | 
-37 38 | 
-38 39 | def f_msg_in_parent_scope():
+36 36 |     def nested():
+37 37 |         msg = "hello"
+38 38 | 
+39    |-    raise RuntimeError("This is an example exception")
+   39 |+    msg = "This is an example exception"
+   40 |+    raise RuntimeError(msg)
+40 41 | 
+41 42 | 
+42 43 | def f_msg_in_parent_scope():
 
-EM.py:42:28: EM101 Exception must not use a string literal, assign to variable first
+EM.py:46:28: EM101 Exception must not use a string literal, assign to variable first
    |
-42 |     def nested():
-43 |         raise RuntimeError("This is an example exception")
+45 |     def nested():
+46 |         raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
 
-EM.py:47:28: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variable first
    |
-47 | def f_fix_indentation_check(foo):
-48 |     if foo:
-49 |         raise RuntimeError("This is an example exception")
+49 | def f_fix_indentation_check(foo):
+50 |     if foo:
+51 |         raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
-50 |     else:
-51 |         if foo == "foo":
+52 |     else:
+53 |         if foo == "foo":
    |
    = help: Assign to variable; remove string literal
 
 ℹ Suggested fix
-44 44 | 
-45 45 | def f_fix_indentation_check(foo):
-46 46 |     if foo:
-47    |-        raise RuntimeError("This is an example exception")
-   47 |+        msg = "This is an example exception"
-   48 |+        raise RuntimeError(msg)
-48 49 |     else:
-49 50 |         if foo == "foo":
-50 51 |             raise RuntimeError(f"This is an exception: {foo}")
+48 48 | 
+49 49 | def f_fix_indentation_check(foo):
+50 50 |     if foo:
+51    |-        raise RuntimeError("This is an example exception")
+   51 |+        msg = "This is an example exception"
+   52 |+        raise RuntimeError(msg)
+52 53 |     else:
+53 54 |         if foo == "foo":
+54 55 |             raise RuntimeError(f"This is an exception: {foo}")
 
-EM.py:50:32: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to variable first
    |
-50 |     else:
-51 |         if foo == "foo":
-52 |             raise RuntimeError(f"This is an exception: {foo}")
+52 |     else:
+53 |         if foo == "foo":
+54 |             raise RuntimeError(f"This is an exception: {foo}")
    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
-53 |     raise RuntimeError("This is an exception: {}".format(foo))
+55 |     raise RuntimeError("This is an exception: {}".format(foo))
    |
    = help: Assign to variable; remove f-string literal
 
 ℹ Suggested fix
-47 47 |         raise RuntimeError("This is an example exception")
-48 48 |     else:
-49 49 |         if foo == "foo":
-50    |-            raise RuntimeError(f"This is an exception: {foo}")
-   50 |+            msg = f"This is an exception: {foo}"
-   51 |+            raise RuntimeError(msg)
-51 52 |     raise RuntimeError("This is an exception: {}".format(foo))
-52 53 | 
-53 54 | 
+51 51 |         raise RuntimeError("This is an example exception")
+52 52 |     else:
+53 53 |         if foo == "foo":
+54    |-            raise RuntimeError(f"This is an exception: {foo}")
+   54 |+            msg = f"This is an exception: {foo}"
+   55 |+            raise RuntimeError(msg)
+55 56 |     raise RuntimeError("This is an exception: {}".format(foo))
+56 57 | 
+57 58 | 
 
-EM.py:51:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
-51 |         if foo == "foo":
-52 |             raise RuntimeError(f"This is an exception: {foo}")
-53 |     raise RuntimeError("This is an exception: {}".format(foo))
+53 |         if foo == "foo":
+54 |             raise RuntimeError(f"This is an exception: {foo}")
+55 |     raise RuntimeError("This is an exception: {}".format(foo))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103
    |
    = help: Assign to variable; remove `.format()` string
 
 ℹ Suggested fix
-48 48 |     else:
-49 49 |         if foo == "foo":
-50 50 |             raise RuntimeError(f"This is an exception: {foo}")
-51    |-    raise RuntimeError("This is an exception: {}".format(foo))
-   51 |+    msg = "This is an exception: {}".format(foo)
-   52 |+    raise RuntimeError(msg)
-52 53 | 
-53 54 | 
-54 55 | # Report these, but don't fix them
+52 52 |     else:
+53 53 |         if foo == "foo":
+54 54 |             raise RuntimeError(f"This is an exception: {foo}")
+55    |-    raise RuntimeError("This is an exception: {}".format(foo))
+   55 |+    msg = "This is an exception: {}".format(foo)
+   56 |+    raise RuntimeError(msg)
+56 57 | 
+57 58 | 
+58 59 | # Report these, but don't fix them
 
-EM.py:55:28: EM101 Exception must not use a string literal, assign to variable first
+EM.py:59:28: EM101 Exception must not use a string literal, assign to variable first
    |
-55 | # Report these, but don't fix them
-56 | if foo: raise RuntimeError("This is an example exception")
+58 | # Report these, but don't fix them
+59 | if foo: raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
-57 | if foo: x = 1; raise RuntimeError("This is an example exception")
+60 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |
    = help: Assign to variable; remove string literal
 
-EM.py:56:35: EM101 Exception must not use a string literal, assign to variable first
+EM.py:60:35: EM101 Exception must not use a string literal, assign to variable first
    |
-56 | # Report these, but don't fix them
-57 | if foo: raise RuntimeError("This is an example exception")
-58 | if foo: x = 1; raise RuntimeError("This is an example exception")
+58 | # Report these, but don't fix them
+59 | if foo: raise RuntimeError("This is an example exception")
+60 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal

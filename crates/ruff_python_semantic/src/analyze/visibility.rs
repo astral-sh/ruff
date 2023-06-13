@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rustpython_parser::ast::{self, Expr, Stmt};
+use rustpython_parser::ast::{self, Decorator, Stmt};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
@@ -14,10 +14,10 @@ pub enum Visibility {
 }
 
 /// Returns `true` if a function is a "static method".
-pub fn is_staticmethod(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
-    decorator_list.iter().any(|expr| {
+pub fn is_staticmethod(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+    decorator_list.iter().any(|decorator| {
         model
-            .resolve_call_path(map_callable(expr))
+            .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "staticmethod"]
             })
@@ -25,10 +25,10 @@ pub fn is_staticmethod(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
 }
 
 /// Returns `true` if a function is a "class method".
-pub fn is_classmethod(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
-    decorator_list.iter().any(|expr| {
+pub fn is_classmethod(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+    decorator_list.iter().any(|decorator| {
         model
-            .resolve_call_path(map_callable(expr))
+            .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "classmethod"]
             })
@@ -36,24 +36,24 @@ pub fn is_classmethod(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
 }
 
 /// Returns `true` if a function definition is an `@overload`.
-pub fn is_overload(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
+pub fn is_overload(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| model.match_typing_expr(map_callable(expr), "overload"))
+        .any(|decorator| model.match_typing_expr(map_callable(&decorator.expression), "overload"))
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
-pub fn is_override(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
+pub fn is_override(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| model.match_typing_expr(map_callable(expr), "override"))
+        .any(|decorator| model.match_typing_expr(map_callable(&decorator.expression), "override"))
 }
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
-pub fn is_abstract(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
-    decorator_list.iter().any(|expr| {
+pub fn is_abstract(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+    decorator_list.iter().any(|decorator| {
         model
-            .resolve_call_path(map_callable(expr))
+            .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
                 matches!(
                     call_path.as_slice(),
@@ -74,12 +74,12 @@ pub fn is_abstract(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
 /// `@property`-like decorators.
 pub fn is_property(
     model: &SemanticModel,
-    decorator_list: &[Expr],
+    decorator_list: &[Decorator],
     extra_properties: &[CallPath],
 ) -> bool {
-    decorator_list.iter().any(|expr| {
+    decorator_list.iter().any(|decorator| {
         model
-            .resolve_call_path(map_callable(expr))
+            .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "property"]
                     || call_path.as_slice() == ["functools", "cached_property"]
@@ -89,6 +89,14 @@ pub fn is_property(
             })
     })
 }
+
+/// Returns `true` if a class is an `final`.
+pub fn is_final(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+    decorator_list
+        .iter()
+        .any(|decorator| model.match_typing_expr(map_callable(&decorator.expression), "final"))
+}
+
 /// Returns `true` if a function is a "magic method".
 pub fn is_magic(name: &str) -> bool {
     name.starts_with("__") && name.ends_with("__")
@@ -198,8 +206,8 @@ pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
             ..
         }) => {
             // Is this a setter or deleter?
-            if decorator_list.iter().any(|expr| {
-                collect_call_path(expr).map_or(false, |call_path| {
+            if decorator_list.iter().any(|decorator| {
+                collect_call_path(&decorator.expression).map_or(false, |call_path| {
                     call_path.as_slice() == [name, "setter"]
                         || call_path.as_slice() == [name, "deleter"]
                 })

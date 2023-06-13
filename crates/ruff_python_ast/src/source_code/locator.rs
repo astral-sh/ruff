@@ -6,7 +6,8 @@ use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::newlines::find_newline;
+use ruff_python_whitespace::find_newline;
+
 use crate::source_code::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
 pub struct Locator<'a> {

@@ -14,7 +14,7 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001.py"); "SLF001")]
+    #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

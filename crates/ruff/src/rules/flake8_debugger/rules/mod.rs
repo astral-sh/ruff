@@ -1,3 +1,3 @@
-pub(crate) use debugger::{debugger_call, debugger_import, Debugger};
+pub(crate) use debugger::*;
 
 mod debugger;

@@ -1,4 +1,4 @@
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 use std::fmt::{Debug, Formatter};
 
 /// The source code of a document that gets formatted
@@ -38,6 +38,10 @@ impl<'a> SourceCode<'a> {
             text: String::from(&self.text[range]).into_boxed_str(),
         }
     }
+
+    pub fn as_str(&self) -> &'a str {
+        self.text
+    }
 }
 
 impl Debug for SourceCode<'_> {
@@ -64,8 +68,16 @@ impl SourceCodeSlice {
         &code.text[self.range]
     }
 
-    pub fn range(&self) -> TextRange {
+    pub const fn range(&self) -> TextRange {
         self.range
+    }
+
+    pub const fn start(&self) -> TextSize {
+        self.range.start()
+    }
+
+    pub const fn end(&self) -> TextSize {
+        self.range.end()
     }
 }
 

@@ -2,9 +2,8 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Indexer;
-use ruff_python_ast::whitespace::leading_space;
+use ruff_python_whitespace::{leading_indentation, Line};
 
 #[violation]
 pub struct TabIndentation;
@@ -18,7 +17,7 @@ impl Violation for TabIndentation {
 
 /// W191
 pub(crate) fn tab_indentation(line: &Line, indexer: &Indexer) -> Option<Diagnostic> {
-    let indent = leading_space(line);
+    let indent = leading_indentation(line);
     if let Some(tab_index) = indent.find('\t') {
         // If the tab character is within a multi-line string, abort.
         let tab_offset = line.start() + TextSize::try_from(tab_index).unwrap();

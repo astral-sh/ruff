@@ -1,54 +1,25 @@
-use bitflags::bitflags;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
+pub(crate) use blank_lines::*;
+pub(crate) use extraneous_whitespace::*;
+pub(crate) use indentation::*;
+pub(crate) use missing_whitespace::*;
+pub(crate) use missing_whitespace_after_keyword::*;
+pub(crate) use missing_whitespace_around_operator::*;
+pub(crate) use space_around_operator::*;
+pub(crate) use whitespace_around_keywords::*;
+pub(crate) use whitespace_around_named_parameter_equals::*;
+pub(crate) use whitespace_before_comment::*;
+pub(crate) use whitespace_before_parameters::*;
+
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
+use bitflags::bitflags;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::lexer::LexResult;
+
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-
-pub(crate) use blank_lines::{
-    blank_lines, BlankLineAfterDecorator, BlankLineBetweenMethods, BlankLinesAfterFunctionOrClass,
-    BlankLinesBeforeNestedDefinition, BlankLinesTopLevel, BlankLinesTrackingVars,
-    TooManyBlankLines,
-};
-pub(crate) use extraneous_whitespace::{
-    extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,
-    WhitespaceBeforePunctuation,
-};
-pub(crate) use indentation::{
-    indentation, IndentationWithInvalidMultiple, IndentationWithInvalidMultipleComment,
-    NoIndentedBlock, NoIndentedBlockComment, OverIndented, UnexpectedIndentation,
-    UnexpectedIndentationComment,
-};
-pub(crate) use missing_whitespace::{missing_whitespace, MissingWhitespace};
-pub(crate) use missing_whitespace_after_keyword::{
-    missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
-};
-pub(crate) use missing_whitespace_around_operator::{
-    missing_whitespace_around_operator, MissingWhitespaceAroundArithmeticOperator,
-    MissingWhitespaceAroundBitwiseOrShiftOperator, MissingWhitespaceAroundModuloOperator,
-    MissingWhitespaceAroundOperator,
-};
-pub(crate) use space_around_operator::{
-    space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
-    TabAfterOperator, TabBeforeOperator,
-};
-pub(crate) use whitespace_around_keywords::{
-    whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
-    TabAfterKeyword, TabBeforeKeyword,
-};
-pub(crate) use whitespace_around_named_parameter_equals::{
-    whitespace_around_named_parameter_equals, MissingWhitespaceAroundParameterEquals,
-    UnexpectedSpacesAroundKeywordParameterEquals,
-};
-pub(crate) use whitespace_before_comment::{
-    whitespace_before_comment, MultipleLeadingHashesForBlockComment, NoSpaceAfterBlockComment,
-    NoSpaceAfterInlineComment, TooFewSpacesBeforeInlineComment,
-};
-pub(crate) use whitespace_before_parameters::{
-    whitespace_before_parameters, WhitespaceBeforeParameters,
-};
+use ruff_python_whitespace::is_python_whitespace;
 
 mod blank_lines;
 mod extraneous_whitespace;
@@ -93,7 +64,7 @@ impl<'a> LogicalLines<'a> {
         assert!(u32::try_from(tokens.len()).is_ok());
 
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
-        let mut parens: u32 = 0;
+        let mut parens = 0u32;
 
         for (token, range) in tokens.iter().flatten() {
             let token_kind = TokenKind::from_token(token);
@@ -101,10 +72,10 @@ impl<'a> LogicalLines<'a> {
 
             match token_kind {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                    parens += 1;
+                    parens = parens.saturating_add(1);
                 }
                 TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
-                    parens -= 1;
+                    parens = parens.saturating_sub(1);
                 }
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     builder.finish_line();
@@ -389,7 +360,7 @@ impl Whitespace {
                 len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
                 break;
-            } else if c.is_whitespace() {
+            } else if is_python_whitespace(c) {
                 count += 1;
                 len += c.text_len();
             } else {
@@ -420,7 +391,7 @@ impl Whitespace {
             } else if matches!(c, '\n' | '\r') {
                 // Indent
                 return (Self::None, TextSize::default());
-            } else if c.is_whitespace() {
+            } else if is_python_whitespace(c) {
                 count += 1;
                 len += c.text_len();
             } else {

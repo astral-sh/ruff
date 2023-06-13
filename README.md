@@ -2,11 +2,11 @@
 
 # Ruff
 
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/charliermarsh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
-[![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
+[![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 
 [**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
@@ -24,17 +24,18 @@ An extremely fast Python linter, written in Rust.
   <i>Linting the CPython codebase from scratch.</i>
 </p>
 
-- ⚡️  10-100x faster than existing linters
-- 🐍  Installable via `pip`
-- 🛠️  `pyproject.toml` support
-- 🤝  Python 3.11 compatibility
-- 📦  Built-in caching, to avoid re-analyzing unchanged files
-- 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏  Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
-- ⚖️  [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-- 🔌  Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️  First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
-- 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
+- ⚡️ 10-100x faster than existing linters
+- 🐍 Installable via `pip`
+- 🛠️ `pyproject.toml` support
+- 🤝 Python 3.11 compatibility
+- 📦 Built-in caching, to avoid re-analyzing unchanged files
+- 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
+- 📏 Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
+- ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
+  built-in Flake8 rule set
+- 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
+- ⌨️ First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
+- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
@@ -84,9 +85,10 @@ of [Conda](https://docs.conda.io/en/latest/):
 [**Timothy Crosley**](https://twitter.com/timothycrosley/status/1606420868514877440),
 creator of [isort](https://github.com/PyCQA/isort):
 
-> Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe it was working till I intentionally introduced some errors.
+> Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe
+> it was working till I intentionally introduced some errors.
 
-[**Tim Abbott**](https://github.com/charliermarsh/ruff/issues/465#issuecomment-1317400028), lead
+[**Tim Abbott**](https://github.com/astral-sh/ruff/issues/465#issuecomment-1317400028), lead
 developer of [Zulip](https://github.com/zulip/zulip):
 
 > This is just ridiculously fast... `ruff` is amazing.
@@ -137,7 +139,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.270
+  rev: v0.0.272
   hooks:
     - id: ruff
 ```
@@ -242,6 +244,8 @@ stylistic rules made obsolete by the use of an autoformatter, like
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
 catches a wide variety of common errors (like unused imports) with zero configuration.
 
+<!-- End section: Rules -->
+
 Beyond the defaults, Ruff re-implements some of the most popular Flake8 plugins and related code
 quality tools, including:
 
@@ -250,13 +254,14 @@ quality tools, including:
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
 - [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 - [flake8-async](https://pypi.org/project/flake8-async)
-- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
+- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/astral-sh/ruff/issues/1646))
 - [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
 - [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
 - [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-copyright/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)
@@ -279,23 +284,23 @@ quality tools, including:
 - [flake8-return](https://pypi.org/project/flake8-return/)
 - [flake8-self](https://pypi.org/project/flake8-self/)
 - [flake8-simplify](https://pypi.org/project/flake8-simplify/)
+- [flake8-slots](https://pypi.org/project/flake8-slots/)
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
-- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/charliermarsh/ruff/issues/2102))
+- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))
 - [isort](https://pypi.org/project/isort/)
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
+- [pylint-airflow](https://pypi.org/project/pylint-airflow/)
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
-
-<!-- End section: Rules -->
 
 For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
 
@@ -308,8 +313,8 @@ You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
 ## Support
 
-Having trouble? Check out the existing issues on [**GitHub**](https://github.com/charliermarsh/ruff/issues),
-or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
+Having trouble? Check out the existing issues on [**GitHub**](https://github.com/astral-sh/ruff/issues),
+or feel free to [**open a new one**](https://github.com/astral-sh/ruff/issues/new).
 
 You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
@@ -331,7 +336,7 @@ and again draws on both the APIs and implementation details of [Rome](https://gi
 Ruff is also influenced by a number of tools outside the Python ecosystem, like
 [Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).
 
-Ruff is the beneficiary of a large number of [contributors](https://github.com/charliermarsh/ruff/graphs/contributors).
+Ruff is the beneficiary of a large number of [contributors](https://github.com/astral-sh/ruff/graphs/contributors).
 
 Ruff is released under the MIT license.
 
@@ -352,7 +357,9 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
-- Hugging Face ([Transformers](https://github.com/huggingface/transformers), [Datasets](https://github.com/huggingface/datasets), [Diffusers](https://github.com/huggingface/diffusers))
+- Hugging Face ([Transformers](https://github.com/huggingface/transformers),
+  [Datasets](https://github.com/huggingface/datasets),
+  [Diffusers](https://github.com/huggingface/diffusers))
 - [Hatch](https://github.com/pypa/hatch)
 - [Home Assistant](https://github.com/home-assistant/core)
 - [Ibis](https://github.com/ibis-project/ibis)
@@ -364,7 +371,9 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
-- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel), [ONNX Runtime](https://github.com/microsoft/onnxruntime), [LightGBM](https://github.com/microsoft/LightGBM))
+- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
+  [ONNX Runtime](https://github.com/microsoft/onnxruntime),
+  [LightGBM](https://github.com/microsoft/LightGBM))
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [ONNX](https://github.com/onnx/onnx)
@@ -406,21 +415,21 @@ Ruff is used by a number of major open-source projects and companies, including:
 If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 
 ```md
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/charliermarsh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 ```
 
 ...or `README.rst`:
 
 ```rst
 .. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json
-    :target: https://github.com/charliermarsh/ruff
+    :target: https://github.com/astral-sh/ruff
     :alt: Ruff
 ```
 
 ...or, as HTML:
 
 ```html
-<a href="https://github.com/charliermarsh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
+<a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
 ```
 
 ## License

@@ -4,6 +4,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
 use ruff_python_semantic::analyze::logging;
+use ruff_python_semantic::analyze::logging::exc_info;
 use ruff_python_stdlib::logging::LoggingLevel;
 
 use crate::checkers::ast::Checker;
@@ -192,53 +193,31 @@ pub(crate) fn logging_call(
             }
 
             // G201, G202
-            if checker.enabled(Rule::LoggingExcInfo)
-                || checker.enabled(Rule::LoggingRedundantExcInfo)
-            {
+            if checker.any_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
                 if !checker.semantic_model().in_exception_handler() {
                     return;
                 }
-                if let Some(exc_info) = find_keyword(keywords, "exc_info") {
-                    // If `exc_info` is `True` or `sys.exc_info()`, it's redundant; but otherwise,
-                    // return.
-                    if !(matches!(
-                        exc_info.value,
-                        Expr::Constant(ast::ExprConstant {
-                            value: Constant::Bool(true),
-                            ..
-                        })
-                    ) || if let Expr::Call(ast::ExprCall { func, .. }) = &exc_info.value {
-                        checker
-                            .semantic_model()
-                            .resolve_call_path(func)
-                            .map_or(false, |call_path| {
-                                call_path.as_slice() == ["sys", "exc_info"]
-                            })
-                    } else {
-                        false
-                    }) {
-                        return;
-                    }
-
-                    if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
-                        match logging_level {
-                            LoggingLevel::Error => {
-                                if checker.enabled(Rule::LoggingExcInfo) {
-                                    checker
-                                        .diagnostics
-                                        .push(Diagnostic::new(LoggingExcInfo, level_call_range));
-                                }
+                let Some(exc_info) = exc_info(keywords, checker.semantic_model()) else {
+                    return;
+                };
+                if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
+                    match logging_level {
+                        LoggingLevel::Error => {
+                            if checker.enabled(Rule::LoggingExcInfo) {
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(LoggingExcInfo, level_call_range));
                             }
-                            LoggingLevel::Exception => {
-                                if checker.enabled(Rule::LoggingRedundantExcInfo) {
-                                    checker.diagnostics.push(Diagnostic::new(
-                                        LoggingRedundantExcInfo,
-                                        exc_info.range(),
-                                    ));
-                                }
-                            }
-                            _ => {}
                         }
+                        LoggingLevel::Exception => {
+                            if checker.enabled(Rule::LoggingRedundantExcInfo) {
+                                checker.diagnostics.push(Diagnostic::new(
+                                    LoggingRedundantExcInfo,
+                                    exc_info.range(),
+                                ));
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }

@@ -3,9 +3,10 @@ use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::str::{leading_quote, trailing_quote};
 
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
 
@@ -34,9 +35,15 @@ use crate::rules::flake8_implicit_str_concat::settings::Settings;
 pub struct SingleLineImplicitStringConcatenation;
 
 impl Violation for SingleLineImplicitStringConcatenation {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Implicitly concatenated string literals on one line")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some("Combine string literals".to_string())
     }
 }
 
@@ -106,12 +113,50 @@ pub(crate) fn implicit(
                     TextRange::new(a_range.start(), b_range.end()),
                 ));
             } else {
-                diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     SingleLineImplicitStringConcatenation,
                     TextRange::new(a_range.start(), b_range.end()),
-                ));
-            }
-        }
+                );
+
+                if let Some(fix) = concatenate_strings(*a_range, *b_range, locator) {
+                    diagnostic.set_fix(fix);
+                }
+
+                diagnostics.push(diagnostic);
+            };
+        };
     }
     diagnostics
+}
+
+fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator) -> Option<Fix> {
+    let a_text = &locator.contents()[a_range];
+    let b_text = &locator.contents()[b_range];
+
+    let a_leading_quote = leading_quote(a_text)?;
+    let b_leading_quote = leading_quote(b_text)?;
+
+    // Require, for now, that the leading quotes are the same.
+    if a_leading_quote != b_leading_quote {
+        return None;
+    }
+
+    let a_trailing_quote = trailing_quote(a_text)?;
+    let b_trailing_quote = trailing_quote(b_text)?;
+
+    // Require, for now, that the trailing quotes are the same.
+    if a_trailing_quote != b_trailing_quote {
+        return None;
+    }
+
+    let a_body = &a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()];
+    let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
+
+    let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
+    let range = TextRange::new(a_range.start(), b_range.end());
+
+    Some(Fix::automatic(Edit::range_replacement(
+        concatenation,
+        range,
+    )))
 }

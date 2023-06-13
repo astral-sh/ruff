@@ -3,7 +3,7 @@
 //! **The API is currently completely unstable**
 //! and subject to change drastically.
 //!
-//! [Ruff]: https://github.com/charliermarsh/ruff
+//! [Ruff]: https://github.com/astral-sh/ruff
 
 pub use ruff_python_ast::source_code::round_trip;
 pub use rule_selector::RuleSelector;
@@ -34,6 +34,7 @@ mod rule_redirects;
 mod rule_selector;
 pub mod rules;
 pub mod settings;
+pub mod source_kind;
 
-#[cfg(test)]
-mod test;
+#[cfg(any(test, fuzzing))]
+pub mod test;

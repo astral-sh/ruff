@@ -493,14 +493,14 @@ impl<'a> ImportReplacer<'a> {
     fn format_import_from(names: &[&Alias], module: &str) -> String {
         // Construct the whitespace strings.
         // Generate the formatted names.
-        let full_names: String = names
+        let qualified_names: String = names
             .iter()
             .map(|name| match &name.asname {
                 Some(asname) => format!("{} as {}", name.name, asname),
                 None => format!("{}", name.name),
             })
             .join(", ");
-        format!("from {module} import {full_names}")
+        format!("from {module} import {qualified_names}")
     }
 }
 

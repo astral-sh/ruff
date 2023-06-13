@@ -11,8 +11,8 @@ use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::newlines::LineEnding;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_whitespace::{LineEnding, PythonWhitespace};
 
 use crate::codes::NoqaCode;
 use crate::registry::{AsRule, Rule, RuleSet};
@@ -87,7 +87,7 @@ enum ParsedExemption<'a> {
 
 /// Return a [`ParsedExemption`] for a given comment line.
 fn parse_file_exemption(line: &str) -> ParsedExemption {
-    let line = line.trim_start();
+    let line = line.trim_whitespace_start();
 
     if line.starts_with("# flake8: noqa")
         || line.starts_with("# flake8: NOQA")
@@ -514,8 +514,8 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use ruff_diagnostics::Diagnostic;
-    use ruff_python_ast::newlines::LineEnding;
     use ruff_python_ast::source_code::Locator;
+    use ruff_python_whitespace::LineEnding;
 
     use crate::noqa::{add_noqa_inner, NoqaMapping, NOQA_LINE_REGEX};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;

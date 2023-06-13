@@ -34,13 +34,14 @@ natively, including:
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
 - [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 - [flake8-async](https://pypi.org/project/flake8-async)
-- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
+- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/astral-sh/ruff/issues/1646))
 - [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
 - [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
 - [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-copyright/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)
@@ -62,12 +63,13 @@ natively, including:
 - [flake8-return](https://pypi.org/project/flake8-return/)
 - [flake8-self](https://pypi.org/project/flake8-self/)
 - [flake8-simplify](https://pypi.org/project/flake8-simplify/)
+- [flake8-slots](https://pypi.org/project/flake8-slots/)
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
-- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/charliermarsh/ruff/issues/2102))
+- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))
 - [isort](https://pypi.org/project/isort/)
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
@@ -97,7 +99,7 @@ There are a few other minor incompatibilities between Ruff and the originating F
 ## How does Ruff compare to Pylint?
 
 At time of writing, Pylint implements ~409 total rules, while Ruff implements 440, of which at least
-89 overlap with the Pylint rule set (you can find the mapping in [#970](https://github.com/charliermarsh/ruff/issues/970)).
+89 overlap with the Pylint rule set (you can find the mapping in [#970](https://github.com/astral-sh/ruff/issues/970)).
 
 Pylint implements many rules that Ruff does not, and vice versa. For example, Pylint does more type
 inference than Ruff (e.g., Pylint can validate the number of arguments in a function call). As such,
@@ -111,7 +113,7 @@ which can cover some of the functionality that Pylint provides.
 Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively.
 Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
-Pylint parity is being tracked in [#970](https://github.com/charliermarsh/ruff/issues/970).
+Pylint parity is being tracked in [#970](https://github.com/astral-sh/ruff/issues/970).
 
 ## How does Ruff compare to Mypy, or Pyright, or Pyre?
 
@@ -135,13 +137,14 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
 - [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 - [flake8-async](https://pypi.org/project/flake8-async)
-- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
+- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/astral-sh/ruff/issues/1646))
 - [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
 - [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
 - [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-comprehensions/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)
@@ -162,12 +165,13 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-return](https://pypi.org/project/flake8-return/)
 - [flake8-self](https://pypi.org/project/flake8-self/)
 - [flake8-simplify](https://pypi.org/project/flake8-simplify/)
+- [flake8-slots](https://pypi.org/project/flake8-slots/)
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
-- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/charliermarsh/ruff/issues/2102))
+- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
@@ -179,7 +183,7 @@ Ruff can also replace [isort](https://pypi.org/project/isort/),
 most of the rules implemented in [pyupgrade](https://pypi.org/project/pyupgrade/).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an
-[issue](https://github.com/charliermarsh/ruff/issues/new).
+[issue](https://github.com/astral-sh/ruff/issues/new).
 
 ## What versions of Python does Ruff support?
 
@@ -204,7 +208,7 @@ on Rust at all.
 ## Can I write my own plugins for Ruff?
 
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
-project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
+project. See [#283](https://github.com/astral-sh/ruff/issues/283) for more.
 
 ## How does Ruff's import sorting compare to [isort](https://pypi.org/project/isort/)?
 
@@ -212,8 +216,8 @@ Ruff's import sorting is intended to be near-equivalent to isort's when using is
 `profile = "black"`.
 
 There are a few known differences in how Ruff and isort treat aliased imports, and in how Ruff and
-isort treat inline comments in some cases (see: [#1381](https://github.com/charliermarsh/ruff/issues/1381),
-[#2104](https://github.com/charliermarsh/ruff/issues/2104)).
+isort treat inline comments in some cases (see: [#1381](https://github.com/astral-sh/ruff/issues/1381),
+[#2104](https://github.com/astral-sh/ruff/issues/2104)).
 
 For example, Ruff tends to group non-aliased imports from the same module:
 
@@ -253,6 +257,52 @@ src = ["src", "tests"]
 
 [tool.ruff.isort]
 known-first-party = ["my_module1", "my_module2"]
+```
+
+## How does Ruff determine which of my imports are first-party, third-party, etc.?
+
+Ruff accepts a `src` option that in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file, which
+specifies the directories that Ruff should consider when determining whether an import is
+first-party.
+
+For example, if you have a project with the following structure:
+
+```tree
+.
+├── pyproject.toml
+├── src
+│   ├── __init__.py
+│   ├── module1.py
+│   └── module2.py
+└── tests
+    ├── __init__.py
+    ├── test_module1.py
+    └── test_module2.py
+```
+
+When Ruff sees an import like `import module1`, it will then iterate over the `src` directories,
+looking for a corresponding Python module. You can configure Ruff to consider `src` and `tests` as
+first-party sources like so:
+
+```toml
+[tool.ruff]
+src = ["src", "tests"]
+```
+
+If the `src` field is omitted, Ruff will default to using the "project root" as the only
+first-party source. The "project root" is typically the directory containing your `pyproject.toml`,
+`ruff.toml`, or `.ruff.toml` file, unless a configuration file is provided on the command-line via
+the `--config` option, in which case, the current working directory is used as the project root.
+
+If your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` extends another configuration file, Ruff
+will still use the "extended" configuration file's directory as the project root. For example, if
+you add a `ruff.toml` to the `tests` directory in the above example, you'll want to explicitly
+set the `src` option in the extended configuration file:
+
+```toml
+# tests/ruff.toml
+extend = "../pyproject.toml"
+src = ["../src", "../test"]
 ```
 
 ## Does Ruff support Jupyter Notebooks?

@@ -3,18 +3,18 @@ source: crates/ruff/src/rules/isort/mod.rs
 ---
 skip.py:20:1: I001 [*] Import block is un-sorted or un-formatted
    |
-20 |       import sys
-21 |       import os  # isort: skip
-22 | /     import collections
-23 | |     import abc
-24 | | 
+18 |       import sys
+19 |       import os  # isort: skip
+20 | /     import collections
+21 | |     import abc
+22 | | 
    | |_^ I001
-25 |   
-26 |   def f():
+23 |   
+24 |   def f():
    |
    = help: Organize imports
 
-ℹ Suggested fix
+ℹ Fix
 17 17 | def f():
 18 18 |     import sys
 19 19 |     import os  # isort: skip
@@ -27,14 +27,14 @@ skip.py:20:1: I001 [*] Import block is un-sorted or un-formatted
 
 skip.py:27:1: I001 [*] Import block is un-sorted or un-formatted
    |
-27 |       import sys
-28 |       import os  # isort:skip
-29 | /     import collections
-30 | |     import abc
+25 |       import sys
+26 |       import os  # isort:skip
+27 | /     import collections
+28 | |     import abc
    |
    = help: Organize imports
 
-ℹ Suggested fix
+ℹ Fix
 24 24 | def f():
 25 25 |     import sys
 26 26 |     import os  # isort:skip

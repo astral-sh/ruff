@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
 docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
-   |
- 5 |   '''
- 6 |   
- 7 | / '''
- 8 | | this is not a docstring
- 9 | | '''
-   | |___^ Q001
-10 |   
-11 |   l = []
-   |
-   = help: Replace single multiline quotes with double quotes
+  |
+3 |   '''
+4 |   
+5 | / '''
+6 | | this is not a docstring
+7 | | '''
+  | |___^ Q001
+8 |   
+9 |   l = []
+  |
+  = help: Replace single multiline quotes with double quotes
 
 ℹ Suggested fix
 2 2 | Single quotes multiline module docstring
@@ -29,15 +29,15 @@ docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quote
 
 docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
    |
-11 |   l = []
-12 |   
-13 |   class Cls(MakeKlass('''
+ 9 |   l = []
+10 |   
+11 |   class Cls(MakeKlass('''
    |  _____________________^
-14 | |     class params \t not a docstring
-15 | | ''')):
+12 | |     class params \t not a docstring
+13 | | ''')):
    | |___^ Q001
-16 |       '''
-17 |       Single quotes multiline class docstring
+14 |       '''
+15 |       Single quotes multiline class docstring
    |
    = help: Replace single multiline quotes with double quotes
 
@@ -56,15 +56,15 @@ docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quo
 
 docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
    |
+16 |       '''
+17 |   
 18 |       '''
-19 |   
-20 |       '''
    |  _____^
-21 | |     this is not a docstring
-22 | |     '''
+19 | |     this is not a docstring
+20 | |     '''
    | |_______^ Q001
-23 |   
-24 |       # The colon in the list indexing below is an edge case for the docstring scanner
+21 |   
+22 |       # The colon in the list indexing below is an edge case for the docstring scanner
    |
    = help: Replace single multiline quotes with double quotes
 
@@ -83,13 +83,13 @@ docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quot
 
 docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quotes preferred
    |
-23 |       # The colon in the list indexing below is an edge case for the docstring scanner
-24 |       def f(self, bar='''
+22 |       # The colon in the list indexing below is an edge case for the docstring scanner
+23 |       def f(self, bar='''
    |  _____________________^
-25 | |         definitely not a docstring''',
+24 | |         definitely not a docstring''',
    | |_____________________________________^ Q001
-26 |           val=l[Cls():3]):
-27 |           '''
+25 |           val=l[Cls():3]):
+26 |           '''
    |
    = help: Replace single multiline quotes with double quotes
 
@@ -107,15 +107,15 @@ docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quo
 
 docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
    |
-32 |           some_expression = 'hello world'
-33 |   
-34 |           '''
+30 |           some_expression = 'hello world'
+31 |   
+32 |           '''
    |  _________^
-35 | |         this is not a docstring
-36 | |         '''
+33 | |         this is not a docstring
+34 | |         '''
    | |___________^ Q001
-37 |   
-38 |           if l:
+35 |   
+36 |           if l:
    |
    = help: Replace single multiline quotes with double quotes
 
@@ -134,13 +134,13 @@ docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quot
 
 docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred
    |
-37 |           if l:
-38 |               '''
+36 |           if l:
+37 |               '''
    |  _____________^
-39 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
-40 | |             '''
+38 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+39 | |             '''
    | |_______________^ Q001
-41 |               pass
+40 |               pass
    |
    = help: Replace single multiline quotes with double quotes
 

@@ -12,7 +12,7 @@ use ruff_python_ast::source_code::Locator;
 /// A bare `except` catches `BaseException` which includes
 /// `KeyboardInterrupt`, `SystemExit`, `Exception`, and others. Catching
 /// `BaseException` can make it hard to interrupt the program (e.g., with
-/// Ctrl-C) and disguise other problems.
+/// Ctrl-C) and can disguise other problems.
 ///
 /// ## Example
 /// ```python
@@ -28,6 +28,17 @@ use ruff_python_ast::source_code::Locator;
 ///     do_something_that_might_break()
 /// except MoreSpecificException as e:
 ///     handle_error(e)
+/// ```
+///
+/// If you actually need to catch an unknown error, use `Exception` which will
+/// catch regular program errors but not important system exceptions.
+///
+/// ```python
+/// def run_a_function(some_other_fn):
+///     try:
+///         some_other_fn()
+///     except Exception as e:
+///         print(f"How exceptional! {e}")
 /// ```
 ///
 /// ## References

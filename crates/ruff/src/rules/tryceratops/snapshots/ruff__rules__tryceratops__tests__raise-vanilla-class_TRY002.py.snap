@@ -3,19 +3,19 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
 TRY002.py:13:15: TRY002 Create your own exception
    |
-13 |     a = 1
-14 |     if a == 1:
-15 |         raise Exception("Custom message")
+11 |     a = 1
+12 |     if a == 1:
+13 |         raise Exception("Custom message")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY002
-16 | 
-17 |     b = 1
+14 | 
+15 |     b = 1
    |
 
 TRY002.py:17:15: TRY002 Create your own exception
    |
-17 |     b = 1
-18 |     if b == 1:
-19 |         raise Exception
+15 |     b = 1
+16 |     if b == 1:
+17 |         raise Exception
    |               ^^^^^^^^^ TRY002
    |
 

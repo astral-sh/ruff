@@ -86,47 +86,80 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -23,7 +23,6 @@
- try:
-     with open(some_other_file) as w:
-         w.write(data)
+@@ -1,33 +1,20 @@
+ while True:
+-    if something.changed:
+-        do.stuff()  # trailing comment
++    if something.NOT_IMPLEMENTED_attr:
++        NOT_IMPLEMENTED_call()  # trailing comment
+         # Comment belongs to the `if` block.
+     # This one belongs to the `while` block.
+ 
+     # Should this one, too?  I guess so.
+ 
+ # This one is properly standalone now.
 -
- except OSError:
-     print("problems")
+-for i in range(100):
+-    # first we do this
+-    if i % 33 == 0:
+-        break
  
-@@ -41,18 +40,18 @@
+-    # then we do this
+-    print(i)
+-    # and finally we loop around
++NOT_YET_IMPLEMENTED_StmtFor
  
+-with open(some_temp_file) as f:
+-    data = f.read()
+-
+-try:
+-    with open(some_other_file) as w:
+-        w.write(data)
++NOT_YET_IMPLEMENTED_StmtWith
+ 
+-except OSError:
+-    print("problems")
++NOT_YET_IMPLEMENTED_StmtTry
+ 
+-import sys
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+ 
+ # leading function comment
+@@ -42,7 +29,7 @@
  # leading 1
  @deco1
--# leading 2
+ # leading 2
 -@deco2(with_args=True)
--# leading 3
--@deco3
-+@# leading 2
-+deco2(with_args=True)
-+@# leading 3
-+deco3
++@NOT_IMPLEMENTED_call()
+ # leading 3
+ @deco3
  def decorated1():
-     ...
- 
- 
+@@ -52,7 +39,7 @@
  # leading 1
  @deco1
--# leading 2
+ # leading 2
 -@deco2(with_args=True)
-+@# leading 2
-+deco2(with_args=True)
++@NOT_IMPLEMENTED_call()
  # leading function comment
  def decorated1():
      ...
+@@ -69,5 +56,5 @@
+     ...
+ 
+ 
+-if __name__ == "__main__":
+-    main()
++if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
 while True:
-    if something.changed:
-        do.stuff()  # trailing comment
+    if something.NOT_IMPLEMENTED_attr:
+        NOT_IMPLEMENTED_call()  # trailing comment
         # Comment belongs to the `if` block.
     # This one belongs to the `while` block.
 
@@ -134,25 +167,13 @@ while True:
 
 # This one is properly standalone now.
 
-for i in range(100):
-    # first we do this
-    if i % 33 == 0:
-        break
+NOT_YET_IMPLEMENTED_StmtFor
 
-    # then we do this
-    print(i)
-    # and finally we loop around
+NOT_YET_IMPLEMENTED_StmtWith
 
-with open(some_temp_file) as f:
-    data = f.read()
+NOT_YET_IMPLEMENTED_StmtTry
 
-try:
-    with open(some_other_file) as w:
-        w.write(data)
-except OSError:
-    print("problems")
-
-import sys
+NOT_YET_IMPLEMENTED_StmtImport
 
 
 # leading function comment
@@ -166,18 +187,18 @@ def wat():
 
 # leading 1
 @deco1
-@# leading 2
-deco2(with_args=True)
-@# leading 3
-deco3
+# leading 2
+@NOT_IMPLEMENTED_call()
+# leading 3
+@deco3
 def decorated1():
     ...
 
 
 # leading 1
 @deco1
-@# leading 2
-deco2(with_args=True)
+# leading 2
+@NOT_IMPLEMENTED_call()
 # leading function comment
 def decorated1():
     ...
@@ -194,8 +215,8 @@ def g():
     ...
 
 
-if __name__ == "__main__":
-    main()
+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

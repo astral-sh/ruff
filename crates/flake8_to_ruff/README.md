@@ -1,7 +1,7 @@
 # flake8-to-ruff
 
 Convert existing Flake8 configuration files (`setup.cfg`, `tox.ini`, or `.flake8`) for use with
-[Ruff](https://github.com/charliermarsh/ruff).
+[Ruff](https://github.com/astral-sh/ruff).
 
 Generates a Ruff-compatible `pyproject.toml` section.
 
@@ -96,4 +96,4 @@ MIT
 ## Contributing
 
 Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
+[contributing guidelines](https://github.com/astral-sh/ruff/blob/main/CONTRIBUTING.md).

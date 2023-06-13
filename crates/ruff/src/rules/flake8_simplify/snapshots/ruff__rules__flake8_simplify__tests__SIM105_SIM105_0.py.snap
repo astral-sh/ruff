@@ -3,14 +3,14 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
 SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
    |
- 6 |   # SIM105
- 7 | / try:
- 8 | |     foo()
- 9 | | except ValueError:
-10 | |     pass
+ 5 |   # SIM105
+ 6 | / try:
+ 7 | |     foo()
+ 8 | | except ValueError:
+ 9 | |     pass
    | |________^ SIM105
-11 |   
-12 |   # SIM105
+10 |   
+11 |   # SIM105
    |
    = help: Replace with `contextlib.suppress(ValueError)`
 
@@ -34,14 +34,14 @@ SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
 
 SIM105_0.py:12:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    |
-12 |   # SIM105
-13 | / try:
-14 | |     foo()
-15 | | except (ValueError, OSError):
-16 | |     pass
+11 |   # SIM105
+12 | / try:
+13 | |     foo()
+14 | | except (ValueError, OSError):
+15 | |     pass
    | |________^ SIM105
-17 |   
-18 |   # SIM105
+16 |   
+17 |   # SIM105
    |
    = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
@@ -67,14 +67,14 @@ SIM105_0.py:12:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
 
 SIM105_0.py:18:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`
    |
-18 |   # SIM105
-19 | / try:
-20 | |     foo()
-21 | | except:
-22 | |     pass
+17 |   # SIM105
+18 | / try:
+19 | |     foo()
+20 | | except:
+21 | |     pass
    | |________^ SIM105
-23 |   
-24 |   # SIM105
+22 |   
+23 |   # SIM105
    |
    = help: Replace with `contextlib.suppress(Exception)`
 
@@ -100,14 +100,14 @@ SIM105_0.py:18:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `tr
 
 SIM105_0.py:24:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
    |
-24 |   # SIM105
-25 | / try:
-26 | |     foo()
-27 | | except (a.Error, b.Error):
-28 | |     pass
+23 |   # SIM105
+24 | / try:
+25 | |     foo()
+26 | | except (a.Error, b.Error):
+27 | |     pass
    | |________^ SIM105
-29 |   
-30 |   # OK
+28 |   
+29 |   # OK
    |
    = help: Replace with `contextlib.suppress(a.Error, b.Error)`
 
@@ -133,13 +133,13 @@ SIM105_0.py:24:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead
 
 SIM105_0.py:78:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
    |
-78 |   def with_ellipsis():
-79 |       # OK
-80 |       try:
+76 |   def with_ellipsis():
+77 |       # OK
+78 |       try:
    |  _____^
-81 | |         foo()
-82 | |     except ValueError:
-83 | |         ...
+79 | |         foo()
+80 | |     except ValueError:
+81 | |         ...
    | |___________^ SIM105
    |
    = help: Replace with `contextlib.suppress(ValueError)`
@@ -167,12 +167,12 @@ SIM105_0.py:78:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
 
 SIM105_0.py:93:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    |
-93 |   def with_comment():
-94 |       try:
+92 |   def with_comment():
+93 |       try:
    |  _____^
-95 | |         foo()
-96 | |     except (ValueError, OSError):
-97 | |         pass  # Trailing comment.
+94 | |         foo()
+95 | |     except (ValueError, OSError):
+96 | |         pass  # Trailing comment.
    | |____________^ SIM105
    |
    = help: Replace with `contextlib.suppress(ValueError, OSError)`

@@ -46,13 +46,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
                 indent = get_indent(line)
                 filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
                 lines.append(
-                    f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py");'
-                    f' "{prefix}{code}")]',
-                )
-                lines.sort(
-                    key=lambda line: line.split('Path::new("')[1]
-                    if linter != "pylint"
-                    else line.split(");")[1],
+                    f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py"))]',
                 )
                 fp.write("\n".join(lines))
                 fp.write("\n")
@@ -76,7 +70,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
 
-    new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
+    new_pub_use = f"pub(crate) use {rule_name_snake}::*"
     new_mod = f"mod {rule_name_snake};"
 
     if len(parts) == 2:
@@ -109,8 +103,7 @@ pub struct {name};
 impl Violation for {name} {{
     #[derive_message_formats]
     fn message(&self) -> String {{
-        todo!("implement message");
-        format!("TODO: write message")
+        format!("TODO: write message: {{}}", todo!("implement message"))
     }}
 }}
 """,
@@ -121,56 +114,6 @@ impl Violation for {name} {{
 pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
 """,
         )
-
-    # Add the relevant code-to-violation pair to `src/registry.rs`.
-    content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
-
-    seen_macro = False
-    has_written = False
-    has_seen_linter = False
-    with (ROOT_DIR / "crates/ruff/src/registry.rs").open("w") as fp:
-        lines = []
-        for line in content.splitlines():
-            if has_written:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if line.startswith("ruff_macros::register_rules!"):
-                seen_macro = True
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not seen_macro:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if line.strip() == f"// {linter}":
-                indent = get_indent(line)
-                lines.append(f"{indent}rules::{dir_name(linter)}::rules::{name},")
-                has_seen_linter = True
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not has_seen_linter:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not line.strip().startswith("// "):
-                lines.append(line)
-            else:
-                lines.sort()
-                fp.write("\n".join(lines))
-                fp.write("\n")
-                fp.write(line)
-                fp.write("\n")
-                has_written = True
-
-    assert has_written
 
     text = ""
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
@@ -183,17 +126,15 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
             lines.append(line)
 
         variant = pascal_case(linter)
+        rule = f"""rules::{linter.split(" ")[0]}::rules::{name}"""
         lines.append(
             " " * 8
-            + f"""({variant}, "{code}") => (RuleGroup::Unspecified, Rule::{name}),\n""",
+            + f"""({variant}, "{code}") => (RuleGroup::Unspecified, {rule}),\n""",
         )
         lines.sort()
-
         text += "".join(lines)
         text += "\n"
-
         text += fp.read()
-
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
         fp.write(text)
 

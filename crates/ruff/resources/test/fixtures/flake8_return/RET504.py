@@ -79,7 +79,7 @@ def x():
     return a
 
 
-# ignore unpacking
+# Ignore unpacking
 def x():
     b, a = [1, 2]
     return a
@@ -109,7 +109,8 @@ def x():
 
 # Considered OK, since functions can have side effects.
 def x():
-    b, a = 1, 2
+    a = 1
+    b = 2
     print(b)
     return a
 
@@ -272,3 +273,87 @@ def str_to_bool(val):
     if isinstance(val, bool):
         return some_obj
     return val
+
+
+# Mixed assignments
+def function_assignment(x):
+    def f():
+        ...
+
+    return f
+
+
+def class_assignment(x):
+    class Foo:
+        ...
+
+    return Foo
+
+
+def mixed_function_assignment(x):
+    if x:
+
+        def f():
+            ...
+
+    else:
+        f = 42
+
+    return f
+
+
+def mixed_class_assignment(x):
+    if x:
+
+        class Foo:
+            ...
+
+    else:
+        Foo = 42
+
+    return Foo
+
+
+# `with` statements
+def foo():
+    with open("foo.txt", "r") as f:
+        x = f.read()
+    return x  # RET504
+
+
+def foo():
+    with open("foo.txt", "r") as f:
+        x = f.read()
+        print(x)
+    return x
+
+
+def foo():
+    with open("foo.txt", "r") as f:
+        x = f.read()
+    print(x)
+    return x
+
+
+# Autofix cases
+def foo():
+    a = 1
+    b=a
+    return b  # RET504
+
+
+def foo():
+    a = 1
+    b =a
+    return b  # RET504
+
+
+def foo():
+    a = 1
+    b= a
+    return b  # RET504
+
+
+def foo():
+    a = 1  # Comment
+    return a

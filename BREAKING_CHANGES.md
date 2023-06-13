@@ -2,7 +2,7 @@
 
 ## 0.0.268
 
-### The `keep-runtime-typing` setting has been removed ([#4427](https://github.com/charliermarsh/ruff/pull/4427))
+### The `keep-runtime-typing` setting has been removed ([#4427](https://github.com/astral-sh/ruff/pull/4427))
 
 Enabling the `keep-runtime-typing` option, located under the `pyupgrade` section, is equivalent
 to ignoring the `UP006` and `UP007` rules via Ruff's standard `ignore` mechanism. As there's no
@@ -11,9 +11,9 @@ removed.
 
 ## 0.0.267
 
-### `update-check` is no longer a valid configuration option ([#4313](https://github.com/charliermarsh/ruff/pull/4313))
+### `update-check` is no longer a valid configuration option ([#4313](https://github.com/astral-sh/ruff/pull/4313))
 
-The `update-check` functionality was deprecated in [#2530](https://github.com/charliermarsh/ruff/pull/2530),
+The `update-check` functionality was deprecated in [#2530](https://github.com/astral-sh/ruff/pull/2530),
 in that the behavior itself was removed, and Ruff was changed to warn when that option was enabled.
 
 Now, Ruff will throw an error when `update-check` is provided via a configuration file (e.g.,
@@ -22,7 +22,7 @@ this option from their configuration.
 
 ## 0.0.265
 
-### `--fix-only` now exits with a zero exit code, unless `--exit-non-zero-on-fix` is specified ([#4146](https://github.com/charliermarsh/ruff/pull/4146))
+### `--fix-only` now exits with a zero exit code, unless `--exit-non-zero-on-fix` is specified ([#4146](https://github.com/astral-sh/ruff/pull/4146))
 
 Previously, `--fix-only` would exit with a non-zero exit code if any fixes were applied. This
 behavior was inconsistent with `--fix`, and further, meant that `--exit-non-zero-on-fix` was
@@ -33,7 +33,7 @@ in which case it will exit with a non-zero exit code if any fixes were applied.
 
 ## 0.0.260
 
-### Fixes are now represented as a list of edits ([#3709](https://github.com/charliermarsh/ruff/pull/3709))
+### Fixes are now represented as a list of edits ([#3709](https://github.com/astral-sh/ruff/pull/3709))
 
 Previously, Ruff represented each fix as a single edit, which prohibited Ruff from automatically
 fixing violations that required multiple edits across a file. As such, Ruff now represents each
@@ -68,14 +68,14 @@ The updated representation instead includes a list of edits:
 
 ## 0.0.246
 
-### `multiple-statements-on-one-line-def` (`E704`) was removed ([#2773](https://github.com/charliermarsh/ruff/pull/2773))
+### `multiple-statements-on-one-line-def` (`E704`) was removed ([#2773](https://github.com/astral-sh/ruff/pull/2773))
 
 This rule was introduced in v0.0.245. However, it turns out that pycodestyle and Flake8 ignore this
 rule by default, as it is not part of PEP 8. As such, we've removed it from Ruff.
 
 ## 0.0.245
 
-### Ruff's public `check` method was removed ([#2709](https://github.com/charliermarsh/ruff/pull/2709))
+### Ruff's public `check` method was removed ([#2709](https://github.com/astral-sh/ruff/pull/2709))
 
 Previously, Ruff exposed a `check` method as a public Rust API. This method was used by few,
 if any clients, and was not well documented or supported. As such, it has been removed, with
@@ -83,10 +83,11 @@ the intention of adding a stable public API in the future.
 
 ## 0.0.238
 
-### `select`, `extend-select`, `ignore`, and `extend-ignore` have new semantics ([#2312](https://github.com/charliermarsh/ruff/pull/2312))
+### `select`, `extend-select`, `ignore`, and `extend-ignore` have new semantics ([#2312](https://github.com/astral-sh/ruff/pull/2312))
 
 Previously, the interplay between `select` and its related options could lead to unexpected
-behavior. For example, `ruff --select E501 --ignore ALL` and `ruff --select E501 --extend-ignore ALL` behaved differently. (See [#2312](https://github.com/charliermarsh/ruff/pull/2312) for more
+behavior. For example, `ruff --select E501 --ignore ALL` and `ruff --select E501 --extend-ignore ALL`
+behaved differently. (See [#2312](https://github.com/astral-sh/ruff/pull/2312) for more
 examples.)
 
 When Ruff determines the enabled rule set, it has to reconcile `select` and `ignore` from a variety
@@ -112,14 +113,14 @@ ignore = ["F401"]
 Running `ruff --select F` would previously have enabled all `F` rules, apart from `F401`. Now, it
 will enable all `F` rules, including `F401`, as the command line's `--select` resets the resolution.
 
-### `remove-six-compat` (`UP016`) has been removed ([#2332](https://github.com/charliermarsh/ruff/pull/2332))
+### `remove-six-compat` (`UP016`) has been removed ([#2332](https://github.com/astral-sh/ruff/pull/2332))
 
 The `remove-six-compat` rule has been removed. This rule was only useful for one-time Python 2-to-3
 upgrades.
 
 ## 0.0.237
 
-### `--explain`, `--clean`, and `--generate-shell-completion` are now subcommands ([#2190](https://github.com/charliermarsh/ruff/pull/2190))
+### `--explain`, `--clean`, and `--generate-shell-completion` are now subcommands ([#2190](https://github.com/astral-sh/ruff/pull/2190))
 
 `--explain`, `--clean`, and `--generate-shell-completion` are now implemented as subcommands:
 
@@ -162,14 +163,14 @@ no change in behavior. However, please note the following exceptions:
 
 ## 0.0.226
 
-### `misplaced-comparison-constant` (`PLC2201`) was deprecated in favor of `SIM300` ([#1980](https://github.com/charliermarsh/ruff/pull/1980))
+### `misplaced-comparison-constant` (`PLC2201`) was deprecated in favor of `SIM300` ([#1980](https://github.com/astral-sh/ruff/pull/1980))
 
 These two rules contain (nearly) identical logic. To deduplicate the rule set, we've upgraded
 `SIM300` to handle a few more cases, and deprecated `PLC2201` in favor of `SIM300`.
 
 ## 0.0.225
 
-### `@functools.cache` rewrites have been moved to a standalone rule (`UP033`) ([#1938](https://github.com/charliermarsh/ruff/pull/1938))
+### `@functools.cache` rewrites have been moved to a standalone rule (`UP033`) ([#1938](https://github.com/astral-sh/ruff/pull/1938))
 
 Previously, `UP011` handled both `@functools.lru_cache()`-to-`@functools.lru_cache` conversions,
 _and_ `@functools.lru_cache(maxsize=None)`-to-`@functools.cache` conversions. The latter has been
@@ -178,7 +179,7 @@ to reflect the change in rule code.
 
 ## 0.0.222
 
-### `--max-complexity` has been removed from the CLI ([#1877](https://github.com/charliermarsh/ruff/pull/1877))
+### `--max-complexity` has been removed from the CLI ([#1877](https://github.com/astral-sh/ruff/pull/1877))
 
 The McCabe plugin's `--max-complexity` setting has been removed from the CLI, for consistency with
 the treatment of other, similar settings.
@@ -193,7 +194,7 @@ max-complexity = 10
 
 ## 0.0.181
 
-### Files excluded by `.gitignore` are now ignored ([#1234](https://github.com/charliermarsh/ruff/pull/1234))
+### Files excluded by `.gitignore` are now ignored ([#1234](https://github.com/astral-sh/ruff/pull/1234))
 
 Ruff will now avoid checking files that are excluded by `.ignore`, `.gitignore`,
 `.git/info/exclude`, and global `gitignore` files. This behavior is powered by the [`ignore`](https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#ignore-rules)
@@ -206,7 +207,7 @@ default.
 
 ## 0.0.178
 
-### Configuration files are now resolved hierarchically ([#1190](https://github.com/charliermarsh/ruff/pull/1190))
+### Configuration files are now resolved hierarchically ([#1190](https://github.com/astral-sh/ruff/pull/1190))
 
 `pyproject.toml` files are now resolved hierarchically, such that for each Python file, we find
 the first `pyproject.toml` file in its path, and use that to determine its lint settings.

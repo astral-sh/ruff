@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F841_3.py:5:5: F841 [*] Local variable `x` is assigned to but never used
   |
-5 | def f():
-6 |     x = 1
+4 | def f():
+5 |     x = 1
   |     ^ F841
-7 |     y = 2
+6 |     y = 2
   |
   = help: Remove assignment to unused variable `x`
 
@@ -20,15 +20,15 @@ F841_3.py:5:5: F841 [*] Local variable `x` is assigned to but never used
 8 7 |     z = 3
 
 F841_3.py:6:5: F841 [*] Local variable `y` is assigned to but never used
-   |
- 6 | def f():
- 7 |     x = 1
- 8 |     y = 2
-   |     ^ F841
- 9 | 
-10 |     z = 3
-   |
-   = help: Remove assignment to unused variable `y`
+  |
+4 | def f():
+5 |     x = 1
+6 |     y = 2
+  |     ^ F841
+7 | 
+8 |     z = 3
+  |
+  = help: Remove assignment to unused variable `y`
 
 ℹ Suggested fix
 3 3 | 
@@ -41,10 +41,10 @@ F841_3.py:6:5: F841 [*] Local variable `y` is assigned to but never used
 
 F841_3.py:13:5: F841 [*] Local variable `x` is assigned to but never used
    |
-13 | def f():
-14 |     x: int = 1
+12 | def f():
+13 |     x: int = 1
    |     ^ F841
-15 |     y: int = 2
+14 |     y: int = 2
    |
    = help: Remove assignment to unused variable `x`
 
@@ -59,12 +59,12 @@ F841_3.py:13:5: F841 [*] Local variable `x` is assigned to but never used
 
 F841_3.py:14:5: F841 [*] Local variable `y` is assigned to but never used
    |
-14 | def f():
-15 |     x: int = 1
-16 |     y: int = 2
+12 | def f():
+13 |     x: int = 1
+14 |     y: int = 2
    |     ^ F841
-17 | 
-18 |     z: int = 3
+15 | 
+16 |     z: int = 3
    |
    = help: Remove assignment to unused variable `y`
 
@@ -79,10 +79,10 @@ F841_3.py:14:5: F841 [*] Local variable `y` is assigned to but never used
 
 F841_3.py:21:19: F841 [*] Local variable `x1` is assigned to but never used
    |
-21 | def f():
-22 |     with foo() as x1:
+20 | def f():
+21 |     with foo() as x1:
    |                   ^^ F841
-23 |         pass
+22 |         pass
    |
    = help: Remove assignment to unused variable `x1`
 
@@ -98,11 +98,11 @@ F841_3.py:21:19: F841 [*] Local variable `x1` is assigned to but never used
 
 F841_3.py:27:20: F841 [*] Local variable `x3` is assigned to but never used
    |
-27 |         pass
-28 | 
-29 |     with (foo() as x3, foo() as y3, foo() as z3):
+25 |         pass
+26 | 
+27 |     with (foo() as x3, foo() as y3, foo() as z3):
    |                    ^^ F841
-30 |         pass
+28 |         pass
    |
    = help: Remove assignment to unused variable `x3`
 
@@ -118,11 +118,11 @@ F841_3.py:27:20: F841 [*] Local variable `x3` is assigned to but never used
 
 F841_3.py:27:33: F841 [*] Local variable `y3` is assigned to but never used
    |
-27 |         pass
-28 | 
-29 |     with (foo() as x3, foo() as y3, foo() as z3):
+25 |         pass
+26 | 
+27 |     with (foo() as x3, foo() as y3, foo() as z3):
    |                                 ^^ F841
-30 |         pass
+28 |         pass
    |
    = help: Remove assignment to unused variable `y3`
 
@@ -138,11 +138,11 @@ F841_3.py:27:33: F841 [*] Local variable `y3` is assigned to but never used
 
 F841_3.py:27:46: F841 [*] Local variable `z3` is assigned to but never used
    |
-27 |         pass
-28 | 
-29 |     with (foo() as x3, foo() as y3, foo() as z3):
+25 |         pass
+26 | 
+27 |     with (foo() as x3, foo() as y3, foo() as z3):
    |                                              ^^ F841
-30 |         pass
+28 |         pass
    |
    = help: Remove assignment to unused variable `z3`
 
@@ -158,31 +158,31 @@ F841_3.py:27:46: F841 [*] Local variable `z3` is assigned to but never used
 
 F841_3.py:32:6: F841 Local variable `x1` is assigned to but never used
    |
-32 | def f():
-33 |     (x1, y1) = (1, 2)
+31 | def f():
+32 |     (x1, y1) = (1, 2)
    |      ^^ F841
-34 |     (x2, y2) = coords2 = (1, 2)
-35 |     coords3 = (x3, y3) = (1, 2)
+33 |     (x2, y2) = coords2 = (1, 2)
+34 |     coords3 = (x3, y3) = (1, 2)
    |
    = help: Remove assignment to unused variable `x1`
 
 F841_3.py:32:10: F841 Local variable `y1` is assigned to but never used
    |
-32 | def f():
-33 |     (x1, y1) = (1, 2)
+31 | def f():
+32 |     (x1, y1) = (1, 2)
    |          ^^ F841
-34 |     (x2, y2) = coords2 = (1, 2)
-35 |     coords3 = (x3, y3) = (1, 2)
+33 |     (x2, y2) = coords2 = (1, 2)
+34 |     coords3 = (x3, y3) = (1, 2)
    |
    = help: Remove assignment to unused variable `y1`
 
 F841_3.py:33:16: F841 [*] Local variable `coords2` is assigned to but never used
    |
-33 | def f():
-34 |     (x1, y1) = (1, 2)
-35 |     (x2, y2) = coords2 = (1, 2)
+31 | def f():
+32 |     (x1, y1) = (1, 2)
+33 |     (x2, y2) = coords2 = (1, 2)
    |                ^^^^^^^ F841
-36 |     coords3 = (x3, y3) = (1, 2)
+34 |     coords3 = (x3, y3) = (1, 2)
    |
    = help: Remove assignment to unused variable `coords2`
 
@@ -198,9 +198,9 @@ F841_3.py:33:16: F841 [*] Local variable `coords2` is assigned to but never used
 
 F841_3.py:34:5: F841 [*] Local variable `coords3` is assigned to but never used
    |
-34 |     (x1, y1) = (1, 2)
-35 |     (x2, y2) = coords2 = (1, 2)
-36 |     coords3 = (x3, y3) = (1, 2)
+32 |     (x1, y1) = (1, 2)
+33 |     (x2, y2) = coords2 = (1, 2)
+34 |     coords3 = (x3, y3) = (1, 2)
    |     ^^^^^^^ F841
    |
    = help: Remove assignment to unused variable `coords3`
@@ -217,11 +217,11 @@ F841_3.py:34:5: F841 [*] Local variable `coords3` is assigned to but never used
 
 F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
    |
-40 |     try:
-41 |         1 / 0
-42 |     except ValueError as x1:
+38 |     try:
+39 |         1 / 0
+40 |     except ValueError as x1:
    |                          ^^ F841
-43 |         pass
+41 |         pass
    |
    = help: Remove assignment to unused variable `x1`
 
@@ -237,11 +237,11 @@ F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
 
 F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
    |
-45 |     try:
-46 |         1 / 0
-47 |     except (ValueError, ZeroDivisionError) as x2:
+43 |     try:
+44 |         1 / 0
+45 |     except (ValueError, ZeroDivisionError) as x2:
    |                                               ^^ F841
-48 |         pass
+46 |         pass
    |
    = help: Remove assignment to unused variable `x2`
 
@@ -257,11 +257,11 @@ F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
 
 F841_3.py:50:5: F841 [*] Local variable `x` is assigned to but never used
    |
-50 | def f(a, b):
-51 |     x = (
+49 | def f(a, b):
+50 |     x = (
    |     ^ F841
-52 |         a()
-53 |         if a is not None
+51 |         a()
+52 |         if a is not None
    |
    = help: Remove assignment to unused variable `x`
 
@@ -277,11 +277,11 @@ F841_3.py:50:5: F841 [*] Local variable `x` is assigned to but never used
 
 F841_3.py:56:5: F841 [*] Local variable `y` is assigned to but never used
    |
-56 |     )
-57 | 
-58 |     y = \
+54 |     )
+55 | 
+56 |     y = \
    |     ^ F841
-59 |         a() if a is not None else b
+57 |         a() if a is not None else b
    |
    = help: Remove assignment to unused variable `y`
 
@@ -298,11 +298,11 @@ F841_3.py:56:5: F841 [*] Local variable `y` is assigned to but never used
 
 F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
    |
-61 | def f(a, b):
-62 |     x = (
+60 | def f(a, b):
+61 |     x = (
    |     ^ F841
-63 |         a
-64 |         if a is not None
+62 |         a
+63 |         if a is not None
    |
    = help: Remove assignment to unused variable `x`
 
@@ -315,18 +315,17 @@ F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
 63    |-        if a is not None
 64    |-        else b
 65    |-    )
-   61 |+    pass
-66 62 | 
-67 63 |     y = \
-68 64 |         a if a is not None else b
+66 61 | 
+67 62 |     y = \
+68 63 |         a if a is not None else b
 
 F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
    |
-67 |     )
-68 | 
-69 |     y = \
+65 |     )
+66 | 
+67 |     y = \
    |     ^ F841
-70 |         a if a is not None else b
+68 |         a if a is not None else b
    |
    = help: Remove assignment to unused variable `y`
 
@@ -342,10 +341,10 @@ F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
 
 F841_3.py:72:24: F841 [*] Local variable `cm` is assigned to but never used
    |
-72 | def f():
-73 |     with Nested(m) as (cm):
+71 | def f():
+72 |     with Nested(m) as (cm):
    |                        ^^ F841
-74 |         pass
+73 |         pass
    |
    = help: Remove assignment to unused variable `cm`
 
@@ -361,10 +360,10 @@ F841_3.py:72:24: F841 [*] Local variable `cm` is assigned to but never used
 
 F841_3.py:77:25: F841 [*] Local variable `cm` is assigned to but never used
    |
-77 | def f():
-78 |     with (Nested(m) as (cm),):
+76 | def f():
+77 |     with (Nested(m) as (cm),):
    |                         ^^ F841
-79 |         pass
+78 |         pass
    |
    = help: Remove assignment to unused variable `cm`
 
@@ -378,126 +377,145 @@ F841_3.py:77:25: F841 [*] Local variable `cm` is assigned to but never used
 79 79 | 
 80 80 | 
 
-F841_3.py:87:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:87:26: F841 [*] Local variable `cm` is assigned to but never used
    |
-87 | def f():
-88 |     toplevel = tt = lexer.get_token()
-   |     ^^^^^^^^ F841
-89 |     if not tt:
-90 |         break
+86 | def f():
+87 |     with (Nested(m)) as (cm):
+   |                          ^^ F841
+88 |         pass
    |
-   = help: Remove assignment to unused variable `toplevel`
+   = help: Remove assignment to unused variable `cm`
 
 ℹ Suggested fix
 84 84 | 
 85 85 | 
 86 86 | def f():
-87    |-    toplevel = tt = lexer.get_token()
-   87 |+    tt = lexer.get_token()
-88 88 |     if not tt:
-89 89 |         break
+87    |-    with (Nested(m)) as (cm):
+   87 |+    with (Nested(m)):
+88 88 |         pass
+89 89 | 
 90 90 | 
 
-F841_3.py:93:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:92:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
-93 | def f():
-94 |     toplevel = tt = lexer.get_token()
+91 | def f():
+92 |     toplevel = tt = lexer.get_token()
+   |     ^^^^^^^^ F841
+93 |     if not tt:
+94 |         break
+   |
+   = help: Remove assignment to unused variable `toplevel`
+
+ℹ Suggested fix
+89 89 | 
+90 90 | 
+91 91 | def f():
+92    |-    toplevel = tt = lexer.get_token()
+   92 |+    tt = lexer.get_token()
+93 93 |     if not tt:
+94 94 |         break
+95 95 | 
+
+F841_3.py:98:5: F841 [*] Local variable `toplevel` is assigned to but never used
+   |
+97 | def f():
+98 |     toplevel = tt = lexer.get_token()
    |     ^^^^^^^^ F841
    |
    = help: Remove assignment to unused variable `toplevel`
 
 ℹ Suggested fix
-90 90 | 
-91 91 | 
-92 92 | def f():
-93    |-    toplevel = tt = lexer.get_token()
-   93 |+    tt = lexer.get_token()
-94 94 | 
 95 95 | 
-96 96 | def f():
+96 96 | 
+97 97 | def f():
+98    |-    toplevel = tt = lexer.get_token()
+   98 |+    tt = lexer.get_token()
+99 99 | 
+100 100 | 
+101 101 | def f():
 
-F841_3.py:93:16: F841 [*] Local variable `tt` is assigned to but never used
+F841_3.py:98:16: F841 [*] Local variable `tt` is assigned to but never used
    |
-93 | def f():
-94 |     toplevel = tt = lexer.get_token()
+97 | def f():
+98 |     toplevel = tt = lexer.get_token()
    |                ^^ F841
    |
    = help: Remove assignment to unused variable `tt`
 
 ℹ Suggested fix
-90 90 | 
-91 91 | 
-92 92 | def f():
-93    |-    toplevel = tt = lexer.get_token()
-   93 |+    toplevel = lexer.get_token()
-94 94 | 
 95 95 | 
-96 96 | def f():
-
-F841_3.py:97:5: F841 [*] Local variable `toplevel` is assigned to but never used
-   |
-97 | def f():
-98 |     toplevel = (a, b) = lexer.get_token()
-   |     ^^^^^^^^ F841
-   |
-   = help: Remove assignment to unused variable `toplevel`
-
-ℹ Suggested fix
-94 94 | 
-95 95 | 
-96 96 | def f():
-97    |-    toplevel = (a, b) = lexer.get_token()
-   97 |+    (a, b) = lexer.get_token()
-98 98 | 
+96 96 | 
+97 97 | def f():
+98    |-    toplevel = tt = lexer.get_token()
+   98 |+    toplevel = lexer.get_token()
 99 99 | 
-100 100 | def f():
+100 100 | 
+101 101 | def f():
 
-F841_3.py:101:14: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:102:5: F841 [*] Local variable `toplevel` is assigned to but never used
     |
 101 | def f():
-102 |     (a, b) = toplevel = lexer.get_token()
-    |              ^^^^^^^^ F841
-    |
-    = help: Remove assignment to unused variable `toplevel`
-
-ℹ Suggested fix
-98  98  | 
-99  99  | 
-100 100 | def f():
-101     |-    (a, b) = toplevel = lexer.get_token()
-    101 |+    (a, b) = lexer.get_token()
-102 102 | 
-103 103 | 
-104 104 | def f():
-
-F841_3.py:105:5: F841 [*] Local variable `toplevel` is assigned to but never used
-    |
-105 | def f():
-106 |     toplevel = tt = 1
+102 |     toplevel = (a, b) = lexer.get_token()
     |     ^^^^^^^^ F841
     |
     = help: Remove assignment to unused variable `toplevel`
 
 ℹ Suggested fix
-102 102 | 
+99  99  | 
+100 100 | 
+101 101 | def f():
+102     |-    toplevel = (a, b) = lexer.get_token()
+    102 |+    (a, b) = lexer.get_token()
 103 103 | 
-104 104 | def f():
-105     |-    toplevel = tt = 1
-    105 |+    tt = 1
+104 104 | 
+105 105 | def f():
 
-F841_3.py:105:16: F841 [*] Local variable `tt` is assigned to but never used
+F841_3.py:106:14: F841 [*] Local variable `toplevel` is assigned to but never used
     |
 105 | def f():
-106 |     toplevel = tt = 1
+106 |     (a, b) = toplevel = lexer.get_token()
+    |              ^^^^^^^^ F841
+    |
+    = help: Remove assignment to unused variable `toplevel`
+
+ℹ Suggested fix
+103 103 | 
+104 104 | 
+105 105 | def f():
+106     |-    (a, b) = toplevel = lexer.get_token()
+    106 |+    (a, b) = lexer.get_token()
+107 107 | 
+108 108 | 
+109 109 | def f():
+
+F841_3.py:110:5: F841 [*] Local variable `toplevel` is assigned to but never used
+    |
+109 | def f():
+110 |     toplevel = tt = 1
+    |     ^^^^^^^^ F841
+    |
+    = help: Remove assignment to unused variable `toplevel`
+
+ℹ Suggested fix
+107 107 | 
+108 108 | 
+109 109 | def f():
+110     |-    toplevel = tt = 1
+    110 |+    tt = 1
+
+F841_3.py:110:16: F841 [*] Local variable `tt` is assigned to but never used
+    |
+109 | def f():
+110 |     toplevel = tt = 1
     |                ^^ F841
     |
     = help: Remove assignment to unused variable `tt`
 
 ℹ Suggested fix
-102 102 | 
-103 103 | 
-104 104 | def f():
-105     |-    toplevel = tt = 1
-    105 |+    toplevel = 1
+107 107 | 
+108 108 | 
+109 109 | def f():
+110     |-    toplevel = tt = 1
+    110 |+    toplevel = 1
 
 

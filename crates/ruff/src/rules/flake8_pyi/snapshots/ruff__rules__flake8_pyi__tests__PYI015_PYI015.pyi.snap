@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
 PYI015.pyi:44:23: PYI015 [*] Only simple default values allowed for assignments
    |
-44 | # We *should* emit Y015 for more complex default values
-45 | field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
+43 | # We *should* emit Y015 for more complex default values
+44 | field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI015
-46 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
-47 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
+45 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
+46 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -23,12 +23,12 @@ PYI015.pyi:44:23: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:45:23: PYI015 [*] Only simple default values allowed for assignments
    |
-45 | # We *should* emit Y015 for more complex default values
-46 | field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
-47 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
+43 | # We *should* emit Y015 for more complex default values
+44 | field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
+45 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
    |                       ^^^^^^^^^^^^ PYI015
-48 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
-49 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
+46 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
+47 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -44,12 +44,12 @@ PYI015.pyi:45:23: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:46:23: PYI015 [*] Only simple default values allowed for assignments
    |
-46 | field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
-47 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
-48 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
+44 | field221: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Y015 Only simple default values are allowed for assignments
+45 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
+46 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
    |                       ^^^^^^^^^^^^^^^ PYI015
-49 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
-50 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
+47 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
+48 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -65,12 +65,12 @@ PYI015.pyi:46:23: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:47:26: PYI015 [*] Only simple default values allowed for assignments
    |
-47 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
-48 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
-49 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
+45 | field223: list[int] = [*range(10)]  # Y015 Only simple default values are allowed for assignments
+46 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
+47 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
    |                          ^^^^^^^^^^ PYI015
-50 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
-51 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
+48 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
+49 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -86,12 +86,12 @@ PYI015.pyi:47:26: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:48:47: PYI015 [*] Only simple default values allowed for assignments
    |
-48 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
-49 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
-50 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
+46 | field224: list[int] = list(range(10))  # Y015 Only simple default values are allowed for assignments
+47 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
+48 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
    |                                               ^^^^^^^^^^^^^^^^^^^^^^^ PYI015
-51 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
-52 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
+49 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
+50 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -107,12 +107,12 @@ PYI015.pyi:48:47: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:49:31: PYI015 [*] Only simple default values allowed for assignments
    |
-49 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
-50 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
-51 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
+47 | field225: list[object] = [{}, 1, 2]  # Y015 Only simple default values are allowed for assignments
+48 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
+49 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
    |                               ^^^^^^^^^^^^^^^^^^^^^^^ PYI015
-52 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
-53 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
+50 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
+51 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
    |
    = help: Replace default value with `...`
 
@@ -128,12 +128,12 @@ PYI015.pyi:49:31: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:50:37: PYI015 [*] Only simple default values allowed for assignments
    |
-50 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
-51 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
-52 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
+48 | field226: tuple[str | tuple[str, ...], ...] = ("foo", ("foo", "bar"))  # Y015 Only simple default values are allowed for assignments
+49 | field227: dict[str, object] = {"foo": {"foo": "bar"}}  # Y015 Only simple default values are allowed for assignments
+50 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
    |                                     ^^^^^^^^^^^ PYI015
-53 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
-54 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
+51 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
+52 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -149,12 +149,12 @@ PYI015.pyi:50:37: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:52:28: PYI015 [*] Only simple default values allowed for assignments
    |
-52 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
-53 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
-54 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
+50 | field228: dict[str, list[object]] = {"foo": []}  # Y015 Only simple default values are allowed for assignments
+51 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
+52 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
    |                            ^^^^^^^^^^^^^^^^ PYI015
-55 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
-56 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
+53 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
+54 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -170,12 +170,12 @@ PYI015.pyi:52:28: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:53:11: PYI015 [*] Only simple default values allowed for assignments
    |
-53 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
-54 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
-55 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
+51 | # When parsed, this case results in `None` being placed in the `.keys` list for the `ast.Dict` node
+52 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
+53 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
    |           ^^^^^^^^^^^^^ PYI015
-56 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
-57 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
+54 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
+55 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -191,11 +191,11 @@ PYI015.pyi:53:11: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:54:11: PYI015 [*] Only simple default values allowed for assignments
    |
-54 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
-55 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
-56 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
+52 | field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values are allowed for assignments
+53 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
+54 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
    |           ^^^^^^^^^^^^^^^ PYI015
-57 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
+55 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
    |
    = help: Replace default value with `...`
 
@@ -211,12 +211,12 @@ PYI015.pyi:54:11: PYI015 [*] Only simple default values allowed for assignments
 
 PYI015.pyi:55:11: PYI015 [*] Only simple default values allowed for assignments
    |
-55 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
-56 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
-57 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
+53 | field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
+54 | field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
+55 | field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
    |           ^^^^^ PYI015
-58 | 
-59 | # We shouldn't emit Y015 within functions
+56 | 
+57 | # We shouldn't emit Y015 within functions
    |
    = help: Replace default value with `...`
 

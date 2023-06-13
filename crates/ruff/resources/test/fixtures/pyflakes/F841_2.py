@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 
-# Test case for https://github.com/charliermarsh/ruff/issues/1552
+# Test case for https://github.com/astral-sh/ruff/issues/1552
 def f():
     x = 0
     list()[x:]
 
 
-# Test case for https://github.com/charliermarsh/ruff/issues/2603
+# Test case for https://github.com/astral-sh/ruff/issues/2603
 def f():
     KeyTupleT = tuple[str, ...]
 

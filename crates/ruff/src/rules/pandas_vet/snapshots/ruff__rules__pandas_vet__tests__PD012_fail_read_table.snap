@@ -1,0 +1,11 @@
+---
+source: crates/ruff/src/rules/pandas_vet/mod.rs
+---
+<filename>:3:13: PD012 `.read_csv` is preferred to `.read_table`; provides same functionality
+  |
+2 | import pandas as pd
+3 | employees = pd.read_table(input_file)
+  |             ^^^^^^^^^^^^^ PD012
+  |
+
+

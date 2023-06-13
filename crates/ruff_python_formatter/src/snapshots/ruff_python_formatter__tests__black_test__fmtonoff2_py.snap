@@ -53,28 +53,27 @@ def test_calculate_fades():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,38 +3,42 @@
+@@ -1,40 +1,38 @@
+-import pytest
++NOT_YET_IMPLEMENTED_StmtImport
+ 
  TmSt = 1
  TmEx = 2
  
-+
  # fmt: off
  
++
  # Test data:
  #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
  
 -@pytest.mark.parametrize('test', [
 -
 -    # Test don't manage the volume
-+@pytest.mark.parametrize(
-+    "test",
-     [
+-    [
 -        ('stuff', 'in')
-+        # Test don't manage the volume
-+        [("stuff", "in")],
-     ],
+-    ],
 -])
-+)
++@NOT_IMPLEMENTED_call()
  def test_fader(test):
      pass
  
@@ -91,17 +90,18 @@ def test_calculate_fades():
  
 +
  def verify_fader(test):
-     """Hey, ho."""
-     assert test.passed()
- 
+-    """Hey, ho."""
+-    assert test.passed()
++    "NOT_YET_IMPLEMENTED_STRING"
++    NOT_YET_IMPLEMENTED_StmtAssert
 +
+ 
  def test_calculate_fades():
      calcs = [
--        # one is zero/none
+         # one is zero/none
 -        (0, 4, 0, 0, 10,        0, 0, 6, 10),
 -        (None, 4, 0, 0, 10,     0, 0, 6, 10),
-+        (# one is zero/none
-+        0, 4, 0, 0, 10, 0, 0, 6, 10),
++        (0, 4, 0, 0, 10, 0, 0, 6, 10),
 +        (None, 4, 0, 0, 10, 0, 0, 6, 10),
      ]
  
@@ -111,24 +111,18 @@ def test_calculate_fades():
 ## Ruff Output
 
 ```py
-import pytest
+NOT_YET_IMPLEMENTED_StmtImport
 
 TmSt = 1
 TmEx = 2
 
-
 # fmt: off
+
 
 # Test data:
 #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
 
-@pytest.mark.parametrize(
-    "test",
-    [
-        # Test don't manage the volume
-        [("stuff", "in")],
-    ],
-)
+@NOT_IMPLEMENTED_call()
 def test_fader(test):
     pass
 
@@ -143,14 +137,14 @@ def verify_fader(test):
 
 
 def verify_fader(test):
-    """Hey, ho."""
-    assert test.passed()
+    "NOT_YET_IMPLEMENTED_STRING"
+    NOT_YET_IMPLEMENTED_StmtAssert
 
 
 def test_calculate_fades():
     calcs = [
-        (# one is zero/none
-        0, 4, 0, 0, 10, 0, 0, 6, 10),
+        # one is zero/none
+        (0, 4, 0, 0, 10, 0, 0, 6, 10),
         (None, 4, 0, 0, 10, 0, 0, 6, 10),
     ]
 

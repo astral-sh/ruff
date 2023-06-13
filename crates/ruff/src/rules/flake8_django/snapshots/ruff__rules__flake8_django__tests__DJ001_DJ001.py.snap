@@ -2,170 +2,170 @@
 source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
 DJ001.py:7:17: DJ001 Avoid using `null=True` on string-based fields such as CharField
-   |
- 7 | class IncorrectModel(models.Model):
- 8 |     charfield = models.CharField(max_length=255, null=True)
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
- 9 |     textfield = models.TextField(max_length=255, null=True)
-10 |     slugfield = models.SlugField(max_length=255, null=True)
-   |
+  |
+6 | class IncorrectModel(models.Model):
+7 |     charfield = models.CharField(max_length=255, null=True)
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
+8 |     textfield = models.TextField(max_length=255, null=True)
+9 |     slugfield = models.SlugField(max_length=255, null=True)
+  |
 
 DJ001.py:8:17: DJ001 Avoid using `null=True` on string-based fields such as TextField
    |
- 8 | class IncorrectModel(models.Model):
- 9 |     charfield = models.CharField(max_length=255, null=True)
-10 |     textfield = models.TextField(max_length=255, null=True)
+ 6 | class IncorrectModel(models.Model):
+ 7 |     charfield = models.CharField(max_length=255, null=True)
+ 8 |     textfield = models.TextField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-11 |     slugfield = models.SlugField(max_length=255, null=True)
-12 |     emailfield = models.EmailField(max_length=255, null=True)
+ 9 |     slugfield = models.SlugField(max_length=255, null=True)
+10 |     emailfield = models.EmailField(max_length=255, null=True)
    |
 
 DJ001.py:9:17: DJ001 Avoid using `null=True` on string-based fields such as SlugField
    |
- 9 |     charfield = models.CharField(max_length=255, null=True)
-10 |     textfield = models.TextField(max_length=255, null=True)
-11 |     slugfield = models.SlugField(max_length=255, null=True)
+ 7 |     charfield = models.CharField(max_length=255, null=True)
+ 8 |     textfield = models.TextField(max_length=255, null=True)
+ 9 |     slugfield = models.SlugField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-12 |     emailfield = models.EmailField(max_length=255, null=True)
-13 |     filepathfield = models.FilePathField(max_length=255, null=True)
+10 |     emailfield = models.EmailField(max_length=255, null=True)
+11 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |
 
 DJ001.py:10:18: DJ001 Avoid using `null=True` on string-based fields such as EmailField
    |
-10 |     textfield = models.TextField(max_length=255, null=True)
-11 |     slugfield = models.SlugField(max_length=255, null=True)
-12 |     emailfield = models.EmailField(max_length=255, null=True)
+ 8 |     textfield = models.TextField(max_length=255, null=True)
+ 9 |     slugfield = models.SlugField(max_length=255, null=True)
+10 |     emailfield = models.EmailField(max_length=255, null=True)
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-13 |     filepathfield = models.FilePathField(max_length=255, null=True)
-14 |     urlfield = models.URLField(max_length=255, null=True)
+11 |     filepathfield = models.FilePathField(max_length=255, null=True)
+12 |     urlfield = models.URLField(max_length=255, null=True)
    |
 
 DJ001.py:11:21: DJ001 Avoid using `null=True` on string-based fields such as FilePathField
    |
-11 |     slugfield = models.SlugField(max_length=255, null=True)
-12 |     emailfield = models.EmailField(max_length=255, null=True)
-13 |     filepathfield = models.FilePathField(max_length=255, null=True)
+ 9 |     slugfield = models.SlugField(max_length=255, null=True)
+10 |     emailfield = models.EmailField(max_length=255, null=True)
+11 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-14 |     urlfield = models.URLField(max_length=255, null=True)
+12 |     urlfield = models.URLField(max_length=255, null=True)
    |
 
 DJ001.py:12:16: DJ001 Avoid using `null=True` on string-based fields such as URLField
    |
-12 |     emailfield = models.EmailField(max_length=255, null=True)
-13 |     filepathfield = models.FilePathField(max_length=255, null=True)
-14 |     urlfield = models.URLField(max_length=255, null=True)
+10 |     emailfield = models.EmailField(max_length=255, null=True)
+11 |     filepathfield = models.FilePathField(max_length=255, null=True)
+12 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
    |
 
 DJ001.py:16:17: DJ001 Avoid using `null=True` on string-based fields such as CharField
    |
-16 | class IncorrectModelWithAlias(DjangoModel):
-17 |     charfield = DjangoModel.CharField(max_length=255, null=True)
+15 | class IncorrectModelWithAlias(DjangoModel):
+16 |     charfield = DjangoModel.CharField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-18 |     textfield = SmthCharField(max_length=255, null=True)
-19 |     slugfield = models.SlugField(max_length=255, null=True)
+17 |     textfield = SmthCharField(max_length=255, null=True)
+18 |     slugfield = models.SlugField(max_length=255, null=True)
    |
 
 DJ001.py:17:17: DJ001 Avoid using `null=True` on string-based fields such as CharField
    |
-17 | class IncorrectModelWithAlias(DjangoModel):
-18 |     charfield = DjangoModel.CharField(max_length=255, null=True)
-19 |     textfield = SmthCharField(max_length=255, null=True)
+15 | class IncorrectModelWithAlias(DjangoModel):
+16 |     charfield = DjangoModel.CharField(max_length=255, null=True)
+17 |     textfield = SmthCharField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-20 |     slugfield = models.SlugField(max_length=255, null=True)
-21 |     emailfield = models.EmailField(max_length=255, null=True)
+18 |     slugfield = models.SlugField(max_length=255, null=True)
+19 |     emailfield = models.EmailField(max_length=255, null=True)
    |
 
 DJ001.py:18:17: DJ001 Avoid using `null=True` on string-based fields such as SlugField
    |
-18 |     charfield = DjangoModel.CharField(max_length=255, null=True)
-19 |     textfield = SmthCharField(max_length=255, null=True)
-20 |     slugfield = models.SlugField(max_length=255, null=True)
+16 |     charfield = DjangoModel.CharField(max_length=255, null=True)
+17 |     textfield = SmthCharField(max_length=255, null=True)
+18 |     slugfield = models.SlugField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-21 |     emailfield = models.EmailField(max_length=255, null=True)
-22 |     filepathfield = models.FilePathField(max_length=255, null=True)
+19 |     emailfield = models.EmailField(max_length=255, null=True)
+20 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |
 
 DJ001.py:19:18: DJ001 Avoid using `null=True` on string-based fields such as EmailField
    |
-19 |     textfield = SmthCharField(max_length=255, null=True)
-20 |     slugfield = models.SlugField(max_length=255, null=True)
-21 |     emailfield = models.EmailField(max_length=255, null=True)
+17 |     textfield = SmthCharField(max_length=255, null=True)
+18 |     slugfield = models.SlugField(max_length=255, null=True)
+19 |     emailfield = models.EmailField(max_length=255, null=True)
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-22 |     filepathfield = models.FilePathField(max_length=255, null=True)
-23 |     urlfield = models.URLField(max_length=255, null=True)
+20 |     filepathfield = models.FilePathField(max_length=255, null=True)
+21 |     urlfield = models.URLField(max_length=255, null=True)
    |
 
 DJ001.py:20:21: DJ001 Avoid using `null=True` on string-based fields such as FilePathField
    |
-20 |     slugfield = models.SlugField(max_length=255, null=True)
-21 |     emailfield = models.EmailField(max_length=255, null=True)
-22 |     filepathfield = models.FilePathField(max_length=255, null=True)
+18 |     slugfield = models.SlugField(max_length=255, null=True)
+19 |     emailfield = models.EmailField(max_length=255, null=True)
+20 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-23 |     urlfield = models.URLField(max_length=255, null=True)
+21 |     urlfield = models.URLField(max_length=255, null=True)
    |
 
 DJ001.py:21:16: DJ001 Avoid using `null=True` on string-based fields such as URLField
    |
-21 |     emailfield = models.EmailField(max_length=255, null=True)
-22 |     filepathfield = models.FilePathField(max_length=255, null=True)
-23 |     urlfield = models.URLField(max_length=255, null=True)
+19 |     emailfield = models.EmailField(max_length=255, null=True)
+20 |     filepathfield = models.FilePathField(max_length=255, null=True)
+21 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
    |
 
 DJ001.py:25:17: DJ001 Avoid using `null=True` on string-based fields such as CharField
    |
-25 | class IncorrectModelWithoutSuperclass:
-26 |     charfield = DjangoModel.CharField(max_length=255, null=True)
+24 | class IncorrectModelWithoutSuperclass:
+25 |     charfield = DjangoModel.CharField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-27 |     textfield = SmthCharField(max_length=255, null=True)
-28 |     slugfield = models.SlugField(max_length=255, null=True)
+26 |     textfield = SmthCharField(max_length=255, null=True)
+27 |     slugfield = models.SlugField(max_length=255, null=True)
    |
 
 DJ001.py:26:17: DJ001 Avoid using `null=True` on string-based fields such as CharField
    |
-26 | class IncorrectModelWithoutSuperclass:
-27 |     charfield = DjangoModel.CharField(max_length=255, null=True)
-28 |     textfield = SmthCharField(max_length=255, null=True)
+24 | class IncorrectModelWithoutSuperclass:
+25 |     charfield = DjangoModel.CharField(max_length=255, null=True)
+26 |     textfield = SmthCharField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-29 |     slugfield = models.SlugField(max_length=255, null=True)
-30 |     emailfield = models.EmailField(max_length=255, null=True)
+27 |     slugfield = models.SlugField(max_length=255, null=True)
+28 |     emailfield = models.EmailField(max_length=255, null=True)
    |
 
 DJ001.py:27:17: DJ001 Avoid using `null=True` on string-based fields such as SlugField
    |
-27 |     charfield = DjangoModel.CharField(max_length=255, null=True)
-28 |     textfield = SmthCharField(max_length=255, null=True)
-29 |     slugfield = models.SlugField(max_length=255, null=True)
+25 |     charfield = DjangoModel.CharField(max_length=255, null=True)
+26 |     textfield = SmthCharField(max_length=255, null=True)
+27 |     slugfield = models.SlugField(max_length=255, null=True)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-30 |     emailfield = models.EmailField(max_length=255, null=True)
-31 |     filepathfield = models.FilePathField(max_length=255, null=True)
+28 |     emailfield = models.EmailField(max_length=255, null=True)
+29 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |
 
 DJ001.py:28:18: DJ001 Avoid using `null=True` on string-based fields such as EmailField
    |
-28 |     textfield = SmthCharField(max_length=255, null=True)
-29 |     slugfield = models.SlugField(max_length=255, null=True)
-30 |     emailfield = models.EmailField(max_length=255, null=True)
+26 |     textfield = SmthCharField(max_length=255, null=True)
+27 |     slugfield = models.SlugField(max_length=255, null=True)
+28 |     emailfield = models.EmailField(max_length=255, null=True)
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-31 |     filepathfield = models.FilePathField(max_length=255, null=True)
-32 |     urlfield = models.URLField(max_length=255, null=True)
+29 |     filepathfield = models.FilePathField(max_length=255, null=True)
+30 |     urlfield = models.URLField(max_length=255, null=True)
    |
 
 DJ001.py:29:21: DJ001 Avoid using `null=True` on string-based fields such as FilePathField
    |
-29 |     slugfield = models.SlugField(max_length=255, null=True)
-30 |     emailfield = models.EmailField(max_length=255, null=True)
-31 |     filepathfield = models.FilePathField(max_length=255, null=True)
+27 |     slugfield = models.SlugField(max_length=255, null=True)
+28 |     emailfield = models.EmailField(max_length=255, null=True)
+29 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
-32 |     urlfield = models.URLField(max_length=255, null=True)
+30 |     urlfield = models.URLField(max_length=255, null=True)
    |
 
 DJ001.py:30:16: DJ001 Avoid using `null=True` on string-based fields such as URLField
    |
-30 |     emailfield = models.EmailField(max_length=255, null=True)
-31 |     filepathfield = models.FilePathField(max_length=255, null=True)
-32 |     urlfield = models.URLField(max_length=255, null=True)
+28 |     emailfield = models.EmailField(max_length=255, null=True)
+29 |     filepathfield = models.FilePathField(max_length=255, null=True)
+30 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
    |
 

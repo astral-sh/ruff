@@ -1,1031 +1,727 @@
-use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::FxHashMap;
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
+use std::str::Chars;
 
-use crate::cst::{
-    Alias, Arg, Body, BoolOp, CmpOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
-    Operator, Pattern, PatternKind, SliceIndex, SliceIndexKind, Stmt, StmtKind, UnaryOp,
-};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum Node<'a> {
-    Alias(&'a Alias),
-    Arg(&'a Arg),
-    Body(&'a Body),
-    BoolOp(&'a BoolOp),
-    CmpOp(&'a CmpOp),
-    Excepthandler(&'a Excepthandler),
-    Expr(&'a Expr),
-    Keyword(&'a Keyword),
-    Mod(&'a [Stmt]),
-    Operator(&'a Operator),
-    Pattern(&'a Pattern),
-    SliceIndex(&'a SliceIndex),
-    Stmt(&'a Stmt),
-    UnaryOp(&'a UnaryOp),
+use ruff_python_whitespace::is_python_whitespace;
+
+/// Searches for the first non-trivia character in `range`.
+///
+/// The search skips over any whitespace and comments.
+///
+/// Returns `Some` if the range contains any non-trivia character. The first item is the absolute offset
+/// of the character, the second item the non-trivia character.
+///
+/// Returns `None` if the range is empty or only contains trivia (whitespace or comments).
+pub(crate) fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<Token> {
+    SimpleTokenizer::starts_at(offset, code)
+        .skip_trivia()
+        .next()
 }
 
-impl Node<'_> {
-    pub(crate) fn id(&self) -> usize {
-        match self {
-            Node::Alias(node) => node.id(),
-            Node::Arg(node) => node.id(),
-            Node::Body(node) => node.id(),
-            Node::BoolOp(node) => node.id(),
-            Node::CmpOp(node) => node.id(),
-            Node::Excepthandler(node) => node.id(),
-            Node::Expr(node) => node.id(),
-            Node::Keyword(node) => node.id(),
-            Node::Mod(nodes) => nodes as *const _ as usize,
-            Node::Operator(node) => node.id(),
-            Node::Pattern(node) => node.id(),
-            Node::SliceIndex(node) => node.id(),
-            Node::Stmt(node) => node.id(),
-            Node::UnaryOp(node) => node.id(),
+/// Returns the first non-trivia token right before `offset` or `None` if at the start of the file
+/// or all preceding tokens are trivia tokens.
+///
+/// ## Notes
+///
+/// Prefer [`first_non_trivia_token`] whenever possible because reverse lookup is expensive because of comments.
+pub(crate) fn first_non_trivia_token_rev(offset: TextSize, code: &str) -> Option<Token> {
+    SimpleTokenizer::up_to(offset, code)
+        .skip_trivia()
+        .next_back()
+}
+
+/// Returns the number of newlines between `offset` and the first non whitespace character in the source code.
+pub(crate) fn lines_before(offset: TextSize, code: &str) -> u32 {
+    let tokens = SimpleTokenizer::up_to(offset, code);
+    let mut newlines = 0u32;
+
+    for token in tokens.rev() {
+        match token.kind() {
+            TokenKind::Newline => {
+                newlines += 1;
+            }
+            TokenKind::Whitespace => {
+                // ignore
+            }
+            _ => {
+                break;
+            }
         }
     }
 
-    pub(crate) fn start(&self) -> TextSize {
-        match self {
-            Node::Alias(node) => node.start(),
-            Node::Arg(node) => node.start(),
-            Node::Body(node) => node.start(),
-            Node::BoolOp(node) => node.start(),
-            Node::CmpOp(node) => node.start(),
-            Node::Excepthandler(node) => node.start(),
-            Node::Expr(node) => node.start(),
-            Node::Keyword(node) => node.start(),
-            Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
-            Node::Operator(node) => node.start(),
-            Node::Pattern(node) => node.start(),
-            Node::SliceIndex(node) => node.start(),
-            Node::Stmt(node) => node.start(),
-            Node::UnaryOp(node) => node.start(),
+    newlines
+}
+
+/// Counts the empty lines between `offset` and the first non-whitespace character.
+pub(crate) fn lines_after(offset: TextSize, code: &str) -> u32 {
+    let tokens = SimpleTokenizer::starts_at(offset, code);
+    let mut newlines = 0u32;
+
+    for token in tokens {
+        match token.kind() {
+            TokenKind::Newline => {
+                newlines += 1;
+            }
+            TokenKind::Whitespace => {
+                // ignore
+            }
+            _ => {
+                break;
+            }
         }
     }
 
-    pub(crate) fn end(&self) -> TextSize {
-        match self {
-            Node::Alias(node) => node.end(),
-            Node::Arg(node) => node.end(),
-            Node::Body(node) => node.end(),
-            Node::BoolOp(node) => node.end(),
-            Node::CmpOp(node) => node.end(),
-            Node::Excepthandler(node) => node.end(),
-            Node::Expr(node) => node.end(),
-            Node::Keyword(node) => node.end(),
-            Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
-            Node::Operator(node) => node.end(),
-            Node::Pattern(node) => node.end(),
-            Node::SliceIndex(node) => node.end(),
-            Node::Stmt(node) => node.end(),
-            Node::UnaryOp(node) => node.end(),
+    newlines
+}
+
+/// Returns the position after skipping any trailing trivia up to, but not including the newline character.
+pub(crate) fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
+    let tokenizer = SimpleTokenizer::starts_at(offset, code);
+
+    for token in tokenizer {
+        match token.kind() {
+            TokenKind::Whitespace | TokenKind::Comment | TokenKind::Continuation => {
+                // No op
+            }
+            _ => {
+                return token.start();
+            }
         }
     }
+
+    offset
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum TriviaTokenKind {
-    OwnLineComment,
-    EndOfLineComment,
-    MagicTrailingComma,
-    EmptyLine,
-    Parentheses,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TriviaToken {
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct Token {
+    pub(crate) kind: TokenKind,
     pub(crate) range: TextRange,
-    pub(crate) kind: TriviaTokenKind,
 }
 
-impl TriviaToken {
+impl Token {
+    pub(crate) const fn kind(&self) -> TokenKind {
+        self.kind
+    }
+
+    #[allow(unused)]
+    pub(crate) const fn range(&self) -> TextRange {
+        self.range
+    }
+
     pub(crate) const fn start(&self) -> TextSize {
         self.range.start()
     }
 
+    #[allow(unused)]
     pub(crate) const fn end(&self) -> TextSize {
-        self.range.end()
+        self.range.start()
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
-pub(crate) enum TriviaKind {
-    /// A Comment that is separated by at least one line break from the
-    /// preceding token.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// a = 1
-    /// # This is an own-line comment.
-    /// b = 2
-    /// ```
-    OwnLineComment(TextRange),
-    /// A comment that is on the same line as the preceding token.
-    ///
-    /// # Examples
-    ///
-    /// ## End of line
-    ///
-    /// ```ignore
-    /// a = 1  # This is an end-of-line comment.
-    /// b = 2
-    /// ```
-    EndOfLineComment(TextRange),
-    MagicTrailingComma,
-    EmptyLine,
-    Parentheses,
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub(crate) enum TokenKind {
+    /// A comment, not including the trailing new line.
+    Comment,
+
+    /// Sequence of ' ' or '\t'
+    Whitespace,
+
+    /// Start or end of the file
+    EndOfFile,
+
+    /// `\\`
+    Continuation,
+
+    /// `\n` or `\r` or `\r\n`
+    Newline,
+
+    /// `(`
+    LParen,
+
+    /// `)`
+    RParen,
+
+    /// `{`
+    LBrace,
+
+    /// `}`
+    RBrace,
+
+    /// `[`
+    LBracket,
+
+    /// `]`
+    RBracket,
+
+    /// `,`
+    Comma,
+
+    /// `:`
+    Colon,
+
+    /// '/'
+    Slash,
+
+    /// Any other non trivia token. Always has a length of 1
+    Other,
+
+    /// Returned for each character after [`TokenKind::Other`] has been returned once.
+    Bogus,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
-pub(crate) enum Relationship {
-    Leading,
-    Trailing,
-    Dangling,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
-pub(crate) enum Parenthesize {
-    /// Always parenthesize the statement or expression.
-    Always,
-    /// Never parenthesize the statement or expression.
-    Never,
-    /// Parenthesize the statement or expression if it expands.
-    IfExpanded,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Trivia {
-    pub(crate) kind: TriviaKind,
-    pub(crate) relationship: Relationship,
-}
-
-impl Trivia {
-    pub(crate) fn from_token(token: &TriviaToken, relationship: Relationship) -> Self {
-        match token.kind {
-            TriviaTokenKind::MagicTrailingComma => Self {
-                kind: TriviaKind::MagicTrailingComma,
-                relationship,
-            },
-            TriviaTokenKind::EmptyLine => Self {
-                kind: TriviaKind::EmptyLine,
-                relationship,
-            },
-            TriviaTokenKind::OwnLineComment => Self {
-                kind: TriviaKind::OwnLineComment(token.range),
-                relationship,
-            },
-            TriviaTokenKind::EndOfLineComment => Self {
-                kind: TriviaKind::EndOfLineComment(token.range),
-                relationship,
-            },
-            TriviaTokenKind::Parentheses => Self {
-                kind: TriviaKind::Parentheses,
-                relationship,
-            },
+impl TokenKind {
+    const fn from_non_trivia_char(c: char) -> TokenKind {
+        match c {
+            '(' => TokenKind::LParen,
+            ')' => TokenKind::RParen,
+            '[' => TokenKind::LBracket,
+            ']' => TokenKind::RBracket,
+            '{' => TokenKind::LBrace,
+            '}' => TokenKind::RBrace,
+            ',' => TokenKind::Comma,
+            ':' => TokenKind::Colon,
+            '/' => TokenKind::Slash,
+            _ => TokenKind::Other,
         }
+    }
+
+    const fn is_trivia(self) -> bool {
+        matches!(
+            self,
+            TokenKind::Whitespace
+                | TokenKind::Newline
+                | TokenKind::Comment
+                | TokenKind::Continuation
+        )
     }
 }
 
-pub(crate) fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
-    let mut tokens = vec![];
-    let mut prev_tok: Option<(&Tok, TextRange)> = None;
-    let mut prev_semantic_tok: Option<(&Tok, TextRange)> = None;
-    let mut parens = vec![];
+/// Simple zero allocation tokenizer for tokenizing trivia (and some tokens).
+///
+/// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
+///
+/// The tokenizer doesn't guarantee any correctness after it returned a [`TokenKind::Other`]. That's why it
+/// will return [`TokenKind::Bogus`] for every character after until it reaches the end of the file.
+pub(crate) struct SimpleTokenizer<'a> {
+    offset: TextSize,
+    back_offset: TextSize,
+    /// `true` when it is known that the current `back` line has no comment for sure.
+    back_line_has_no_comment: bool,
+    bogus: bool,
+    cursor: Cursor<'a>,
+}
 
-    for (tok, range) in lxr.iter().flatten() {
-        let after_new_line = matches!(prev_tok, Some((Tok::Newline | Tok::NonLogicalNewline, _)));
+impl<'a> SimpleTokenizer<'a> {
+    pub(crate) fn new(source: &'a str, range: TextRange) -> Self {
+        Self {
+            offset: range.start(),
+            back_offset: range.end(),
+            back_line_has_no_comment: false,
+            bogus: false,
+            cursor: Cursor::new(&source[range]),
+        }
+    }
 
-        // Add empty lines.
-        if after_new_line && matches!(tok, Tok::NonLogicalNewline) {
-            tokens.push(TriviaToken {
-                range: *range,
-                kind: TriviaTokenKind::EmptyLine,
-            });
+    pub(crate) fn starts_at(offset: TextSize, source: &'a str) -> Self {
+        let range = TextRange::new(offset, source.text_len());
+        Self::new(source, range)
+    }
+
+    pub(crate) fn up_to(offset: TextSize, source: &'a str) -> Self {
+        Self::new(source, TextRange::up_to(offset))
+    }
+
+    fn next_token(&mut self) -> Token {
+        self.cursor.start_token();
+
+        let Some(first) = self.cursor.bump() else {
+            return Token {
+                kind: TokenKind::EndOfFile,
+                range: TextRange::empty(self.offset),
+            }
+        };
+
+        if self.bogus {
+            let token = Token {
+                kind: TokenKind::Bogus,
+                range: TextRange::at(self.offset, first.text_len()),
+            };
+
+            self.offset += first.text_len();
+            return token;
         }
 
-        // Add comments.
-        if matches!(tok, Tok::Comment(..)) {
-            tokens.push(TriviaToken {
-                range: *range,
-                // Used to use prev_non-newline_tok
-                kind: if after_new_line || prev_tok.is_none() {
-                    TriviaTokenKind::OwnLineComment
+        let kind = match first {
+            ' ' | '\t' => {
+                self.cursor.eat_while(|c| matches!(c, ' ' | '\t'));
+                TokenKind::Whitespace
+            }
+
+            '\n' => TokenKind::Newline,
+
+            '\r' => {
+                self.cursor.eat_char('\n');
+                TokenKind::Newline
+            }
+
+            '#' => {
+                self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
+                TokenKind::Comment
+            }
+
+            '\\' => TokenKind::Continuation,
+
+            c => {
+                let kind = TokenKind::from_non_trivia_char(c);
+
+                if kind == TokenKind::Other {
+                    self.bogus = true;
+                }
+
+                kind
+            }
+        };
+
+        let token_len = self.cursor.token_len();
+
+        let token = Token {
+            kind,
+            range: TextRange::at(self.offset, token_len),
+        };
+
+        self.offset += token_len;
+
+        token
+    }
+
+    /// Returns the next token from the back. Prefer iterating forwards. Iterating backwards is significantly more expensive
+    /// because it needs to check if the line has any comments when encountering any non-trivia token.
+    pub(crate) fn next_token_back(&mut self) -> Token {
+        self.cursor.start_token();
+
+        let Some(last) = self.cursor.bump_back() else {
+            return Token {
+                kind: TokenKind::EndOfFile,
+                range: TextRange::empty(self.back_offset),
+            }
+        };
+
+        if self.bogus {
+            let token = Token {
+                kind: TokenKind::Bogus,
+                range: TextRange::at(self.back_offset - last.text_len(), last.text_len()),
+            };
+
+            self.back_offset -= last.text_len();
+            return token;
+        }
+
+        let kind = match last {
+            // This may not be 100% correct because it will lex-out trailing whitespace from a comment
+            // as whitespace rather than being part of the token. This shouldn't matter for what we use the lexer for.
+            ' ' | '\t' => {
+                self.cursor.eat_back_while(|c| matches!(c, ' ' | '\t'));
+                TokenKind::Whitespace
+            }
+
+            '\r' => {
+                self.back_line_has_no_comment = false;
+                TokenKind::Newline
+            }
+
+            '\n' => {
+                self.back_line_has_no_comment = false;
+                self.cursor.eat_char_back('\r');
+                TokenKind::Newline
+            }
+
+            // Empty comment (could also be a comment nested in another comment, but this shouldn't matter for what we use the lexer for)
+            '#' => TokenKind::Comment,
+
+            // For all other tokens, test if the character isn't part of a comment.
+            c => {
+                let mut comment_offset = None;
+
+                // Skip the test whether there's a preceding comment if it has been performed before.
+                if !self.back_line_has_no_comment {
+                    let rest = self.cursor.chars.as_str();
+
+                    for (back_index, c) in rest.chars().rev().enumerate() {
+                        match c {
+                            '#' => {
+                                // Potentially a comment
+                                comment_offset = Some(back_index + 1);
+                            }
+                            '\r' | '\n' | '\\' => {
+                                break;
+                            }
+                            c => {
+                                if !is_python_whitespace(c)
+                                    && TokenKind::from_non_trivia_char(c) == TokenKind::Other
+                                {
+                                    comment_offset = None;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // From here on it is guaranteed that this line has no other comment.
+                self.back_line_has_no_comment = true;
+
+                if let Some(comment_offset) = comment_offset {
+                    // It is a comment, bump all tokens
+                    for _ in 0..comment_offset {
+                        self.cursor.bump_back().unwrap();
+                    }
+
+                    TokenKind::Comment
+                } else if c == '\\' {
+                    TokenKind::Continuation
                 } else {
-                    TriviaTokenKind::EndOfLineComment
-                },
-            });
-        }
+                    let kind = TokenKind::from_non_trivia_char(c);
 
-        // Add magic trailing commas.
-        if matches!(
-            tok,
-            Tok::Rpar | Tok::Rsqb | Tok::Rbrace | Tok::Equal | Tok::Newline
-        ) {
-            if let Some((prev_tok, prev_range)) = prev_semantic_tok {
-                if prev_tok == &Tok::Comma {
-                    tokens.push(TriviaToken {
-                        range: prev_range,
-                        kind: TriviaTokenKind::MagicTrailingComma,
-                    });
+                    if kind == TokenKind::Other {
+                        self.bogus = true;
+                    }
+
+                    kind
                 }
             }
-        }
+        };
 
-        if matches!(tok, Tok::Lpar) {
-            if prev_tok.map_or(true, |(prev_tok, _)| {
-                !matches!(
-                    prev_tok,
-                    Tok::Name { .. }
-                        | Tok::Int { .. }
-                        | Tok::Float { .. }
-                        | Tok::Complex { .. }
-                        | Tok::String { .. }
-                )
-            }) {
-                parens.push((range.start(), true));
-            } else {
-                parens.push((range.start(), false));
-            }
-        } else if matches!(tok, Tok::Rpar) {
-            let (start, explicit) = parens.pop().unwrap();
-            if explicit {
-                tokens.push(TriviaToken {
-                    range: TextRange::new(start, range.end()),
-                    kind: TriviaTokenKind::Parentheses,
-                });
-            }
-        }
+        let token_len = self.cursor.token_len();
 
-        prev_tok = Some((tok, *range));
+        let start = self.back_offset - token_len;
 
-        // Track the most recent semantic token.
-        if !matches!(
-            tok,
-            Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)
-        ) {
-            prev_semantic_tok = Some((tok, *range));
-        }
+        let token = Token {
+            kind,
+            range: TextRange::at(start, token_len),
+        };
+
+        self.back_offset = start;
+
+        token
     }
-    tokens
-}
 
-fn sorted_child_nodes_inner<'a>(node: Node<'a>, result: &mut Vec<Node<'a>>) {
-    match node {
-        Node::Mod(nodes) => {
-            for stmt in nodes.iter() {
-                result.push(Node::Stmt(stmt));
-            }
-        }
-        Node::Body(body) => {
-            result.extend(body.iter().map(Node::Stmt));
-        }
-        Node::Stmt(stmt) => match &stmt.node {
-            StmtKind::Return { value } => {
-                if let Some(value) = value {
-                    result.push(Node::Expr(value));
-                }
-            }
-            StmtKind::Expr { value } => {
-                result.push(Node::Expr(value));
-            }
-            StmtKind::Pass => {}
-            StmtKind::Assign { targets, value, .. } => {
-                for target in targets {
-                    result.push(Node::Expr(target));
-                }
-                result.push(Node::Expr(value));
-            }
-            StmtKind::FunctionDef {
-                args,
-                body,
-                decorator_list,
-                returns,
-                ..
-            }
-            | StmtKind::AsyncFunctionDef {
-                args,
-                body,
-                decorator_list,
-                returns,
-                ..
-            } => {
-                for decorator in decorator_list {
-                    result.push(Node::Expr(decorator));
-                }
-                for arg in &args.posonlyargs {
-                    result.push(Node::Arg(arg));
-                }
-                for arg in &args.args {
-                    result.push(Node::Arg(arg));
-                }
-                if let Some(arg) = &args.vararg {
-                    result.push(Node::Arg(arg));
-                }
-                for arg in &args.kwonlyargs {
-                    result.push(Node::Arg(arg));
-                }
-                if let Some(arg) = &args.kwarg {
-                    result.push(Node::Arg(arg));
-                }
-                for expr in &args.defaults {
-                    result.push(Node::Expr(expr));
-                }
-                for expr in &args.kw_defaults {
-                    result.push(Node::Expr(expr));
-                }
-                if let Some(returns) = returns {
-                    result.push(Node::Expr(returns));
-                }
-                result.push(Node::Body(body));
-            }
-            StmtKind::ClassDef {
-                bases,
-                keywords,
-                body,
-                decorator_list,
-                ..
-            } => {
-                for decorator in decorator_list {
-                    result.push(Node::Expr(decorator));
-                }
-                for base in bases {
-                    result.push(Node::Expr(base));
-                }
-                for keyword in keywords {
-                    result.push(Node::Keyword(keyword));
-                }
-                result.push(Node::Body(body));
-            }
-            StmtKind::Delete { targets } => {
-                for target in targets {
-                    result.push(Node::Expr(target));
-                }
-            }
-            StmtKind::AugAssign { target, op, value } => {
-                result.push(Node::Expr(target));
-                result.push(Node::Operator(op));
-                result.push(Node::Expr(value));
-            }
-            StmtKind::AnnAssign {
-                target,
-                annotation,
-                value,
-                ..
-            } => {
-                result.push(Node::Expr(target));
-                result.push(Node::Expr(annotation));
-                if let Some(value) = value {
-                    result.push(Node::Expr(value));
-                }
-            }
-            StmtKind::For {
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            }
-            | StmtKind::AsyncFor {
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            } => {
-                result.push(Node::Expr(target));
-                result.push(Node::Expr(iter));
-                result.push(Node::Body(body));
-                if let Some(orelse) = orelse {
-                    result.push(Node::Body(orelse));
-                }
-            }
-            StmtKind::While { test, body, orelse } => {
-                result.push(Node::Expr(test));
-                result.push(Node::Body(body));
-                if let Some(orelse) = orelse {
-                    result.push(Node::Body(orelse));
-                }
-            }
-            StmtKind::If {
-                test, body, orelse, ..
-            } => {
-                result.push(Node::Expr(test));
-                result.push(Node::Body(body));
-                if let Some(orelse) = orelse {
-                    result.push(Node::Body(orelse));
-                }
-            }
-            StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
-                for item in items {
-                    result.push(Node::Expr(&item.context_expr));
-                    if let Some(expr) = &item.optional_vars {
-                        result.push(Node::Expr(expr));
-                    }
-                }
-                result.push(Node::Body(body));
-            }
-            StmtKind::Match { subject, cases } => {
-                result.push(Node::Expr(subject));
-                for case in cases {
-                    result.push(Node::Pattern(&case.pattern));
-                    if let Some(expr) = &case.guard {
-                        result.push(Node::Expr(expr));
-                    }
-                    result.push(Node::Body(&case.body));
-                }
-            }
-            StmtKind::Raise { exc, cause } => {
-                if let Some(exc) = exc {
-                    result.push(Node::Expr(exc));
-                }
-                if let Some(cause) = cause {
-                    result.push(Node::Expr(cause));
-                }
-            }
-            StmtKind::Assert { test, msg } => {
-                result.push(Node::Expr(test));
-                if let Some(msg) = msg {
-                    result.push(Node::Expr(msg));
-                }
-            }
-            StmtKind::Break => {}
-            StmtKind::Continue => {}
-            StmtKind::Try {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-            }
-            | StmtKind::TryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-            } => {
-                result.push(Node::Body(body));
-                for handler in handlers {
-                    result.push(Node::Excepthandler(handler));
-                }
-                if let Some(orelse) = orelse {
-                    result.push(Node::Body(orelse));
-                }
-                if let Some(finalbody) = finalbody {
-                    result.push(Node::Body(finalbody));
-                }
-            }
-            StmtKind::Import { names } => {
-                for name in names {
-                    result.push(Node::Alias(name));
-                }
-            }
-            StmtKind::ImportFrom { names, .. } => {
-                for name in names {
-                    result.push(Node::Alias(name));
-                }
-            }
-            StmtKind::Global { .. } => {}
-            StmtKind::Nonlocal { .. } => {}
-        },
-        Node::Arg(arg) => {
-            if let Some(annotation) = &arg.node.annotation {
-                result.push(Node::Expr(annotation));
-            }
-        }
-        Node::Expr(expr) => match &expr.node {
-            ExprKind::BoolOp { ops, values } => {
-                result.push(Node::Expr(&values[0]));
-                for (op, value) in ops.iter().zip(&values[1..]) {
-                    result.push(Node::BoolOp(op));
-                    result.push(Node::Expr(value));
-                }
-            }
-            ExprKind::NamedExpr { target, value } => {
-                result.push(Node::Expr(target));
-                result.push(Node::Expr(value));
-            }
-            ExprKind::BinOp { left, op, right } => {
-                result.push(Node::Expr(left));
-                result.push(Node::Operator(op));
-                result.push(Node::Expr(right));
-            }
-            ExprKind::UnaryOp { op, operand } => {
-                result.push(Node::UnaryOp(op));
-                result.push(Node::Expr(operand));
-            }
-            ExprKind::Lambda { body, args, .. } => {
-                for expr in &args.defaults {
-                    result.push(Node::Expr(expr));
-                }
-                for expr in &args.kw_defaults {
-                    result.push(Node::Expr(expr));
-                }
-                result.push(Node::Expr(body));
-            }
-            ExprKind::IfExp { test, body, orelse } => {
-                result.push(Node::Expr(body));
-                result.push(Node::Expr(test));
-                result.push(Node::Expr(orelse));
-            }
-            ExprKind::Dict { keys, values } => {
-                for key in keys.iter().flatten() {
-                    result.push(Node::Expr(key));
-                }
-                for value in values {
-                    result.push(Node::Expr(value));
-                }
-            }
-            ExprKind::Set { elts } => {
-                for elt in elts {
-                    result.push(Node::Expr(elt));
-                }
-            }
-            ExprKind::ListComp { elt, generators } => {
-                result.push(Node::Expr(elt));
-                for generator in generators {
-                    result.push(Node::Expr(&generator.target));
-                    result.push(Node::Expr(&generator.iter));
-                    for expr in &generator.ifs {
-                        result.push(Node::Expr(expr));
-                    }
-                }
-            }
-            ExprKind::SetComp { elt, generators } => {
-                result.push(Node::Expr(elt));
-                for generator in generators {
-                    result.push(Node::Expr(&generator.target));
-                    result.push(Node::Expr(&generator.iter));
-                    for expr in &generator.ifs {
-                        result.push(Node::Expr(expr));
-                    }
-                }
-            }
-            ExprKind::DictComp {
-                key,
-                value,
-                generators,
-            } => {
-                result.push(Node::Expr(key));
-                result.push(Node::Expr(value));
-                for generator in generators {
-                    result.push(Node::Expr(&generator.target));
-                    result.push(Node::Expr(&generator.iter));
-                    for expr in &generator.ifs {
-                        result.push(Node::Expr(expr));
-                    }
-                }
-            }
-            ExprKind::GeneratorExp { elt, generators } => {
-                result.push(Node::Expr(elt));
-                for generator in generators {
-                    result.push(Node::Expr(&generator.target));
-                    result.push(Node::Expr(&generator.iter));
-                    for expr in &generator.ifs {
-                        result.push(Node::Expr(expr));
-                    }
-                }
-            }
-            ExprKind::Await { value } => {
-                result.push(Node::Expr(value));
-            }
-            ExprKind::Yield { value } => {
-                if let Some(value) = value {
-                    result.push(Node::Expr(value));
-                }
-            }
-            ExprKind::YieldFrom { value } => {
-                result.push(Node::Expr(value));
-            }
-            ExprKind::Compare {
-                left,
-                ops,
-                comparators,
-            } => {
-                result.push(Node::Expr(left));
-                for (op, comparator) in ops.iter().zip(comparators) {
-                    result.push(Node::CmpOp(op));
-                    result.push(Node::Expr(comparator));
-                }
-            }
-            ExprKind::Call {
-                func,
-                args,
-                keywords,
-            } => {
-                result.push(Node::Expr(func));
-                for arg in args {
-                    result.push(Node::Expr(arg));
-                }
-                for keyword in keywords {
-                    result.push(Node::Keyword(keyword));
-                }
-            }
-            ExprKind::FormattedValue {
-                value, format_spec, ..
-            } => {
-                result.push(Node::Expr(value));
-                if let Some(format_spec) = format_spec {
-                    result.push(Node::Expr(format_spec));
-                }
-            }
-            ExprKind::JoinedStr { values } => {
-                for value in values {
-                    result.push(Node::Expr(value));
-                }
-            }
-            ExprKind::Constant { .. } => {}
-            ExprKind::Attribute { value, .. } => {
-                result.push(Node::Expr(value));
-            }
-            ExprKind::Subscript { value, slice, .. } => {
-                result.push(Node::Expr(value));
-                result.push(Node::Expr(slice));
-            }
-            ExprKind::Starred { value, .. } => {
-                result.push(Node::Expr(value));
-            }
-
-            ExprKind::Name { .. } => {}
-            ExprKind::List { elts, .. } => {
-                for elt in elts {
-                    result.push(Node::Expr(elt));
-                }
-            }
-            ExprKind::Tuple { elts, .. } => {
-                for elt in elts {
-                    result.push(Node::Expr(elt));
-                }
-            }
-            ExprKind::Slice { lower, upper, step } => {
-                result.push(Node::SliceIndex(lower));
-                result.push(Node::SliceIndex(upper));
-                if let Some(step) = step {
-                    result.push(Node::SliceIndex(step));
-                }
-            }
-        },
-        Node::Keyword(keyword) => {
-            result.push(Node::Expr(&keyword.node.value));
-        }
-        Node::Alias(..) => {}
-        Node::Excepthandler(excepthandler) => {
-            let ExcepthandlerKind::ExceptHandler { type_, body, .. } = &excepthandler.node;
-            if let Some(type_) = type_ {
-                result.push(Node::Expr(type_));
-            }
-            result.push(Node::Body(body));
-        }
-        Node::SliceIndex(slice_index) => {
-            if let SliceIndexKind::Index { value } = &slice_index.node {
-                result.push(Node::Expr(value));
-            }
-        }
-        Node::Pattern(pattern) => match &pattern.node {
-            PatternKind::MatchValue { value } => {
-                result.push(Node::Expr(value));
-            }
-            PatternKind::MatchSingleton { .. } => {}
-            PatternKind::MatchSequence { patterns } => {
-                for pattern in patterns {
-                    result.push(Node::Pattern(pattern));
-                }
-            }
-            PatternKind::MatchMapping { keys, patterns, .. } => {
-                for (key, pattern) in keys.iter().zip(patterns.iter()) {
-                    result.push(Node::Expr(key));
-                    result.push(Node::Pattern(pattern));
-                }
-            }
-            PatternKind::MatchClass {
-                cls,
-                patterns,
-                kwd_patterns,
-                ..
-            } => {
-                result.push(Node::Expr(cls));
-                for pattern in patterns {
-                    result.push(Node::Pattern(pattern));
-                }
-                for pattern in kwd_patterns {
-                    result.push(Node::Pattern(pattern));
-                }
-            }
-            PatternKind::MatchStar { .. } => {}
-            PatternKind::MatchAs { pattern, .. } => {
-                if let Some(pattern) = pattern {
-                    result.push(Node::Pattern(pattern));
-                }
-            }
-            PatternKind::MatchOr { patterns } => {
-                for pattern in patterns {
-                    result.push(Node::Pattern(pattern));
-                }
-            }
-        },
-        Node::BoolOp(..) => {}
-        Node::UnaryOp(..) => {}
-        Node::Operator(..) => {}
-        Node::CmpOp(..) => {}
+    pub(crate) fn skip_trivia(self) -> impl Iterator<Item = Token> + DoubleEndedIterator + 'a {
+        self.filter(|t| !t.kind().is_trivia())
     }
 }
 
-pub(crate) fn sorted_child_nodes(node: Node) -> Vec<Node> {
-    let mut result = Vec::new();
-    sorted_child_nodes_inner(node, &mut result);
+impl Iterator for SimpleTokenizer<'_> {
+    type Item = Token;
 
-    result
-}
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.next_token();
 
-pub(crate) fn decorate_token<'a>(
-    token: &TriviaToken,
-    node: Node<'a>,
-    enclosing_node: Option<Node<'a>>,
-    enclosed_node: Option<Node<'a>>,
-    cache: &mut FxHashMap<usize, Vec<Node<'a>>>,
-) -> (
-    Option<Node<'a>>,
-    Option<Node<'a>>,
-    Option<Node<'a>>,
-    Option<Node<'a>>,
-) {
-    let child_nodes = cache
-        .entry(node.id())
-        .or_insert_with(|| sorted_child_nodes(node));
-
-    let mut preceding_node = None;
-    let mut following_node = None;
-    let mut enclosed_node = enclosed_node;
-
-    let mut left = 0;
-    let mut right = child_nodes.len();
-
-    while left < right {
-        let middle = (left + right) / 2;
-        let child = child_nodes[middle];
-        let start = child.start();
-        let end = child.end();
-
-        if let Some(existing) = &enclosed_node {
-            // Special-case: if we're dealing with a statement that's a single expression,
-            // we want to treat the expression as the enclosed node.
-            let existing_start = existing.start();
-            let existing_end = existing.end();
-            if start == existing_start && end == existing_end {
-                enclosed_node = Some(child);
-            }
+        if token.kind == TokenKind::EndOfFile {
+            None
         } else {
-            if token.start() <= start && token.end() >= end {
-                enclosed_node = Some(child);
-            }
+            Some(token)
         }
-
-        // The comment is completely contained by this child node.
-        if token.start() >= start && token.end() <= end {
-            return decorate_token(token, child, Some(child), enclosed_node, cache);
-        }
-
-        if end <= token.start() {
-            // This child node falls completely before the comment.
-            // Because we will never consider this node or any nodes
-            // before it again, this node must be the closest preceding
-            // node we have encountered so far.
-            preceding_node = Some(child);
-            left = middle + 1;
-            continue;
-        }
-
-        if token.end() <= start {
-            // This child node falls completely after the comment.
-            // Because we will never consider this node or any nodes after
-            // it again, this node must be the closest following node we
-            // have encountered so far.
-            following_node = Some(child);
-            right = middle;
-            continue;
-        }
-
-        return (None, None, None, enclosed_node);
-    }
-
-    (
-        preceding_node,
-        following_node,
-        enclosing_node,
-        enclosed_node,
-    )
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct TriviaIndex {
-    pub(crate) alias: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) arg: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) body: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) bool_op: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) cmp_op: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) excepthandler: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) expr: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) keyword: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) operator: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) pattern: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) slice_index: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) stmt: FxHashMap<usize, Vec<Trivia>>,
-    pub(crate) unary_op: FxHashMap<usize, Vec<Trivia>>,
-}
-
-fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
-    match node {
-        Node::Alias(node) => {
-            trivia
-                .alias
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Arg(node) => {
-            trivia
-                .arg
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Body(node) => {
-            trivia
-                .body
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::BoolOp(node) => {
-            trivia
-                .bool_op
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::CmpOp(node) => {
-            trivia
-                .cmp_op
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Excepthandler(node) => {
-            trivia
-                .excepthandler
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Expr(node) => {
-            trivia
-                .expr
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Keyword(node) => {
-            trivia
-                .keyword
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Operator(node) => {
-            trivia
-                .operator
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Pattern(node) => {
-            trivia
-                .pattern
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::SliceIndex(node) => {
-            trivia
-                .slice_index
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Stmt(node) => {
-            trivia
-                .stmt
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::UnaryOp(node) => {
-            trivia
-                .unary_op
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Mod(_) => {}
     }
 }
 
-pub(crate) fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaIndex {
-    let mut stack = vec![];
-    let mut cache = FxHashMap::default();
-    for token in &tokens {
-        let (preceding_node, following_node, enclosing_node, enclosed_node) =
-            decorate_token(token, Node::Mod(python_ast), None, None, &mut cache);
+impl DoubleEndedIterator for SimpleTokenizer<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let token = self.next_token_back();
 
-        stack.push((
-            preceding_node,
-            following_node,
-            enclosing_node,
-            enclosed_node,
-        ));
+        if token.kind == TokenKind::EndOfFile {
+            None
+        } else {
+            Some(token)
+        }
     }
+}
 
-    let mut trivia_index = TriviaIndex::default();
+const EOF_CHAR: char = '\0';
 
-    for (index, token) in tokens.into_iter().enumerate() {
-        let (preceding_node, following_node, enclosing_node, enclosed_node) = &stack[index];
-        match token.kind {
-            TriviaTokenKind::EmptyLine | TriviaTokenKind::OwnLineComment => {
-                if let Some(following_node) = following_node {
-                    // Always a leading comment.
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Leading),
-                        following_node,
-                        &mut trivia_index,
-                    );
-                } else if let Some(enclosing_node) = enclosing_node {
-                    // TODO(charlie): Prettier puts this `else if` after `preceding_note`.
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Dangling),
-                        enclosing_node,
-                        &mut trivia_index,
-                    );
-                } else if let Some(preceding_node) = preceding_node {
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Trailing),
-                        preceding_node,
-                        &mut trivia_index,
-                    );
-                } else {
-                    unreachable!("Attach token to the ast: {:?}", token);
-                }
-            }
-            TriviaTokenKind::EndOfLineComment => {
-                if let Some(preceding_node) = preceding_node {
-                    // There is content before this comment on the same line, but
-                    // none after it, so prefer a trailing comment of the previous node.
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Trailing),
-                        preceding_node,
-                        &mut trivia_index,
-                    );
-                } else if let Some(enclosing_node) = enclosing_node {
-                    // TODO(charlie): Prettier puts this later, and uses `Relationship::Dangling`.
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Trailing),
-                        enclosing_node,
-                        &mut trivia_index,
-                    );
-                } else if let Some(following_node) = following_node {
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Leading),
-                        following_node,
-                        &mut trivia_index,
-                    );
-                } else {
-                    unreachable!("Attach token to the ast: {:?}", token);
-                }
-            }
-            TriviaTokenKind::MagicTrailingComma => {
-                if let Some(enclosing_node) = enclosing_node {
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Trailing),
-                        enclosing_node,
-                        &mut trivia_index,
-                    );
-                } else {
-                    unreachable!("Attach token to the ast: {:?}", token);
-                }
-            }
-            TriviaTokenKind::Parentheses => {
-                if let Some(enclosed_node) = enclosed_node {
-                    add_comment(
-                        Trivia::from_token(&token, Relationship::Leading),
-                        enclosed_node,
-                        &mut trivia_index,
-                    );
-                } else {
-                    unreachable!("Attach token to the ast: {:?}", token);
-                }
-            }
+#[derive(Debug, Clone)]
+struct Cursor<'a> {
+    chars: Chars<'a>,
+    source_length: TextSize,
+}
+
+impl<'a> Cursor<'a> {
+    fn new(source: &'a str) -> Self {
+        Self {
+            source_length: source.text_len(),
+            chars: source.chars(),
         }
     }
 
-    trivia_index
+    /// Peeks the next character from the input stream without consuming it.
+    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
+    fn first(&self) -> char {
+        self.chars.clone().next().unwrap_or(EOF_CHAR)
+    }
+
+    /// Peeks the next character from the input stream without consuming it.
+    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
+    fn last(&self) -> char {
+        self.chars.clone().next_back().unwrap_or(EOF_CHAR)
+    }
+
+    // SAFETY: THe `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
+    #[allow(clippy::cast_possible_truncation)]
+    fn text_len(&self) -> TextSize {
+        TextSize::new(self.chars.as_str().len() as u32)
+    }
+
+    fn token_len(&self) -> TextSize {
+        self.source_length - self.text_len()
+    }
+
+    fn start_token(&mut self) {
+        self.source_length = self.text_len();
+    }
+
+    fn is_eof(&self) -> bool {
+        self.chars.as_str().is_empty()
+    }
+
+    /// Consumes the next character
+    fn bump(&mut self) -> Option<char> {
+        self.chars.next()
+    }
+
+    /// Consumes the next character from the back
+    fn bump_back(&mut self) -> Option<char> {
+        self.chars.next_back()
+    }
+
+    fn eat_char(&mut self, c: char) -> bool {
+        if self.first() == c {
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn eat_char_back(&mut self, c: char) -> bool {
+        if self.last() == c {
+            self.bump_back();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Eats symbols while predicate returns true or until the end of file is reached.
+    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+        // It was tried making optimized version of this for eg. line comments, but
+        // LLVM can inline all of this and compile it down to fast iteration over bytes.
+        while predicate(self.first()) && !self.is_eof() {
+            self.bump();
+        }
+    }
+
+    /// Eats symbols from the back while predicate returns true or until the beginning of file is reached.
+    fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+        // It was tried making optimized version of this for eg. line comments, but
+        // LLVM can inline all of this and compile it down to fast iteration over bytes.
+        while predicate(self.last()) && !self.is_eof() {
+            self.bump_back();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_debug_snapshot;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
+
+    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token};
+
+    struct TokenizationTestCase {
+        source: &'static str,
+        range: TextRange,
+        tokens: Vec<Token>,
+    }
+
+    impl TokenizationTestCase {
+        fn assert_reverse_tokenization(&self) {
+            let mut backwards = self.tokenize_reverse();
+
+            // Re-reverse to get the tokens in forward order.
+            backwards.reverse();
+
+            assert_eq!(&backwards, &self.tokens);
+        }
+
+        fn tokenize_reverse(&self) -> Vec<Token> {
+            SimpleTokenizer::new(self.source, self.range)
+                .rev()
+                .collect()
+        }
+
+        fn tokens(&self) -> &[Token] {
+            &self.tokens
+        }
+    }
+
+    fn tokenize_range(source: &'static str, range: TextRange) -> TokenizationTestCase {
+        let tokens: Vec<_> = SimpleTokenizer::new(source, range).collect();
+
+        TokenizationTestCase {
+            source,
+            range,
+            tokens,
+        }
+    }
+
+    fn tokenize(source: &'static str) -> TokenizationTestCase {
+        tokenize_range(source, TextRange::new(TextSize::new(0), source.text_len()))
+    }
+
+    #[test]
+    fn tokenize_trivia() {
+        let source = "# comment\n    # comment";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_parentheses() {
+        let source = "([{}])";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_comma() {
+        let source = ",,,,";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_continuation() {
+        let source = "( \\\n )";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_substring() {
+        let source = "('some string') # comment";
+
+        let test_case =
+            tokenize_range(source, TextRange::new(TextSize::new(14), source.text_len()));
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_slash() {
+        let source = r#" # trailing positional comment
+        # Positional arguments only after here
+        ,/"#;
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_bogus() {
+        let source = r#"# leading comment
+        "a string"
+        a = (10)"#;
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        assert_debug_snapshot!("Reverse", test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn lines_before_empty_string() {
+        assert_eq!(lines_before(TextSize::new(0), ""), 0);
+    }
+
+    #[test]
+    fn lines_before_in_the_middle_of_a_line() {
+        assert_eq!(lines_before(TextSize::new(4), "a = 20"), 0);
+    }
+
+    #[test]
+    fn lines_before_on_a_new_line() {
+        assert_eq!(lines_before(TextSize::new(7), "a = 20\nb = 10"), 1);
+    }
+
+    #[test]
+    fn lines_before_multiple_leading_newlines() {
+        assert_eq!(lines_before(TextSize::new(9), "a = 20\n\r\nb = 10"), 2);
+    }
+
+    #[test]
+    fn lines_before_with_comment_offset() {
+        assert_eq!(lines_before(TextSize::new(8), "a = 20\n# a comment"), 0);
+    }
+
+    #[test]
+    fn lines_before_with_trailing_comment() {
+        assert_eq!(
+            lines_before(TextSize::new(22), "a = 20 # some comment\nb = 10"),
+            1
+        );
+    }
+
+    #[test]
+    fn lines_before_with_comment_only_line() {
+        assert_eq!(
+            lines_before(TextSize::new(22), "a = 20\n# some comment\nb = 10"),
+            1
+        );
+    }
+
+    #[test]
+    fn lines_after_empty_string() {
+        assert_eq!(lines_after(TextSize::new(0), ""), 0);
+    }
+
+    #[test]
+    fn lines_after_in_the_middle_of_a_line() {
+        assert_eq!(lines_after(TextSize::new(4), "a = 20"), 0);
+    }
+
+    #[test]
+    fn lines_after_before_a_new_line() {
+        assert_eq!(lines_after(TextSize::new(6), "a = 20\nb = 10"), 1);
+    }
+
+    #[test]
+    fn lines_after_multiple_newlines() {
+        assert_eq!(lines_after(TextSize::new(6), "a = 20\n\r\nb = 10"), 2);
+    }
+
+    #[test]
+    fn lines_after_before_comment_offset() {
+        assert_eq!(lines_after(TextSize::new(7), "a = 20 # a comment\n"), 0);
+    }
+
+    #[test]
+    fn lines_after_with_comment_only_line() {
+        assert_eq!(
+            lines_after(TextSize::new(6), "a = 20\n# some comment\nb = 10"),
+            1
+        );
+    }
 }

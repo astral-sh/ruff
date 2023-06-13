@@ -53,6 +53,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "too-many-blank-lines",
     "trailing-comma-on-bare-tuple",
     "unexpected-indentation-comment",
+    "unnecessary-class-parentheses",
     "useless-semicolon",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",

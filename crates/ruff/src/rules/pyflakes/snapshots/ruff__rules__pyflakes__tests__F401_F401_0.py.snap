@@ -3,15 +3,15 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F401_0.py:2:8: F401 [*] `functools` imported but unused
   |
-2 | from __future__ import all_feature_names
-3 | import functools, os
+1 | from __future__ import all_feature_names
+2 | import functools, os
   |        ^^^^^^^^^ F401
-4 | from datetime import datetime
-5 | from collections import (
+3 | from datetime import datetime
+4 | from collections import (
   |
   = help: Remove unused import: `functools`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | from __future__ import all_feature_names
 2   |-import functools, os
   2 |+import os
@@ -20,17 +20,17 @@ F401_0.py:2:8: F401 [*] `functools` imported but unused
 5 5 |     Counter,
 
 F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
-   |
- 6 | from collections import (
- 7 |     Counter,
- 8 |     OrderedDict,
-   |     ^^^^^^^^^^^ F401
- 9 |     namedtuple,
-10 | )
-   |
-   = help: Remove unused import: `collections.OrderedDict`
+  |
+4 | from collections import (
+5 |     Counter,
+6 |     OrderedDict,
+  |     ^^^^^^^^^^^ F401
+7 |     namedtuple,
+8 | )
+  |
+  = help: Remove unused import: `collections.OrderedDict`
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | from datetime import datetime
 4 4 | from collections import (
 5 5 |     Counter,
@@ -41,16 +41,16 @@ F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
 
 F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
    |
-12 | import multiprocessing.process
-13 | import logging.config
-14 | import logging.handlers
+10 | import multiprocessing.process
+11 | import logging.config
+12 | import logging.handlers
    |        ^^^^^^^^^^^^^^^^ F401
-15 | from typing import (
-16 |     TYPE_CHECKING,
+13 | from typing import (
+14 |     TYPE_CHECKING,
    |
    = help: Remove unused import: `logging.handlers`
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | import multiprocessing.pool
 10 10 | import multiprocessing.process
 11 11 | import logging.config
@@ -61,14 +61,14 @@ F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
 
 F401_0.py:32:12: F401 [*] `shelve` imported but unused
    |
-32 | if TYPE_CHECKING:
-33 |     import shelve
+31 | if TYPE_CHECKING:
+32 |     import shelve
    |            ^^^^^^ F401
-34 |     import importlib
+33 |     import importlib
    |
    = help: Remove unused import: `shelve`
 
-ℹ Suggested fix
+ℹ Fix
 29 29 |     from models import Fruit, Nut, Vegetable
 30 30 | 
 31 31 | if TYPE_CHECKING:
@@ -79,37 +79,36 @@ F401_0.py:32:12: F401 [*] `shelve` imported but unused
 
 F401_0.py:33:12: F401 [*] `importlib` imported but unused
    |
-33 | if TYPE_CHECKING:
-34 |     import shelve
-35 |     import importlib
+31 | if TYPE_CHECKING:
+32 |     import shelve
+33 |     import importlib
    |            ^^^^^^^^^ F401
-36 | 
-37 | if TYPE_CHECKING:
+34 | 
+35 | if TYPE_CHECKING:
    |
    = help: Remove unused import: `importlib`
 
-ℹ Suggested fix
+ℹ Fix
 30 30 | 
 31 31 | if TYPE_CHECKING:
 32 32 |     import shelve
 33    |-    import importlib
-   33 |+    pass
-34 34 | 
-35 35 | if TYPE_CHECKING:
-36 36 |     """Hello, world!"""
+34 33 | 
+35 34 | if TYPE_CHECKING:
+36 35 |     """Hello, world!"""
 
 F401_0.py:37:12: F401 [*] `pathlib` imported but unused
    |
-37 | if TYPE_CHECKING:
-38 |     """Hello, world!"""
-39 |     import pathlib
+35 | if TYPE_CHECKING:
+36 |     """Hello, world!"""
+37 |     import pathlib
    |            ^^^^^^^ F401
-40 | 
-41 |     z = 1
+38 | 
+39 |     z = 1
    |
    = help: Remove unused import: `pathlib`
 
-ℹ Suggested fix
+ℹ Fix
 34 34 | 
 35 35 | if TYPE_CHECKING:
 36 36 |     """Hello, world!"""
@@ -120,13 +119,13 @@ F401_0.py:37:12: F401 [*] `pathlib` imported but unused
 
 F401_0.py:52:16: F401 [*] `pickle` imported but unused
    |
-52 |     def b(self) -> None:
-53 |         import pickle
+51 |     def b(self) -> None:
+52 |         import pickle
    |                ^^^^^^ F401
    |
    = help: Remove unused import: `pickle`
 
-ℹ Suggested fix
+ℹ Fix
 49 49 |         z = multiprocessing.pool.ThreadPool()
 50 50 | 
 51 51 |     def b(self) -> None:
@@ -138,15 +137,15 @@ F401_0.py:52:16: F401 [*] `pickle` imported but unused
 
 F401_0.py:93:16: F401 [*] `x` imported but unused
    |
-93 | match *0, 1, *2:
-94 |     case 0,:
-95 |         import x
+91 | match *0, 1, *2:
+92 |     case 0,:
+93 |         import x
    |                ^ F401
-96 |         import y
+94 |         import y
    |
    = help: Remove unused import: `x`
 
-ℹ Suggested fix
+ℹ Fix
 90 90 | # Test: match statements.
 91 91 | match *0, 1, *2:
 92 92 |     case 0,:
@@ -155,18 +154,17 @@ F401_0.py:93:16: F401 [*] `x` imported but unused
 
 F401_0.py:94:16: F401 [*] `y` imported but unused
    |
-94 |     case 0,:
-95 |         import x
-96 |         import y
+92 |     case 0,:
+93 |         import x
+94 |         import y
    |                ^ F401
    |
    = help: Remove unused import: `y`
 
-ℹ Suggested fix
+ℹ Fix
 91 91 | match *0, 1, *2:
 92 92 |     case 0,:
 93 93 |         import x
 94    |-        import y
-   94 |+        pass
 
 

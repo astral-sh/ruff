@@ -1,76 +1,224 @@
 ---
 source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 ---
-TCH002.py:5:12: TCH002 Move third-party import `pandas` into a type-checking block
+TCH002.py:5:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
   |
-5 | def f():
-6 |     import pandas as pd  # TCH002
+4 | def f():
+5 |     import pandas as pd  # TCH002
   |            ^^^^^^^^^^^^ TCH002
-7 | 
-8 |     x: pd.DataFrame
+6 | 
+7 |     x: pd.DataFrame
   |
+  = help: Move into type-checking block
 
-TCH002.py:11:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
+ℹ Suggested fix
+1 1 | """Tests to determine accurate detection of typing-only imports."""
+  2 |+from typing import TYPE_CHECKING
+  3 |+
+  4 |+if TYPE_CHECKING:
+  5 |+    import pandas as pd
+2 6 | 
+3 7 | 
+4 8 | def f():
+5   |-    import pandas as pd  # TCH002
+6 9 | 
+7 10 |     x: pd.DataFrame
+8 11 | 
+
+TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-11 | def f():
-12 |     from pandas import DataFrame  # TCH002
+10 | def f():
+11 |     from pandas import DataFrame  # TCH002
    |                        ^^^^^^^^^ TCH002
-13 | 
-14 |     x: DataFrame
+12 | 
+13 |     x: DataFrame
    |
+   = help: Move into type-checking block
 
-TCH002.py:17:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
+ℹ Suggested fix
+1  1  | """Tests to determine accurate detection of typing-only imports."""
+   2  |+from typing import TYPE_CHECKING
+   3  |+
+   4  |+if TYPE_CHECKING:
+   5  |+    from pandas import DataFrame
+2  6  | 
+3  7  | 
+4  8  | def f():
+--------------------------------------------------------------------------------
+8  12 | 
+9  13 | 
+10 14 | def f():
+11    |-    from pandas import DataFrame  # TCH002
+12 15 | 
+13 16 |     x: DataFrame
+14 17 | 
+
+TCH002.py:17:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-17 | def f():
-18 |     from pandas import DataFrame as df  # TCH002
+16 | def f():
+17 |     from pandas import DataFrame as df  # TCH002
    |                        ^^^^^^^^^^^^^^^ TCH002
-19 | 
-20 |     x: df
+18 | 
+19 |     x: df
    |
+   = help: Move into type-checking block
 
-TCH002.py:23:12: TCH002 Move third-party import `pandas` into a type-checking block
+ℹ Suggested fix
+1  1  | """Tests to determine accurate detection of typing-only imports."""
+   2  |+from typing import TYPE_CHECKING
+   3  |+
+   4  |+if TYPE_CHECKING:
+   5  |+    from pandas import DataFrame as df
+2  6  | 
+3  7  | 
+4  8  | def f():
+--------------------------------------------------------------------------------
+14 18 | 
+15 19 | 
+16 20 | def f():
+17    |-    from pandas import DataFrame as df  # TCH002
+18 21 | 
+19 22 |     x: df
+20 23 | 
+
+TCH002.py:23:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
-23 | def f():
-24 |     import pandas as pd  # TCH002
+22 | def f():
+23 |     import pandas as pd  # TCH002
    |            ^^^^^^^^^^^^ TCH002
-25 | 
-26 |     x: pd.DataFrame = 1
+24 | 
+25 |     x: pd.DataFrame = 1
    |
+   = help: Move into type-checking block
 
-TCH002.py:29:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
+ℹ Suggested fix
+1  1  | """Tests to determine accurate detection of typing-only imports."""
+   2  |+from typing import TYPE_CHECKING
+   3  |+
+   4  |+if TYPE_CHECKING:
+   5  |+    import pandas as pd
+2  6  | 
+3  7  | 
+4  8  | def f():
+--------------------------------------------------------------------------------
+20 24 | 
+21 25 | 
+22 26 | def f():
+23    |-    import pandas as pd  # TCH002
+24 27 | 
+25 28 |     x: pd.DataFrame = 1
+26 29 | 
+
+TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-29 | def f():
-30 |     from pandas import DataFrame  # TCH002
+28 | def f():
+29 |     from pandas import DataFrame  # TCH002
    |                        ^^^^^^^^^ TCH002
-31 | 
-32 |     x: DataFrame = 2
+30 | 
+31 |     x: DataFrame = 2
    |
+   = help: Move into type-checking block
 
-TCH002.py:35:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
+ℹ Suggested fix
+1  1  | """Tests to determine accurate detection of typing-only imports."""
+   2  |+from typing import TYPE_CHECKING
+   3  |+
+   4  |+if TYPE_CHECKING:
+   5  |+    from pandas import DataFrame
+2  6  | 
+3  7  | 
+4  8  | def f():
+--------------------------------------------------------------------------------
+26 30 | 
+27 31 | 
+28 32 | def f():
+29    |-    from pandas import DataFrame  # TCH002
+30 33 | 
+31 34 |     x: DataFrame = 2
+32 35 | 
+
+TCH002.py:35:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-35 | def f():
-36 |     from pandas import DataFrame as df  # TCH002
+34 | def f():
+35 |     from pandas import DataFrame as df  # TCH002
    |                        ^^^^^^^^^^^^^^^ TCH002
-37 | 
-38 |     x: df = 3
+36 | 
+37 |     x: df = 3
    |
+   = help: Move into type-checking block
 
-TCH002.py:41:12: TCH002 Move third-party import `pandas` into a type-checking block
-   |
-41 | def f():
-42 |     import pandas as pd  # TCH002
-   |            ^^^^^^^^^^^^ TCH002
-43 | 
-44 |     x: "pd.DataFrame" = 1
-   |
+ℹ Suggested fix
+1  1  | """Tests to determine accurate detection of typing-only imports."""
+   2  |+from typing import TYPE_CHECKING
+   3  |+
+   4  |+if TYPE_CHECKING:
+   5  |+    from pandas import DataFrame as df
+2  6  | 
+3  7  | 
+4  8  | def f():
+--------------------------------------------------------------------------------
+32 36 | 
+33 37 | 
+34 38 | def f():
+35    |-    from pandas import DataFrame as df  # TCH002
+36 39 | 
+37 40 |     x: df = 3
+38 41 | 
 
-TCH002.py:47:12: TCH002 Move third-party import `pandas` into a type-checking block
+TCH002.py:41:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
-47 | def f():
-48 |     import pandas as pd  # TCH002
+40 | def f():
+41 |     import pandas as pd  # TCH002
    |            ^^^^^^^^^^^^ TCH002
-49 | 
-50 |     x = dict["pd.DataFrame", "pd.DataFrame"]
+42 | 
+43 |     x: "pd.DataFrame" = 1
    |
+   = help: Move into type-checking block
+
+ℹ Suggested fix
+1  1  | """Tests to determine accurate detection of typing-only imports."""
+   2  |+from typing import TYPE_CHECKING
+   3  |+
+   4  |+if TYPE_CHECKING:
+   5  |+    import pandas as pd
+2  6  | 
+3  7  | 
+4  8  | def f():
+--------------------------------------------------------------------------------
+38 42 | 
+39 43 | 
+40 44 | def f():
+41    |-    import pandas as pd  # TCH002
+42 45 | 
+43 46 |     x: "pd.DataFrame" = 1
+44 47 | 
+
+TCH002.py:47:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
+   |
+46 | def f():
+47 |     import pandas as pd  # TCH002
+   |            ^^^^^^^^^^^^ TCH002
+48 | 
+49 |     x = dict["pd.DataFrame", "pd.DataFrame"]
+   |
+   = help: Move into type-checking block
+
+ℹ Suggested fix
+1  1  | """Tests to determine accurate detection of typing-only imports."""
+   2  |+from typing import TYPE_CHECKING
+   3  |+
+   4  |+if TYPE_CHECKING:
+   5  |+    import pandas as pd
+2  6  | 
+3  7  | 
+4  8  | def f():
+--------------------------------------------------------------------------------
+44 48 | 
+45 49 | 
+46 50 | def f():
+47    |-    import pandas as pd  # TCH002
+48 51 | 
+49 52 |     x = dict["pd.DataFrame", "pd.DataFrame"]
+50 53 | 
 
 

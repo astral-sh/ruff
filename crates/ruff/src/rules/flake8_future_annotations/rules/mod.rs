@@ -1,5 +1,5 @@
-pub(crate) use missing_future_annotations::{
-    missing_future_annotations, MissingFutureAnnotationsImport,
-};
+pub(crate) use future_required_type_annotation::*;
+pub(crate) use future_rewritable_type_annotation::*;
 
-mod missing_future_annotations;
+mod future_required_type_annotation;
+mod future_rewritable_type_annotation;

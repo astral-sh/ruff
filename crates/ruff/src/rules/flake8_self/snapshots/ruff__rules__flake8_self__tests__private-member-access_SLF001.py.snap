@@ -3,109 +3,109 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 ---
 SLF001.py:34:12: SLF001 Private member accessed: `_private`
    |
-34 |     def get_bar():
-35 |         if self.bar._private:  # SLF001
+33 |     def get_bar():
+34 |         if self.bar._private:  # SLF001
    |            ^^^^^^^^^^^^^^^^^ SLF001
-36 |             return None
-37 |         if self.bar()._private:  # SLF001
+35 |             return None
+36 |         if self.bar()._private:  # SLF001
    |
 
 SLF001.py:36:12: SLF001 Private member accessed: `_private`
    |
-36 |         if self.bar._private:  # SLF001
-37 |             return None
-38 |         if self.bar()._private:  # SLF001
+34 |         if self.bar._private:  # SLF001
+35 |             return None
+36 |         if self.bar()._private:  # SLF001
    |            ^^^^^^^^^^^^^^^^^^^ SLF001
-39 |             return None
-40 |         if Bar._private_thing:  # SLF001
+37 |             return None
+38 |         if Bar._private_thing:  # SLF001
    |
 
 SLF001.py:38:12: SLF001 Private member accessed: `_private_thing`
    |
-38 |         if self.bar()._private:  # SLF001
-39 |             return None
-40 |         if Bar._private_thing:  # SLF001
+36 |         if self.bar()._private:  # SLF001
+37 |             return None
+38 |         if Bar._private_thing:  # SLF001
    |            ^^^^^^^^^^^^^^^^^^ SLF001
-41 |             return None
-42 |         if Foo._private_thing:
+39 |             return None
+40 |         if Foo._private_thing:
    |
 
 SLF001.py:43:12: SLF001 Private member accessed: `_private_thing`
    |
-43 |             return None
-44 |         Foo = Bar()
-45 |         if Foo._private_thing:  # SLF001
+41 |             return None
+42 |         Foo = Bar()
+43 |         if Foo._private_thing:  # SLF001
    |            ^^^^^^^^^^^^^^^^^^ SLF001
-46 |             return None
-47 |         return self.bar
+44 |             return None
+45 |         return self.bar
    |
 
-SLF001.py:59:7: SLF001 Private member accessed: `_private_thing`
+SLF001.py:62:7: SLF001 Private member accessed: `_private_thing`
    |
-59 | foo = Foo()
-60 | 
-61 | print(foo._private_thing)  # SLF001
+60 | foo = Foo()
+61 | 
+62 | print(foo._private_thing)  # SLF001
    |       ^^^^^^^^^^^^^^^^^^ SLF001
-62 | print(foo.__really_private_thing)  # SLF001
-63 | print(foo._private_func())  # SLF001
+63 | print(foo.__really_private_thing)  # SLF001
+64 | print(foo._private_func())  # SLF001
    |
 
-SLF001.py:60:7: SLF001 Private member accessed: `__really_private_thing`
+SLF001.py:63:7: SLF001 Private member accessed: `__really_private_thing`
    |
-60 | print(foo._private_thing)  # SLF001
-61 | print(foo.__really_private_thing)  # SLF001
+62 | print(foo._private_thing)  # SLF001
+63 | print(foo.__really_private_thing)  # SLF001
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^ SLF001
-62 | print(foo._private_func())  # SLF001
-63 | print(foo.__really_private_func(1))  # SLF001
+64 | print(foo._private_func())  # SLF001
+65 | print(foo.__really_private_func(1))  # SLF001
    |
 
-SLF001.py:61:7: SLF001 Private member accessed: `_private_func`
+SLF001.py:64:7: SLF001 Private member accessed: `_private_func`
    |
-61 | print(foo._private_thing)  # SLF001
-62 | print(foo.__really_private_thing)  # SLF001
-63 | print(foo._private_func())  # SLF001
+62 | print(foo._private_thing)  # SLF001
+63 | print(foo.__really_private_thing)  # SLF001
+64 | print(foo._private_func())  # SLF001
    |       ^^^^^^^^^^^^^^^^^ SLF001
-64 | print(foo.__really_private_func(1))  # SLF001
-65 | print(foo.bar._private)  # SLF001
+65 | print(foo.__really_private_func(1))  # SLF001
+66 | print(foo.bar._private)  # SLF001
    |
 
-SLF001.py:62:7: SLF001 Private member accessed: `__really_private_func`
+SLF001.py:65:7: SLF001 Private member accessed: `__really_private_func`
    |
-62 | print(foo.__really_private_thing)  # SLF001
-63 | print(foo._private_func())  # SLF001
-64 | print(foo.__really_private_func(1))  # SLF001
+63 | print(foo.__really_private_thing)  # SLF001
+64 | print(foo._private_func())  # SLF001
+65 | print(foo.__really_private_func(1))  # SLF001
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ SLF001
-65 | print(foo.bar._private)  # SLF001
-66 | print(foo()._private_thing)  # SLF001
+66 | print(foo.bar._private)  # SLF001
+67 | print(foo()._private_thing)  # SLF001
    |
 
-SLF001.py:63:7: SLF001 Private member accessed: `_private`
+SLF001.py:66:7: SLF001 Private member accessed: `_private`
    |
-63 | print(foo._private_func())  # SLF001
-64 | print(foo.__really_private_func(1))  # SLF001
-65 | print(foo.bar._private)  # SLF001
+64 | print(foo._private_func())  # SLF001
+65 | print(foo.__really_private_func(1))  # SLF001
+66 | print(foo.bar._private)  # SLF001
    |       ^^^^^^^^^^^^^^^^ SLF001
-66 | print(foo()._private_thing)  # SLF001
-67 | print(foo()._private_thing__)  # SLF001
+67 | print(foo()._private_thing)  # SLF001
+68 | print(foo()._private_thing__)  # SLF001
    |
 
-SLF001.py:64:7: SLF001 Private member accessed: `_private_thing`
+SLF001.py:67:7: SLF001 Private member accessed: `_private_thing`
    |
-64 | print(foo.__really_private_func(1))  # SLF001
-65 | print(foo.bar._private)  # SLF001
-66 | print(foo()._private_thing)  # SLF001
+65 | print(foo.__really_private_func(1))  # SLF001
+66 | print(foo.bar._private)  # SLF001
+67 | print(foo()._private_thing)  # SLF001
    |       ^^^^^^^^^^^^^^^^^^^^ SLF001
-67 | print(foo()._private_thing__)  # SLF001
+68 | print(foo()._private_thing__)  # SLF001
    |
 
-SLF001.py:65:7: SLF001 Private member accessed: `_private_thing__`
+SLF001.py:68:7: SLF001 Private member accessed: `_private_thing__`
    |
-65 | print(foo.bar._private)  # SLF001
-66 | print(foo()._private_thing)  # SLF001
-67 | print(foo()._private_thing__)  # SLF001
+66 | print(foo.bar._private)  # SLF001
+67 | print(foo()._private_thing)  # SLF001
+68 | print(foo()._private_thing__)  # SLF001
    |       ^^^^^^^^^^^^^^^^^^^^^^ SLF001
-68 | 
-69 | print(foo.public_thing)
+69 | 
+70 | print(foo.public_thing)
    |
 
 

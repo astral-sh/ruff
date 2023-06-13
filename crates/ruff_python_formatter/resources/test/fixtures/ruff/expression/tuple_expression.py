@@ -1,0 +1,59 @@
+# Non-wrapping parentheses checks
+a1 = 1, 2
+a2 = (1, 2)
+a3 = (1, 2), 3
+a4 = ((1, 2), 3)
+
+# Wrapping parentheses checks
+b1 = (("Michael", "Ende"), ("Der", "satanarchäolügenialkohöllische", "Wunschpunsch"), ("Beelzebub", "Irrwitzer"), ("Tyrannja", "Vamperl"),)
+b2 = ("akjdshflkjahdslkfjlasfdahjlfds", "ljklsadhflakfdajflahfdlajfhafldkjalfj", "ljklsadhflakfdajflahfdlajfhafldkjalf2",)
+b3 = ("The", "Night", "of", "Wishes:", "Or", "the", "Satanarchaeolidealcohellish", "Notion", "Potion",)
+
+# Nested wrapping parentheses check
+c1 = (("cicero"), ("Qui", "autem,", "si", "maxime", "hoc", "placeat,", "moderatius", "tamen", "id", "uolunt", "fieri,", "difficilem", "quandam", "temperantiam", "postulant", "in", "eo,", "quod", "semel", "admissum", "coerceri", "reprimique", "non", "potest,", "ut", "propemodum", "iustioribus", "utamur", "illis,", "qui", "omnino", "auocent", "a", "philosophia,", "quam", "his,", "qui", "rebus", "infinitis", "modum", "constituant", "in", "reque", "eo", "meliore,", "quo", "maior", "sit,", "mediocritatem", "desiderent."), ("de", "finibus", "bonorum", "et", "malorum"))
+
+# Deeply nested parentheses
+d1 = ((("3D",),),)
+d2 = (((((((((((((((((((((((((((("¯\_(ツ)_/¯",),),),),),),),),),),),),),),),),),),),),),),),),),),),)
+
+# Join and magic trailing comma
+e1 = (
+    1,
+    2
+)
+e2 = (
+    1,
+    2,
+)
+e3 = (
+    1,
+)
+e4 = (
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+    "incididunt"
+)
+
+# Empty tuples and comments
+f1 = (
+	# empty
+)
+f2 = ()
+
+# Comments in other tuples
+g1 = ( # a
+    # b
+    1, # c
+    # d
+) # e
+g2 = ( # a
+    # b
+    1, # c
+    # d
+    2, # e
+    # f
+) # g
+
+# Ensure the correct number of parentheses
+h1 = ((((1, 2))))
+h2 = ((((1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"))))
+h3 = 1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"

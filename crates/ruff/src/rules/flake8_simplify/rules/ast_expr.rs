@@ -7,6 +7,31 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Check for environment variables that are not capitalized.
+///
+/// ## Why is this bad?
+/// By convention, environment variables should be capitalized.
+///
+/// On Windows, environment variables are case-insensitive and are converted to
+/// uppercase, so using lowercase environment variables can lead to subtle bugs.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+/// os.environ["foo"]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+/// os.environ["FOO"]
+/// ```
+///
+/// ## References
+/// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[violation]
 pub struct UncapitalizedEnvironmentVariables {
     expected: String,

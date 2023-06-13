@@ -1,17 +1,53 @@
-use std::fs;
+use std::io::{stdout, Read, Write};
+use std::{fs, io};
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use clap::Parser as ClapParser;
 
-use ruff_python_formatter::cli::Cli;
-use ruff_python_formatter::fmt;
+use ruff_python_formatter::cli::{format_and_debug_print, Cli, Emit};
 
+/// Read a `String` from `stdin`.
+pub(crate) fn read_from_stdin() -> Result<String> {
+    let mut buffer = String::new();
+    io::stdin().lock().read_to_string(&mut buffer)?;
+    Ok(buffer)
+}
+
+#[allow(clippy::print_stdout)]
 fn main() -> Result<()> {
-    let cli = Cli::parse();
-    let contents = fs::read_to_string(cli.file)?;
-    #[allow(clippy::print_stdout)]
-    {
-        println!("{}", fmt(&contents)?.print()?.as_code());
+    let cli: Cli = Cli::parse();
+
+    if cli.files.is_empty() {
+        if !matches!(cli.emit, None | Some(Emit::Stdout)) {
+            bail!(
+                "Can only write to stdout when formatting from stdin, but you asked for {:?}",
+                cli.emit
+            );
+        }
+        let input = read_from_stdin()?;
+        let formatted = format_and_debug_print(&input, &cli)?;
+        if cli.check {
+            if formatted == input {
+                return Ok(());
+            }
+            bail!("Content not correctly formatted")
+        }
+        stdout().lock().write_all(formatted.as_bytes())?;
+    } else {
+        for file in &cli.files {
+            let input = fs::read_to_string(file)
+                .with_context(|| format!("Could not read {}: ", file.display()))?;
+            let formatted = format_and_debug_print(&input, &cli)?;
+            match cli.emit {
+                Some(Emit::Stdout) => stdout().lock().write_all(formatted.as_bytes())?,
+                None | Some(Emit::Files) => {
+                    fs::write(file, formatted.as_bytes()).with_context(|| {
+                        format!("Could not write to {}, exiting", file.display())
+                    })?;
+                }
+            }
+        }
     }
+
     Ok(())
 }

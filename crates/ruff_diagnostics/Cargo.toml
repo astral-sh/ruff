@@ -2,13 +2,19 @@
 name = "ruff_diagnostics"
 version = "0.0.0"
 publish = false
+authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [lib]
 
 [dependencies]
+ruff_text_size = { workspace = true }
+
 anyhow = { workspace = true }
 log = { workspace = true }
-ruff_text_size = { workspace = true }
 serde = { workspace = true, optional = true, features = [] }

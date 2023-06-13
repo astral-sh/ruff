@@ -10,6 +10,7 @@ pub(super) const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "assertEquals",
     "assertNotEqual",
     "assertNotEquals",
+    "bool",
     "bytes",
     "count",
     "failIfEqual",
@@ -27,7 +28,10 @@ pub(super) const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "param",
     "pop",
     "remove",
+    "set_blocking",
+    "set_enabled",
     "setattr",
+    "__setattr__",
     "setdefault",
     "str",
 ];

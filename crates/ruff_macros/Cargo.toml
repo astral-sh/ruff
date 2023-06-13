@@ -2,16 +2,22 @@
 name = "ruff_macros"
 version = "0.0.0"
 publish = false
+authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [lib]
 proc-macro = true
 doctest = false
 
 [dependencies]
+ruff_textwrap = { path = "../ruff_textwrap" }
+
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true, features = ["derive", "parsing", "extra-traits", "full"] }
-textwrap = { workspace = true }
 itertools = { workspace = true }

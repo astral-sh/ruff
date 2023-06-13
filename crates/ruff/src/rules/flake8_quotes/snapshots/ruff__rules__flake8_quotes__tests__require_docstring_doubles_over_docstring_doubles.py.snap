@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
 docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
-   |
- 5 |   """
- 6 |   
- 7 | / """
- 8 | | this is not a docstring
- 9 | | """
-   | |___^ Q001
-10 |   
-11 |   l = []
-   |
-   = help: Replace double multiline quotes with single quotes
+  |
+3 |   """
+4 |   
+5 | / """
+6 | | this is not a docstring
+7 | | """
+  | |___^ Q001
+8 |   
+9 |   l = []
+  |
+  = help: Replace double multiline quotes with single quotes
 
 ℹ Suggested fix
 2 2 | Double quotes multiline module docstring
@@ -29,15 +29,15 @@ docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quote
 
 docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
+14 |       """
+15 |   
 16 |       """
-17 |   
-18 |       """
    |  _____^
-19 | |     this is not a docstring
-20 | |     """
+17 | |     this is not a docstring
+18 | |     """
    | |_______^ Q001
-21 |   
-22 |       # The colon in the list indexing below is an edge case for the docstring scanner
+19 |   
+20 |       # The colon in the list indexing below is an edge case for the docstring scanner
    |
    = help: Replace double multiline quotes with single quotes
 
@@ -56,13 +56,13 @@ docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quot
 
 docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quotes preferred
    |
-21 |       # The colon in the list indexing below is an edge case for the docstring scanner
-22 |       def f(self, bar="""
+20 |       # The colon in the list indexing below is an edge case for the docstring scanner
+21 |       def f(self, bar="""
    |  _____________________^
-23 | |         definitely not a docstring""",
+22 | |         definitely not a docstring""",
    | |_____________________________________^ Q001
-24 |           val=l[Cls():3]):
-25 |           """
+23 |           val=l[Cls():3]):
+24 |           """
    |
    = help: Replace double multiline quotes with single quotes
 
@@ -80,15 +80,15 @@ docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quo
 
 docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quotes preferred
    |
-30 |           some_expression = 'hello world'
-31 |   
-32 |           """
+28 |           some_expression = 'hello world'
+29 |   
+30 |           """
    |  _________^
-33 | |         this is not a docstring
-34 | |         """
+31 | |         this is not a docstring
+32 | |         """
    | |___________^ Q001
-35 |   
-36 |           if l:
+33 |   
+34 |           if l:
    |
    = help: Replace double multiline quotes with single quotes
 
@@ -107,13 +107,13 @@ docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quot
 
 docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quotes preferred
    |
-35 |           if l:
-36 |               """
+34 |           if l:
+35 |               """
    |  _____________^
-37 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
-38 | |             """
+36 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+37 | |             """
    | |_______________^ Q001
-39 |               pass
+38 |               pass
    |
    = help: Replace double multiline quotes with single quotes
 

@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_future_annotations/mod.rs
 ---
 edge_case.py:6:13: FA100 Missing `from __future__ import annotations`, but uses `typing.List`
   |
-6 | def main(_: List[int]) -> None:
-7 |     a_list: t.List[str] = []
+5 | def main(_: List[int]) -> None:
+6 |     a_list: t.List[str] = []
   |             ^^^^^^ FA100
-8 |     a_list.append("hello")
+7 |     a_list.append("hello")
   |
 
 

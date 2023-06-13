@@ -29,20 +29,22 @@ else:
 -    and b    != 9  # fmt: skip
 -    and c is not None
 -):
-+if a == 3 and b != 9 and c is not None:  # fmt: skip
-     print("I'm good!")
+-    print("I'm good!")
++if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++    NOT_IMPLEMENTED_call()
  else:
-     print("I'm bad")
+-    print("I'm bad")
++    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
 a, b, c = 3, 4, 5
-if a == 3 and b != 9 and c is not None:  # fmt: skip
-    print("I'm good!")
+if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    NOT_IMPLEMENTED_call()
 else:
-    print("I'm bad")
+    NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

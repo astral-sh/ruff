@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 bar.py:26:17: F821 Undefined name `foo`
    |
-26 |     # F821
-27 |     x: Literal["foo"]
+25 |     # F821
+26 |     x: Literal["foo"]
    |                 ^^^ F821
    |
 

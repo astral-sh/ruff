@@ -101,114 +101,34 @@ def foo() -> tuple[int, int, int,]:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,52 +1,53 @@
- # Control
- def double(a: int) -> int:
--    return 2 * a
-+    return 2
-+    * a
- 
- 
- # Remove the brackets
- def double(a: int) -> int:
--    return 2 * a
-+    return 2
-+    * a
- 
- 
- # Some newline variations
- def double(a: int) -> int:
--    return 2 * a
-+    return 2
-+    * a
- 
- 
- def double(a: int) -> int:
--    return 2 * a
-+    return 2
-+    * a
- 
- 
- def double(a: int) -> int:
--    return 2 * a
-+    return 2
-+    * a
- 
- 
- # Don't lose the comments
- def double(a: int) -> int:  # Hello
--    return 2 * a
-+    return 2
-+    * a
+@@ -26,7 +26,9 @@
+     return 2 * a
  
  
 -def double(a: int) -> int:  # Hello
--    return 2 * a
-+def double(a: int) -> int:
-+    return 2
-+    * a
++def double(a: int) -> (
++    int  # Hello
++):
+     return 2 * a
  
  
- # Really long annotations
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
-+def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
- 
- 
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
-+def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
- 
- 
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
-+def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-+| intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
- 
- 
-@@ -62,10 +63,8 @@
+@@ -54,7 +56,9 @@
      a: int,
      b: int,
      c: int,
--) -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
-+) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-+| intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
+-) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
++) -> (
++    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
++):
      return 2
  
  
-@@ -81,16 +80,16 @@
- # Deeply nested brackets
- # with *interesting* spacing
- def double(a: int) -> int:
--    return 2 * a
-+    return 2
-+    * a
+@@ -95,26 +99,14 @@
  
  
- def double(a: int) -> int:
--    return 2 * a
-+    return 2
-+    * a
- 
- 
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
-+def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
- 
- 
-@@ -99,22 +98,18 @@
+ # Return type with commas
+-def foo() -> tuple[int, int, int]:
++def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
      return 2
  
  
@@ -219,11 +139,7 @@ def foo() -> tuple[int, int, int,]:
 -        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
 -    ]
 -):
-+def foo() -> tuple[
-+    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-+    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-+    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-+]:
++def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
      return 2
  
  
@@ -235,11 +151,7 @@ def foo() -> tuple[int, int, int,]:
 -        int,
 -    ]
 -):
-+def foo() -> tuple[
-+    int,
-+    int,
-+    int,
-+]:
++def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
      return 2
 ```
 
@@ -248,54 +160,55 @@ def foo() -> tuple[int, int, int,]:
 ```py
 # Control
 def double(a: int) -> int:
-    return 2
-    * a
+    return 2 * a
 
 
 # Remove the brackets
 def double(a: int) -> int:
-    return 2
-    * a
+    return 2 * a
 
 
 # Some newline variations
 def double(a: int) -> int:
-    return 2
-    * a
+    return 2 * a
 
 
 def double(a: int) -> int:
-    return 2
-    * a
+    return 2 * a
 
 
 def double(a: int) -> int:
-    return 2
-    * a
+    return 2 * a
 
 
 # Don't lose the comments
 def double(a: int) -> int:  # Hello
-    return 2
-    * a
+    return 2 * a
 
 
-def double(a: int) -> int:
-    return 2
-    * a
+def double(a: int) -> (
+    int  # Hello
+):
+    return 2 * a
 
 
 # Really long annotations
-def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
     return 2
 
 
-def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
     return 2
 
 
-def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-| intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
     return 2
 
 
@@ -303,7 +216,9 @@ def foo(
     a: int,
     b: int,
     c: int,
-) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
+) -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
     return 2
 
 
@@ -311,8 +226,10 @@ def foo(
     a: int,
     b: int,
     c: int,
-) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-| intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
+) -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
     return 2
 
 
@@ -328,38 +245,30 @@ def foo(
 # Deeply nested brackets
 # with *interesting* spacing
 def double(a: int) -> int:
-    return 2
-    * a
+    return 2 * a
 
 
 def double(a: int) -> int:
-    return 2
-    * a
+    return 2 * a
 
 
-def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
     return 2
 
 
 # Return type with commas
-def foo() -> tuple[int, int, int]:
+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
     return 2
 
 
-def foo() -> tuple[
-    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-]:
+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
     return 2
 
 
 # Magic trailing comma example
-def foo() -> tuple[
-    int,
-    int,
-    int,
-]:
+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
     return 2
 ```
 

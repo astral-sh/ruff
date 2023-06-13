@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP009_1.py:2:1: UP009 [*] UTF-8 encoding declaration is unnecessary
   |
-2 |   #!/usr/bin/python
-3 | / # -*- coding: utf-8 -*-
-4 | | 
+1 |   #!/usr/bin/python
+2 | / # -*- coding: utf-8 -*-
+3 | | 
   | |_^ UP009
-5 |   print('Hello world')
+4 |   print('Hello world')
   |
   = help: Remove unnecessary coding comment
 

@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 sections.py:65:5: D413 [*] Missing blank line after last section ("Returns")
    |
-65 |   @expect("D414: Section has no content ('Returns')")
-66 |   def no_underline_and_no_newline():  # noqa: D416
-67 |       """Toggle the gizmo.
+63 |   @expect("D414: Section has no content ('Returns')")
+64 |   def no_underline_and_no_newline():  # noqa: D416
+65 |       """Toggle the gizmo.
    |  _____^
-68 | | 
-69 | |     Returns"""
+66 | | 
+67 | |     Returns"""
    | |______________^ D413
    |
    = help: Add blank line after "Returns"

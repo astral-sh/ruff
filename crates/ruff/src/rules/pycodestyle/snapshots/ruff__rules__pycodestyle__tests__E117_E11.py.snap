@@ -2,33 +2,33 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E11.py:6:1: E117 Over-indented
-   |
- 6 | #: E111 E117
- 7 | if True:
- 8 |      print()
-   | ^^^^^ E117
- 9 | #: E112
-10 | if False:
-   |
+  |
+4 | #: E111 E117
+5 | if True:
+6 |      print()
+  | ^^^^^ E117
+7 | #: E112
+8 | if False:
+  |
 
 E11.py:39:1: E117 Over-indented
    |
-39 | #: E117
-40 | def start():
-41 |         print()
+37 | #: E117
+38 | def start():
+39 |         print()
    | ^^^^^^^^ E117
-42 | #: E117 W191
-43 | def start():
+40 | #: E117 W191
+41 | def start():
    |
 
 E11.py:42:1: E117 Over-indented
    |
-42 | #: E117 W191
-43 | def start():
-44 |         print()
+40 | #: E117 W191
+41 | def start():
+42 |         print()
    | ^^^^^^^^ E117
-45 | #: E112
-46 | if False:  #
+43 | #: E112
+44 | if False:  #
    |
 
 

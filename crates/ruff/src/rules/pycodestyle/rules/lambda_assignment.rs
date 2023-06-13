@@ -4,10 +4,9 @@ use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt}
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
-use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Generator;
-use ruff_python_ast::whitespace::leading_space;
 use ruff_python_semantic::model::SemanticModel;
+use ruff_python_whitespace::{leading_indentation, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -77,14 +76,14 @@ pub(crate) fn lambda_assignment(
             // carrying a type annotation that will be used by some
             // package like dataclasses, which wouldn't consider the
             // rewritten function definition to be equivalent.
-            // See https://github.com/charliermarsh/ruff/issues/3046
+            // See https://github.com/astral-sh/ruff/issues/3046
             if checker.patch(diagnostic.kind.rule())
                 && !checker.semantic_model().scope().kind.is_class()
                 && !has_leading_content(stmt, checker.locator)
                 && !has_trailing_content(stmt, checker.locator)
             {
                 let first_line = checker.locator.line(stmt.start());
-                let indentation = &leading_space(first_line);
+                let indentation = leading_indentation(first_line);
                 let mut indented = String::new();
                 for (idx, line) in function(
                     checker.semantic_model(),

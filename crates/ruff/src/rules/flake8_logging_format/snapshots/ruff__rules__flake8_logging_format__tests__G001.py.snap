@@ -3,85 +3,85 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
 G001.py:4:14: G001 Logging statement uses `string.format()`
   |
-4 | import logging as foo
-5 | 
-6 | logging.info("Hello {}".format("World!"))
+2 | import logging as foo
+3 | 
+4 | logging.info("Hello {}".format("World!"))
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
-7 | logging.log(logging.INFO, "Hello {}".format("World!"))
-8 | foo.info("Hello {}".format("World!"))
+5 | logging.log(logging.INFO, "Hello {}".format("World!"))
+6 | foo.info("Hello {}".format("World!"))
   |
 
 G001.py:5:27: G001 Logging statement uses `string.format()`
   |
-5 | logging.info("Hello {}".format("World!"))
-6 | logging.log(logging.INFO, "Hello {}".format("World!"))
+4 | logging.info("Hello {}".format("World!"))
+5 | logging.log(logging.INFO, "Hello {}".format("World!"))
   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
-7 | foo.info("Hello {}".format("World!"))
-8 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
+6 | foo.info("Hello {}".format("World!"))
+7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
   |
 
 G001.py:6:10: G001 Logging statement uses `string.format()`
-   |
- 6 | logging.info("Hello {}".format("World!"))
- 7 | logging.log(logging.INFO, "Hello {}".format("World!"))
- 8 | foo.info("Hello {}".format("World!"))
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
- 9 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
-10 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
-   |
+  |
+4 | logging.info("Hello {}".format("World!"))
+5 | logging.log(logging.INFO, "Hello {}".format("World!"))
+6 | foo.info("Hello {}".format("World!"))
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
+7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
+8 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
+  |
 
 G001.py:7:31: G001 Logging statement uses `string.format()`
-   |
- 7 | logging.log(logging.INFO, "Hello {}".format("World!"))
- 8 | foo.info("Hello {}".format("World!"))
- 9 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
-   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
-10 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
-11 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
-   |
+  |
+5 | logging.log(logging.INFO, "Hello {}".format("World!"))
+6 | foo.info("Hello {}".format("World!"))
+7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
+  |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
+8 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
+9 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
+  |
 
 G001.py:8:37: G001 Logging statement uses `string.format()`
-   |
- 8 | foo.info("Hello {}".format("World!"))
- 9 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
-10 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
-   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
-11 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
-   |
+  |
+6 | foo.info("Hello {}".format("World!"))
+7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
+8 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
+  |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
+9 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
+  |
 
 G001.py:9:17: G001 Logging statement uses `string.format()`
    |
- 9 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
-10 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
-11 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
+ 7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
+ 8 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
+ 9 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
-12 | 
-13 | # Flask support
+10 | 
+11 | # Flask support
    |
 
 G001.py:16:31: G001 Logging statement uses `string.format()`
    |
-16 | from flask import current_app as app
-17 | 
-18 | flask.current_app.logger.info("Hello {}".format("World!"))
+14 | from flask import current_app as app
+15 | 
+16 | flask.current_app.logger.info("Hello {}".format("World!"))
    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
-19 | current_app.logger.info("Hello {}".format("World!"))
-20 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
+17 | current_app.logger.info("Hello {}".format("World!"))
+18 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
    |
 
 G001.py:17:25: G001 Logging statement uses `string.format()`
    |
-17 | flask.current_app.logger.info("Hello {}".format("World!"))
-18 | current_app.logger.info("Hello {}".format("World!"))
+16 | flask.current_app.logger.info("Hello {}".format("World!"))
+17 | current_app.logger.info("Hello {}".format("World!"))
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
-19 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
+18 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
    |
 
 G001.py:18:30: G001 Logging statement uses `string.format()`
    |
-18 | flask.current_app.logger.info("Hello {}".format("World!"))
-19 | current_app.logger.info("Hello {}".format("World!"))
-20 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
+16 | flask.current_app.logger.info("Hello {}".format("World!"))
+17 | current_app.logger.info("Hello {}".format("World!"))
+18 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
    |
 

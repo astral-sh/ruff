@@ -206,9 +206,7 @@ impl UnittestAssert {
         keywords: &'a [Keyword],
     ) -> Result<FxHashMap<&'a str, &'a Expr>> {
         // If we have variable-length arguments, abort.
-        if args.iter().any(|arg| matches!(arg, Expr::Starred(_)))
-            || keywords.iter().any(|kw| kw.arg.is_none())
-        {
+        if args.iter().any(Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none()) {
             bail!("Variable-length arguments are not supported");
         }
 
@@ -263,14 +261,14 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 Ok(if matches!(self, UnittestAssert::False) {
-                    let node = expr.clone();
-                    let node1 = Expr::UnaryOp(ast::ExprUnaryOp {
-                        op: Unaryop::Not,
-                        operand: Box::new(node),
-                        range: TextRange::default(),
-                    });
-                    let unary_expr = node1;
-                    assert(&unary_expr, msg)
+                    assert(
+                        &Expr::UnaryOp(ast::ExprUnaryOp {
+                            op: Unaryop::Not,
+                            operand: Box::new(expr.clone()),
+                            range: TextRange::default(),
+                        }),
+                        msg,
+                    )
                 } else {
                     assert(expr, msg)
                 })

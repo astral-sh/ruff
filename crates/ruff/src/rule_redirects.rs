@@ -93,5 +93,10 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         // TODO(charlie): Remove by 2023-06-01.
         ("RUF004", "B026"),
         ("PIE802", "C419"),
+        ("PLW0130", "B033"),
+        ("T001", "FIX001"),
+        ("T002", "FIX002"),
+        ("T003", "FIX003"),
+        ("T004", "FIX004"),
     ])
 });

@@ -6,7 +6,8 @@ Utilities for benchmarking Ruff.
 
 Run `./scripts/benchmarks/run.sh` to clone the benchmarking target (CPython).
 
-If you're looking to benchmark Ruff against other tools, you'll also need to run `poetry install` to create a virtual environment with the required dependencies.
+If you're looking to benchmark Ruff against other tools, you'll also need to run `poetry install`
+to create a virtual environment with the required dependencies.
 
 ## Running Benchmarks
 

@@ -2,7 +2,7 @@ export default function RepoButton() {
   return (
     <a
       className={"hover:text-ayu-accent/70 text-ayu-accent"}
-      href={"https://github.com/charliermarsh/ruff"}
+      href={"https://github.com/astral-sh/ruff"}
       target={"_blank"}
       rel={"noreferrer"}
     >

@@ -3,29 +3,29 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E40.py:55:1: E402 Module level import not at top of file
    |
-55 | VERSION = '1.2.3'
-56 | 
-57 | import foo
+53 | VERSION = '1.2.3'
+54 | 
+55 | import foo
    | ^^^^^^^^^^ E402
-58 | #: E402
-59 | import foo
+56 | #: E402
+57 | import foo
    |
 
 E40.py:57:1: E402 Module level import not at top of file
    |
+55 | import foo
+56 | #: E402
 57 | import foo
-58 | #: E402
-59 | import foo
    | ^^^^^^^^^^ E402
-60 | 
-61 | a = 1
+58 | 
+59 | a = 1
    |
 
 E40.py:61:1: E402 Module level import not at top of file
    |
-61 | a = 1
-62 | 
-63 | import bar
+59 | a = 1
+60 | 
+61 | import bar
    | ^^^^^^^^^^ E402
    |
 

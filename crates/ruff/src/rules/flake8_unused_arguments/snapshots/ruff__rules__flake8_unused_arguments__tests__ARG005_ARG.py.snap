@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
 ARG.py:28:8: ARG005 Unused lambda argument: `x`
    |
-28 | # Unused arguments on lambdas.
-29 | ###
-30 | lambda x: print("Hello, world!")
+26 | # Unused arguments on lambdas.
+27 | ###
+28 | lambda x: print("Hello, world!")
    |        ^ ARG005
    |
 

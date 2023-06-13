@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::Locator;
 
-use crate::autofix::actions::remove_argument;
+use crate::autofix::edits::remove_argument;
 
 fn match_name(expr: &Expr) -> Option<&str> {
     if let Expr::Call(ast::ExprCall { func, .. }) = expr {

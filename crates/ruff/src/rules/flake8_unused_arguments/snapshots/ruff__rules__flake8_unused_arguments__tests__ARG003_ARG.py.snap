@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
 ARG.py:45:16: ARG003 Unused class method argument: `x`
    |
-45 |     @classmethod
-46 |     def f(cls, x):
+44 |     @classmethod
+45 |     def f(cls, x):
    |                ^ ARG003
-47 |         print("Hello, world!")
+46 |         print("Hello, world!")
    |
 
 

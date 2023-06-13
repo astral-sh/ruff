@@ -3,12 +3,12 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
   |
-5 | try:
-6 |     pass
-7 | except (OSError, mmap.error, IOError):
+3 | try:
+4 |     pass
+5 | except (OSError, mmap.error, IOError):
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP024
-8 |     pass
-9 | except (OSError, socket.error, KeyError):
+6 |     pass
+7 | except (OSError, socket.error, KeyError):
   |
   = help: Replace with builtin `OSError`
 
@@ -23,14 +23,14 @@ UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
 8 8 |     pass
 
 UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
-   |
- 7 | except (OSError, mmap.error, IOError):
- 8 |     pass
- 9 | except (OSError, socket.error, KeyError):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP024
-10 |     pass
-   |
-   = help: Replace with builtin `OSError`
+  |
+5 | except (OSError, mmap.error, IOError):
+6 |     pass
+7 | except (OSError, socket.error, KeyError):
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP024
+8 |     pass
+  |
+  = help: Replace with builtin `OSError`
 
 ℹ Suggested fix
 4 4 |     pass
@@ -44,16 +44,16 @@ UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
 
 UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
    |
-12 |   try:
-13 |       pass
-14 |   except (
+10 |   try:
+11 |       pass
+12 |   except (
    |  ________^
-15 | |     OSError,
-16 | |     select.error,
-17 | |     IOError,
-18 | | ):
+13 | |     OSError,
+14 | |     select.error,
+15 | |     IOError,
+16 | | ):
    | |_^ UP024
-19 |       pass
+17 |       pass
    |
    = help: Replace with builtin `OSError`
 

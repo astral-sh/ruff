@@ -3,48 +3,48 @@ source: crates/ruff/src/rules/isort/mod.rs
 ---
 magic_trailing_comma.py:2:1: I001 [*] Import block is un-sorted or un-formatted
    |
- 2 |   # This has a magic trailing comma, will be sorted, but not rolled into one line
- 3 | / from sys import (
- 4 | |     stderr,
- 5 | |     argv,
- 6 | |     stdout,
- 7 | |     exit,
- 8 | | )
- 9 | | 
-10 | | # No magic comma, this will be rolled into one line.
-11 | | from os import (
-12 | |     path,
-13 | |     environ,
-14 | |     execl,
-15 | |     execv
-16 | | )
-17 | | 
-18 | | from glob import (
-19 | |     glob,
-20 | |     iglob,
-21 | |     escape,  # Ends with a comment, should still treat as magic trailing comma.
-22 | | )
-23 | | 
-24 | | # These will be combined, but without a trailing comma.
-25 | | from foo import bar
-26 | | from foo import baz
-27 | | 
-28 | | # These will be combined, _with_ a trailing comma.
-29 | | from module1 import member1
-30 | | from module1 import (
-31 | |     member2,
-32 | |     member3,
-33 | | )
-34 | | 
-35 | | # These will be combined, _with_ a trailing comma.
-36 | | from module2 import member1, member2
-37 | | from module2 import (
-38 | |     member3,
-39 | | )
+ 1 |   # This has a magic trailing comma, will be sorted, but not rolled into one line
+ 2 | / from sys import (
+ 3 | |     stderr,
+ 4 | |     argv,
+ 5 | |     stdout,
+ 6 | |     exit,
+ 7 | | )
+ 8 | | 
+ 9 | | # No magic comma, this will be rolled into one line.
+10 | | from os import (
+11 | |     path,
+12 | |     environ,
+13 | |     execl,
+14 | |     execv
+15 | | )
+16 | | 
+17 | | from glob import (
+18 | |     glob,
+19 | |     iglob,
+20 | |     escape,  # Ends with a comment, should still treat as magic trailing comma.
+21 | | )
+22 | | 
+23 | | # These will be combined, but without a trailing comma.
+24 | | from foo import bar
+25 | | from foo import baz
+26 | | 
+27 | | # These will be combined, _with_ a trailing comma.
+28 | | from module1 import member1
+29 | | from module1 import (
+30 | |     member2,
+31 | |     member3,
+32 | | )
+33 | | 
+34 | | # These will be combined, _with_ a trailing comma.
+35 | | from module2 import member1, member2
+36 | | from module2 import (
+37 | |     member3,
+38 | | )
    |
    = help: Organize imports
 
-ℹ Suggested fix
+ℹ Fix
 1  1  | # This has a magic trailing comma, will be sorted, but not rolled into one line
 2     |-from sys import (
 3     |-    stderr,

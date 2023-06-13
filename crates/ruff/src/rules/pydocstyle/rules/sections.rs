@@ -8,11 +8,13 @@ use rustpython_parser::ast::{self, Stmt};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::cast;
+use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::newlines::NewlineWithTrailingNewline;
-use ruff_python_ast::{cast, whitespace};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_whitespace::NewlineWithTrailingNewline;
+use ruff_textwrap::dedent;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
@@ -399,7 +401,7 @@ fn blanks_and_section_underline(
                         // Replace the existing underline with a line of the appropriate length.
                         let content = format!(
                             "{}{}{}",
-                            whitespace::clean(docstring.indentation),
+                            clean_space(docstring.indentation),
                             "-".repeat(context.section_name().len()),
                             checker.stylist.line_ending().as_str()
                         );
@@ -415,7 +417,7 @@ fn blanks_and_section_underline(
             }
 
             if checker.enabled(Rule::SectionUnderlineNotOverIndented) {
-                let leading_space = whitespace::leading_space(&non_blank_line);
+                let leading_space = leading_space(&non_blank_line);
                 if leading_space.len() > docstring.indentation.len() {
                     let mut diagnostic = Diagnostic::new(
                         SectionUnderlineNotOverIndented {
@@ -432,7 +434,7 @@ fn blanks_and_section_underline(
                         // Replace the existing indentation with whitespace of the appropriate length.
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            whitespace::clean(docstring.indentation),
+                            clean_space(docstring.indentation),
                             range,
                         )));
                     };
@@ -502,7 +504,7 @@ fn blanks_and_section_underline(
                     let content = format!(
                         "{}{}{}",
                         checker.stylist.line_ending().as_str(),
-                        whitespace::clean(docstring.indentation),
+                        clean_space(docstring.indentation),
                         "-".repeat(context.section_name().len()),
                     );
                     #[allow(deprecated)]
@@ -547,7 +549,7 @@ fn blanks_and_section_underline(
                 let content = format!(
                     "{}{}{}",
                     checker.stylist.line_ending().as_str(),
-                    whitespace::clean(docstring.indentation),
+                    clean_space(docstring.indentation),
                     "-".repeat(context.section_name().len()),
                 );
 
@@ -600,7 +602,7 @@ fn common_section(
     }
 
     if checker.enabled(Rule::SectionNotOverIndented) {
-        let leading_space = whitespace::leading_space(context.summary_line());
+        let leading_space = leading_space(context.summary_line());
         if leading_space.len() > docstring.indentation.len() {
             let mut diagnostic = Diagnostic::new(
                 SectionNotOverIndented {
@@ -610,7 +612,7 @@ fn common_section(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
-                let content = whitespace::clean(docstring.indentation);
+                let content = clean_space(docstring.indentation);
                 let fix_range = TextRange::at(context.range().start(), leading_space.text_len());
 
                 #[allow(deprecated)]
@@ -774,13 +776,13 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
 
     // Normalize leading whitespace, by removing any lines with less indentation
     // than the first.
-    let leading_space = whitespace::leading_space(first_line.as_str());
+    let leading_space = leading_space(first_line.as_str());
     let relevant_lines = std::iter::once(first_line)
         .chain(following_lines)
         .map(|l| l.as_str())
         .filter(|line| line.starts_with(leading_space) || line.is_empty())
         .join("\n");
-    let args_content = textwrap::dedent(&relevant_lines);
+    let args_content = dedent(&relevant_lines);
 
     // Reformat each section.
     let mut args_sections: Vec<String> = vec![];
@@ -818,7 +820,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
 fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
     let mut docstring_args: FxHashSet<String> = FxHashSet::default();
-    let section_level_indent = whitespace::leading_space(context.summary_line());
+    let section_level_indent = leading_space(context.summary_line());
 
     // Join line continuations, then resplit by line.
     let adjusted_following_lines = context
@@ -829,9 +831,9 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
     let mut lines = NewlineWithTrailingNewline::from(&adjusted_following_lines);
     if let Some(mut current_line) = lines.next() {
         for next_line in lines {
-            let current_leading_space = whitespace::leading_space(current_line.as_str());
+            let current_leading_space = leading_space(current_line.as_str());
             if current_leading_space == section_level_indent
-                && (whitespace::leading_space(&next_line).len() > current_leading_space.len())
+                && (leading_space(&next_line).len() > current_leading_space.len())
                 && !next_line.trim().is_empty()
             {
                 let parameters = if let Some(semi_index) = current_line.find(':') {

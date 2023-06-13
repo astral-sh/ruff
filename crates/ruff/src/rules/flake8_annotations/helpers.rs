@@ -7,7 +7,7 @@ use ruff_python_semantic::model::SemanticModel;
 
 pub(super) fn match_function_def(
     stmt: &Stmt,
-) -> (&str, &Arguments, Option<&Expr>, &[Stmt], &[Expr]) {
+) -> (&str, &Arguments, Option<&Expr>, &[Stmt], &[ast::Decorator]) {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             name,

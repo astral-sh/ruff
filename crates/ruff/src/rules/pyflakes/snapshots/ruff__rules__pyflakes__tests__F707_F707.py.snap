@@ -3,32 +3,32 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F707.py:3:1: F707 An `except` block as not the last exception handler
   |
-3 | try:
-4 |     pass
-5 | except:
+1 | try:
+2 |     pass
+3 | except:
   | ^^^^^^ F707
-6 |     pass
-7 | except ValueError:
+4 |     pass
+5 | except ValueError:
   |
 
 F707.py:10:1: F707 An `except` block as not the last exception handler
    |
-10 | try:
-11 |     pass
-12 | except:
+ 8 | try:
+ 9 |     pass
+10 | except:
    | ^^^^^^ F707
-13 |     pass
-14 | except ValueError:
+11 |     pass
+12 | except ValueError:
    |
 
 F707.py:19:1: F707 An `except` block as not the last exception handler
    |
-19 | try:
-20 |     pass
-21 | except:
+17 | try:
+18 |     pass
+19 | except:
    | ^^^^^^ F707
-22 |     pass
-23 | except ValueError:
+20 |     pass
+21 | except ValueError:
    |
 
 

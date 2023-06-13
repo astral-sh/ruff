@@ -1,12 +1,11 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{is_docstring_stmt, trailing_comment_start_offset};
 
-use ruff_python_ast::helpers::trailing_comment_start_offset;
-
-use crate::autofix::actions::delete_stmt;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -53,41 +52,31 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
     if body.len() > 1 {
         // This only catches the case in which a docstring makes a `pass` statement
         // redundant. Consider removing all `pass` statements instead.
-        let docstring_stmt = &body[0];
-        let pass_stmt = &body[1];
-        let Stmt::Expr(ast::StmtExpr { value, range: _ } )= docstring_stmt else {
+        if !is_docstring_stmt(&body[0]) {
             return;
-        };
-        if matches!(
-            value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(..),
-                ..
-            })
-        ) {
-            if pass_stmt.is_pass_stmt() {
-                let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
-                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
-                            pass_stmt.range().add_end(index),
-                        )));
-                    } else {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
-                            delete_stmt(
-                                pass_stmt,
-                                None,
-                                &[],
-                                checker.locator,
-                                checker.indexer,
-                                checker.stylist,
-                            )
-                        });
-                    }
-                }
-                checker.diagnostics.push(diagnostic);
-            }
         }
+
+        // The second statement must be a `pass` statement.
+        let stmt = &body[1];
+        if !stmt.is_pass_stmt() {
+            return;
+        }
+
+        let mut diagnostic = Diagnostic::new(UnnecessaryPass, stmt.range());
+        if checker.patch(diagnostic.kind.rule()) {
+            let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.locator) {
+                Edit::range_deletion(stmt.range().add_end(index))
+            } else {
+                autofix::edits::delete_stmt(
+                    stmt,
+                    None,
+                    checker.locator,
+                    checker.indexer,
+                    checker.stylist,
+                )
+            };
+            diagnostic.set_fix(Fix::automatic(edit));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }

@@ -34,6 +34,7 @@ jobs:
           args: --out dist
       - name: "Test sdist"
         run: |
+          rustup default $(cat rust-toolchain)
           pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
           ruff --help
           python -m ruff --help
@@ -220,7 +221,7 @@ jobs:
         platform:
           - target: aarch64-unknown-linux-gnu
             arch: aarch64
-            # see https://github.com/charliermarsh/ruff/issues/3791
+            # see https://github.com/astral-sh/ruff/issues/3791
             # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
@@ -399,6 +400,8 @@ jobs:
     permissions:
       # For pypi trusted publishing
       id-token: write
+      # For GitHub release publishing
+      contents: write
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -414,7 +417,7 @@ jobs:
         with:
           name: binaries
           path: binaries
-      - name: Release
+      - name: "Publish to GitHub"
         uses: softprops/action-gh-release@v1
         with:
           files: binaries/*

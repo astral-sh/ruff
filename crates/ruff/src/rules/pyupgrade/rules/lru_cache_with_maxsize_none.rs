@@ -1,10 +1,11 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use rustpython_parser::ast::{self, Constant, Decorator, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 #[violation]
@@ -22,14 +23,14 @@ impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
 }
 
 /// UP033
-pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr]) {
-    for expr in decorator_list.iter() {
+pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Decorator]) {
+    for decorator in decorator_list.iter() {
         let Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
             range: _,
-        }) = expr else {
+        }) = &decorator.expression else {
             continue;
         };
 
@@ -60,17 +61,17 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
             {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
-                    TextRange::new(func.end(), expr.end()),
+                    TextRange::new(func.end(), decorator.end()),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
-                            "functools",
-                            "cache",
-                            expr.start(),
+                            &ImportRequest::import("functools", "cache"),
+                            decorator.start(),
                             checker.semantic_model(),
                         )?;
-                        let reference_edit = Edit::range_replacement(binding, expr.range());
+                        let reference_edit =
+                            Edit::range_replacement(binding, decorator.expression.range());
                         #[allow(deprecated)]
                         Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
                     });
