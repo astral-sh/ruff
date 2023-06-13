@@ -313,6 +313,37 @@ mod tests {
     )]
     #[test_case(
         r#"
+        import os
+
+        def f():
+            os = 1
+            print(os)
+
+            del os
+
+            def g():
+                # `import os` should still be flagged as shadowing an import.
+                os = 1
+                print(os)
+        "#,
+        "del_shadowed_import_shadow_in_local_scope"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def foo():
+            x = 2
+            del x
+            # Flake8 treats this as an F823 error, because it removes the binding
+            # entirely after the `del` statement. However, it should be an F821
+            # error, because the name is defined in the scope, but unbound.
+            x += 1
+    "#,
+        "augmented_assignment_after_del"
+    )]
+    #[test_case(
+        r#"
         def f():
             x = 1
 
