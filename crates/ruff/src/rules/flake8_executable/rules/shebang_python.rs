@@ -5,6 +5,27 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
+/// ## What it does
+/// Checks for a shebang directive that does not contain `python`.
+///
+/// ## Why is this bad?
+/// The shebang directive must contain `python` to indicate that the file is a
+/// Python script. If the shebang does not contain `python`, then the file is
+/// unlikely to be executed as a Python script. This is either a mistake or
+/// misleading.
+///
+/// ## Example
+/// ```python
+/// #!/usr/bin/env bash
+/// ```
+///
+/// Use instead:
+/// ```python
+/// #!/usr/bin/env python3
+/// ```
+///
+/// ## References
+/// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[violation]
 pub struct ShebangMissingPython;
 

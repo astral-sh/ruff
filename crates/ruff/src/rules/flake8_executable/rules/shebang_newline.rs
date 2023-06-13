@@ -5,6 +5,28 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
+/// ## What it does
+/// Checks for a shebang directive that is not at the beginning of the file.
+///
+/// ## Why is this bad?
+/// The shebang `#!` must be the first two characters of a file. If the shebang
+/// is not at the beginning of the file, the shebang will have no effect. This
+/// is likely a mistake.
+///
+/// ## Example
+/// ```python
+/// foo = 1
+/// #!/usr/bin/env python3
+/// ```
+///
+/// Use instead:
+/// ```python
+/// #!/usr/bin/env python3
+/// foo = 1
+/// ```
+///
+/// ## References
+/// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[violation]
 pub struct ShebangNotFirstLine;
 

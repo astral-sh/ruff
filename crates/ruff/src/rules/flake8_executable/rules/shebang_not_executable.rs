@@ -12,6 +12,20 @@ use crate::registry::AsRule;
 use crate::rules::flake8_executable::helpers::is_executable;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
+/// ## What it does
+/// Checks for a shebang directive in a file that is not executable.
+///
+/// ## Why is this bad?
+/// Shebangs indicate that a file is executable. If the file is not executable,
+/// then the shebang is misleading and is likely a mistake.
+///
+/// Instead, remove the shebang or give the file executable permissions with
+/// `chmod +x`.
+///
+/// _This rule is only available on Unix-like systems._
+///
+/// ## References
+/// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[violation]
 pub struct ShebangNotExecutable;
 

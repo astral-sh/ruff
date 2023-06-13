@@ -5,6 +5,26 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
+/// ## What it does
+/// Checks for whitespace before a shebang directive.
+///
+/// ## Why is this bad?
+/// The shebang `#!` must be the first two characters of a file. If there is
+/// whitespace before the shebang, the shebang will have no effect. This is
+/// likely a mistake.
+///
+/// ## Example
+/// ```python
+///  #!/usr/bin/env python3
+/// ```
+///
+/// Use instead:
+/// ```python
+/// #!/usr/bin/env python3
+/// ```
+///
+/// ## References
+/// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[violation]
 pub struct ShebangLeadingWhitespace;
 

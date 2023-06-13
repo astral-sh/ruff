@@ -11,6 +11,21 @@ use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
 
+/// ## What it does
+/// Checks for executable files that do not have a shebang directive.
+///
+/// ## Why is this bad?
+/// Shebangs indicate that a file is executable. If the file has executable
+/// permissions but no shebang, then the absence of a shebang is potentially
+/// misleading and is likely a mistake.
+///
+/// Instead, add a shebang or remove the executable permissions with
+/// `chmod -x`.
+///
+/// _This rule is only available on Unix-like systems._
+///
+/// ## References
+/// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[violation]
 pub struct ShebangMissingExecutableFile;
 
