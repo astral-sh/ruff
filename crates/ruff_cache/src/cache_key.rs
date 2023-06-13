@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
+use glob::Pattern;
 use itertools::Itertools;
 use regex::Regex;
 
@@ -371,6 +372,12 @@ where
 }
 
 impl CacheKey for Regex {
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.as_str().cache_key(state);
+    }
+}
+
+impl CacheKey for Pattern {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         self.as_str().cache_key(state);
     }

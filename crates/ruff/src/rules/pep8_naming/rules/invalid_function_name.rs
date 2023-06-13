@@ -7,6 +7,8 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::model::SemanticModel;
 
+use crate::settings::types::IdentifierPattern;
+
 /// ## What it does
 /// Checks for functions names that do not follow the `snake_case` naming
 /// convention.
@@ -52,12 +54,15 @@ pub(crate) fn invalid_function_name(
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
-    ignore_names: &[String],
+    ignore_names: &[IdentifierPattern],
     model: &SemanticModel,
     locator: &Locator,
 ) -> Option<Diagnostic> {
     // Ignore any explicitly-ignored function names.
-    if ignore_names.iter().any(|ignore_name| ignore_name == name) {
+    if ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name.matches(name))
+    {
         return None;
     }
 

@@ -265,7 +265,8 @@ impl Settings {
                 .unwrap_or_default(),
             pep8_naming: config
                 .pep8_naming
-                .map(pep8_naming::settings::Settings::from)
+                .map(pep8_naming::settings::Settings::try_from)
+                .transpose()?
                 .unwrap_or_default(),
             pycodestyle: config
                 .pycodestyle
