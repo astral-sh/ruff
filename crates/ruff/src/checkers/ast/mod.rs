@@ -3944,7 +3944,6 @@ where
                             );
                         }
 
-                        let definition = self.semantic_model.scope().get(name);
                         self.handle_node_store(
                             name,
                             &Expr::Name(ast::ExprName {
@@ -3978,11 +3977,6 @@ where
                                     self.diagnostics.push(diagnostic);
                                 }
                             }
-                        }
-
-                        if let Some(binding_id) = definition {
-                            let scope = self.semantic_model.scope_mut();
-                            scope.add(name, binding_id);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
