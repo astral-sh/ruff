@@ -1,8 +1,4 @@
-some_dict = {
-    "a": 12,
-    "b": 32,
-    "c": 44
-}
+some_dict = {"a": 12, "b": 32, "c": 44}
 
 for _, value in some_dict.items():  # PERF102
     print(value)
@@ -66,3 +62,10 @@ for key in some_dict.keys():  # OK
 
 for value in some_dict.values():  # OK
     print(value)
+
+
+for name, (_, _) in (some_function()).items():  # PERF102
+    pass
+
+for name, (_, _) in (some_function().some_attribute).items():  # PERF102
+    pass
