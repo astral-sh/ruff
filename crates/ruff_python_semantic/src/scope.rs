@@ -13,19 +13,37 @@ use crate::globals::GlobalsId;
 
 #[derive(Debug)]
 pub struct Scope<'a> {
+    /// The kind of scope.
     pub kind: ScopeKind<'a>,
+
+    /// The parent scope, if any.
     pub parent: Option<ScopeId>,
+
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
     star_imports: Vec<StarImportation<'a>>,
+
     /// A map from bound name to binding ID.
     bindings: FxHashMap<&'a str, BindingId>,
+
     /// A map from binding ID to binding ID that it shadows.
+    ///
+    /// For example:
+    /// ```python
+    /// def f():
+    ///     x = 1
+    ///     x = 2
+    /// ```
+    ///
+    /// In this case, the binding created by `x = 2` shadows the binding created by `x = 1`.
     shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
+
     /// A list of all names that have been deleted in this scope.
     deleted_symbols: Vec<&'a str>,
+
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
+
     /// Flags for the [`Scope`].
     flags: ScopeFlags,
 }

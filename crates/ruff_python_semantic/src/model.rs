@@ -25,34 +25,60 @@ use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
-    pub typing_modules: &'a [String],
-    pub module_path: Option<&'a [String]>,
-    // Stack of all visited statements, along with the identifier of the current statement.
+    typing_modules: &'a [String],
+    module_path: Option<&'a [String]>,
+
+    /// Stack of all visited statements.
     pub stmts: Nodes<'a>,
-    pub stmt_id: Option<NodeId>,
-    // Stack of current expressions.
-    pub exprs: Vec<&'a Expr>,
-    // Stack of all scopes, along with the identifier of the current scope.
+
+    /// The identifier of the current statement.
+    stmt_id: Option<NodeId>,
+
+    /// Stack of current expressions.
+    exprs: Vec<&'a Expr>,
+
+    /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
     pub dead_scopes: Vec<ScopeId>,
-    // Stack of all definitions created in any scope, at any point in execution, along with the
-    // identifier of the current definition.
+
+    /// Stack of all definitions created in any scope, at any point in execution.
     pub definitions: Definitions<'a>,
+
+    /// The ID of the current definition.
     pub definition_id: DefinitionId,
-    // A stack of all bindings created in any scope, at any point in execution.
+
+    /// A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
-    // Stack of all references created in any scope, at any point in execution.
+
+    /// Stack of all references created in any scope, at any point in execution.
     references: References,
-    // Arena of global bindings.
+
+    /// Arena of global bindings.
     globals: GlobalsArena<'a>,
-    // Map from binding index to indexes of bindings that shadow it in other scopes.
+
+    /// Map from binding ID to binding ID that it shadows (in another scope).
+    ///
+    /// For example:
+    /// ```python
+    /// import x
+    ///
+    /// def f():
+    ///     x = 1
+    /// ```
+    ///
+    /// In this case, the binding created by `x = 1` shadows the binding created by `import x`,
+    /// despite the fact that they're in different scopes.
     pub shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
-    // Body iteration; used to peek at siblings.
+
+    /// Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
-    // Internal, derivative state.
+
+    /// Flags for the semantic model.
     pub flags: SemanticModelFlags,
+
+    /// Exceptions that have been handled by the current scope.
     pub handled_exceptions: Vec<Exceptions>,
 }
 
