@@ -1,6 +1,6 @@
 # Rust Python Formatter
 
-The goal of out formatter is to be compatible with Black except for rare edge cases (mostly
+The goal of our formatter is to be compatible with Black except for rare edge cases (mostly
 involving comment placement).
 
 ## Implementing a node
