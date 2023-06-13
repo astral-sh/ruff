@@ -1397,7 +1397,7 @@
           }
         },
         "ignore-names": {
-          "description": "A list of names to ignore when considering `pep8-naming` violations.",
+          "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.",
           "type": [
             "array",
             "null"
