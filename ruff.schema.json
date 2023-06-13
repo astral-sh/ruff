@@ -2606,6 +2606,7 @@
       "enum": [
         "text",
         "json",
+        "json-lines",
         "junit",
         "grouped",
         "github",
