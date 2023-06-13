@@ -2,7 +2,7 @@ use std::io::Write;
 
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::SourceCode;
@@ -38,35 +38,38 @@ impl Serialize for ExpandedMessages<'_> {
         let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
 
         for message in self.messages {
-            let source_code = message.file.to_source_code();
-
-            let fix = message.fix.as_ref().map(|fix| {
-                json!({
-                    "applicability": fix.applicability(),
-                    "message": message.kind.suggestion.as_deref(),
-                    "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code },
-                })
-            });
-
-            let start_location = source_code.source_location(message.start());
-            let end_location = source_code.source_location(message.end());
-            let noqa_location = source_code.source_location(message.noqa_offset);
-
-            let value = json!({
-                "code": message.kind.rule().noqa_code().to_string(),
-                "message": message.kind.body,
-                "fix": fix,
-                "location": start_location,
-                "end_location": end_location,
-                "filename": message.filename(),
-                "noqa_row": noqa_location.row
-            });
-
+            let value = message_to_json_value(message);
             s.serialize_element(&value)?;
         }
 
         s.end()
     }
+}
+
+pub(crate) fn message_to_json_value(message: &Message) -> Value {
+    let source_code = message.file.to_source_code();
+
+    let fix = message.fix.as_ref().map(|fix| {
+        json!({
+            "applicability": fix.applicability(),
+            "message": message.kind.suggestion.as_deref(),
+            "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code },
+        })
+    });
+
+    let start_location = source_code.source_location(message.start());
+    let end_location = source_code.source_location(message.end());
+    let noqa_location = source_code.source_location(message.noqa_offset);
+
+    json!({
+        "code": message.kind.rule().noqa_code().to_string(),
+        "message": message.kind.body,
+        "fix": fix,
+        "location": start_location,
+        "end_location": end_location,
+        "filename": message.filename(),
+        "noqa_row": noqa_location.row
+    })
 }
 
 struct ExpandedEdits<'a> {

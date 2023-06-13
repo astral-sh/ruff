@@ -16,7 +16,7 @@ use ruff::linter::FixTable;
 use ruff::logging::LogLevel;
 use ruff::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JunitEmitter, PylintEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, TextEmitter,
 };
 use ruff::notify_user;
 use ruff::registry::{AsRule, Rule};
@@ -183,6 +183,9 @@ impl Printer {
         match self.format {
             SerializationFormat::Json => {
                 JsonEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+            }
+            SerializationFormat::JsonLines => {
+                JsonLinesEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Junit => {
                 JunitEmitter::default().emit(writer, &diagnostics.messages, &context)?;
