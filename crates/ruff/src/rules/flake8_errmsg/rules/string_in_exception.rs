@@ -172,6 +172,96 @@ impl Violation for DotFormatInException {
     }
 }
 
+/// EM101, EM102, EM103
+pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
+    if let Expr::Call(ast::ExprCall { args, .. }) = exc {
+        if let Some(first) = args.first() {
+            match first {
+                // Check for string literals.
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Str(string),
+                    ..
+                }) => {
+                    if checker.enabled(Rule::RawStringInException) {
+                        if string.len() >= checker.settings.flake8_errmsg.max_string_length {
+                            let mut diagnostic =
+                                Diagnostic::new(RawStringInException, first.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                if let Some(indentation) =
+                                    whitespace::indentation(checker.locator, stmt)
+                                {
+                                    if checker.semantic_model().is_unbound("msg") {
+                                        diagnostic.set_fix(generate_fix(
+                                            stmt,
+                                            first,
+                                            indentation,
+                                            checker.stylist,
+                                            checker.generator(),
+                                        ));
+                                    }
+                                }
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
+                    }
+                }
+                // Check for f-strings.
+                Expr::JoinedStr(_) => {
+                    if checker.enabled(Rule::FStringInException) {
+                        let mut diagnostic = Diagnostic::new(FStringInException, first.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            if let Some(indentation) =
+                                whitespace::indentation(checker.locator, stmt)
+                            {
+                                if checker.semantic_model().is_unbound("msg") {
+                                    diagnostic.set_fix(generate_fix(
+                                        stmt,
+                                        first,
+                                        indentation,
+                                        checker.stylist,
+                                        checker.generator(),
+                                    ));
+                                }
+                            }
+                        }
+                        checker.diagnostics.push(diagnostic);
+                    }
+                }
+                // Check for .format() calls.
+                Expr::Call(ast::ExprCall { func, .. }) => {
+                    if checker.enabled(Rule::DotFormatInException) {
+                        if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
+                            func.as_ref()
+                        {
+                            if attr == "format" && value.is_constant_expr() {
+                                let mut diagnostic =
+                                    Diagnostic::new(DotFormatInException, first.range());
+                                if checker.patch(diagnostic.kind.rule()) {
+                                    if let Some(indentation) =
+                                        whitespace::indentation(checker.locator, stmt)
+                                    {
+                                        if checker.semantic_model().is_unbound("msg") {
+                                            diagnostic.set_fix(generate_fix(
+                                                stmt,
+                                                first,
+                                                indentation,
+                                                checker.stylist,
+                                                checker.generator(),
+                                            ));
+                                        }
+                                    }
+                                }
+                                checker.diagnostics.push(diagnostic);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 /// Generate the [`Fix`] for EM001, EM002, and EM003 violations.
 ///
 /// This assumes that the violation is fixable and that the patch should
@@ -189,24 +279,22 @@ fn generate_fix(
     stylist: &Stylist,
     generator: Generator,
 ) -> Fix {
-    let node = Expr::Name(ast::ExprName {
-        id: "msg".into(),
-        ctx: ExprContext::Store,
-        range: TextRange::default(),
-    });
-    let node1 = Stmt::Assign(ast::StmtAssign {
-        targets: vec![node],
+    let assignment = Stmt::Assign(ast::StmtAssign {
+        targets: vec![Expr::Name(ast::ExprName {
+            id: "msg".into(),
+            ctx: ExprContext::Store,
+            range: TextRange::default(),
+        })],
         value: Box::new(exc_arg.clone()),
         type_comment: None,
         range: TextRange::default(),
     });
-    let assignment = generator.stmt(&node1);
-    #[allow(deprecated)]
-    Fix::unspecified_edits(
+
+    Fix::suggested_edits(
         Edit::insertion(
             format!(
                 "{}{}{}",
-                assignment,
+                generator.stmt(&assignment),
                 stylist.line_ending().as_str(),
                 indentation,
             ),
@@ -217,107 +305,4 @@ fn generate_fix(
             exc_arg.range(),
         )],
     )
-}
-
-/// EM101, EM102, EM103
-pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
-    if let Expr::Call(ast::ExprCall { args, .. }) = exc {
-        if let Some(first) = args.first() {
-            match first {
-                // Check for string literals.
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(string),
-                    ..
-                }) => {
-                    if checker.enabled(Rule::RawStringInException) {
-                        if string.len() >= checker.settings.flake8_errmsg.max_string_length {
-                            let indentation = whitespace::indentation(checker.locator, stmt)
-                                .and_then(|indentation| {
-                                    if checker.semantic_model().find_binding("msg").is_none() {
-                                        Some(indentation)
-                                    } else {
-                                        None
-                                    }
-                                });
-                            let mut diagnostic =
-                                Diagnostic::new(RawStringInException, first.range());
-                            if let Some(indentation) = indentation {
-                                if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(generate_fix(
-                                        stmt,
-                                        first,
-                                        indentation,
-                                        checker.stylist,
-                                        checker.generator(),
-                                    ));
-                                }
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                }
-                // Check for f-strings.
-                Expr::JoinedStr(_) => {
-                    if checker.enabled(Rule::FStringInException) {
-                        let indentation = whitespace::indentation(checker.locator, stmt).and_then(
-                            |indentation| {
-                                if checker.semantic_model().find_binding("msg").is_none() {
-                                    Some(indentation)
-                                } else {
-                                    None
-                                }
-                            },
-                        );
-                        let mut diagnostic = Diagnostic::new(FStringInException, first.range());
-                        if let Some(indentation) = indentation {
-                            if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(generate_fix(
-                                    stmt,
-                                    first,
-                                    indentation,
-                                    checker.stylist,
-                                    checker.generator(),
-                                ));
-                            }
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
-                // Check for .format() calls.
-                Expr::Call(ast::ExprCall { func, .. }) => {
-                    if checker.enabled(Rule::DotFormatInException) {
-                        if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
-                            func.as_ref()
-                        {
-                            if attr == "format" && value.is_constant_expr() {
-                                let indentation = whitespace::indentation(checker.locator, stmt)
-                                    .and_then(|indentation| {
-                                        if checker.semantic_model().find_binding("msg").is_none() {
-                                            Some(indentation)
-                                        } else {
-                                            None
-                                        }
-                                    });
-                                let mut diagnostic =
-                                    Diagnostic::new(DotFormatInException, first.range());
-                                if let Some(indentation) = indentation {
-                                    if checker.patch(diagnostic.kind.rule()) {
-                                        diagnostic.set_fix(generate_fix(
-                                            stmt,
-                                            first,
-                                            indentation,
-                                            checker.stylist,
-                                            checker.generator(),
-                                        ));
-                                    }
-                                }
-                                checker.diagnostics.push(diagnostic);
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
 }
