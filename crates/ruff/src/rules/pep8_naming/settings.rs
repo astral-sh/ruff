@@ -41,7 +41,7 @@ pub struct Options {
             ignore-names = ["callMethod"]
         "#
     )]
-    /// A list of names to ignore when considering `pep8-naming` violations.
+    /// A list of names (or patterns) to ignore when considering `pep8-naming` violations.
     pub ignore_names: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
