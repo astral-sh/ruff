@@ -8,16 +8,18 @@ use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass, is_mutable_expr};
 
 /// ## What it does
-/// Checks for mutable default values in dataclasses.
+/// Checks for mutable default values in dataclass attributes.
 ///
 /// ## Why is this bad?
-/// Mutable default values share state across all instances of the dataclass,
-/// while not being obvious. This can lead to bugs when the attributes are
-/// changed in one instance, as those changes will unexpectedly affect all
-/// other instances.
+/// Mutable default values share state across all instances of the dataclass.
+/// This can lead to bugs when the attributes are changed in one instance, as
+/// those changes will unexpectedly affect all other instances.
 ///
 /// Instead of sharing mutable defaults, use the `field(default_factory=...)`
 /// pattern.
+///
+/// If the default value is intended to be mutable, it should be annotated with
+/// `typing.ClassVar`.
 ///
 /// ## Examples
 /// ```python
@@ -38,6 +40,17 @@ use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass, 
 /// class A:
 ///     mutable_default: list[int] = field(default_factory=list)
 /// ```
+///
+/// Or:
+/// ```python
+/// from dataclasses import dataclass, field
+/// from typing import ClassVar
+///
+///
+/// @dataclass
+/// class A:
+///     mutable_default: ClassVar[list[int]] = []
+/// ```
 #[violation]
 pub struct MutableDataclassDefault;
 
@@ -55,29 +68,20 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::
     }
 
     for statement in &class_def.body {
-        match statement {
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                annotation,
-                value: Some(value),
-                ..
-            }) => {
-                if is_mutable_expr(value)
-                    && !is_class_var_annotation(checker.semantic_model(), annotation)
-                    && !is_immutable_annotation(checker.semantic_model(), annotation)
-                {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableDataclassDefault, value.range()));
-                }
+        if let Stmt::AnnAssign(ast::StmtAnnAssign {
+            annotation,
+            value: Some(value),
+            ..
+        }) = statement
+        {
+            if is_mutable_expr(value)
+                && !is_class_var_annotation(checker.semantic_model(), annotation)
+                && !is_immutable_annotation(checker.semantic_model(), annotation)
+            {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(MutableDataclassDefault, value.range()));
             }
-            Stmt::Assign(ast::StmtAssign { value, .. }) => {
-                if is_mutable_expr(value) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MutableDataclassDefault, value.range()));
-                }
-            }
-            _ => (),
         }
     }
 }
