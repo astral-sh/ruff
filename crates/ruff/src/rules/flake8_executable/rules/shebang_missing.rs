@@ -15,8 +15,8 @@ use crate::rules::flake8_executable::helpers::is_executable;
 /// Checks for executable `.py` files that do not have a shebang directive.
 ///
 /// ## Why is this bad?
-/// Shebangs indicate that a file is executable. If the file has executable
-/// permissions but no shebang, then the absence of a shebang is potentially
+/// Shebangs indicate that a text file is executable. If a `.py` file has
+/// executable permissions but no shebang, then the absence of a shebang is
 /// misleading and is likely a mistake.
 ///
 /// Instead, add a shebang or remove the executable permissions with
