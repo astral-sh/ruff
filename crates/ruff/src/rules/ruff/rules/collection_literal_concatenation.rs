@@ -31,7 +31,7 @@ impl Violation for CollectionLiteralConcatenation {
 }
 
 fn make_splat_elts(
-    splat_element: &Expr,
+    splat_element: verbatim_ast::Expr,
     other_elements: &[Expr],
     splat_at_left: bool,
 ) -> Vec<verbatim_ast::Expr> {
@@ -39,16 +39,10 @@ fn make_splat_elts(
         .iter()
         .map(|e| verbatim_ast::Expr::Verbatim(verbatim_ast::ExprVerbatim { range: e.range() }))
         .collect_vec();
-    let splat_elt = verbatim_ast::Expr::Starred(verbatim_ast::ExprStarred {
-        value: Box::from(verbatim_ast::Expr::Verbatim(verbatim_ast::ExprVerbatim {
-            range: splat_element.range(),
-        })),
-        ctx: verbatim_ast::ExprContext::Load,
-    });
     if splat_at_left {
-        new_elts.insert(0, splat_elt);
+        new_elts.insert(0, splat_element);
     } else {
-        new_elts.push(splat_elt);
+        new_elts.push(splat_element);
     }
     new_elts
 }
@@ -68,37 +62,49 @@ fn concatenate_expressions(expr: &Expr) -> Option<(verbatim_ast::Expr, Type)> {
     let new_left = match left.as_ref() {
         Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(left) {
             Some((new_left, _)) => new_left,
-            None => *left.clone(),
+            None => verbatim_ast::Expr::from(left),
         },
-        _ => *left.clone(),
+        _ => verbatim_ast::Expr::from(left),
     };
 
     let new_right = match right.as_ref() {
         Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(right) {
             Some((new_right, _)) => new_right,
-            None => *right.clone(),
+            None => verbatim_ast::Expr::from(right),
         },
-        _ => *right.clone(),
+        _ => verbatim_ast::Expr::from(right),
     };
 
     // Figure out which way the splat is, and the type of the collection.
     let (type_, splat_element, other_elements, splat_at_left) = match (&new_left, &new_right) {
-        (Expr::List(ast::ExprList { elts: l_elts, .. }), _) => {
-            (Type::List, &new_right, l_elts, false)
-        }
-        (Expr::Tuple(ast::ExprTuple { elts: l_elts, .. }), _) => {
-            (Type::Tuple, &new_right, l_elts, false)
-        }
-        (_, Expr::List(ast::ExprList { elts: r_elts, .. })) => {
-            (Type::List, &new_left, r_elts, true)
-        }
-        (_, Expr::Tuple(ast::ExprTuple { elts: r_elts, .. })) => {
-            (Type::Tuple, &new_left, r_elts, true)
-        }
+        (Expr::List(ast::ExprList { elts: l_elts, .. }), _) => (
+            Type::List,
+            new_right,
+            l_elts.iter().map(verbatim_ast::Expr::from).collect(),
+            false,
+        ),
+        (Expr::Tuple(ast::ExprTuple { elts: l_elts, .. }), _) => (
+            Type::Tuple,
+            new_right,
+            l_elts.iter().map(verbatim_ast::Expr::from).collect(),
+            false,
+        ),
+        (_, Expr::List(ast::ExprList { elts: r_elts, .. })) => (
+            Type::List,
+            new_left,
+            r_elts.iter().map(verbatim_ast::Expr::from).collect(),
+            true,
+        ),
+        (_, Expr::Tuple(ast::ExprTuple { elts: r_elts, .. })) => (
+            Type::Tuple,
+            new_left,
+            r_elts.iter().map(verbatim_ast::Expr::from).collect(),
+            true,
+        ),
         _ => return None,
     };
 
-    let new_elts = match splat_element {
+    let new_elts = match &splat_element {
         // We'll be a bit conservative here; only calls, names and attribute accesses
         // will be considered as splat elements.
         Expr::Call(_) | Expr::Attribute(_) | Expr::Name(_) => {
@@ -115,18 +121,8 @@ fn concatenate_expressions(expr: &Expr) -> Option<(verbatim_ast::Expr, Type)> {
     };
 
     let new_expr = match type_ {
-        Type::List => ast::ExprList {
-            elts: new_elts,
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-        }
-        .into(),
-        Type::Tuple => ast::ExprTuple {
-            elts: new_elts,
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-        }
-        .into(),
+        Type::List => verbatim_ast::Expr::List(verbatim_ast::ExprList { elts: new_elts }),
+        Type::Tuple => verbatim_ast::Expr::Tuple(verbatim_ast::ExprTuple { elts: new_elts }),
     };
 
     Some((new_expr, type_))
@@ -151,8 +147,8 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
 
     let contents = match type_ {
         // Wrap the new expression in parentheses if it was a tuple.
-        Type::Tuple => format!("({})", checker.generator().expr(&new_expr)),
-        Type::List => checker.generator().expr(&new_expr),
+        Type::Tuple => format!("({})", checker.verbatim_generator().expr(&new_expr)),
+        Type::List => checker.verbatim_generator().expr(&new_expr),
     };
     let mut diagnostic = Diagnostic::new(
         CollectionLiteralConcatenation {

@@ -12,6 +12,7 @@ pub use generator::Generator;
 pub use indexer::Indexer;
 pub use locator::Locator;
 pub use stylist::{Quote, Stylist};
+pub use verbatim_generator::VerbatimGenerator;
 
 pub use crate::source_code::line_index::{LineIndex, OneIndexed};
 

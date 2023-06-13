@@ -60,7 +60,7 @@ mod precedence {
     pub(crate) const MAX: u8 = 63;
 }
 
-pub struct Generator<'a> {
+pub struct VerbatimGenerator<'a> {
     /// The locator to use for source code positions.
     locator: &'a Locator<'a>,
     /// The indentation style to use.
@@ -75,7 +75,7 @@ pub struct Generator<'a> {
     initial: bool,
 }
 
-impl<'a> Generator<'a> {
+impl<'a> VerbatimGenerator<'a> {
     pub const fn new(
         locator: &'a Locator<'a>,
         indent: &'a Indentation,
@@ -1199,7 +1199,8 @@ impl<'a> Generator<'a> {
         conversion: rustpython_ast::ConversionFlag,
         spec: Option<&Expr>,
     ) {
-        let mut generator = Generator::new(self.locator, self.indent, self.quote, self.line_ending);
+        let mut generator =
+            VerbatimGenerator::new(self.locator, self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
             // put a space to avoid escaping the bracket
@@ -1255,7 +1256,7 @@ impl<'a> Generator<'a> {
             self.unparse_fstring_body(values, is_spec);
         } else {
             self.p("f");
-            let mut generator = Generator::new(
+            let mut generator = VerbatimGenerator::new(
                 self.locator,
                 self.indent,
                 match self.quote {
@@ -1295,14 +1296,14 @@ mod tests {
     use ruff_python_whitespace::LineEnding;
 
     use crate::source_code::stylist::{Indentation, Quote};
-    use crate::source_code::Generator;
+    use crate::source_code::VerbatimGenerator;
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
         let stmt = Stmt::parse(contents, "<filename>").unwrap();
-        let mut generator = Generator::new(&indentation, quote, line_ending);
+        let mut generator = VerbatimGenerator::new(&indentation, quote, line_ending);
         generator.unparse_stmt(&stmt);
         generator.generate()
     }
@@ -1314,7 +1315,7 @@ mod tests {
         contents: &str,
     ) -> String {
         let stmt = Stmt::parse(contents, "<filename>").unwrap();
-        let mut generator = Generator::new(indentation, quote, line_ending);
+        let mut generator = VerbatimGenerator::new(indentation, quote, line_ending);
         generator.unparse_stmt(&stmt);
         generator.generate()
     }

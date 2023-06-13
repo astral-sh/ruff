@@ -3,24 +3,8 @@
 
 use num_bigint::BigInt;
 use ruff_text_size::TextRange;
+use rustpython_ast::Ranged;
 use rustpython_parser::ast;
-
-#[derive(Debug, Copy, Clone)]
-pub enum ExprContext {
-    Load,
-    Store,
-    Del,
-}
-
-impl From<&ast::ExprContext> for ExprContext {
-    fn from(ctx: &ast::ExprContext) -> Self {
-        match ctx {
-            ast::ExprContext::Load => Self::Load,
-            ast::ExprContext::Store => Self::Store,
-            ast::ExprContext::Del => Self::Del,
-        }
-    }
-}
 
 #[derive(Debug, Copy, Clone)]
 pub enum Boolop {
@@ -579,38 +563,32 @@ pub struct ExprConstant<'a> {
 pub struct ExprAttribute<'a> {
     pub value: Box<Expr<'a>>,
     pub attr: &'a str,
-    pub ctx: ExprContext,
 }
 
 #[derive(Debug)]
 pub struct ExprSubscript<'a> {
     pub value: Box<Expr<'a>>,
     pub slice: Box<Expr<'a>>,
-    pub ctx: ExprContext,
 }
 
 #[derive(Debug)]
 pub struct ExprStarred<'a> {
     pub value: Box<Expr<'a>>,
-    pub ctx: ExprContext,
 }
 
 #[derive(Debug)]
 pub struct ExprName<'a> {
     pub id: &'a str,
-    pub ctx: ExprContext,
 }
 
 #[derive(Debug)]
 pub struct ExprList<'a> {
     pub elts: Vec<Expr<'a>>,
-    pub ctx: ExprContext,
 }
 
 #[derive(Debug)]
 pub struct ExprTuple<'a> {
     pub elts: Vec<Expr<'a>>,
-    pub ctx: ExprContext,
 }
 
 #[derive(Debug)]
@@ -621,13 +599,13 @@ pub struct ExprSlice<'a> {
 }
 
 #[derive(Debug)]
-pub struct ExprVerbatim {
-    pub range: TextRange,
+pub struct ExprVerbatim<'a> {
+    pub expr: &'a ast::Expr,
 }
 
 #[derive(Debug)]
 pub enum Expr<'a> {
-    Verbatim(ExprVerbatim),
+    Verbatim(ExprVerbatim<'a>),
     BoolOp(ExprBoolOp<'a>),
     NamedExpr(ExprNamedExpr<'a>),
     BinOp(ExprBinOp<'a>),
@@ -671,235 +649,7 @@ impl<'a> From<&'a Box<ast::Expr>> for Expr<'a> {
 
 impl<'a> From<&'a ast::Expr> for Expr<'a> {
     fn from(expr: &'a ast::Expr) -> Self {
-        match expr {
-            ast::Expr::BoolOp(ast::ExprBoolOp {
-                op,
-                values,
-                range: _range,
-            }) => Self::BoolOp(ExprBoolOp {
-                op: op.into(),
-                values: values.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::NamedExpr(ast::ExprNamedExpr {
-                target,
-                value,
-                range: _range,
-            }) => Self::NamedExpr(ExprNamedExpr {
-                target: target.into(),
-                value: value.into(),
-            }),
-            ast::Expr::BinOp(ast::ExprBinOp {
-                left,
-                op,
-                right,
-                range: _range,
-            }) => Self::BinOp(ExprBinOp {
-                left: left.into(),
-                op: op.into(),
-                right: right.into(),
-            }),
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op,
-                operand,
-                range: _range,
-            }) => Self::UnaryOp(ExprUnaryOp {
-                op: op.into(),
-                operand: operand.into(),
-            }),
-            ast::Expr::Lambda(ast::ExprLambda {
-                args,
-                body,
-                range: _range,
-            }) => Self::Lambda(ExprLambda {
-                args: (&**args).into(),
-                body: body.into(),
-            }),
-            ast::Expr::IfExp(ast::ExprIfExp {
-                test,
-                body,
-                orelse,
-                range: _range,
-            }) => Self::IfExp(ExprIfExp {
-                test: test.into(),
-                body: body.into(),
-                orelse: orelse.into(),
-            }),
-            ast::Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range: _range,
-            }) => Self::Dict(ExprDict {
-                keys: keys
-                    .iter()
-                    .map(|expr| expr.as_ref().map(Into::into))
-                    .collect(),
-                values: values.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::Set(ast::ExprSet {
-                elts,
-                range: _range,
-            }) => Self::Set(ExprSet {
-                elts: elts.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::ListComp(ast::ExprListComp {
-                elt,
-                generators,
-                range: _range,
-            }) => Self::ListComp(ExprListComp {
-                elt: elt.into(),
-                generators: generators.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::SetComp(ast::ExprSetComp {
-                elt,
-                generators,
-                range: _range,
-            }) => Self::SetComp(ExprSetComp {
-                elt: elt.into(),
-                generators: generators.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                range: _range,
-            }) => Self::DictComp(ExprDictComp {
-                key: key.into(),
-                value: value.into(),
-                generators: generators.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::GeneratorExp(ast::ExprGeneratorExp {
-                elt,
-                generators,
-                range: _range,
-            }) => Self::GeneratorExp(ExprGeneratorExp {
-                elt: elt.into(),
-                generators: generators.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::Await(ast::ExprAwait {
-                value,
-                range: _range,
-            }) => Self::Await(ExprAwait {
-                value: value.into(),
-            }),
-            ast::Expr::Yield(ast::ExprYield {
-                value,
-                range: _range,
-            }) => Self::Yield(ExprYield {
-                value: value.as_ref().map(Into::into),
-            }),
-            ast::Expr::YieldFrom(ast::ExprYieldFrom {
-                value,
-                range: _range,
-            }) => Self::YieldFrom(ExprYieldFrom {
-                value: value.into(),
-            }),
-            ast::Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                range: _range,
-            }) => Self::Compare(ExprCompare {
-                left: left.into(),
-                ops: ops.iter().map(Into::into).collect(),
-                comparators: comparators.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords,
-                range: _range,
-            }) => Self::Call(ExprCall {
-                func: func.into(),
-                args: args.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::FormattedValue(ast::ExprFormattedValue {
-                value,
-                conversion,
-                format_spec,
-                range: _range,
-            }) => Self::FormattedValue(ExprFormattedValue {
-                value: value.into(),
-                conversion: *conversion,
-                format_spec: format_spec.as_ref().map(Into::into),
-            }),
-            ast::Expr::JoinedStr(ast::ExprJoinedStr {
-                values,
-                range: _range,
-            }) => Self::JoinedStr(ExprJoinedStr {
-                values: values.iter().map(Into::into).collect(),
-            }),
-            ast::Expr::Constant(ast::ExprConstant {
-                value,
-                kind,
-                range: _range,
-            }) => Self::Constant(ExprConstant {
-                value: value.into(),
-                kind: kind.as_ref().map(String::as_str),
-            }),
-            ast::Expr::Attribute(ast::ExprAttribute {
-                value,
-                attr,
-                ctx,
-                range: _range,
-            }) => Self::Attribute(ExprAttribute {
-                value: value.into(),
-                attr: attr.as_str(),
-                ctx: ctx.into(),
-            }),
-            ast::Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                ctx,
-                range: _range,
-            }) => Self::Subscript(ExprSubscript {
-                value: value.into(),
-                slice: slice.into(),
-                ctx: ctx.into(),
-            }),
-            ast::Expr::Starred(ast::ExprStarred {
-                value,
-                ctx,
-                range: _range,
-            }) => Self::Starred(ExprStarred {
-                value: value.into(),
-                ctx: ctx.into(),
-            }),
-            ast::Expr::Name(ast::ExprName {
-                id,
-                ctx,
-                range: _range,
-            }) => Self::Name(ExprName {
-                id: id.as_str(),
-                ctx: ctx.into(),
-            }),
-            ast::Expr::List(ast::ExprList {
-                elts,
-                ctx,
-                range: _range,
-            }) => Self::List(ExprList {
-                elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
-            }),
-            ast::Expr::Tuple(ast::ExprTuple {
-                elts,
-                ctx,
-                range: _range,
-            }) => Self::Tuple(ExprTuple {
-                elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
-            }),
-            ast::Expr::Slice(ast::ExprSlice {
-                lower,
-                upper,
-                step,
-                range: _range,
-            }) => Self::Slice(ExprSlice {
-                lower: lower.as_ref().map(Into::into),
-                upper: upper.as_ref().map(Into::into),
-                step: step.as_ref().map(Into::into),
-            }),
-        }
+        Self::Verbatim(ExprVerbatim { expr })
     }
 }
 
@@ -1072,13 +822,13 @@ pub struct StmtExpr<'a> {
 }
 
 #[derive(Debug)]
-pub struct StmtVerbatim {
-    pub range: TextRange,
+pub struct StmtVerbatim<'a> {
+    pub stmt: &'a ast::Stmt,
 }
 
 #[derive(Debug)]
 pub enum Stmt<'a> {
-    Verbatim(StmtVerbatim),
+    Verbatim(StmtVerbatim<'a>),
     FunctionDef(StmtFunctionDef<'a>),
     AsyncFunctionDef(StmtAsyncFunctionDef<'a>),
     ClassDef(StmtClassDef<'a>),
@@ -1110,250 +860,6 @@ pub enum Stmt<'a> {
 
 impl<'a> From<&'a ast::Stmt> for Stmt<'a> {
     fn from(stmt: &'a ast::Stmt) -> Self {
-        match stmt {
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef {
-                name,
-                args,
-                body,
-                decorator_list,
-                returns,
-                type_comment,
-                range: _range,
-            }) => Self::FunctionDef(StmtFunctionDef {
-                name: name.as_str(),
-                args: args.into(),
-                body: body.iter().map(Into::into).collect(),
-                decorator_list: decorator_list.iter().map(Into::into).collect(),
-                returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                name,
-                args,
-                body,
-                decorator_list,
-                returns,
-                type_comment,
-                range: _range,
-            }) => Self::AsyncFunctionDef(StmtAsyncFunctionDef {
-                name: name.as_str(),
-                args: args.into(),
-                body: body.iter().map(Into::into).collect(),
-                decorator_list: decorator_list.iter().map(Into::into).collect(),
-                returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::ClassDef(ast::StmtClassDef {
-                name,
-                bases,
-                keywords,
-                body,
-                decorator_list,
-                range: _range,
-            }) => Self::ClassDef(StmtClassDef {
-                name: name.as_str(),
-                bases: bases.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
-                body: body.iter().map(Into::into).collect(),
-                decorator_list: decorator_list.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::Return(ast::StmtReturn {
-                value,
-                range: _range,
-            }) => Self::Return(StmtReturn {
-                value: value.as_ref().map(Into::into),
-            }),
-            ast::Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _range,
-            }) => Self::Delete(StmtDelete {
-                targets: targets.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::Assign(ast::StmtAssign {
-                targets,
-                value,
-                type_comment,
-                range: _range,
-            }) => Self::Assign(StmtAssign {
-                targets: targets.iter().map(Into::into).collect(),
-                value: value.into(),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op,
-                value,
-                range: _range,
-            }) => Self::AugAssign(StmtAugAssign {
-                target: target.into(),
-                op: op.into(),
-                value: value.into(),
-            }),
-            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value,
-                simple,
-                range: _range,
-            }) => Self::AnnAssign(StmtAnnAssign {
-                target: target.into(),
-                annotation: annotation.into(),
-                value: value.as_ref().map(Into::into),
-                simple: *simple,
-            }),
-            ast::Stmt::For(ast::StmtFor {
-                target,
-                iter,
-                body,
-                orelse,
-                type_comment,
-                range: _range,
-            }) => Self::For(StmtFor {
-                target: target.into(),
-                iter: iter.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::AsyncFor(ast::StmtAsyncFor {
-                target,
-                iter,
-                body,
-                orelse,
-                type_comment,
-                range: _range,
-            }) => Self::AsyncFor(StmtAsyncFor {
-                target: target.into(),
-                iter: iter.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _range,
-            }) => Self::While(StmtWhile {
-                test: test.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::If(ast::StmtIf {
-                test,
-                body,
-                orelse,
-                range: _range,
-            }) => Self::If(StmtIf {
-                test: test.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::With(ast::StmtWith {
-                items,
-                body,
-                type_comment,
-                range: _range,
-            }) => Self::With(StmtWith {
-                items: items.iter().map(Into::into).collect(),
-                body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::AsyncWith(ast::StmtAsyncWith {
-                items,
-                body,
-                type_comment,
-                range: _range,
-            }) => Self::AsyncWith(StmtAsyncWith {
-                items: items.iter().map(Into::into).collect(),
-                body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
-            }),
-            ast::Stmt::Match(ast::StmtMatch {
-                subject,
-                cases,
-                range: _range,
-            }) => Self::Match(StmtMatch {
-                subject: subject.into(),
-                cases: cases.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::Raise(ast::StmtRaise {
-                exc,
-                cause,
-                range: _range,
-            }) => Self::Raise(StmtRaise {
-                exc: exc.as_ref().map(Into::into),
-                cause: cause.as_ref().map(Into::into),
-            }),
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _range,
-            }) => Self::Try(StmtTry {
-                body: body.iter().map(Into::into).collect(),
-                handlers: handlers.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                finalbody: finalbody.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _range,
-            }) => Self::TryStar(StmtTryStar {
-                body: body.iter().map(Into::into).collect(),
-                handlers: handlers.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                finalbody: finalbody.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _range,
-            }) => Self::Assert(StmtAssert {
-                test: test.into(),
-                msg: msg.as_ref().map(Into::into),
-            }),
-            ast::Stmt::Import(ast::StmtImport {
-                names,
-                range: _range,
-            }) => Self::Import(StmtImport {
-                names: names.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level,
-                range: _range,
-            }) => Self::ImportFrom(StmtImportFrom {
-                module: module.as_deref(),
-                names: names.iter().map(Into::into).collect(),
-                level: *level,
-            }),
-            ast::Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _range,
-            }) => Self::Global(StmtGlobal {
-                names: names.iter().map(ast::Identifier::as_str).collect(),
-            }),
-            ast::Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _range,
-            }) => Self::Nonlocal(StmtNonlocal {
-                names: names.iter().map(ast::Identifier::as_str).collect(),
-            }),
-            ast::Stmt::Expr(ast::StmtExpr {
-                value,
-                range: _range,
-            }) => Self::Expr(StmtExpr {
-                value: value.into(),
-            }),
-            ast::Stmt::Pass(_) => Self::Pass,
-            ast::Stmt::Break(_) => Self::Break,
-            ast::Stmt::Continue(_) => Self::Continue,
-        }
+        Self::Verbatim(StmtVerbatim { stmt })
     }
 }

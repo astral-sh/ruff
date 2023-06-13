@@ -12,7 +12,9 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
+use ruff_python_ast::source_code::{
+    Generator, Indexer, Locator, Quote, Stylist, VerbatimGenerator,
+};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
@@ -138,6 +140,16 @@ impl<'a> Checker<'a> {
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
         Generator::new(
+            self.stylist.indentation(),
+            self.f_string_quote_style().unwrap_or(self.stylist.quote()),
+            self.stylist.line_ending(),
+        )
+    }
+
+    /// Create a [`Generator`] to generate source code based on the current AST state.
+    pub(crate) fn verbatim_generator(&self) -> VerbatimGenerator {
+        VerbatimGenerator::new(
+            self.locator,
             self.stylist.indentation(),
             self.f_string_quote_style().unwrap_or(self.stylist.quote()),
             self.stylist.line_ending(),
