@@ -24,7 +24,7 @@ impl Emitter for JsonLinesEmitter {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::jsonlines::JsonLinesEmitter;
+    use crate::message::json_lines::JsonLinesEmitter;
     use insta::assert_snapshot;
 
     use crate::message::tests::{capture_emitter_output, create_messages};
