@@ -134,7 +134,18 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, format } => commands::rule::rule(rule, format)?,
+        Command::Rule { rule, all, format } => {
+            if all {
+                commands::rule::rules(format)?;
+            } else {
+                match rule {
+                    Some(rule) => commands::rule::rule(rule, format)?,
+                    None => {
+                        return Err(anyhow::anyhow!("No rule or --all specified"));
+                    }
+                }
+            }
+        }
         Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
         Command::Linter { format } => commands::linter::linter(format)?,
         Command::Clean => commands::clean::clean(log_level)?,

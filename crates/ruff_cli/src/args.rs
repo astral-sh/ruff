@@ -35,11 +35,15 @@ pub struct Args {
 pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckArgs),
-    /// Explain a rule.
+    /// Explain a rule (or all rules).
     #[clap(alias = "--explain")]
     Rule {
         #[arg(value_parser=Rule::from_code)]
-        rule: Rule,
+        rule: Option<Rule>,
+
+        /// Explain all rules
+        #[arg(long, conflicts_with = "rule")]
+        all: bool,
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
