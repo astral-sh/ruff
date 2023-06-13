@@ -5038,21 +5038,26 @@ impl<'a> Checker<'a> {
         }
 
         // Compute visibility of all definitions.
-        let global_scope = self.semantic_model.global_scope();
-        let exports: Option<&[&str]> = global_scope
-            .get("__all__")
-            .map(|binding_id| &self.semantic_model.bindings[binding_id])
-            .and_then(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => Some(names.as_slice()),
-                _ => None,
-            });
-        let definitions = std::mem::take(&mut self.semantic_model.definitions);
+        let exports: Option<Vec<&str>> = {
+            let global_scope = self.semantic_model.global_scope();
+            global_scope
+                .bindings_for_name("__all__")
+                .map(|binding_id| &self.semantic_model.bindings[binding_id])
+                .filter_map(|binding| match &binding.kind {
+                    BindingKind::Export(Export { names }) => Some(names.iter().copied()),
+                    _ => None,
+                })
+                .fold(None, |acc, names| {
+                    Some(acc.into_iter().flatten().chain(names).collect())
+                })
+        };
 
+        let definitions = std::mem::take(&mut self.semantic_model.definitions);
         let mut overloaded_name: Option<String> = None;
         for ContextualizedDefinition {
             definition,
             visibility,
-        } in definitions.resolve(exports).iter()
+        } in definitions.resolve(exports.as_deref()).iter()
         {
             let docstring = docstrings::extraction::extract_docstring(definition);
 
