@@ -310,7 +310,12 @@ impl Rule {
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
-            Rule::IndentationWithInvalidMultiple
+            Rule::BlankLineAfterDecorator
+            | Rule::BlankLineBetweenMethods
+            | Rule::BlankLinesAfterFunctionOrClass
+            | Rule::BlankLinesBeforeNestedDefinition
+            | Rule::BlankLinesTopLevel
+            | Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
@@ -334,6 +339,7 @@ impl Rule {
             | Rule::TabBeforeKeyword
             | Rule::TabBeforeOperator
             | Rule::TooFewSpacesBeforeInlineComment
+            | Rule::TooManyBlankLines
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
             | Rule::UnexpectedSpacesAroundKeywordParameterEquals

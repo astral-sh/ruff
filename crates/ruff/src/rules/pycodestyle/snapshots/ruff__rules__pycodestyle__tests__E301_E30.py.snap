@@ -2,15 +2,15 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E30.py:6:5: E301 [*] Expected 1 blank line, found 0
-   |
- 6 |     def a():
- 7 |         pass
- 8 |     def b():
-   |     ^^^ E301
- 9 |         pass
-10 | #: E301:6:5
-   |
-   = help: Add missing blank line(s)
+  |
+4 |     def a():
+5 |         pass
+6 |     def b():
+  |     ^^^ E301
+7 |         pass
+8 | #: E301:6:5
+  |
+  = help: Add missing blank line(s)
 
 ℹ Fix
 3 3 | 
@@ -23,12 +23,12 @@ E30.py:6:5: E301 [*] Expected 1 blank line, found 0
 
 E30.py:14:5: E301 [*] Expected 1 blank line, found 0
    |
-14 |         pass
-15 |     # comment
-16 |     def b():
+12 |         pass
+13 |     # comment
+14 |     def b():
    |     ^^^ E301
-17 |         pass
-18 | #:
+15 |         pass
+16 | #:
    |
    = help: Add missing blank line(s)
 
