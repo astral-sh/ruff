@@ -299,6 +299,7 @@ where
                             .ancestors(self.semantic_model.scope_id)
                             .skip(1)
                             .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
+                            // NOTE(charlie): Intentionally include deletions here.
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
@@ -307,18 +308,8 @@ where
                                 stmt.range(),
                                 ExecutionContext::Runtime,
                             );
-                        }
-
-                        // Ensure that every nonlocal has an existing binding from a parent scope.
-                        if self.enabled(Rule::NonlocalWithoutBinding) {
-                            if self
-                                .semantic_model
-                                .scopes
-                                .ancestors(self.semantic_model.scope_id)
-                                .skip(1)
-                                .take_while(|scope| !scope.kind.is_module())
-                                .all(|scope| !scope.declares(name.as_str()))
-                            {
+                        } else {
+                            if self.enabled(Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
@@ -3932,7 +3923,7 @@ where
                         }
 
                         // Add the bound exception name to the scope.
-                        self.add_binding(
+                        let binding_id = self.add_binding(
                             name,
                             range,
                             BindingKind::Assignment,
@@ -3942,27 +3933,30 @@ where
                         walk_excepthandler(self, excepthandler);
 
                         // Remove it from the scope immediately after.
-                        if let Some(binding_id) = {
-                            let scope = self.semantic_model.scope_mut();
-                            scope.delete(name)
-                        } {
-                            if !self.semantic_model.is_used(binding_id) {
-                                if self.enabled(Rule::UnusedVariable) {
-                                    let mut diagnostic = Diagnostic::new(
-                                        pyflakes::rules::UnusedVariable { name: name.into() },
-                                        range,
-                                    );
-                                    if self.patch(Rule::UnusedVariable) {
-                                        diagnostic.try_set_fix(|| {
-                                            let edit = pyflakes::fixes::remove_exception_handler_assignment(
-                                                excepthandler,
-                                                self.locator,
-                                            )?;
-                                            Ok(Fix::automatic(edit))
-                                        });
-                                    }
-                                    self.diagnostics.push(diagnostic);
+                        self.add_binding(
+                            name,
+                            range,
+                            BindingKind::UnboundException,
+                            BindingFlags::empty(),
+                        );
+
+                        // If the exception name wasn't used in the scope, emit a diagnostic.
+                        if !self.semantic_model.is_used(binding_id) {
+                            if self.enabled(Rule::UnusedVariable) {
+                                let mut diagnostic = Diagnostic::new(
+                                    pyflakes::rules::UnusedVariable { name: name.into() },
+                                    range,
+                                );
+                                if self.patch(Rule::UnusedVariable) {
+                                    diagnostic.try_set_fix(|| {
+                                        pyflakes::fixes::remove_exception_handler_assignment(
+                                            excepthandler,
+                                            self.locator,
+                                        )
+                                        .map(Fix::automatic)
+                                    });
                                 }
+                                self.diagnostics.push(diagnostic);
                             }
                         }
                     }
@@ -4224,7 +4218,14 @@ impl<'a> Checker<'a> {
             .ancestors(self.semantic_model.scope_id)
             .enumerate()
             .find_map(|(stack_index, scope)| {
-                scope.get(name).map(|binding_id| (stack_index, binding_id))
+                scope.get(name).and_then(|binding_id| {
+                    let binding = &self.semantic_model.bindings[binding_id];
+                    if binding.is_unbound() {
+                        None
+                    } else {
+                        Some((stack_index, binding_id))
+                    }
+                })
             })
         {
             let shadowed = &self.semantic_model.bindings[shadowed_id];
@@ -4303,7 +4304,7 @@ impl<'a> Checker<'a> {
             .map(|binding_id| &self.semantic_model.bindings[binding_id])
         {
             match &shadowed.kind {
-                BindingKind::Builtin => {
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException => {
                     // Avoid overriding builtins.
                 }
                 kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
@@ -4336,18 +4337,6 @@ impl<'a> Checker<'a> {
         binding_id
     }
 
-    /// Delete a binding from the scope, if it exists.
-    fn delete_binding(&mut self, name: &'a str, range: TextRange) -> Option<BindingId> {
-        // Create a binding to model the deletion.
-        let binding_id =
-            self.semantic_model
-                .push_binding(range, BindingKind::Deletion, BindingFlags::empty());
-
-        // Add the binding to the scope.
-        let scope = self.semantic_model.scope_mut();
-        scope.add(name, binding_id)
-    }
-
     fn bind_builtins(&mut self) {
         for builtin in BUILTINS
             .iter()
@@ -4363,7 +4352,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
         match self.semantic_model.resolve_read(id, expr.range()) {
@@ -4436,6 +4425,7 @@ impl<'a> Checker<'a> {
                     .scope()
                     .get(id)
                     .map_or(false, |binding_id| {
+                        // NOTE(charlie): No change necessary (we're gating on `is_global`).
                         self.semantic_model.bindings[binding_id].kind.is_global()
                     })
                 {
@@ -4571,11 +4561,29 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        if helpers::on_conditional_branch(&mut self.semantic_model.parents()) {
-            return;
-        }
 
-        if self.delete_binding(id.as_str(), expr.range()).is_none() {
+        // Treat the deletion of a name as a reference to that name.
+        if let Some(binding_id) = self.semantic_model.scope().get(id) {
+            self.semantic_model.add_local_reference(
+                binding_id,
+                expr.range(),
+                ExecutionContext::Runtime,
+            );
+
+            // If the name is unbound, then it's an error.
+            if self.enabled(Rule::UndefinedName) {
+                let binding = &self.semantic_model.bindings[binding_id];
+                if binding.is_unbound() {
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedName {
+                            name: id.to_string(),
+                        },
+                        expr.range(),
+                    ));
+                }
+            }
+        } else {
+            // If the name isn't bound at all, then it's an error.
             if self.enabled(Rule::UndefinedName) {
                 self.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedName {
@@ -4585,6 +4593,19 @@ impl<'a> Checker<'a> {
                 ));
             }
         }
+
+        if helpers::on_conditional_branch(&mut self.semantic_model.parents()) {
+            return;
+        }
+
+        // Create a binding to model the deletion.
+        let binding_id = self.semantic_model.push_binding(
+            expr.range(),
+            BindingKind::Deletion,
+            BindingFlags::empty(),
+        );
+        let scope = self.semantic_model.scope_mut();
+        scope.add(id, binding_id);
     }
 
     fn check_deferred_future_type_definitions(&mut self) {
@@ -4770,8 +4791,8 @@ impl<'a> Checker<'a> {
 
         // Mark anything referenced in `__all__` as used.
         let exports: Vec<(&str, TextRange)> = {
-            let global_scope = self.semantic_model.global_scope();
-            global_scope
+            self.semantic_model
+                .global_scope()
                 .bindings_for_name("__all__")
                 .map(|binding_id| &self.semantic_model.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {
@@ -4785,6 +4806,7 @@ impl<'a> Checker<'a> {
         };
 
         for (name, range) in &exports {
+            // NOTE(charlie): It's fine to include deletions here.
             if let Some(binding_id) = self.semantic_model.global_scope().get(name) {
                 self.semantic_model.add_global_reference(
                     binding_id,
@@ -5030,11 +5052,10 @@ impl<'a> Checker<'a> {
         }
 
         // Compute visibility of all definitions.
-
         let exports: Option<Vec<&str>> = {
             let global_scope = self.semantic_model.global_scope();
             global_scope
-                // XXX: This usage is fine, since we're gating on `is_export()`.
+                // NOTE(charlie): No change necessary (we're gating on `is_export()`).
                 .bindings_for_name("__all__")
                 .map(|binding_id| &self.semantic_model.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {

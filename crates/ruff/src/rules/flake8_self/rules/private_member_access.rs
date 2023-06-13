@@ -163,6 +163,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                         if call_path.as_slice() == [name.as_str()] {
                             checker
                                 .semantic_model()
+                                // NOTE(charlie): No change necessary (we're gating on `is_class_definition`).
                                 .find_binding(name)
                                 .map_or(false, |binding| {
                                     // TODO(charlie): Could the name ever be bound to a

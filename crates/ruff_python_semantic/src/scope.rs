@@ -38,9 +38,6 @@ pub struct Scope<'a> {
     /// In this case, the binding created by `x = 2` shadows the binding created by `x = 1`.
     shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
 
-    /// A list of all names that have been deleted in this scope.
-    deleted_symbols: Vec<&'a str>,
-
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
 
@@ -56,7 +53,6 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
-            deleted_symbols: Vec::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }
@@ -69,7 +65,6 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
-            deleted_symbols: Vec::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }
@@ -92,21 +87,12 @@ impl<'a> Scope<'a> {
 
     /// Removes the binding with the given name.
     pub fn delete(&mut self, name: &'a str) -> Option<BindingId> {
-        self.deleted_symbols.push(name);
         self.bindings.remove(name)
     }
 
     /// Returns `true` if this scope has a binding with the given name.
     pub fn has(&self, name: &str) -> bool {
         self.bindings.contains_key(name)
-    }
-
-    /// Returns `true` if the scope declares a symbol with the given name.
-    ///
-    /// Unlike [`Scope::has`], the name may no longer be bound to a value (e.g., it could be
-    /// deleted).
-    pub fn declares(&self, name: &str) -> bool {
-        self.has(name) || self.deleted_symbols.contains(&name)
     }
 
     /// Returns the ids of all bindings defined in this scope.

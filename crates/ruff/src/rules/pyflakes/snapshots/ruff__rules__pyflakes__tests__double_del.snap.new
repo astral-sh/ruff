@@ -1,5 +1,0 @@
----
-source: crates/ruff/src/rules/pyflakes/mod.rs
-assertion_line: 325
----
-
