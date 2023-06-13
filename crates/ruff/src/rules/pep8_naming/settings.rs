@@ -87,7 +87,7 @@ impl Default for Settings {
         Self {
             ignore_names: IGNORE_NAMES
                 .iter()
-                .map(|name| IdentifierPattern::new(*name).unwrap())
+                .map(|name| IdentifierPattern::new(name).unwrap())
                 .collect(),
             classmethod_decorators: Vec::new(),
             staticmethod_decorators: Vec::new(),
@@ -104,7 +104,7 @@ impl TryFrom<Options> for Settings {
                 Some(names) => names
                     .into_iter()
                     .map(|name| {
-                        IdentifierPattern::new(&*name).map_err(SettingsError::InvalidIgnoreName)
+                        IdentifierPattern::new(&name).map_err(SettingsError::InvalidIgnoreName)
                     })
                     .collect::<Result<Vec<_>, Self::Error>>()?,
                 None => IGNORE_NAMES
