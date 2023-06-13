@@ -1052,9 +1052,6 @@ where
                 }
 
                 if self.is_stub {
-                    if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
-                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
-                    }
                     if self.enabled(Rule::FutureAnnotationsInStub) {
                         flake8_pyi::rules::from_future_import(self, import_from);
                     }
@@ -4711,23 +4708,18 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        let enforce_typing_imports = !self.is_stub
-            && self.any_enabled(&[
-                Rule::GlobalVariableNotAssigned,
-                Rule::RuntimeImportInTypeCheckingBlock,
-                Rule::TypingOnlyFirstPartyImport,
-                Rule::TypingOnlyThirdPartyImport,
-                Rule::TypingOnlyStandardLibraryImport,
-            ]);
-
-        if !(enforce_typing_imports
-            || self.any_enabled(&[
-                Rule::UnusedImport,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::RedefinedWhileUnused,
-                Rule::UndefinedExport,
-            ]))
-        {
+        if !self.any_enabled(&[
+            Rule::UnusedImport,
+            Rule::GlobalVariableNotAssigned,
+            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::RedefinedWhileUnused,
+            Rule::RuntimeImportInTypeCheckingBlock,
+            Rule::TypingOnlyFirstPartyImport,
+            Rule::TypingOnlyThirdPartyImport,
+            Rule::TypingOnlyStandardLibraryImport,
+            Rule::UndefinedExport,
+            Rule::UnaliasedCollectionsAbcSetImport,
+        ]) {
             return;
         }
 
@@ -4757,6 +4749,16 @@ impl<'a> Checker<'a> {
         // Identify any valid runtime imports. If a module is imported at runtime, and
         // used at runtime, then by default, we avoid flagging any other
         // imports from that model as typing-only.
+        let enforce_typing_imports = if self.is_stub {
+            false
+        } else {
+            self.any_enabled(&[
+                Rule::RuntimeImportInTypeCheckingBlock,
+                Rule::TypingOnlyFirstPartyImport,
+                Rule::TypingOnlyThirdPartyImport,
+                Rule::TypingOnlyStandardLibraryImport,
+            ])
+        };
         let runtime_imports: Vec<Vec<&Binding>> = if enforce_typing_imports {
             if self.settings.flake8_type_checking.strict {
                 vec![]
@@ -4906,6 +4908,16 @@ impl<'a> Checker<'a> {
 
             if self.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(self, scope, &mut diagnostics);
+            }
+
+            if self.is_stub {
+                if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+                    flake8_pyi::rules::unaliased_collections_abc_set_import(
+                        self,
+                        scope,
+                        &mut diagnostics,
+                    );
+                }
             }
         }
         self.diagnostics.extend(diagnostics);

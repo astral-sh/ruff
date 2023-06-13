@@ -766,6 +766,24 @@ impl<'a> SemanticModel<'a> {
         self.delayed_annotations.get(&binding_id).map(Vec::as_slice)
     }
 
+    /// Return the [`TextRange`]s of all references to the given [`BindingId`].
+    pub fn references(&self, name: &str, scope: &Scope) -> Vec<TextRange> {
+        let mut references = Vec::new();
+
+        for binding_id in scope.bindings_for_name(name) {
+            // Add the "write" reference that created this binding.
+            references.push(self.bindings[binding_id].range);
+
+            // Add all "read" references that use this binding.
+            for reference_id in &self.bindings[binding_id].references {
+                let reference = self.references.resolve(*reference_id);
+                references.push(reference.range());
+            }
+        }
+
+        references
+    }
+
     /// Return the [`ExecutionContext`] of the current scope.
     pub const fn execution_context(&self) -> ExecutionContext {
         if self.in_type_checking_block()

@@ -1,19 +1,12 @@
 from collections.abc import Set as AbstractSet  # Ok
 
+from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
 
 from collections.abc import Set  # PYI025
 
+from collections.abc import Container, Sized, Set, ValuesView  # PYI025
 
-from collections.abc import (
-    Container,
-    Sized,
-    Set,  # PYI025
-    ValuesView
-)
+GLOBAL: Set[int] = set()
 
-from collections.abc import (
-    Container,
-    Sized,
-    Set as AbstractSet,
-    ValuesView # Ok
-)
+class Class:
+    member: Set[int]
