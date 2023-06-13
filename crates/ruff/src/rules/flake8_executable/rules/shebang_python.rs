@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
 /// ## What it does
-/// Checks for a shebang directive that does not contain `python`.
+/// Checks for a shebang directive in `.py` files that does not contain `python`.
 ///
 /// ## Why is this bad?
 /// The shebang directive must contain `python` to indicate that the file is a

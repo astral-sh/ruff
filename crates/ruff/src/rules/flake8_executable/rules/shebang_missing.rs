@@ -12,7 +12,7 @@ use crate::registry::AsRule;
 use crate::rules::flake8_executable::helpers::is_executable;
 
 /// ## What it does
-/// Checks for executable files that do not have a shebang directive.
+/// Checks for executable `.py` files that do not have a shebang directive.
 ///
 /// ## Why is this bad?
 /// Shebangs indicate that a file is executable. If the file has executable
