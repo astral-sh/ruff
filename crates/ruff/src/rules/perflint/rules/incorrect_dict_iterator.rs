@@ -1,21 +1,22 @@
+use std::fmt;
+
 use ruff_text_size::TextRange;
+use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
 
-use crate::registry::AsRule;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::prelude::Ranged;
-use rustpython_parser::ast;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks if a call to `dict.items()` uses only the keys or values
+/// Checks for uses of `dict.items()` that discard either the key or the value
+/// when iterating over the dictionary.
 ///
 /// ## Why is this bad?
-/// Python dictionaries store keys and values in two separate tables. They can be individually
-/// iterated. Using .items() and discarding either the key or the value using _ is inefficient,
-/// when .keys() or .values() can be used instead:
+///
 ///
 /// ## Example
 /// ```python
@@ -32,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct IncorrectDictIterator {
-    subset: String,
+    subset: DictSubset,
 }
 
 impl AlwaysAutofixableViolation for IncorrectDictIterator {
@@ -45,6 +46,21 @@ impl AlwaysAutofixableViolation for IncorrectDictIterator {
     fn autofix_title(&self) -> String {
         let IncorrectDictIterator { subset } = self;
         format!("Replace `.items()` with `.{subset}()`.")
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum DictSubset {
+    Keys,
+    Values,
+}
+
+impl fmt::Display for DictSubset {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DictSubset::Keys => fmt.write_str("keys"),
+            DictSubset::Values => fmt.write_str("values"),
+        }
     }
 }
 
@@ -96,7 +112,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
             if id == "_" {
                 let mut diagnostic = Diagnostic::new(
                     IncorrectDictIterator {
-                        subset: "values".to_string(),
+                        subset: DictSubset::Values,
                     },
                     method_range,
                 );
@@ -124,7 +140,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
             if sub_elts.iter().all(is_ignored_tuple_or_name) {
                 let mut diagnostic = Diagnostic::new(
                     IncorrectDictIterator {
-                        subset: "values".to_string(),
+                        subset: DictSubset::Values,
                     },
                     method_range,
                 );
@@ -155,7 +171,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
             if id == "_" {
                 let mut diagnostic = Diagnostic::new(
                     IncorrectDictIterator {
-                        subset: "keys".to_string(),
+                        subset: DictSubset::Keys,
                     },
                     method_range,
                 );
@@ -182,7 +198,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
             if sub_elts.iter().all(is_ignored_tuple_or_name) {
                 let mut diagnostic = Diagnostic::new(
                     IncorrectDictIterator {
-                        subset: "keys".to_string(),
+                        subset: DictSubset::Keys,
                     },
                     method_range,
                 );
