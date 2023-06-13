@@ -5,13 +5,14 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use anyhow::Result;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
+    use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -102,6 +103,32 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidFunctionName, "N802.py")]
+    #[test_case(Rule::InvalidArgumentName, "N803.py")]
+    #[test_case(Rule::InvalidFirstArgumentNameForClassMethod, "N804.py")]
+    #[test_case(Rule::InvalidFirstArgumentNameForMethod, "N805.py")]
+    #[test_case(Rule::NonLowercaseVariableInFunction, "N806.py")]
+    #[test_case(Rule::MixedCaseVariableInClassScope, "N815.py")]
+    #[test_case(Rule::MixedCaseVariableInGlobalScope, "N816.py")]
+    fn ignore_names(rule_code: Rule, path: &str) -> Result<()> {
+        let snapshot = format!("ignore_names_{}_{path}", rule_code.noqa_code());
+        let diagnostics = test_path(
+            PathBuf::from_iter(["pep8_naming", "ignore_names", path]).as_path(),
+            &settings::Settings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    ignore_names: vec![
+                        IdentifierPattern::new("*Allowed").unwrap(),
+                        IdentifierPattern::new("*ALLOWED").unwrap(),
+                    ],
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
