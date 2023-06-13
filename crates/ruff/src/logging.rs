@@ -231,11 +231,11 @@ impl Display for DisplayParseErrorType<'_> {
                 if let Some(expected) = expected.as_ref() {
                     write!(
                         f,
-                        "expected '{expected}', but got {tok}",
+                        "Expected '{expected}', but got {tok}",
                         tok = TruncateAtNewline(&tok)
                     )
                 } else {
-                    write!(f, "unexpected token {tok}", tok = TruncateAtNewline(&tok))
+                    write!(f, "Unexpected token {tok}", tok = TruncateAtNewline(&tok))
                 }
             }
             ParseErrorType::Lexical(ref error) => write!(f, "{error}"),
