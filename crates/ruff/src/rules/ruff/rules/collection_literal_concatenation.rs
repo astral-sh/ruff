@@ -1,9 +1,11 @@
+use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::has_comments;
+use ruff_python_ast::verbatim_ast;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -32,18 +34,21 @@ fn make_splat_elts(
     splat_element: &Expr,
     other_elements: &[Expr],
     splat_at_left: bool,
-) -> Vec<Expr> {
-    let mut new_elts = other_elements.to_owned();
-    let node = ast::ExprStarred {
-        value: Box::from(splat_element.clone()),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-    };
-    let splat = node.into();
+) -> Vec<verbatim_ast::Expr> {
+    let mut new_elts = other_elements
+        .iter()
+        .map(|e| verbatim_ast::Expr::Verbatim(verbatim_ast::ExprVerbatim { range: e.range() }))
+        .collect_vec();
+    let splat_elt = verbatim_ast::Expr::Starred(verbatim_ast::ExprStarred {
+        value: Box::from(verbatim_ast::Expr::Verbatim(verbatim_ast::ExprVerbatim {
+            range: splat_element.range(),
+        })),
+        ctx: verbatim_ast::ExprContext::Load,
+    });
     if splat_at_left {
-        new_elts.insert(0, splat);
+        new_elts.insert(0, splat_elt);
     } else {
-        new_elts.push(splat);
+        new_elts.push(splat_elt);
     }
     new_elts
 }
@@ -55,7 +60,7 @@ enum Type {
 }
 
 /// Recursively merge all the tuples and lists in the expression.
-fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
+fn concatenate_expressions(expr: &Expr) -> Option<(verbatim_ast::Expr, Type)> {
     let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
         return None;
     };

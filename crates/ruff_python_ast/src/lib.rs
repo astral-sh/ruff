@@ -16,5 +16,6 @@ pub mod str;
 pub mod token_kind;
 pub mod types;
 pub mod typing;
+pub mod verbatim_ast;
 pub mod visitor;
 pub mod whitespace;

@@ -21,6 +21,7 @@ mod indexer;
 mod line_index;
 mod locator;
 mod stylist;
+mod verbatim_generator;
 
 /// Run round-trip source code generation on a given Python code.
 pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {
