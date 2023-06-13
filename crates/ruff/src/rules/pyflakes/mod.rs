@@ -311,6 +311,20 @@ mod tests {
     "#,
         "del_shadowed_local_import_in_local_scope"
     )]
+    #[test_case(
+        r#"
+        def f():
+            x = 1
+
+            try:
+                1 / 0
+            except Exception as x:
+                pass
+
+            print(x)
+            "#,
+        "print_after_shadowing_except"
+    )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(contents, &Settings::for_rules(&Linter::Pyflakes));
         assert_messages!(snapshot, diagnostics);
