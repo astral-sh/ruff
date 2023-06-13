@@ -3160,6 +3160,20 @@ mod tests {
         T: object
         def g(t: 'T'): pass
         "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        T = object
+        def f(t: T): pass
+        "#,
+            &[],
+        );
+        flakes(
+            r#"
+        T = object
+        def g(t: 'T'): pass
+        "#,
             &[],
         );
         flakes(
@@ -3348,6 +3362,16 @@ mod tests {
             r#"
         from __future__ import annotations
         T: object
+        def f(t: T): pass
+        def g(t: 'T'): pass
+        "#,
+            &[Rule::UndefinedName, Rule::UndefinedName],
+        );
+
+        flakes(
+            r#"
+        from __future__ import annotations
+        T = object
         def f(t: T): pass
         def g(t: 'T'): pass
         "#,

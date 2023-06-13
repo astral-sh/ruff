@@ -177,20 +177,22 @@ impl<'a> SemanticModel<'a> {
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
-                // Mark the binding as used.
-                let context = self.execution_context();
-                let reference_id = self.references.push(ScopeId::global(), range, context);
-                self.bindings[binding_id].references.push(reference_id);
-
-                // Mark any submodule aliases as used.
-                if let Some(binding_id) =
-                    self.resolve_submodule(symbol, ScopeId::global(), binding_id)
-                {
+                if !self.bindings[binding_id].kind.is_annotation() {
+                    // Mark the binding as used.
+                    let context = self.execution_context();
                     let reference_id = self.references.push(ScopeId::global(), range, context);
                     self.bindings[binding_id].references.push(reference_id);
-                }
 
-                return ResolvedRead::Resolved(binding_id);
+                    // Mark any submodule aliases as used.
+                    if let Some(binding_id) =
+                        self.resolve_submodule(symbol, ScopeId::global(), binding_id)
+                    {
+                        let reference_id = self.references.push(ScopeId::global(), range, context);
+                        self.bindings[binding_id].references.push(reference_id);
+                    }
+
+                    return ResolvedRead::Resolved(binding_id);
+                }
             }
         }
 
@@ -226,8 +228,7 @@ impl<'a> SemanticModel<'a> {
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
-                // But if it's a type annotation, don't treat it as resolved, unless we're in a
-                // forward reference. For example, given:
+                // But if it's a type annotation, don't treat it as resolved. For example, given:
                 //
                 // ```python
                 // name: str
@@ -236,7 +237,7 @@ impl<'a> SemanticModel<'a> {
                 //
                 // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                 // `name: str` should be treated as used.
-                if !self.in_forward_reference() && self.bindings[binding_id].kind.is_annotation() {
+                if self.bindings[binding_id].kind.is_annotation() {
                     continue;
                 }
 
