@@ -44,6 +44,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "no-space-after-inline-comment",
     "over-indented",
     "prohibited-trailing-comma",
+    "shebang-leading-whitespace",
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
     "unexpected-indentation-comment",
