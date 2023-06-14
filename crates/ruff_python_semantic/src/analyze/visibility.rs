@@ -208,8 +208,7 @@ pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
             // Is this a setter or deleter?
             if decorator_list.iter().any(|decorator| {
                 collect_call_path(&decorator.expression).map_or(false, |call_path| {
-                    call_path.as_slice() == [name, "setter"]
-                        || call_path.as_slice() == [name, "deleter"]
+                    matches!(call_path.as_slice(), [name, "setter" | "deleter"])
                 })
             }) {
                 return Visibility::Private;

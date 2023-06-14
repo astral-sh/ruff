@@ -52,15 +52,13 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
         .semantic()
         .resolve_call_path(expr)
         .and_then(|call_path| {
-            if call_path.as_slice() == ["numpy", "bool"]
-                || call_path.as_slice() == ["numpy", "int"]
-                || call_path.as_slice() == ["numpy", "float"]
-                || call_path.as_slice() == ["numpy", "complex"]
-                || call_path.as_slice() == ["numpy", "object"]
-                || call_path.as_slice() == ["numpy", "str"]
-                || call_path.as_slice() == ["numpy", "long"]
-                || call_path.as_slice() == ["numpy", "unicode"]
-            {
+            if matches!(
+                call_path.as_slice(),
+                [
+                    "numpy",
+                    "bool" | "int" | "float" | "complex" | "object" | "str" | "long" | "unicode"
+                ]
+            ) {
                 Some(call_path[1])
             } else {
                 None
