@@ -225,7 +225,7 @@ F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x1`
 
-ℹ Suggested fix
+ℹ Fix
 37 37 | def f():
 38 38 |     try:
 39 39 |         1 / 0
@@ -245,7 +245,7 @@ F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x2`
 
-ℹ Suggested fix
+ℹ Fix
 42 42 | 
 43 43 |     try:
 44 44 |         1 / 0
