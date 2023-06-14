@@ -15,12 +15,24 @@ use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist}
 
 use crate::autofix::{fix_file, FixResult};
 use crate::directives;
+use crate::jupyter::Notebook;
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
+use crate::source_kind::SourceKind;
+
+fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
+    Notebook::read(path).map_err(|err| {
+        anyhow::anyhow!(
+            "Failed to read notebook file `{}`: {:?}",
+            path.display(),
+            err
+        )
+    })
+}
 
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -32,14 +44,41 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
-    Ok(test_contents(&contents, &path, settings))
+    Ok(test_contents(
+        &mut SourceKind::Python(contents),
+        &path,
+        settings,
+    ))
+}
+
+#[cfg(not(fuzzing))]
+pub(crate) fn test_notebook_path(
+    path: impl AsRef<Path>,
+    expected: impl AsRef<Path>,
+    settings: &Settings,
+) -> Result<Vec<Message>> {
+    let path = test_resource_path("fixtures/jupyter").join(path);
+    let mut source_kind = SourceKind::Jupyter(read_jupyter_notebook(&path)?);
+    let messages = test_contents(&mut source_kind, &path, settings);
+    let expected_notebook =
+        read_jupyter_notebook(&test_resource_path("fixtures/jupyter").join(expected))?;
+    if let SourceKind::Jupyter(notebook) = source_kind {
+        assert_eq!(notebook.cell_offsets(), expected_notebook.cell_offsets());
+        assert_eq!(notebook.index(), expected_notebook.index());
+        assert_eq!(notebook.content(), expected_notebook.content());
+    };
+    Ok(messages)
 }
 
 /// Run [`check_path`] on a snippet of Python code.
 pub fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
-    test_contents(&contents, path, settings)
+    test_contents(
+        &mut SourceKind::Python(contents.to_string()),
+        path,
+        settings,
+    )
 }
 
 thread_local! {
@@ -56,9 +95,10 @@ pub(crate) fn max_iterations() -> usize {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after a fixed number of iterations.
-fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Message> {
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
-    let locator = Locator::new(contents);
+fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings) -> Vec<Message> {
+    let contents = source_kind.content().to_string();
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+    let locator = Locator::new(&contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer = Indexer::from_tokens(&tokens, &locator);
     let directives = directives::extract_directives(
@@ -81,7 +121,7 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
         &directives,
         settings,
         flags::Noqa::Enabled,
-        None,
+        Some(source_kind),
     );
 
     let source_has_errors = error.is_some();
@@ -98,6 +138,7 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
 
         while let Some(FixResult {
             code: fixed_contents,
+            source_map,
             ..
         }) = fix_file(&diagnostics, &Locator::new(&contents))
         {
@@ -113,6 +154,10 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
                     output
                 );
             }
+
+            if let Some(notebook) = source_kind.as_mut_jupyter() {
+                notebook.update(&source_map, &fixed_contents);
+            };
 
             let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&fixed_contents);
             let locator = Locator::new(&fixed_contents);
@@ -138,7 +183,7 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
-                None,
+                Some(source_kind),
             );
 
             if let Some(fixed_error) = fixed_error {
@@ -169,7 +214,7 @@ Source with applied fixes:
 
     let source_code = SourceFileBuilder::new(
         path.file_name().unwrap().to_string_lossy().as_ref(),
-        contents,
+        contents.as_str(),
     )
     .finish();
 
