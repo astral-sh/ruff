@@ -63,58 +63,64 @@ pub(crate) fn numpy_legacy_random(checker: &mut Checker, expr: &Expr) {
         .resolve_call_path(expr)
         .and_then(|call_path| {
             // seeding state
-            if call_path.as_slice() == ["numpy", "random", "seed"]
-            || call_path.as_slice() == ["numpy", "random", "get_state"]
-            || call_path.as_slice() == ["numpy", "random", "set_state"]
-            // simple random data
-            || call_path.as_slice() == ["numpy", "random", "rand"]
-            || call_path.as_slice() == ["numpy", "random", "randn"]
-            || call_path.as_slice() == ["numpy", "random", "randint"]
-            || call_path.as_slice() == ["numpy", "random", "random_integers"]
-            || call_path.as_slice() == ["numpy", "random", "random_sample"]
-            || call_path.as_slice() == ["numpy", "random", "choice"]
-            || call_path.as_slice() == ["numpy", "random", "bytes"]
-            // permutations
-            || call_path.as_slice() == ["numpy", "random", "shuffle"]
-            || call_path.as_slice() == ["numpy", "random", "permutation"]
-            // distributions
-            || call_path.as_slice() == ["numpy", "random", "beta"]
-            || call_path.as_slice() == ["numpy", "random", "binomial"]
-            || call_path.as_slice() == ["numpy", "random", "chisquare"]
-            || call_path.as_slice() == ["numpy", "random", "dirichlet"]
-            || call_path.as_slice() == ["numpy", "random", "exponential"]
-            || call_path.as_slice() == ["numpy", "random", "f"]
-            || call_path.as_slice() == ["numpy", "random", "gamma"]
-            || call_path.as_slice() == ["numpy", "random", "geometric"]
-            || call_path.as_slice() == ["numpy", "random", "get_state"]
-            || call_path.as_slice() == ["numpy", "random", "gumbel"]
-            || call_path.as_slice() == ["numpy", "random", "hypergeometric"]
-            || call_path.as_slice() == ["numpy", "random", "laplace"]
-            || call_path.as_slice() == ["numpy", "random", "logistic"]
-            || call_path.as_slice() == ["numpy", "random", "lognormal"]
-            || call_path.as_slice() == ["numpy", "random", "logseries"]
-            || call_path.as_slice() == ["numpy", "random", "multinomial"]
-            || call_path.as_slice() == ["numpy", "random", "multivariate_normal"]
-            || call_path.as_slice() == ["numpy", "random", "negative_binomial"]
-            || call_path.as_slice() == ["numpy", "random", "noncentral_chisquare"]
-            || call_path.as_slice() == ["numpy", "random", "noncentral_f"]
-            || call_path.as_slice() == ["numpy", "random", "normal"]
-            || call_path.as_slice() == ["numpy", "random", "pareto"]
-            || call_path.as_slice() == ["numpy", "random", "poisson"]
-            || call_path.as_slice() == ["numpy", "random", "power"]
-            || call_path.as_slice() == ["numpy", "random", "rayleigh"]
-            || call_path.as_slice() == ["numpy", "random", "standard_cauchy"]
-            || call_path.as_slice() == ["numpy", "random", "standard_exponential"]
-            || call_path.as_slice() == ["numpy", "random", "standard_gamma"]
-            || call_path.as_slice() == ["numpy", "random", "standard_normal"]
-            || call_path.as_slice() == ["numpy", "random", "standard_t"]
-            || call_path.as_slice() == ["numpy", "random", "triangular"]
-            || call_path.as_slice() == ["numpy", "random", "uniform"]
-            || call_path.as_slice() == ["numpy", "random", "vonmises"]
-            || call_path.as_slice() == ["numpy", "random", "wald"]
-            || call_path.as_slice() == ["numpy", "random", "weibull"]
-            || call_path.as_slice() == ["numpy", "random", "zipf"]
-            {
+            if matches!(
+                call_path.as_slice(),
+                [
+                    "numpy",
+                    "random",
+                    // Seeds
+                    "seed" |
+                    "get_state" |
+                    "set_state" |
+                    // Simple random data
+                    "rand" |
+                    "randn" |
+                    "randint" |
+                    "random_integers" |
+                    "random_sample" |
+                    "choice" |
+                    "bytes" |
+                    // Permutations
+                    "shuffle" |
+                    "permutation" |
+                    // Distributions
+                    "beta" |
+                    "binomial" |
+                    "chisquare" |
+                    "dirichlet" |
+                    "exponential" |
+                    "f" |
+                    "gamma" |
+                    "geometric" |
+                    "gumbel" |
+                    "hypergeometric" |
+                    "laplace" |
+                    "logistic" |
+                    "lognormal" |
+                    "logseries" |
+                    "multinomial" |
+                    "multivariate_normal" |
+                    "negative_binomial" |
+                    "noncentral_chisquare" |
+                    "noncentral_f" |
+                    "normal" |
+                    "pareto" |
+                    "poisson" |
+                    "power" |
+                    "rayleigh" |
+                    "standard_cauchy" |
+                    "standard_exponential" |
+                    "standard_gamma" |
+                    "standard_normal" |
+                    "standard_t" |
+                    "triangular" |
+                    "uniform" |
+                    "vonmises" |
+                    "wald" |
+                    "weibull" |
+                    "zipf"
+                ]
+            ) {
                 Some(call_path[2])
             } else {
                 None

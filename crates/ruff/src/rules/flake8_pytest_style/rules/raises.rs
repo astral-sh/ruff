@@ -49,7 +49,7 @@ impl Violation for PytestRaisesWithoutException {
 
 fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["pytest", "raises"]
+        matches!(call_path.as_slice(), ["pytest", "raises"])
     })
 }
 

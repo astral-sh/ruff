@@ -52,9 +52,7 @@ fn match_typed_dict_assign<'a>(
     }) = value else {
         return None;
     };
-    if !semantic.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypedDict"]
-    }) {
+    if !semantic.match_typing_expr(func, "TypedDict") {
         return None;
     }
     Some((class_name, args, keywords, func))

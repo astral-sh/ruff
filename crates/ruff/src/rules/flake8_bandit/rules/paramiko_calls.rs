@@ -21,7 +21,7 @@ pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["paramiko", "exec_command"]
+            matches!(call_path.as_slice(), ["paramiko", "exec_command"])
         })
     {
         checker

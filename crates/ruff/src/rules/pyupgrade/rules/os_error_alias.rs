@@ -49,9 +49,9 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if an [`Expr`] is `OSError`.
 fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_call_path(expr)
-        .map_or(false, |call_path| call_path.as_slice() == ["", "OSError"])
+    semantic.resolve_call_path(expr).map_or(false, |call_path| {
+        matches!(call_path.as_slice(), ["", "OSError"])
+    })
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].

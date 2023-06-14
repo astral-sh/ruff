@@ -52,9 +52,7 @@ fn match_named_tuple_assign<'a>(
     }) = value else {
         return None;
     };
-    if !semantic.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "NamedTuple"]
-    }) {
+    if !semantic.match_typing_expr(func, "NamedTuple") {
         return None;
     }
     Some((typename, args, keywords, func))

@@ -68,7 +68,9 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
     if !checker
         .semantic()
         .resolve_call_path(args.first().unwrap())
-        .map_or(false, |call_path| call_path.as_slice() == ["", "Exception"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["", "Exception"])
+        })
     {
         return;
     }
@@ -81,7 +83,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
             .semantic()
             .resolve_call_path(func)
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["pytest", "raises"]
+                matches!(call_path.as_slice(), ["pytest", "raises"])
             })
             && !keywords
                 .iter()

@@ -191,16 +191,16 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
                     .any(|target| call_path.as_slice() == *target)
                 {
                     true
-                } else if call_path.as_slice() == ["typing", "Union"] {
+                } else if matches!(call_path.as_slice(), ["typing", "Union"]) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.iter()
                             .all(|elt| is_immutable_annotation(elt, semantic))
                     } else {
                         false
                     }
-                } else if call_path.as_slice() == ["typing", "Optional"] {
+                } else if matches!(call_path.as_slice(), ["typing", "Optional"]) {
                     is_immutable_annotation(slice, semantic)
-                } else if call_path.as_slice() == ["typing", "Annotated"] {
+                } else if matches!(call_path.as_slice(), ["typing", "Annotated"]) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first()
                             .map_or(false, |elt| is_immutable_annotation(elt, semantic))
@@ -290,7 +290,7 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
 
     // Ex) `if typing.TYPE_CHECKING:`
     if semantic.resolve_call_path(test).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TYPE_CHECKING"]
+        matches!(call_path.as_slice(), ["typing", "TYPE_CHECKING"])
     }) {
         return true;
     }

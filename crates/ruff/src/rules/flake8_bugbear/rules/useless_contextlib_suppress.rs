@@ -30,7 +30,7 @@ pub(crate) fn useless_contextlib_suppress(
             .semantic()
             .resolve_call_path(func)
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["contextlib", "suppress"]
+                matches!(call_path.as_slice(), ["contextlib", "suppress"])
             })
     {
         checker

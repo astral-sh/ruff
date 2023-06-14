@@ -5,15 +5,17 @@ use ruff_python_semantic::SemanticModel;
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(base: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(base).map_or(false, |call_path| {
-        call_path.as_slice() == ["django", "db", "models", "Model"]
+        matches!(call_path.as_slice(), ["django", "db", "models", "Model"])
     })
 }
 
 /// Return `true` if a Python class appears to be a Django model form, based on its base classes.
 pub(super) fn is_model_form(base: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(base).map_or(false, |call_path| {
-        call_path.as_slice() == ["django", "forms", "ModelForm"]
-            || call_path.as_slice() == ["django", "forms", "models", "ModelForm"]
+        matches!(
+            call_path.as_slice(),
+            ["django", "forms", "ModelForm"] | ["django", "forms", "models", "ModelForm"]
+        )
     })
 }
 

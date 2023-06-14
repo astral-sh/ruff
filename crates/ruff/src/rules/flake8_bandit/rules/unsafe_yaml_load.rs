@@ -40,7 +40,9 @@ pub(crate) fn unsafe_yaml_load(
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["yaml", "load"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["yaml", "load"])
+        })
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(loader_arg) = call_args.argument("Loader", 1) {
@@ -48,8 +50,7 @@ pub(crate) fn unsafe_yaml_load(
                 .semantic()
                 .resolve_call_path(loader_arg)
                 .map_or(false, |call_path| {
-                    call_path.as_slice() == ["yaml", "SafeLoader"]
-                        || call_path.as_slice() == ["yaml", "CSafeLoader"]
+                    matches!(call_path.as_slice(), ["yaml", "SafeLoader" | "CSafeLoader"])
                 })
             {
                 let loader = match loader_arg {

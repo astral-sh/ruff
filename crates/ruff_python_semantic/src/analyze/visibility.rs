@@ -19,7 +19,7 @@ pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["", "staticmethod"]
+                matches!(call_path.as_slice(), ["", "staticmethod"])
             })
     })
 }
@@ -30,7 +30,7 @@ pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) ->
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["", "classmethod"]
+                matches!(call_path.as_slice(), ["", "classmethod"])
             })
     })
 }
@@ -81,11 +81,12 @@ pub fn is_property(
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["", "property"]
-                    || call_path.as_slice() == ["functools", "cached_property"]
-                    || extra_properties
-                        .iter()
-                        .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
+                matches!(
+                    call_path.as_slice(),
+                    ["", "property"] | ["functools", "cached_property"]
+                ) || extra_properties
+                    .iter()
+                    .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
             })
     })
 }

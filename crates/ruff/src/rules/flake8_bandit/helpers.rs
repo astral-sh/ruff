@@ -29,16 +29,14 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
                 semantic
                     .resolve_call_path(type_)
                     .map_or(false, |call_path| {
-                        call_path.as_slice() == ["", "Exception"]
-                            || call_path.as_slice() == ["", "BaseException"]
+                        matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
                     })
             })
         } else {
             semantic
                 .resolve_call_path(type_)
                 .map_or(false, |call_path| {
-                    call_path.as_slice() == ["", "Exception"]
-                        || call_path.as_slice() == ["", "BaseException"]
+                    matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
                 })
         }
     })

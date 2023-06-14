@@ -39,7 +39,7 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["dataclasses", "dataclass"]
+                matches!(call_path.as_slice(), ["dataclasses", "dataclass"])
             })
     })
 }

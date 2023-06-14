@@ -106,7 +106,7 @@ pub(crate) fn unrecognized_platform(
         .semantic()
         .resolve_call_path(left)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["sys", "platform"]
+            matches!(call_path.as_slice(), ["sys", "platform"])
         })
     {
         return;

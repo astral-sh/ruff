@@ -32,7 +32,7 @@ pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location:
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "utcnow"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "utcnow"])
         })
     {
         checker

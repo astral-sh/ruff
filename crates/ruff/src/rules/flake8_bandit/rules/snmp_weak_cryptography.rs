@@ -30,7 +30,7 @@ pub(crate) fn snmp_weak_cryptography(
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["pysnmp", "hlapi", "UsmUserData"]
+            matches!(call_path.as_slice(), ["pysnmp", "hlapi", "UsmUserData"])
         })
     {
         let call_args = SimpleCallArgs::new(args, keywords);

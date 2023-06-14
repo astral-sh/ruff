@@ -134,7 +134,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     if !semantic
         .resolve_call_path(value)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["collections", "abc", "Callable"]
+            matches!(call_path.as_slice(), ["collections", "abc", "Callable"])
                 || semantic.match_typing_call_path(&call_path, "Callable")
         })
     {

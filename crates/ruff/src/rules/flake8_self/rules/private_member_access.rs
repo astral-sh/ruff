@@ -136,16 +136,13 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
             if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                 // Ignore `super()` calls.
                 if let Some(call_path) = collect_call_path(func) {
-                    if call_path.as_slice() == ["super"] {
+                    if matches!(call_path.as_slice(), ["super"]) {
                         return;
                     }
                 }
             } else if let Some(call_path) = collect_call_path(value) {
                 // Ignore `self` and `cls` accesses.
-                if call_path.as_slice() == ["self"]
-                    || call_path.as_slice() == ["cls"]
-                    || call_path.as_slice() == ["mcs"]
-                {
+                if matches!(call_path.as_slice(), ["self" | "cls" | "mcs"]) {
                     return;
                 }
 
