@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
     Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
 };
 
-use ruff_diagnostics::{Diagnostic, IsolationLevel};
+use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
@@ -3912,12 +3912,13 @@ where
                 }
                 match name {
                     Some(name) => {
+                        let range = helpers::excepthandler_name_range(excepthandler, self.locator)
+                            .expect("Failed to find `name` range");
+
                         if self.enabled(Rule::AmbiguousVariableName) {
-                            if let Some(diagnostic) = pycodestyle::rules::ambiguous_variable_name(
-                                name,
-                                helpers::excepthandler_name_range(excepthandler, self.locator)
-                                    .expect("Failed to find `name` range"),
-                            ) {
+                            if let Some(diagnostic) =
+                                pycodestyle::rules::ambiguous_variable_name(name, range)
+                            {
                                 self.diagnostics.push(diagnostic);
                             }
                         }
@@ -3930,31 +3931,17 @@ where
                             );
                         }
 
-                        let name_range =
-                            helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
-
-                        if self.semantic_model.scope().has(name) {
-                            self.handle_node_store(
-                                name,
-                                &Expr::Name(ast::ExprName {
-                                    id: name.into(),
-                                    ctx: ExprContext::Store,
-                                    range: name_range,
-                                }),
-                            );
-                        }
-
-                        self.handle_node_store(
+                        // Add the bound exception name to the scope.
+                        self.add_binding(
                             name,
-                            &Expr::Name(ast::ExprName {
-                                id: name.into(),
-                                ctx: ExprContext::Store,
-                                range: name_range,
-                            }),
+                            range,
+                            BindingKind::Assignment,
+                            BindingFlags::empty(),
                         );
 
                         walk_excepthandler(self, excepthandler);
 
+                        // Remove it from the scope immediately after.
                         if let Some(binding_id) = {
                             let scope = self.semantic_model.scope_mut();
                             scope.delete(name)
@@ -3963,15 +3950,15 @@ where
                                 if self.enabled(Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         pyflakes::rules::UnusedVariable { name: name.into() },
-                                        name_range,
+                                        range,
                                     );
                                     if self.patch(Rule::UnusedVariable) {
-                                        #[allow(deprecated)]
-                                        diagnostic.try_set_fix_from_edit(|| {
-                                            pyflakes::fixes::remove_exception_handler_assignment(
+                                        diagnostic.try_set_fix(|| {
+                                            let edit = pyflakes::fixes::remove_exception_handler_assignment(
                                                 excepthandler,
                                                 self.locator,
-                                            )
+                                            )?;
+                                            Ok(Fix::automatic(edit))
                                         });
                                     }
                                     self.diagnostics.push(diagnostic);
