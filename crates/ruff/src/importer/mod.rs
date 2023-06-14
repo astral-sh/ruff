@@ -239,7 +239,7 @@ impl<'a> Importer<'a> {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
-            if semantic_model.is_unbound(symbol.member) {
+            if semantic_model.is_available(symbol.member) {
                 let Ok(import_edit) = self.add_member(stmt, symbol.member) else {
                     return Err(ResolutionError::InvalidEdit);
                 };
@@ -252,7 +252,7 @@ impl<'a> Importer<'a> {
                 ImportStyle::Import => {
                     // Case 2a: No `functools` import is in scope; thus, we add `import functools`,
                     // and return `"functools.cache"` as the bound name.
-                    if semantic_model.is_unbound(symbol.module) {
+                    if semantic_model.is_available(symbol.module) {
                         let import_edit =
                             self.add_import(&AnyImport::Import(Import::module(symbol.module)), at);
                         Ok((
@@ -270,7 +270,7 @@ impl<'a> Importer<'a> {
                 ImportStyle::ImportFrom => {
                     // Case 2b: No `functools` import is in scope; thus, we add
                     // `from functools import cache`, and return `"cache"` as the bound name.
-                    if semantic_model.is_unbound(symbol.member) {
+                    if semantic_model.is_available(symbol.member) {
                         let import_edit = self.add_import(
                             &AnyImport::ImportFrom(ImportFrom::member(
                                 symbol.module,

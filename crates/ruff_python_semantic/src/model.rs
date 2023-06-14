@@ -191,8 +191,9 @@ impl<'a> SemanticModel<'a> {
             .map_or(false, |binding| binding.kind.is_builtin())
     }
 
-    /// Return `true` if `member` is unbound.
-    pub fn is_unbound(&self, member: &str) -> bool {
+    /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
+    /// in the current scope, or in any containing scope.
+    pub fn is_available(&self, member: &str) -> bool {
         self.find_binding(member)
             .map_or(true, |binding| binding.kind.is_builtin())
     }
@@ -203,7 +204,7 @@ impl<'a> SemanticModel<'a> {
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
-                if !self.bindings[binding_id].kind.is_annotation() {
+                if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let context = self.execution_context();
                     let reference_id = self.references.push(ScopeId::global(), range, context);
@@ -254,17 +255,29 @@ impl<'a> SemanticModel<'a> {
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
-                // But if it's a type annotation, don't treat it as resolved. For example, given:
-                //
-                // ```python
-                // name: str
-                // print(name)
-                // ```
-                //
-                // The `name` in `print(name)` should be treated as unresolved, but the `name` in
-                // `name: str` should be treated as used.
-                if self.bindings[binding_id].kind.is_annotation() {
-                    continue;
+                match self.bindings[binding_id].kind {
+                    // If it's a type annotation, don't treat it as resolved. For example, given:
+                    //
+                    // ```python
+                    // name: str
+                    // print(name)
+                    // ```
+                    //
+                    // The `name` in `print(name)` should be treated as unresolved, but the `name` in
+                    // `name: str` should be treated as used.
+                    BindingKind::Annotation => continue,
+                    // If it's a deletion, don't treat it as resolved, since the name is now
+                    // unbound. For example, given:
+                    //
+                    // ```python
+                    // x = 1
+                    // del x
+                    // print(x)
+                    // ```
+                    //
+                    // The `x` in `print(x)` should be treated as unresolved.
+                    BindingKind::Deletion | BindingKind::UnboundException => break,
+                    _ => {}
                 }
 
                 return ResolvedRead::Resolved(binding_id);
@@ -618,9 +631,11 @@ impl<'a> SemanticModel<'a> {
     pub fn set_globals(&mut self, globals: Globals<'a>) {
         // If any global bindings don't already exist in the global scope, add them.
         for (name, range) in globals.iter() {
-            if self.global_scope().get(name).map_or(true, |binding_id| {
-                self.bindings[binding_id].kind.is_annotation()
-            }) {
+            if self
+                .global_scope()
+                .get(name)
+                .map_or(true, |binding_id| self.bindings[binding_id].is_unbound())
+            {
                 let id = self.bindings.push(Binding {
                     kind: BindingKind::Assignment,
                     range: *range,

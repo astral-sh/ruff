@@ -41,9 +41,18 @@ impl<'a> Binding<'a> {
     }
 
     /// Return `true` if this [`Binding`] represents an explicit re-export
-    /// (e.g., `import FastAPI as FastAPI`).
+    /// (e.g., `FastAPI` in `from fastapi import FastAPI as FastAPI`).
     pub const fn is_explicit_export(&self) -> bool {
         self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
+    }
+
+    /// Return `true` if this [`Binding`] represents an unbound variable
+    /// (e.g., `x` in `x = 1; del x`).
+    pub const fn is_unbound(&self) -> bool {
+        matches!(
+            self.kind,
+            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException
+        )
     }
 
     /// Return `true` if this binding redefines the given binding.
@@ -83,10 +92,10 @@ impl<'a> Binding<'a> {
                     _ => {}
                 }
             }
-            BindingKind::Annotation => {
-                return false;
-            }
-            BindingKind::FutureImportation => {
+            BindingKind::Deletion
+            | BindingKind::Annotation
+            | BindingKind::FutureImportation
+            | BindingKind::Builtin => {
                 return false;
             }
             _ => {}
@@ -95,7 +104,6 @@ impl<'a> Binding<'a> {
             existing.kind,
             BindingKind::ClassDefinition
                 | BindingKind::FunctionDefinition
-                | BindingKind::Builtin
                 | BindingKind::Importation(..)
                 | BindingKind::FromImportation(..)
                 | BindingKind::SubmoduleImportation(..)
@@ -367,6 +375,24 @@ pub enum BindingKind<'a> {
     /// import foo.bar
     /// ```
     SubmoduleImportation(SubmoduleImportation<'a>),
+
+    /// A binding for a deletion, like `x` in:
+    /// ```python
+    /// del x
+    /// ```
+    Deletion,
+
+    /// A binding to unbind the local variable, like `x` in:
+    /// ```python
+    /// try:
+    ///    ...
+    /// except Exception as x:
+    ///   ...
+    /// ```
+    ///
+    /// After the `except` block, `x` is unbound, despite the lack
+    /// of an explicit `del` statement.
+    UnboundException,
 }
 
 bitflags! {

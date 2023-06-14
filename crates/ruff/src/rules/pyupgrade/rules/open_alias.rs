@@ -31,9 +31,8 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
     {
         let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            if checker.semantic_model().is_unbound("open") {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            if checker.semantic_model().is_available("open") {
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     "open".to_string(),
                     func.range(),
                 )));
