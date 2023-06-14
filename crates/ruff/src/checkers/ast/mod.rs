@@ -4208,7 +4208,7 @@ impl<'a> Checker<'a> {
 
         // Create the `Binding`.
         let binding_id = self.semantic_model.push_binding(range, kind, flags);
-        let binding = &self.semantic_model.bindings[binding_id];
+        let binding = self.semantic_model.binding(binding_id);
 
         // Determine whether the binding shadows any existing bindings.
         if let Some((stack_index, shadowed_id)) = self
@@ -4218,7 +4218,7 @@ impl<'a> Checker<'a> {
             .enumerate()
             .find_map(|(stack_index, scope)| {
                 scope.get(name).and_then(|binding_id| {
-                    let binding = &self.semantic_model.bindings[binding_id];
+                    let binding = self.semantic_model.binding(binding_id);
                     if binding.is_unbound() {
                         None
                     } else {
@@ -4227,7 +4227,7 @@ impl<'a> Checker<'a> {
                 })
             })
         {
-            let shadowed = &self.semantic_model.bindings[shadowed_id];
+            let shadowed = self.semantic_model.binding(shadowed_id);
             let in_current_scope = stack_index == 0;
             if !shadowed.kind.is_builtin()
                 && shadowed.source.map_or(true, |left| {
@@ -4321,10 +4321,7 @@ impl<'a> Checker<'a> {
 
             // If this is an annotation, and we already have an existing value in the same scope,
             // don't treat it as an assignment (i.e., avoid adding it to the scope).
-            if self.semantic_model.bindings[binding_id]
-                .kind
-                .is_annotation()
-            {
+            if self.semantic_model.binding(binding_id).kind.is_annotation() {
                 return binding_id;
             }
         }
@@ -4424,7 +4421,7 @@ impl<'a> Checker<'a> {
                     .scope()
                     .get(id)
                     .map_or(false, |binding_id| {
-                        self.semantic_model.bindings[binding_id].kind.is_global()
+                        self.semantic_model.binding(binding_id).kind.is_global()
                     })
                 {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
@@ -4570,7 +4567,7 @@ impl<'a> Checker<'a> {
 
             // If the name is unbound, then it's an error.
             if self.enabled(Rule::UndefinedName) {
-                let binding = &self.semantic_model.bindings[binding_id];
+                let binding = self.semantic_model.binding(binding_id);
                 if binding.is_unbound() {
                     self.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::UndefinedName {
@@ -4734,10 +4731,7 @@ impl<'a> Checker<'a> {
                         let parent = &self.semantic_model.scopes[scope.parent.unwrap()];
                         self.diagnostics
                             .extend(flake8_unused_arguments::rules::unused_arguments(
-                                self,
-                                parent,
-                                scope,
-                                &self.semantic_model.bindings,
+                                self, parent, scope,
                             ));
                     }
                 }
@@ -4826,7 +4820,7 @@ impl<'a> Checker<'a> {
                     .map(|scope| {
                         scope
                             .binding_ids()
-                            .map(|binding_id| &self.semantic_model.bindings[binding_id])
+                            .map(|binding_id| self.semantic_model.binding(binding_id))
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(
                                     &self.semantic_model,
@@ -4885,7 +4879,7 @@ impl<'a> Checker<'a> {
             // PLW0602
             if self.enabled(Rule::GlobalVariableNotAssigned) {
                 for (name, binding_id) in scope.bindings() {
-                    let binding = &self.semantic_model.bindings[binding_id];
+                    let binding = self.semantic_model.binding(binding_id);
                     if binding.kind.is_global() {
                         if let Some(source) = binding.source {
                             let stmt = &self.semantic_model.stmts[source];
@@ -4913,7 +4907,7 @@ impl<'a> Checker<'a> {
             if self.enabled(Rule::RedefinedWhileUnused) {
                 for (name, binding_id) in scope.bindings() {
                     if let Some(shadowed_id) = self.semantic_model.shadowed_binding(binding_id) {
-                        let shadowed = &self.semantic_model.bindings[shadowed_id];
+                        let shadowed = self.semantic_model.binding(shadowed_id);
                         if shadowed.is_used() {
                             continue;
                         }
@@ -4925,7 +4919,7 @@ impl<'a> Checker<'a> {
                                 .start(),
                         );
 
-                        let binding = &self.semantic_model.bindings[binding_id];
+                        let binding = self.semantic_model.binding(binding_id);
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::RedefinedWhileUnused {
                                 name: (*name).to_string(),

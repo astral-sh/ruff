@@ -106,6 +106,18 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
+    /// Return the [`Binding`] for the given [`BindingId`].
+    #[inline]
+    pub fn binding(&self, id: BindingId) -> &Binding {
+        &self.bindings[id]
+    }
+
+    /// Resolve the [`Reference`] for the given [`ReferenceId`].
+    #[inline]
+    pub fn reference(&self, id: ReferenceId) -> &Reference {
+        &self.references[id]
+    }
+
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
         self.resolve_call_path(expr).map_or(false, |call_path| {
@@ -710,11 +722,6 @@ impl<'a> SemanticModel<'a> {
     ) {
         let reference_id = self.references.push(ScopeId::global(), range, context);
         self.bindings[binding_id].references.push(reference_id);
-    }
-
-    /// Resolve a [`ReferenceId`].
-    pub fn reference(&self, reference_id: ReferenceId) -> &Reference {
-        self.references.resolve(reference_id)
     }
 
     /// Return the [`ExecutionContext`] of the current scope.
