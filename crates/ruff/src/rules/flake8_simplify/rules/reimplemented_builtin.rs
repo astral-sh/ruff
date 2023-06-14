@@ -56,6 +56,156 @@ impl Violation for ReimplementedBuiltin {
     }
 }
 
+/// SIM110, SIM111
+pub(crate) fn convert_for_loop_to_any_all(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    sibling: Option<&Stmt>,
+) {
+    // There are two cases to consider:
+    // - `for` loop with an `else: return True` or `else: return False`.
+    // - `for` loop followed by `return True` or `return False`
+    if let Some(loop_info) = return_values_for_else(stmt)
+        .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
+    {
+        // Check if loop_info.target, loop_info.iter, or loop_info.test contains `await`.
+        if contains_await(loop_info.target)
+            || contains_await(loop_info.iter)
+            || contains_await(loop_info.test)
+        {
+            return;
+        }
+        if loop_info.return_value && !loop_info.next_return_value {
+            if checker.enabled(Rule::ReimplementedBuiltin) {
+                let contents = return_stmt(
+                    "any",
+                    loop_info.test,
+                    loop_info.target,
+                    loop_info.iter,
+                    checker.generator(),
+                );
+
+                // Don't flag if the resulting expression would exceed the maximum line length.
+                let line_start = checker.locator.line_start(stmt.start());
+                if LineWidth::new(checker.settings.tab_size)
+                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+                    .add_str(&contents)
+                    > checker.settings.line_length
+                {
+                    return;
+                }
+
+                let mut diagnostic = Diagnostic::new(
+                    ReimplementedBuiltin {
+                        repl: contents.clone(),
+                    },
+                    TextRange::new(stmt.start(), loop_info.terminal),
+                );
+                if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("any") {
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                        contents,
+                        stmt.start(),
+                        loop_info.terminal,
+                    )));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+
+        if !loop_info.return_value && loop_info.next_return_value {
+            if checker.enabled(Rule::ReimplementedBuiltin) {
+                // Invert the condition.
+                let test = {
+                    if let Expr::UnaryOp(ast::ExprUnaryOp {
+                        op: Unaryop::Not,
+                        operand,
+                        range: _,
+                    }) = &loop_info.test
+                    {
+                        *operand.clone()
+                    } else if let Expr::Compare(ast::ExprCompare {
+                        left,
+                        ops,
+                        comparators,
+                        range: _,
+                    }) = &loop_info.test
+                    {
+                        if let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) {
+                            let op = match op {
+                                Cmpop::Eq => Cmpop::NotEq,
+                                Cmpop::NotEq => Cmpop::Eq,
+                                Cmpop::Lt => Cmpop::GtE,
+                                Cmpop::LtE => Cmpop::Gt,
+                                Cmpop::Gt => Cmpop::LtE,
+                                Cmpop::GtE => Cmpop::Lt,
+                                Cmpop::Is => Cmpop::IsNot,
+                                Cmpop::IsNot => Cmpop::Is,
+                                Cmpop::In => Cmpop::NotIn,
+                                Cmpop::NotIn => Cmpop::In,
+                            };
+                            let node = ast::ExprCompare {
+                                left: left.clone(),
+                                ops: vec![op],
+                                comparators: vec![comparator.clone()],
+                                range: TextRange::default(),
+                            };
+                            node.into()
+                        } else {
+                            let node = ast::ExprUnaryOp {
+                                op: Unaryop::Not,
+                                operand: Box::new(loop_info.test.clone()),
+                                range: TextRange::default(),
+                            };
+                            node.into()
+                        }
+                    } else {
+                        let node = ast::ExprUnaryOp {
+                            op: Unaryop::Not,
+                            operand: Box::new(loop_info.test.clone()),
+                            range: TextRange::default(),
+                        };
+                        node.into()
+                    }
+                };
+                let contents = return_stmt(
+                    "all",
+                    &test,
+                    loop_info.target,
+                    loop_info.iter,
+                    checker.generator(),
+                );
+
+                // Don't flag if the resulting expression would exceed the maximum line length.
+                let line_start = checker.locator.line_start(stmt.start());
+                if LineWidth::new(checker.settings.tab_size)
+                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+                    .add_str(&contents)
+                    > checker.settings.line_length
+                {
+                    return;
+                }
+
+                let mut diagnostic = Diagnostic::new(
+                    ReimplementedBuiltin {
+                        repl: contents.clone(),
+                    },
+                    TextRange::new(stmt.start(), loop_info.terminal),
+                );
+                if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("all") {
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                        contents,
+                        stmt.start(),
+                        loop_info.terminal,
+                    )));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+    }
+}
+
 struct Loop<'a> {
     return_value: bool,
     next_return_value: bool,
@@ -225,157 +375,7 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     generator.stmt(&node3.into())
 }
 
-/// Return `true` if the `Expr` contains an `await` expression.
+/// Return `true` if the [`Expr`] contains an `await` expression.
 fn contains_await(expr: &Expr) -> bool {
-    any_over_expr(expr, &|expr| matches!(expr, Expr::Await(_)))
-}
-
-/// SIM110, SIM111
-pub(crate) fn convert_for_loop_to_any_all(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    sibling: Option<&Stmt>,
-) {
-    // There are two cases to consider:
-    // - `for` loop with an `else: return True` or `else: return False`.
-    // - `for` loop followed by `return True` or `return False`
-    if let Some(loop_info) = return_values_for_else(stmt)
-        .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
-    {
-        // Check if loop_info.target, loop_info.iter, or loop_info.test contains `await`.
-        if contains_await(loop_info.target)
-            || contains_await(loop_info.iter)
-            || contains_await(loop_info.test)
-        {
-            return;
-        }
-        if loop_info.return_value && !loop_info.next_return_value {
-            if checker.enabled(Rule::ReimplementedBuiltin) {
-                let contents = return_stmt(
-                    "any",
-                    loop_info.test,
-                    loop_info.target,
-                    loop_info.iter,
-                    checker.generator(),
-                );
-
-                // Don't flag if the resulting expression would exceed the maximum line length.
-                let line_start = checker.locator.line_start(stmt.start());
-                if LineWidth::new(checker.settings.tab_size)
-                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
-                    .add_str(&contents)
-                    > checker.settings.line_length
-                {
-                    return;
-                }
-
-                let mut diagnostic = Diagnostic::new(
-                    ReimplementedBuiltin {
-                        repl: contents.clone(),
-                    },
-                    TextRange::new(stmt.start(), loop_info.terminal),
-                );
-                if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("any") {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
-                        contents,
-                        stmt.start(),
-                        loop_info.terminal,
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-        }
-
-        if !loop_info.return_value && loop_info.next_return_value {
-            if checker.enabled(Rule::ReimplementedBuiltin) {
-                // Invert the condition.
-                let test = {
-                    if let Expr::UnaryOp(ast::ExprUnaryOp {
-                        op: Unaryop::Not,
-                        operand,
-                        range: _,
-                    }) = &loop_info.test
-                    {
-                        *operand.clone()
-                    } else if let Expr::Compare(ast::ExprCompare {
-                        left,
-                        ops,
-                        comparators,
-                        range: _,
-                    }) = &loop_info.test
-                    {
-                        if let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) {
-                            let op = match op {
-                                Cmpop::Eq => Cmpop::NotEq,
-                                Cmpop::NotEq => Cmpop::Eq,
-                                Cmpop::Lt => Cmpop::GtE,
-                                Cmpop::LtE => Cmpop::Gt,
-                                Cmpop::Gt => Cmpop::LtE,
-                                Cmpop::GtE => Cmpop::Lt,
-                                Cmpop::Is => Cmpop::IsNot,
-                                Cmpop::IsNot => Cmpop::Is,
-                                Cmpop::In => Cmpop::NotIn,
-                                Cmpop::NotIn => Cmpop::In,
-                            };
-                            let node = ast::ExprCompare {
-                                left: left.clone(),
-                                ops: vec![op],
-                                comparators: vec![comparator.clone()],
-                                range: TextRange::default(),
-                            };
-                            node.into()
-                        } else {
-                            let node = ast::ExprUnaryOp {
-                                op: Unaryop::Not,
-                                operand: Box::new(loop_info.test.clone()),
-                                range: TextRange::default(),
-                            };
-                            node.into()
-                        }
-                    } else {
-                        let node = ast::ExprUnaryOp {
-                            op: Unaryop::Not,
-                            operand: Box::new(loop_info.test.clone()),
-                            range: TextRange::default(),
-                        };
-                        node.into()
-                    }
-                };
-                let contents = return_stmt(
-                    "all",
-                    &test,
-                    loop_info.target,
-                    loop_info.iter,
-                    checker.generator(),
-                );
-
-                // Don't flag if the resulting expression would exceed the maximum line length.
-                let line_start = checker.locator.line_start(stmt.start());
-                if LineWidth::new(checker.settings.tab_size)
-                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
-                    .add_str(&contents)
-                    > checker.settings.line_length
-                {
-                    return;
-                }
-
-                let mut diagnostic = Diagnostic::new(
-                    ReimplementedBuiltin {
-                        repl: contents.clone(),
-                    },
-                    TextRange::new(stmt.start(), loop_info.terminal),
-                );
-                if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("all") {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
-                        contents,
-                        stmt.start(),
-                        loop_info.terminal,
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-        }
-    }
+    any_over_expr(expr, &Expr::is_await_expr)
 }
