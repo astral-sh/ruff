@@ -178,3 +178,10 @@ async def f():
         if await check(x):
             return True
     return False
+
+async def f():
+    # SIM110
+    for x in iterable:
+        if check(x):
+            return True
+    return False
