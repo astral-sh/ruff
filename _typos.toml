@@ -8,3 +8,4 @@ whos = "whos"
 spawnve = "spawnve"
 ned = "ned"
 poit = "poit"
+BA = "BA" # acronym for "Bad Allowed", used in testing.
