@@ -93,7 +93,7 @@ pub(crate) fn logging_call(
     keywords: &[Keyword],
 ) {
     // If there are any starred arguments, abort.
-    if args.iter().any(|arg| matches!(arg, Expr::Starred(_))) {
+    if args.iter().any(Expr::is_starred_expr) {
         return;
     }
 

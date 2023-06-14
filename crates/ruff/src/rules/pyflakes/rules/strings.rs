@@ -514,14 +514,13 @@ impl Violation for StringDotFormatMixingAutomatic {
 }
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
-    keywords.iter().any(|k| {
-        let Keyword { arg, .. } = &k;
-        arg.is_none()
-    })
+    keywords
+        .iter()
+        .any(|keyword| matches!(keyword, Keyword { arg: None, .. }))
 }
 
 fn has_star_args(args: &[Expr]) -> bool {
-    args.iter().any(|arg| matches!(&arg, Expr::Starred(_)))
+    args.iter().any(Expr::is_starred_expr)
 }
 
 /// F502
@@ -805,9 +804,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         .iter()
         .enumerate()
         .filter(|(i, arg)| {
-            !(matches!(arg, Expr::Starred(_))
-                || summary.autos.contains(i)
-                || summary.indices.contains(i))
+            !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
         })
         .map(|(i, _)| i)
         .collect();

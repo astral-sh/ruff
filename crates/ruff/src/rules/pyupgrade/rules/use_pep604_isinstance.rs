@@ -85,14 +85,13 @@ pub(crate) fn use_pep604_isinstance(
                 }
 
                 // Ex) `(*args,)`
-                if elts.iter().any(|elt| matches!(elt, Expr::Starred(_))) {
+                if elts.iter().any(Expr::is_starred_expr) {
                     return;
                 }
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                         checker.generator().expr(&union(elts)),
                         types.range(),
                     )));

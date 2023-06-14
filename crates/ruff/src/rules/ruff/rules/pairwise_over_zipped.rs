@@ -115,7 +115,7 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     };
 
     // Require second argument to be a `Subscript`.
-    if !matches!(&args[1], Expr::Subscript(_)) {
+    if !args[1].is_subscript_expr() {
         return;
     }
     let Some(second_arg_info) = match_slice_info(&args[1]) else {
