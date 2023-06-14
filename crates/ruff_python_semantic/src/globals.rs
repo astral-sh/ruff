@@ -49,11 +49,11 @@ impl<'a> Globals<'a> {
         builder.finish()
     }
 
-    pub fn get(&self, name: &str) -> Option<&TextRange> {
+    pub(crate) fn get(&self, name: &str) -> Option<&TextRange> {
         self.0.get(name)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&&'a str, &TextRange)> + '_ {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&&'a str, &TextRange)> + '_ {
         self.0.iter()
     }
 }
