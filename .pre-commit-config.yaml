@@ -3,6 +3,8 @@ fail_fast: true
 exclude: |
   (?x)^(
     crates/ruff/resources/.*|
+    crates/ruff/src/rules/.*/snapshots/.*|
+    crates/ruff/src/rules/pep8_naming/mod.rs| # Uses "BA" as acronym.
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/src/snapshots/.*
   )$
