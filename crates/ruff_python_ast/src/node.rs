@@ -4214,19 +4214,19 @@ impl AnyNodeRef<'_> {
     }
 
     pub const fn is_node_with_body(self) -> bool {
-        match self {
+        matches!(
+            self,
             AnyNodeRef::StmtIf(_)
-            | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
-            | AnyNodeRef::StmtWhile(_)
-            | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
-            | AnyNodeRef::StmtMatch(_)
-            | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
-            | AnyNodeRef::StmtClassDef(_) => true,
-            _ => false,
-        }
+                | AnyNodeRef::StmtFor(_)
+                | AnyNodeRef::StmtAsyncFor(_)
+                | AnyNodeRef::StmtWhile(_)
+                | AnyNodeRef::StmtWith(_)
+                | AnyNodeRef::StmtAsyncWith(_)
+                | AnyNodeRef::StmtMatch(_)
+                | AnyNodeRef::StmtFunctionDef(_)
+                | AnyNodeRef::StmtAsyncFunctionDef(_)
+                | AnyNodeRef::StmtClassDef(_)
+        )
     }
 }
 
