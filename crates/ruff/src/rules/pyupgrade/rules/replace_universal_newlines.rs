@@ -8,6 +8,30 @@ use ruff_python_ast::helpers::find_keyword;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `universal_newlines` keyword argument in `subprocess.run` calls.
+///
+/// ## Why is this bad?
+/// As of Python 3.7, `text` is an alias for `universal_newlines`. `text` is
+/// more understandable and explicit than `universal_newlines`.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.run(["foo"], universal_newlines=True)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.run(["foo"], text=True)
+/// ```
+///
+/// ## References
+/// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
+/// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[violation]
 pub struct ReplaceUniversalNewlines;
 

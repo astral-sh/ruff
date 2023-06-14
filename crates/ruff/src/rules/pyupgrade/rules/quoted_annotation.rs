@@ -6,6 +6,34 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for unnecessary quotes in type annotations.
+///
+/// ## Why is this bad?
+/// Quotes in type annotations are unnecessary if `from __future__ import
+/// annotations` is used. The quotes should be removed.
+///
+/// ## Example
+/// ```python
+/// from __future__ import annotations
+///
+///
+/// def foo(bar: "Bar") -> "Bar":
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from __future__ import annotations
+///
+///
+/// def foo(bar: Bar) -> Bar:
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 563](https://peps.python.org/pep-0563/)
+/// - [Python documentation: `__future__` - Future statement definitions](https://docs.python.org/3/library/__future__.html#module-__future__)
 #[violation]
 pub struct QuotedAnnotation;
 

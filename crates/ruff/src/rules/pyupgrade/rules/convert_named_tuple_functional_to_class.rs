@@ -13,6 +13,31 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `NamedTuple` functional syntax.
+///
+/// ## Why is this bad?
+/// Class syntax is more readable than functional syntax.
+///
+/// ## Example
+/// ```python
+/// from typing import NamedTuple
+///
+/// Foo = NamedTuple("Foo", [("a", int), ("b", str)])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import NamedTuple
+///
+///
+/// class Foo(NamedTuple):
+///     a: int
+///     b: str
+/// ```
+///
+/// ## References
+/// - [Python documenation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[violation]
 pub struct ConvertNamedTupleFunctionalToClass {
     name: String,

@@ -8,6 +8,28 @@ use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for classes that inherit from `object`.
+///
+/// ## Why is this bad?
+/// Since Python 3, all classes inherit from `object` by default. It is not
+/// required to inherit from `object` explicitly.
+///
+/// ## Example
+/// ```python
+/// class Foo(object):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
+/// - [Should you inherit from object?](https://www.youtube.com/watch?v=vvuYPUbwAO0)
 #[violation]
 pub struct UselessObjectInheritance {
     name: String,

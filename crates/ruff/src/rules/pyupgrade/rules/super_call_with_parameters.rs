@@ -7,6 +7,41 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes;
 
+/// ## What it does
+/// Checks for calls to `super` with redundant arguments.
+///
+/// ## Why is this bad?
+/// In Python 3, `super` does not require arguments if its first argument is
+/// `__class__` and its second argument is the first argument of the
+/// enclosing method.
+///
+/// ## Example
+/// ```python
+/// class A:
+///     def foo(self):
+///         pass
+///
+///
+/// class B(A):
+///     def bar(self):
+///         super(B, self).foo()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class A:
+///     def foo(self):
+///         pass
+///
+///
+/// class B(A):
+///     def bar(self):
+///         super().foo()
+/// ```
+///
+/// ## References
+/// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
+/// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
 #[violation]
 pub struct SuperCallWithParameters;
 

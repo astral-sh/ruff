@@ -9,6 +9,28 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for generic type annotations that do not use the PEP 585 syntax.
+///
+/// ## Why is this bad?
+/// PEP 585 introduced a new syntax for generic type annotations by using
+/// generics directly instead of the `typing` module. This is more concise and
+/// easier to read.
+///
+/// ## Example
+/// ```python
+/// from typing import List
+///
+/// foo: List[int] = [1, 2, 3]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: list[int] = [1, 2, 3]
+/// ```
+///
+/// ## References
+/// - [PEP 585](https://peps.python.org/pep-0585/)
 #[violation]
 pub struct NonPEP585Annotation {
     from: String,

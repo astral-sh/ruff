@@ -23,6 +23,27 @@ pub(crate) enum MockReference {
     Attribute,
 }
 
+/// ## What it does
+/// Checks for importing `mock` instead of `unittest.mock`.
+///
+/// ## Why is this bad?
+/// Since Python 3.3, `mock` has been a part of the standard library as
+/// `unittest.mock`. The `mock` package is deprecated and `unittest.mock`
+/// should be used instead.
+///
+/// ## Example
+/// ```python
+/// import mock
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from unittest import mock
+/// ```
+///
+/// ## References
+/// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
+/// - [PyPI: `mock`](https://pypi.org/project/mock/)
 #[violation]
 pub struct DeprecatedMockImport {
     reference_type: MockReference,

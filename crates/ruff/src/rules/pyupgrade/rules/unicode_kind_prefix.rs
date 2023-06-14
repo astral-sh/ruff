@@ -7,6 +7,25 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unicode literals in strings.
+///
+/// ## Why is this bad?
+/// In Python 3, all strings are unicode by default. Unicode literals should be
+/// replaced with regular strings to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// u"foo"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "foo"
+/// ```
+///
+/// ## References
+/// - [Python documentation: Unicode HOWTO](https://docs.python.org/3/howto/unicode.html)
 #[violation]
 pub struct UnicodeKindPrefix;
 

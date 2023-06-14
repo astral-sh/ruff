@@ -8,6 +8,35 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for deprecated aliases from the `unittest` module.
+///
+/// ## Why is this bad?
+/// The aliases are deprecated and should not be used. Use the alias target
+/// instead.
+///
+/// ## Example
+/// ```python
+/// from unittest import TestCase
+///
+///
+/// class SomeTest(TestCase):
+///     def test_something(self):
+///         self.assertEquals(1, 1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from unittest import TestCase
+///
+///
+/// class SomeTest(TestCase):
+///     def test_something(self):
+///         self.assertEqual(1, 1)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Deprecated aliases](https://docs.python.org/3/library/unittest.html#deprecated-aliases)
 #[violation]
 pub struct DeprecatedUnittestAlias {
     alias: String,

@@ -8,6 +8,36 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `functools.lru_cache` with `maxsize=None`.
+///
+/// ## Why is this bad?
+/// Since Python 3.9, `functools.cache` can be used instead of
+/// `functools.lru_cache(maxsize=None)`. `functools.cache` is faster and more
+/// memory efficient.
+///
+/// ## Example
+/// ```python
+/// import functools
+///
+///
+/// @functools.lru_cache(maxsize=None)
+/// def foo():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import functools
+///
+///
+/// @functools.cache
+/// def foo():
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `@functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 #[violation]
 pub struct LRUCacheWithMaxsizeNone;
 

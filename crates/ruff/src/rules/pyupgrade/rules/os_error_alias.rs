@@ -9,6 +9,26 @@ use ruff_python_semantic::model::SemanticModel;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `OSError` aliases.
+///
+/// ## Why is this bad?
+/// `OSError` is the builtin error type for exceptions related to the operating
+/// system. Replacing aliases to `OSError` with `OSError` makes the exception
+/// more explicit and is more idiomatic.
+///
+/// ## Example
+/// ```python
+/// raise IOError
+/// ```
+///
+/// Use instead:
+/// ```python
+/// raise OSError
+/// ```
+///
+/// ## References
+/// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
 #[violation]
 pub struct OSErrorAlias {
     pub name: Option<String>,

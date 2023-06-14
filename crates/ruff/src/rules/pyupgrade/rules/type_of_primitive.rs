@@ -8,6 +8,27 @@ use crate::registry::AsRule;
 
 use super::super::types::Primitive;
 
+/// ## What it does
+/// Checks for code that passes a primitive to `type()`.
+///
+/// ## Why is this bad?
+/// `type()` returns the type of the given object. It should not be used to get
+/// the type of a primitive, as the type of a primitive is already known.
+/// Instead, use the primitive type itself.
+///
+/// ## Example
+/// ```python
+/// type(1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// int
+/// ```
+///
+/// ## References
+/// - [Python documentation: `type()`](https://docs.python.org/3/library/functions.html#type)
+/// - [Python documentation: Built-in types](https://docs.python.org/3/library/stdtypes.html)
 #[violation]
 pub struct TypeOfPrimitive {
     primitive: Primitive,

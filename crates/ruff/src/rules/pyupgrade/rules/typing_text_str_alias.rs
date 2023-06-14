@@ -6,6 +6,28 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `typing.Text`.
+///
+/// ## Why is this bad?
+/// `typing.Text` is an alias for `str` and exists only for Python 2
+/// compatibility. As of Python 3.11, `typing.Text` is deprecated. Use `str`
+/// instead.
+///
+/// ## Example
+/// ```python
+/// from typing import Text
+///
+/// foo: Text = "bar"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: str = "bar"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `typing.Text`](https://docs.python.org/3/library/typing.html#typing.Text)
 #[violation]
 pub struct TypingTextStrAlias;
 

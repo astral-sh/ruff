@@ -6,6 +6,27 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unpacked list comprehensions.
+///
+/// ## Why is this bad?
+/// There is no reason to use a list comprehension if the result is immediately
+/// unpacked. Instead, a generator expression should be used. This is more
+/// idiomatic and avoids creating an unnecessary list.
+///
+/// ## Example
+/// ```python
+/// a, b, c = [foo(x) for x in items]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a, b, c = (foo(x) for x in items)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Generator expressions](https://docs.python.org/3/reference/expressions.html#generator-expressions)
+/// - [Python documentation: List comprehensions](https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions)
 #[violation]
 pub struct UnpackedListComprehension;
 

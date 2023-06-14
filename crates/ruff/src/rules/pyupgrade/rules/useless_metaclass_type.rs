@@ -7,6 +7,26 @@ use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for code that sets `__metaclass__ = type`.
+///
+/// ## Why is this bad?
+/// Since Python 3, `__metaclass__ = type` is implied, and is not required.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     __metaclass__ = type
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
 #[violation]
 pub struct UselessMetaclassType;
 

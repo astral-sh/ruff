@@ -34,6 +34,27 @@ impl CallKind {
     }
 }
 
+/// ## What it does
+/// Checks for `isinstance` or `issubclass` calls with a tuple of types.
+///
+/// ## Why is this bad?
+/// Since Python 3.10, `isinstance` and `issubclass` can be used with a
+/// `|`-separated union of types. This is more concise and easier to read.
+///
+/// ## Example
+/// ```python
+/// isinstance(x, (int, float))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// isinstance(x, int | float)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
+/// - [Python documentation: `issubclass`](https://docs.python.org/3/library/functions.html#issubclass)
+/// - [Python documentation: PEP 604](https://peps.python.org/pep-0604/)
 #[violation]
 pub struct NonPEP604Isinstance {
     kind: CallKind,

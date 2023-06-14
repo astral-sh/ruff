@@ -16,6 +16,34 @@ use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
 
+/// ## What it does
+/// Checks for outdated version blocks.
+///
+/// ## Why is this bad?
+/// If the a code block is only executed for a version of Python older than
+/// the oldest supported version, it should be removed.
+///
+/// The oldest supported version can be configured using the `target-version`
+/// option.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info < (3, 0):
+///     print("py2")
+/// else:
+///     print("py3")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("py3")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
+/// - [Ruff documentation: `target-version`](https://beta.ruff.rs/docs/settings/#target-version)
 #[violation]
 pub struct OutdatedVersionBlock;
 

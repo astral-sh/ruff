@@ -6,6 +6,25 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `cElementTree` imports.
+///
+/// ## Why is this bad?
+/// Since Python 3.3, `cElementTree` has been deprecated in favor of
+/// `ElementTree`.
+///
+/// ## Example
+/// ```python
+/// from xml.etree import cElementTree
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from xml.etree import ElementTree
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
 #[violation]
 pub struct DeprecatedCElementTree;
 

@@ -6,6 +6,29 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `io.open`.
+///
+/// ## Why is this bad?
+/// In Python 3, `io.open` is an alias for `open`. Using `io.open` is
+/// unnecessary and less idiomatic.
+///
+/// ## Example
+/// ```python
+/// import io
+///
+/// with io.open("file.txt") as f:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with open("file.txt") as f:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `io.open`](https://docs.python.org/3/library/io.html#io.open)
 #[violation]
 pub struct OpenAlias;
 

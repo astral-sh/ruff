@@ -18,6 +18,26 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
+/// ## What it does
+/// Checks for `printf`-style string formatting.
+///
+/// ## Why is this bad?
+/// `printf`-style string formatting is harder to read and less flexible than
+/// format specifiers.
+///
+/// ## Example
+/// ```python
+/// "%s, %s" % ("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "{}, {}".format("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct PrintfStringFormatting;
 
