@@ -156,7 +156,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
                 // used _after_ the loop.
                 let scope = checker.semantic_model().scope();
                 if scope
-                    .bindings_for_name(name)
+                    .get_all(name)
                     .map(|binding_id| checker.semantic_model().binding(binding_id))
                     .all(|binding| !binding.is_used())
                 {

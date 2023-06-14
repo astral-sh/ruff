@@ -90,21 +90,38 @@ impl<'a> Scope<'a> {
         self.bindings.contains_key(name)
     }
 
-    /// Returns the ids of all bindings defined in this scope.
+    /// Returns the IDs of all bindings defined in this scope.
     pub fn binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
         self.bindings.values().copied()
     }
 
-    /// Returns a tuple of the name and id of all bindings defined in this scope.
+    /// Returns a tuple of the name and ID of all bindings defined in this scope.
     pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
         self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
-    /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
+    /// Like [`Scope::get`], but returns all bindings with the given name, including
     /// those that were shadowed by later bindings.
-    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
+    pub fn get_all(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
         std::iter::successors(self.bindings.get(name).copied(), |id| {
             self.shadowed_bindings.get(id).copied()
+        })
+    }
+
+    /// Like [`Scope::binding_ids`], but returns all bindings that were added to the scope,
+    /// including those that were shadowed by later bindings.
+    pub fn all_binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
+        self.bindings.values().copied().flat_map(|id| {
+            std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
+        })
+    }
+
+    /// Like [`Scope::bindings`], but returns all bindings added to the scope, including those that
+    /// were shadowed by later bindings.
+    pub fn all_bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+        self.bindings.iter().flat_map(|(&name, &id)| {
+            std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
+                .map(move |id| (name, id))
         })
     }
 
