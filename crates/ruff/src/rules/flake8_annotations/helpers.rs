@@ -2,8 +2,7 @@ use rustpython_parser::ast::{self, Arguments, Expr, Stmt};
 
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
 
 pub(super) fn match_function_def(
     stmt: &Stmt,

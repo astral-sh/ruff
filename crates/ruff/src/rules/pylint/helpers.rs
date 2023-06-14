@@ -1,10 +1,10 @@
-use ruff_python_semantic::analyze::function_type;
-use ruff_python_semantic::analyze::function_type::FunctionType;
-use ruff_python_semantic::ScopeKind;
-use ruff_python_semantic::SemanticModel;
+use std::fmt;
+
 use rustpython_parser::ast;
 use rustpython_parser::ast::Cmpop;
-use std::fmt;
+
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::settings::Settings;
 
@@ -40,7 +40,7 @@ pub(super) fn in_dunder_init(model: &SemanticModel, settings: &Settings) -> bool
             &settings.pep8_naming.classmethod_decorators,
             &settings.pep8_naming.staticmethod_decorators,
         ),
-        FunctionType::Method
+        function_type::FunctionType::Method
     ) {
         return false;
     }

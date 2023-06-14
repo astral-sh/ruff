@@ -7,11 +7,8 @@ use rustpython_parser::ast::{Arg, Arguments};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::analyze::function_type;
-use ruff_python_semantic::analyze::function_type::FunctionType;
-use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::{Scope, ScopeKind};
+use ruff_python_semantic::analyze::{function_type, visibility};
+use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -327,7 +324,7 @@ pub(crate) fn unused_arguments(
                 &checker.settings.pep8_naming.classmethod_decorators,
                 &checker.settings.pep8_naming.staticmethod_decorators,
             ) {
-                FunctionType::Function => {
+                function_type::FunctionType::Function => {
                     if checker.enabled(Argumentable::Function.rule_code())
                         && !visibility::is_overload(checker.semantic_model(), decorator_list)
                     {
@@ -346,7 +343,7 @@ pub(crate) fn unused_arguments(
                         vec![]
                     }
                 }
-                FunctionType::Method => {
+                function_type::FunctionType::Method => {
                     if checker.enabled(Argumentable::Method.rule_code())
                         && !helpers::is_empty(body)
                         && (!visibility::is_magic(name)
@@ -372,7 +369,7 @@ pub(crate) fn unused_arguments(
                         vec![]
                     }
                 }
-                FunctionType::ClassMethod => {
+                function_type::FunctionType::ClassMethod => {
                     if checker.enabled(Argumentable::ClassMethod.rule_code())
                         && !helpers::is_empty(body)
                         && (!visibility::is_magic(name)
@@ -398,7 +395,7 @@ pub(crate) fn unused_arguments(
                         vec![]
                     }
                 }
-                FunctionType::StaticMethod => {
+                function_type::FunctionType::StaticMethod => {
                     if checker.enabled(Argumentable::StaticMethod.rule_code())
                         && !helpers::is_empty(body)
                         && (!visibility::is_magic(name)

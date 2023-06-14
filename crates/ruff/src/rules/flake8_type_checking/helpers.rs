@@ -2,9 +2,7 @@ use rustpython_parser::ast;
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_semantic::ScopeKind;
-use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::{Binding, BindingKind};
+use ruff_python_semantic::{Binding, BindingKind, ScopeKind, SemanticModel};
 
 pub(crate) fn is_valid_runtime_import(semantic_model: &SemanticModel, binding: &Binding) -> bool {
     if matches!(

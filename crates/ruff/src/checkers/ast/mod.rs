@@ -18,19 +18,13 @@ use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, str, visitor};
-use ruff_python_semantic::analyze;
-use ruff_python_semantic::analyze::branch_detection;
-use ruff_python_semantic::analyze::typing::{Callable, SubscriptKind};
-use ruff_python_semantic::analyze::visibility::ModuleSource;
-use ruff_python_semantic::ExecutionContext;
-use ruff_python_semantic::Globals;
+use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
-    Binding, BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImportation,
-    Importation, StarImportation, SubmoduleImportation,
+    Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
+    ExecutionContext, Export, FromImportation, Globals, Importation, Module, ModuleKind,
+    ResolvedRead, Scope, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImportation,
+    SubmoduleImportation,
 };
-use ruff_python_semantic::{ContextualizedDefinition, Module, ModuleKind};
-use ruff_python_semantic::{ResolvedRead, SemanticModel, SemanticModelFlags};
-use ruff_python_semantic::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -2079,7 +2073,7 @@ where
             ) => {
                 self.visit_boolean_test(test);
 
-                if analyze::typing::is_type_checking_block(stmt_if, &self.semantic_model) {
+                if typing::is_type_checking_block(stmt_if, &self.semantic_model) {
                     if self.semantic_model.at_top_level() {
                         self.importer.visit_type_checking_block(stmt);
                     }
@@ -2179,7 +2173,7 @@ where
                     Rule::NonPEP604Annotation,
                 ]) {
                     if let Some(operator) =
-                        analyze::typing::to_pep604_operator(value, slice, &self.semantic_model)
+                        typing::to_pep604_operator(value, slice, &self.semantic_model)
                     {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py310
@@ -2211,7 +2205,7 @@ where
                     if self.settings.target_version < PythonVersion::Py39
                         && !self.semantic_model.future_annotations()
                         && self.semantic_model.in_annotation()
-                        && analyze::typing::is_pep585_generic(value, &self.semantic_model)
+                        && typing::is_pep585_generic(value, &self.semantic_model)
                     {
                         flake8_future_annotations::rules::future_required_type_annotation(
                             self,
@@ -2284,7 +2278,7 @@ where
                             Rule::NonPEP585Annotation,
                         ]) {
                             if let Some(replacement) =
-                                analyze::typing::to_pep585_generic(expr, &self.semantic_model)
+                                typing::to_pep585_generic(expr, &self.semantic_model)
                             {
                                 if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                                     if self.settings.target_version < PythonVersion::Py39
@@ -2360,8 +2354,7 @@ where
                     Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP585Annotation,
                 ]) {
-                    if let Some(replacement) =
-                        analyze::typing::to_pep585_generic(expr, &self.semantic_model)
+                    if let Some(replacement) = typing::to_pep585_generic(expr, &self.semantic_model)
                     {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py39
@@ -3576,27 +3569,27 @@ where
                             .semantic_model
                             .match_typing_call_path(&call_path, "cast")
                         {
-                            Some(Callable::Cast)
+                            Some(typing::Callable::Cast)
                         } else if self
                             .semantic_model
                             .match_typing_call_path(&call_path, "NewType")
                         {
-                            Some(Callable::NewType)
+                            Some(typing::Callable::NewType)
                         } else if self
                             .semantic_model
                             .match_typing_call_path(&call_path, "TypeVar")
                         {
-                            Some(Callable::TypeVar)
+                            Some(typing::Callable::TypeVar)
                         } else if self
                             .semantic_model
                             .match_typing_call_path(&call_path, "NamedTuple")
                         {
-                            Some(Callable::NamedTuple)
+                            Some(typing::Callable::NamedTuple)
                         } else if self
                             .semantic_model
                             .match_typing_call_path(&call_path, "TypedDict")
                         {
-                            Some(Callable::TypedDict)
+                            Some(typing::Callable::TypedDict)
                         } else if [
                             "Arg",
                             "DefaultArg",
@@ -3608,15 +3601,15 @@ where
                         .iter()
                         .any(|target| call_path.as_slice() == ["mypy_extensions", target])
                         {
-                            Some(Callable::MypyExtension)
+                            Some(typing::Callable::MypyExtension)
                         } else if call_path.as_slice() == ["", "bool"] {
-                            Some(Callable::Bool)
+                            Some(typing::Callable::Bool)
                         } else {
                             None
                         }
                     });
                 match callable {
-                    Some(Callable::Bool) => {
+                    Some(typing::Callable::Bool) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3626,7 +3619,7 @@ where
                             self.visit_expr(arg);
                         }
                     }
-                    Some(Callable::Cast) => {
+                    Some(typing::Callable::Cast) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3636,7 +3629,7 @@ where
                             self.visit_expr(arg);
                         }
                     }
-                    Some(Callable::NewType) => {
+                    Some(typing::Callable::NewType) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3646,7 +3639,7 @@ where
                             self.visit_type_definition(arg);
                         }
                     }
-                    Some(Callable::TypeVar) => {
+                    Some(typing::Callable::TypeVar) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3670,7 +3663,7 @@ where
                             }
                         }
                     }
-                    Some(Callable::NamedTuple) => {
+                    Some(typing::Callable::NamedTuple) => {
                         self.visit_expr(func);
 
                         // Ex) NamedTuple("a", [("a", int)])
@@ -3707,7 +3700,7 @@ where
                             self.visit_type_definition(value);
                         }
                     }
-                    Some(Callable::TypedDict) => {
+                    Some(typing::Callable::TypedDict) => {
                         self.visit_expr(func);
 
                         // Ex) TypedDict("a", {"a": int})
@@ -3739,7 +3732,7 @@ where
                             self.visit_type_definition(value);
                         }
                     }
-                    Some(Callable::MypyExtension) => {
+                    Some(typing::Callable::MypyExtension) => {
                         self.visit_expr(func);
 
                         let mut args = args.iter();
@@ -3801,7 +3794,7 @@ where
                     self.semantic_model.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
-                    match analyze::typing::match_annotated_subscript(
+                    match typing::match_annotated_subscript(
                         value,
                         &self.semantic_model,
                         self.settings.typing_modules.iter().map(String::as_str),
@@ -3810,13 +3803,13 @@ where
                         Some(subscript) => {
                             match subscript {
                                 // Ex) Optional[int]
-                                SubscriptKind::AnnotatedSubscript => {
+                                typing::SubscriptKind::AnnotatedSubscript => {
                                     self.visit_expr(value);
                                     self.visit_type_definition(slice);
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
-                                SubscriptKind::PEP593AnnotatedSubscript => {
+                                typing::SubscriptKind::PEP593AnnotatedSubscript => {
                                     // First argument is a type (including forward references); the
                                     // rest are arbitrary Python objects.
                                     self.visit_expr(value);
@@ -4291,7 +4284,7 @@ impl<'a> Checker<'a> {
                         && binding.redefines(shadowed)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || shadows_import)
                         && !(shadowed.kind.is_function_definition()
-                            && analyze::visibility::is_overload(
+                            && visibility::is_overload(
                                 &self.semantic_model,
                                 cast::decorator_list(
                                     self.semantic_model.stmts[shadowed.source.unwrap()],
@@ -5298,9 +5291,9 @@ pub(crate) fn check_ast(
             ModuleKind::Module
         },
         source: if let Some(module_path) = module_path.as_ref() {
-            ModuleSource::Path(module_path)
+            visibility::ModuleSource::Path(module_path)
         } else {
-            ModuleSource::File(path)
+            visibility::ModuleSource::File(path)
         },
         python_ast,
     };

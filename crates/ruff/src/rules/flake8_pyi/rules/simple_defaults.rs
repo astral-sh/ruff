@@ -3,8 +3,7 @@ use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::ScopeKind;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
