@@ -192,23 +192,17 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     } = pyproject_config.settings.cli;
 
     // Autofix rules are as follows:
+    // - By default, generate all fixes, but don't apply them to the filesystem.
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
-    // - Otherwise, if `--format json` is set, generate the fixes (so we print them
-    //   out as part of the JSON payload), but don't write them to disk.
     // - If `--diff` or `--fix-only` are set, don't print any violations (only
     //   fixes).
-    // TODO(charlie): Consider adding ESLint's `--fix-dry-run`, which would generate
-    // but not apply fixes. That would allow us to avoid special-casing JSON
-    // here.
     let autofix = if cli.diff {
         flags::FixMode::Diff
     } else if fix || fix_only {
         flags::FixMode::Apply
-    } else if matches!(format, SerializationFormat::Json) {
-        flags::FixMode::Generate
     } else {
-        flags::FixMode::None
+        flags::FixMode::Generate
     };
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
@@ -238,7 +232,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     }
 
     if cli.add_noqa {
-        if !matches!(autofix, flags::FixMode::None) {
+        if !autofix.is_generate() {
             warn_user_once!("--fix is incompatible with --add-noqa.");
         }
         let modifications =
