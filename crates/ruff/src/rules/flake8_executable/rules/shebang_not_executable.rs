@@ -16,11 +16,16 @@ use crate::rules::flake8_executable::helpers::ShebangDirective;
 /// Checks for a shebang directive in a file that is not executable.
 ///
 /// ## Why is this bad?
-/// Shebangs indicate that a file is executable. If the file is not executable,
-/// then the shebang is misleading and is likely a mistake.
+/// In Python, a shebang (also known as a hashbang) is the first line of a
+/// script, which specifies the interpreter that should be used to run the
+/// script.
 ///
-/// Instead, remove the shebang or give the file executable permissions with
-/// `chmod +x`.
+/// The presence of a shebang suggests that a file is intended to be
+/// executable. If a file contains a shebang but is not executable, then the
+/// shebang is misleading, or the file is missing the executable bit.
+///
+/// If the file is meant to be executable, add a shebang; otherwise, remove the
+/// executable bit from the file.
 ///
 /// _This rule is only available on Unix-like systems._
 ///

@@ -12,15 +12,18 @@ use crate::registry::AsRule;
 use crate::rules::flake8_executable::helpers::is_executable;
 
 /// ## What it does
-/// Checks for executable `.py` files that do not have a shebang directive.
+/// Checks for executable `.py` files that do not have a shebang.
 ///
 /// ## Why is this bad?
-/// Shebangs indicate that a text file is executable. If a `.py` file has
-/// executable permissions but no shebang, then the absence of a shebang is
-/// misleading and is likely a mistake.
+/// In Python, a shebang (also known as a hashbang) is the first line of a
+/// script, which specifies the interpreter that should be used to run the
+/// script.
 ///
-/// Instead, add a shebang or remove the executable permissions with
-/// `chmod -x`.
+/// If a `.py` file is executable, but does not have a shebang, it may be run
+/// with the wrong interpreter, or fail to run at all.
+///
+/// If the file is meant to be executable, add a shebang; otherwise, remove the
+/// executable bit from the file.
 ///
 /// _This rule is only available on Unix-like systems._
 ///

@@ -9,9 +9,13 @@ use crate::rules::flake8_executable::helpers::ShebangDirective;
 /// Checks for whitespace before a shebang directive.
 ///
 /// ## Why is this bad?
-/// The shebang `#!` must be the first two characters of a file. If there is
-/// whitespace before the shebang, the shebang will have no effect. This is
-/// likely a mistake.
+/// In Python, a shebang (also known as a hashbang) is the first line of a
+/// script, which specifies the interpreter that should be used to run the
+/// script.
+///
+/// The shebang's `#!` prefix must be the first two characters of a file. The
+/// presence of whitespace before the shebang will cause the shebang to be
+/// ignored, which is likely a mistake.
 ///
 /// ## Example
 /// ```python
