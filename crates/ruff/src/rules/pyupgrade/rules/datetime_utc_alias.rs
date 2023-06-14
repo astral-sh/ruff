@@ -8,9 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct DatetimeTimezoneUTC {
-    straight_import: bool,
-}
+pub struct DatetimeTimezoneUTC;
 
 impl Violation for DatetimeTimezoneUTC {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -31,17 +29,18 @@ pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
         .semantic()
         .resolve_call_path(expr)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "timezone", "utc"]
+            matches!(call_path.as_slice(), ["datetime", "timezone", "utc"])
         })
     {
-        let straight_import = collect_call_path(expr).map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "timezone", "utc"]
-        });
-        let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC { straight_import }, expr.range());
+        let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            if straight_import {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            // If the reference was structured as, e.g., `datetime.timezone.utc`, then we can
+            // replace it with `datetime.UTC`. If `timezone` was imported via `from datetime import
+            // timezone`, then the replacement is more complicated.
+            if collect_call_path(expr).map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["datetime", "timezone", "utc"])
+            }) {
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     "datetime.UTC".to_string(),
                     expr.range(),
                 )));

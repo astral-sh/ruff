@@ -79,10 +79,9 @@ impl Violation for PPrint {
 pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
     let diagnostic = {
         let call_path = checker.semantic().resolve_call_path(func);
-        if call_path
-            .as_ref()
-            .map_or(false, |call_path| *call_path.as_slice() == ["", "print"])
-        {
+        if call_path.as_ref().map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["", "print"])
+        }) {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = keywords
@@ -103,7 +102,7 @@ pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword
             }
             Diagnostic::new(Print, func.range())
         } else if call_path.as_ref().map_or(false, |call_path| {
-            *call_path.as_slice() == ["pprint", "pprint"]
+            matches!(call_path.as_slice(), ["pprint", "pprint"])
         }) {
             Diagnostic::new(PPrint, func.range())
         } else {

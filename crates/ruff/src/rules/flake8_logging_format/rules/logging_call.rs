@@ -108,7 +108,9 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             if checker
                 .semantic()
                 .resolve_call_path(func)
-                .map_or(false, |call_path| call_path.as_slice() == ["", "dict"])
+                .map_or(false, |call_path| {
+                    matches!(call_path.as_slice(), ["", "dict"])
+                })
             {
                 for keyword in keywords {
                     if let Some(key) = &keyword.arg {

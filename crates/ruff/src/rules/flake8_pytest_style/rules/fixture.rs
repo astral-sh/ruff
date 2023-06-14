@@ -233,7 +233,7 @@ where
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
                 if collect_call_path(func).map_or(false, |call_path| {
-                    call_path.as_slice() == ["request", "addfinalizer"]
+                    matches!(call_path.as_slice(), ["request", "addfinalizer"])
                 }) {
                     self.addfinalizer_call = Some(expr);
                 };

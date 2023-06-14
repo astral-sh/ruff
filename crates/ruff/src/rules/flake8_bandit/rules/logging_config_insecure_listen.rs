@@ -27,7 +27,7 @@ pub(crate) fn logging_config_insecure_listen(
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["logging", "config", "listen"]
+            matches!(call_path.as_slice(), ["logging", "config", "listen"])
         })
     {
         let call_args = SimpleCallArgs::new(args, keywords);

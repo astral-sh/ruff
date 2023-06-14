@@ -3566,19 +3566,20 @@ where
                         .match_typing_call_path(&call_path, "TypedDict")
                     {
                         Some(typing::Callable::TypedDict)
-                    } else if [
-                        "Arg",
-                        "DefaultArg",
-                        "NamedArg",
-                        "DefaultNamedArg",
-                        "VarArg",
-                        "KwArg",
-                    ]
-                    .iter()
-                    .any(|target| call_path.as_slice() == ["mypy_extensions", target])
-                    {
+                    } else if matches!(
+                        call_path.as_slice(),
+                        [
+                            "mypy_extensions",
+                            "Arg"
+                                | "DefaultArg"
+                                | "NamedArg"
+                                | "DefaultNamedArg"
+                                | "VarArg"
+                                | "KwArg"
+                        ]
+                    ) {
                         Some(typing::Callable::MypyExtension)
-                    } else if call_path.as_slice() == ["", "bool"] {
+                    } else if matches!(call_path.as_slice(), ["", "bool"]) {
                         Some(typing::Callable::Bool)
                     } else {
                         None

@@ -58,7 +58,7 @@ pub fn exc_info<'a>(keywords: &'a [Keyword], semantic: &SemanticModel) -> Option
     // Ex) `logging.error("...", exc_info=sys.exc_info())`
     if let Expr::Call(ast::ExprCall { func, .. }) = &exc_info.value {
         if semantic.resolve_call_path(func).map_or(false, |call_path| {
-            call_path.as_slice() == ["sys", "exc_info"]
+            matches!(call_path.as_slice(), ["sys", "exc_info"])
         }) {
             return Some(exc_info);
         }

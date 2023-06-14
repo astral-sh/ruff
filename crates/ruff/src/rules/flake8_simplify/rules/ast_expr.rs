@@ -115,8 +115,10 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["os", "environ", "get"]
-                || call_path.as_slice() == ["os", "getenv"]
+            matches!(
+                call_path.as_slice(),
+                ["os", "environ", "get"] | ["os", "getenv"]
+            )
         })
     {
         return;

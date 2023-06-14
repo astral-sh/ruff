@@ -42,12 +42,12 @@ fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) 
             && semantic
                 .resolve_call_path(&keyword.value)
                 .map_or(false, |call_path| {
-                    call_path.as_slice() == ["abc", "ABCMeta"]
+                    matches!(call_path.as_slice(), ["abc", "ABCMeta"])
                 })
     }) || bases.iter().any(|base| {
-        semantic
-            .resolve_call_path(base)
-            .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
+        semantic.resolve_call_path(base).map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["abc", "ABC"])
+        })
     })
 }
 

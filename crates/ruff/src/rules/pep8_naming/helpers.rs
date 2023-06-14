@@ -45,7 +45,7 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
         return false;
     };
     semantic.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypedDict"]
+        matches!(call_path.as_slice(), ["typing", "TypedDict"])
     })
 }
 
@@ -57,8 +57,7 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
         return false;
     };
     semantic.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypeVar"]
-            || call_path.as_slice() == ["typing", "NewType"]
+        matches!(call_path.as_slice(), ["typing", "TypeVar" | "NewType"])
     })
 }
 

@@ -29,7 +29,7 @@ pub(crate) fn call_datetime_now_without_tzinfo(
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "now"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "now"])
         })
     {
         return;

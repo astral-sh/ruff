@@ -34,7 +34,9 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["", "type"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["", "type"])
+        })
     {
         return;
     }

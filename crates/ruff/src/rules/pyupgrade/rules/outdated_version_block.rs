@@ -339,7 +339,7 @@ pub(crate) fn outdated_version_block(
         .semantic()
         .resolve_call_path(left)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["sys", "version_info"]
+            matches!(call_path.as_slice(), ["sys", "version_info"])
         })
     {
         return;

@@ -31,7 +31,7 @@ pub(crate) fn call_datetime_strptime_without_zone(
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "strptime"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "strptime"])
         })
     {
         return;

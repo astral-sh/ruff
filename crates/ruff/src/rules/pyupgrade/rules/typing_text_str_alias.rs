@@ -26,7 +26,7 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
         .semantic()
         .resolve_call_path(expr)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "Text"]
+            matches!(call_path.as_slice(), ["typing", "Text"])
         })
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());

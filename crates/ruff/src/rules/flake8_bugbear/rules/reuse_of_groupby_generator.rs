@@ -345,7 +345,7 @@ pub(crate) fn reuse_of_groupby_generator(
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["itertools", "groupby"]
+            matches!(call_path.as_slice(), ["itertools", "groupby"])
         })
     {
         return;

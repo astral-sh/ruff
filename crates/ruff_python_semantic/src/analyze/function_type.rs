@@ -35,7 +35,7 @@ pub fn classify(
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["", "staticmethod"]
+                matches!(call_path.as_slice(), ["", "staticmethod"])
                     || staticmethod_decorators
                         .iter()
                         .any(|decorator| call_path == from_qualified_name(decorator))
@@ -55,7 +55,7 @@ pub fn classify(
         || decorator_list.iter().any(|decorator| {
             // The method is decorated with a class method decorator (like `@classmethod`).
             semantic.resolve_call_path(map_callable(&decorator.expression)).map_or(false, |call_path| {
-                call_path.as_slice() == ["", "classmethod"] ||
+                matches!(call_path.as_slice(), ["", "classmethod"]) ||
                 classmethod_decorators
                     .iter()
                     .any(|decorator| call_path == from_qualified_name(decorator))

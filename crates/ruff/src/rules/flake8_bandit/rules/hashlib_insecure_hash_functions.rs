@@ -52,7 +52,7 @@ pub(crate) fn hashlib_insecure_hash_functions(
         .semantic()
         .resolve_call_path(func)
         .and_then(|call_path| {
-            if call_path.as_slice() == ["hashlib", "new"] {
+            if matches!(call_path.as_slice(), ["hashlib", "new"]) {
                 Some(HashlibCall::New)
             } else {
                 WEAK_HASHES

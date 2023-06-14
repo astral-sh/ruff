@@ -22,7 +22,7 @@ pub(super) fn get_mark_decorators(
 
 pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(call).map_or(false, |call_path| {
-        call_path.as_slice() == ["pytest", "fail"]
+        matches!(call_path.as_slice(), ["pytest", "fail"])
     })
 }
 
@@ -30,7 +30,7 @@ pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel)
     semantic
         .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["pytest", "fixture"]
+            matches!(call_path.as_slice(), ["pytest", "fixture"])
         })
 }
 
@@ -38,7 +38,7 @@ pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &Semantic
     semantic
         .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["pytest", "yield_fixture"]
+            matches!(call_path.as_slice(), ["pytest", "yield_fixture"])
         })
 }
 
@@ -46,7 +46,7 @@ pub(super) fn is_pytest_parametrize(decorator: &Decorator, semantic: &SemanticMo
     semantic
         .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["pytest", "mark", "parametrize"]
+            matches!(call_path.as_slice(), ["pytest", "mark", "parametrize"])
         })
 }
 

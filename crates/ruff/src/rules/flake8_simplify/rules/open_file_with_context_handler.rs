@@ -63,7 +63,7 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if semantic.resolve_call_path(func).map_or(false, |call_path| {
-                        call_path.as_slice() == ["contextlib", "AsyncExitStack"]
+                        matches!(call_path.as_slice(), ["contextlib", "AsyncExitStack"])
                     }) {
                         return true;
                     }
@@ -94,7 +94,7 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if semantic.resolve_call_path(func).map_or(false, |call_path| {
-                        call_path.as_slice() == ["contextlib", "ExitStack"]
+                        matches!(call_path.as_slice(), ["contextlib", "ExitStack"])
                     }) {
                         return true;
                     }
@@ -110,7 +110,9 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr)
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["", "open"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["", "open"])
+        })
     {
         if checker.semantic().is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`

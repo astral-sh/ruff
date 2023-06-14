@@ -68,7 +68,9 @@ pub(crate) fn non_unique_enums<'a, 'b>(
         checker
             .semantic()
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
+            .map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["enum", "Enum"])
+            })
     }) {
         return;
     }
@@ -83,7 +85,9 @@ pub(crate) fn non_unique_enums<'a, 'b>(
             if checker
                 .semantic()
                 .resolve_call_path(func)
-                .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
+                .map_or(false, |call_path| {
+                    matches!(call_path.as_slice(), ["enum", "auto"])
+                })
             {
                 continue;
             }
