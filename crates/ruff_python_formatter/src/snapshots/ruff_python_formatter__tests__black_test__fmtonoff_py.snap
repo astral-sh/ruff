@@ -222,7 +222,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,109 +16,111 @@
+@@ -18,109 +16,112 @@
  
  # fmt: off
  def func_no_args():
@@ -269,6 +269,7 @@ d={'a':1,
 +    number: int,
 +    no_annotation=None,
 +    text: str = "NOT_YET_IMPLEMENTED_STRING",
++    *,
 +    debug: bool = False,
 +    **kwargs,
 +) -> str:
@@ -393,7 +394,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
-@@ -130,13 +130,15 @@
+@@ -130,13 +131,15 @@
  
  
  def on_and_off_broken():
@@ -414,7 +415,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,80 +147,21 @@
+@@ -145,80 +148,21 @@
  
  def long_lines():
      if True:
@@ -426,13 +427,11 @@ d={'a':1,
 -                implicit_default=True,
 -            )
 -        )
-+        NOT_IMPLEMENTED_call()
-         # fmt: off
+-        # fmt: off
 -        a = (
 -            unnecessary_bracket()
 -        )
-+        a = NOT_IMPLEMENTED_call()
-         # fmt: on
+-        # fmt: on
 -    _type_comment_re = re.compile(
 -        r"""
 -        ^
@@ -453,9 +452,11 @@ d={'a':1,
 -        )
 -        $
 -        """,
--        # fmt: off
++        NOT_IMPLEMENTED_call()
+         # fmt: off
 -        re.MULTILINE|re.VERBOSE
--        # fmt: on
++        a = NOT_IMPLEMENTED_call()
+         # fmt: on
 -    )
 +    _type_comment_re = NOT_IMPLEMENTED_call()
  
@@ -550,6 +551,7 @@ def function_signature_stress_test(
     number: int,
     no_annotation=None,
     text: str = "NOT_YET_IMPLEMENTED_STRING",
+    *,
     debug: bool = False,
     **kwargs,
 ) -> str:

@@ -73,15 +73,20 @@ def with_leading_comment(): ...
 # looking from the position of the if
 # Regression test for https://github.com/python/cpython/blob/ad56340b665c5d8ac1f318964f71697bba41acb7/Lib/logging/__init__.py#L253-L260
 if True:
-    def f():
+    def f1():
         pass  # a
 else:
     pass
 
 # Here it's actually a trailing comment
 if True:
-    def g():
+    def f2():
         pass
         # a
 else:
+    pass
+
+# Make sure the star is emitted
+# Regression test for https://github.com/python/cpython/blob/7199584ac8632eab57612f595a7162ab8d2ebbc0/Lib/warnings.py#L513
+def f(arg1=1, *, kwonlyarg1, kwonlyarg2=2):
     pass
