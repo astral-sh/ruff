@@ -4355,10 +4355,10 @@ impl<'a> Checker<'a> {
             return;
         };
         match self.semantic_model.resolve_read(id, expr.range()) {
-            ResolvedRead::Resolved(..) | ResolvedRead::ImplicitGlobal => {
+            ResolvedRead::Resolved(_) | ResolvedRead::ImplicitGlobal => {
                 // Nothing to do.
             }
-            ResolvedRead::StarImport => {
+            ResolvedRead::WildcardImport => {
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = self
@@ -4381,7 +4381,7 @@ impl<'a> Checker<'a> {
                     ));
                 }
             }
-            ResolvedRead::NotFound => {
+            ResolvedRead::NotFound | ResolvedRead::UnboundLocal(_) => {
                 // F821
                 if self.enabled(Rule::UndefinedName) {
                     // Allow __path__.
