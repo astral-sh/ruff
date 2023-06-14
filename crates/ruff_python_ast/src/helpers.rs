@@ -1353,7 +1353,7 @@ impl<'a> SimpleCallArgs<'a> {
     ) -> Self {
         let args = args
             .into_iter()
-            .take_while(|arg| !matches!(arg, Expr::Starred(_)))
+            .take_while(|arg| !arg.is_starred_expr())
             .collect();
 
         let kwargs = keywords
@@ -1404,7 +1404,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
             range: _range,
         }) = parent
         {
-            if matches!(value.as_ref(), Expr::IfExp(_)) {
+            if value.is_if_exp_expr() {
                 return true;
             }
         }
@@ -1427,7 +1427,7 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
     match parent {
         Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
             if let Some(optional_vars) = &item.optional_vars {
-                if matches!(optional_vars.as_ref(), Expr::Tuple(_)) {
+                if optional_vars.is_tuple_expr() {
                     if any_over_expr(optional_vars, &|expr| expr == child) {
                         return true;
                     }
