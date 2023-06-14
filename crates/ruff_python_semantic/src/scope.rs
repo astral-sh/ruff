@@ -85,11 +85,6 @@ impl<'a> Scope<'a> {
         }
     }
 
-    /// Removes the binding with the given name.
-    pub fn delete(&mut self, name: &'a str) -> Option<BindingId> {
-        self.bindings.remove(name)
-    }
-
     /// Returns `true` if this scope has a binding with the given name.
     pub fn has(&self, name: &str) -> bool {
         self.bindings.contains_key(name)
