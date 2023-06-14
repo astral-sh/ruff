@@ -30,26 +30,26 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         // ```
         // In all other cases comments get assigned to a list element
         if elts.is_empty() {
-            let partition_point = dangling
+            let end_of_line_split = dangling
                 .partition_point(|comment| comment.position() == CommentTextPosition::EndOfLine);
-            debug_assert!(dangling[partition_point..]
+            debug_assert!(dangling[end_of_line_split..]
                 .iter()
                 .all(|comment| comment.position() == CommentTextPosition::OwnLine));
             return write!(
                 f,
                 [group(&format_args![
                     text("["),
-                    dangling_comments(&dangling[..partition_point]),
-                    soft_block_indent(&dangling_comments(&dangling[partition_point..])),
+                    dangling_comments(&dangling[..end_of_line_split]),
+                    soft_block_indent(&dangling_comments(&dangling[end_of_line_split..])),
                     text("]")
                 ])]
             );
-        } else {
-            debug_assert!(
-                dangling.is_empty(),
-                "A non-empty expression list has dangling comments"
-            );
         }
+
+        debug_assert!(
+            dangling.is_empty(),
+            "A non-empty expression list has dangling comments"
+        );
 
         let items = format_with(|f| {
             let mut iter = elts.iter();
