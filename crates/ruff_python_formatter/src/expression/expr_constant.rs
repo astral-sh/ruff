@@ -39,6 +39,22 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
             }
         }
     }
+
+    fn fmt_dangling_comments(
+        &self,
+        _node: &ExprConstant,
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // TODO(konstin): Reactivate when string formatting works, currently a source of unstable
+        // formatting, e.g.:
+        // magic_methods = (
+        //     "enter exit "
+        //     # we added divmod and rdivmod here instead of numerics
+        //     # because there is no idivmod
+        //     "divmod rdivmod neg pos abs invert "
+        // )
+        Ok(())
+    }
 }
 
 impl NeedsParentheses for ExprConstant {
