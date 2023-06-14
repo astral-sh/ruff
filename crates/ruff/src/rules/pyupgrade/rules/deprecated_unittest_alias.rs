@@ -9,11 +9,12 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for deprecated aliases from the `unittest` module.
+/// Checks for uses of deprecated methods from the `unittest` module.
 ///
 /// ## Why is this bad?
-/// The aliases are deprecated and should not be used. Use the alias target
-/// instead.
+/// The `unittest` module has deprecated aliases for some of its methods.
+/// The aliases may be removed in future versions of Python. Instead,
+/// use their non-deprecated counterparts.
 ///
 /// ## Example
 /// ```python

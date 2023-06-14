@@ -21,7 +21,7 @@ pub(crate) enum Reason {
 ///
 /// ## Why is this bad?
 /// UTF-8 is the default encoding in Python, so there is no need to call
-/// `encode` with UTF-8. Instead, use a bytes literal.
+/// `encode` when UTF-8 is the desired encoding. Instead, use a bytes literal.
 ///
 /// ## Example
 /// ```python

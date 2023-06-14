@@ -8,11 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for unicode literals in strings.
+/// Checks for uses of the Unicode kind prefix (`u`) in strings.
 ///
 /// ## Why is this bad?
-/// In Python 3, all strings are unicode by default. Unicode literals should be
-/// replaced with regular strings to avoid confusion.
+/// In Python 3, all strings are Unicode by default. The Unicode kind prefix is
+/// unnecessary and should be removed to avoid confusion.
 ///
 /// ## Example
 /// ```python
@@ -42,17 +42,14 @@ impl AlwaysAutofixableViolation for UnicodeKindPrefix {
 
 /// UP025
 pub(crate) fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
-    if let Some(const_kind) = kind {
-        if const_kind.to_lowercase() == "u" {
-            let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, expr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::at(
-                    expr.start(),
-                    TextSize::from(1),
-                ))));
-            }
-            checker.diagnostics.push(diagnostic);
+    if matches!(kind, Some("u" | "U")) {
+        let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, expr.range());
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::at(
+                expr.start(),
+                TextSize::from(1),
+            ))));
         }
+        checker.diagnostics.push(diagnostic);
     }
 }

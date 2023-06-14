@@ -9,11 +9,12 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Check for type annotations that do not use the PEP 604 syntax.
+/// Check for type annotations that can be rewritten based on [PEP 604] syntax.
 ///
 /// ## Why is this bad?
-/// PEP 604 introduced a new syntax for union type annotations by using the
-/// `|` operator. This syntax is more concise and easier to read.
+/// [PEP 604] introduced a new syntax for union type annotations based on the
+/// `|` operator. This syntax is more concise and readable than the previous
+/// `typing.Union` and `typing.Optional` syntaxes.
 ///
 /// ## Example
 /// ```python
@@ -27,8 +28,7 @@ use crate::registry::AsRule;
 /// foo: int | str = 1
 /// ```
 ///
-/// ## References
-/// - [PEP 604](https://peps.python.org/pep-0604/)
+/// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
 pub struct NonPEP604Annotation;
 

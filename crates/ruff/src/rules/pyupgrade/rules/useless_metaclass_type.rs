@@ -8,10 +8,10 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for code that sets `__metaclass__ = type`.
+/// Checks for the use of `__metaclass__ = type` in class definitions.
 ///
 /// ## Why is this bad?
-/// Since Python 3, `__metaclass__ = type` is implied, and is not required.
+/// Since Python 3, `__metaclass__ = type` is implied and can thus be omitted.
 ///
 /// ## Example
 /// ```python

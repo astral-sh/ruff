@@ -9,12 +9,12 @@ use crate::registry::AsRule;
 use super::super::types::Primitive;
 
 /// ## What it does
-/// Checks for code that passes a primitive to `type()`.
+/// Checks for uses of `type` that take a primitive as an argument.
 ///
 /// ## Why is this bad?
-/// `type()` returns the type of the given object. It should not be used to get
-/// the type of a primitive, as the type of a primitive is already known.
-/// Instead, use the primitive type itself.
+/// `type()` returns the type of a given object. A type of a primitive can
+/// always be known in advance and accessed directly, which is more concise
+/// and explicit than using `type()`.
 ///
 /// ## Example
 /// ```python

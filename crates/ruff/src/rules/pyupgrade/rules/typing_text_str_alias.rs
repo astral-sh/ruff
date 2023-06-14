@@ -1,16 +1,16 @@
 use rustpython_parser::ast::{Expr, Ranged};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `typing.Text`.
+/// Checks for uses of `typing.Text`.
 ///
 /// ## Why is this bad?
-/// `typing.Text` is an alias for `str` and exists only for Python 2
+/// `typing.Text` is an alias for `str`, and only exists for Python 2
 /// compatibility. As of Python 3.11, `typing.Text` is deprecated. Use `str`
 /// instead.
 ///
@@ -31,14 +31,16 @@ use crate::registry::AsRule;
 #[violation]
 pub struct TypingTextStrAlias;
 
-impl AlwaysAutofixableViolation for TypingTextStrAlias {
+impl Violation for TypingTextStrAlias {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`typing.Text` is deprecated, use `str`")
     }
 
-    fn autofix_title(&self) -> String {
-        "Replace with `str`".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Replace with `str`".to_string())
     }
 }
 
@@ -53,11 +55,12 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                "str".to_string(),
-                expr.range(),
-            )));
+            if checker.semantic().is_builtin("str") {
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    "str".to_string(),
+                    expr.range(),
+                )));
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

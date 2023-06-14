@@ -13,12 +13,10 @@ use crate::registry::AsRule;
 ///
 /// ## Why is this bad?
 /// The `__future__` module is used to enable features that are not yet
-/// available in the current Python version. If the feature is already
-/// available in the oldest supported Python version, the import is
-/// unnecessary.
-///
-/// The current Python version can be configured using the `target-version`
-/// option.
+/// available in the current Python version. If a feature is already
+/// available in the minimum supported Python version, importing it
+/// from `__future__` is unnecessary and should be removed to avoid
+/// confusion.
 ///
 /// ## Example
 /// ```python
@@ -33,8 +31,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [`__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
-/// - [Ruff documentation: `target-version`](https://beta.ruff.rs/docs/settings/#target-version)
+/// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[violation]
 pub struct UnnecessaryFutureImport {
     pub names: Vec<String>,

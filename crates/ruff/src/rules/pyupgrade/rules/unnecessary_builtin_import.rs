@@ -12,8 +12,8 @@ use crate::registry::AsRule;
 /// Checks for unnecessary imports of builtins.
 ///
 /// ## Why is this bad?
-/// Builtins are always available, so there is no need to import them. Doing so
-/// is redundant and can cause confusion.
+/// Builtins are always available. Importing them is unnecessary and should be
+/// removed to avoid confusion.
 ///
 /// ## Example
 /// ```python

@@ -12,10 +12,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `yield` in `for` loops that can be replaced with `yield from`.
+/// Checks for `for` loops that can be replaced with `yield from` expressions.
 ///
 /// ## Why is this bad?
-/// Using `yield from` is more idiomatic and less verbose.
+/// If a `for` loop only contains a `yield` statement, it can be replaced with a
+/// `yield from` expression, which is more concise and idiomatic.
 ///
 /// ## Example
 /// ```python

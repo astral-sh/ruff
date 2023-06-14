@@ -10,12 +10,17 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `OSError` aliases.
+/// Checks for uses of exceptions that alias `OSError`.
 ///
 /// ## Why is this bad?
-/// `OSError` is the builtin error type for exceptions related to the operating
-/// system. Replacing aliases to `OSError` with `OSError` makes the exception
-/// more explicit and is more idiomatic.
+/// `OSError` is the builtin error type used for exceptions that relate to the
+/// operating system.
+///
+/// In Python 3.3, a variety of other exceptions, like `WindowsError` were
+/// aliased to `OSError`. These aliases remain in place for compatibility with
+/// older versions of Python, but may be removed in future versions.
+///
+/// Prefer using `OSError` directly, as it is more idiomatic and future-proof.
 ///
 /// ## Example
 /// ```python

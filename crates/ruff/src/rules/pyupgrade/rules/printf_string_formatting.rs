@@ -22,8 +22,10 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// Checks for `printf`-style string formatting.
 ///
 /// ## Why is this bad?
-/// `printf`-style string formatting is harder to read and less flexible than
-/// format specifiers.
+/// `printf`-style string formatting has a number of quirks, and leads to less
+/// readable code than using `str.format` calls or f-strings. In general, prefer
+/// the newer `str.format` and f-strings constructs over `printf`-style string
+/// formatting.
 ///
 /// ## Example
 /// ```python

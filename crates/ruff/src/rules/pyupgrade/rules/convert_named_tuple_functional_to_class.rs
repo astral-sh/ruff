@@ -14,10 +14,15 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `NamedTuple` functional syntax.
+/// Checks for `NamedTuple` declarations that use functional syntax.
 ///
 /// ## Why is this bad?
-/// Class syntax is more readable than functional syntax.
+/// `NamedTuple` subclasses can be defined either through a functional syntax
+/// (`Foo = NamedTuple(...)`) or a class syntax (`class Foo(NamedTuple): ...`).
+///
+/// The class syntax is more readable and generally preferred over the
+/// functional syntax, which exists primarily for backwards compatibility
+/// with `collections.namedtuple`.
 ///
 /// ## Example
 /// ```python

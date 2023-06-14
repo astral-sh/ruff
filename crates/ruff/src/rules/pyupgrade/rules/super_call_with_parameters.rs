@@ -8,12 +8,15 @@ use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes;
 
 /// ## What it does
-/// Checks for calls to `super` with redundant arguments.
+/// Checks for `super` calls that pass redundant arguments.
 ///
 /// ## Why is this bad?
-/// In Python 3, `super` does not require arguments if its first argument is
-/// `__class__` and its second argument is the first argument of the
-/// enclosing method.
+/// In Python 3, `super` can be invoked without any arguments when: (1) the
+/// first argument is `__class__`, and (2) the second argument is equivalent to
+/// the first argument of the enclosing method.
+///
+/// When possible, omit the arguments to `super` to make the code more concise
+/// and maintainable.
 ///
 /// ## Example
 /// ```python

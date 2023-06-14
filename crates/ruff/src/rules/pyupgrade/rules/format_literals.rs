@@ -15,11 +15,15 @@ use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 
 /// ## What it does
-/// Checks for unnecessary explicit positional indices in format strings.
+/// Checks for unnecessary positional indices in format strings.
 ///
 /// ## Why is this bad?
-/// If the positional indices are in order, they are redundant and can be
-/// removed to improve readability.
+/// In Python 3.1 and later, format strings can use implicit positional
+/// references. For example, `"{0}, {1}".format("Hello", "World")` can be
+/// rewritten as `"{}, {}".format("Hello", "World")`.
+///
+/// If the positional indices appear exactly in-order, they can be omitted
+/// in favor of automatic indices to improve readability.
 ///
 /// ## Example
 /// ```python

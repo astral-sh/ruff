@@ -9,8 +9,8 @@ use ruff_python_whitespace::Line;
 /// Checks for unnecessary UTF-8 encoding declarations.
 ///
 /// ## Why is this bad?
-/// PEP 3120 makes UTF-8 the default encoding, so the encoding declaration is
-/// unnecessary.
+/// [PEP 3120] makes UTF-8 the default encoding, so a UTF-8 encoding
+/// declaration is unnecessary.
 ///
 /// ## Example
 /// ```python
@@ -23,8 +23,7 @@ use ruff_python_whitespace::Line;
 /// print("Hello, world!")
 /// ```
 ///
-/// ## References
-/// - [PEP 3120](https://peps.python.org/pep-3120/)
+/// [PEP 3120]: https://peps.python.org/pep-3120/
 #[violation]
 pub struct UTF8EncodingDeclaration;
 

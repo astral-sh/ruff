@@ -36,10 +36,12 @@ enum Deprecation {
 }
 
 /// ## What it does
-/// Checks for deprecated imports.
+/// Checks for uses of deprecated imports based on the minimum supported
+/// Python version.
 ///
 /// ## Why is this bad?
-/// Deprecated imports may be removed in future versions of Python.
+/// Deprecated imports may be removed in future versions of Python, and
+/// should be replaced with their new equivalents.
 ///
 /// ## Example
 /// ```python

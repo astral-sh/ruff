@@ -24,12 +24,13 @@ pub(crate) enum MockReference {
 }
 
 /// ## What it does
-/// Checks for importing `mock` instead of `unittest.mock`.
+/// Checks for imports of the `mock` module that should be replaced with
+/// `unittest.mock`.
 ///
 /// ## Why is this bad?
 /// Since Python 3.3, `mock` has been a part of the standard library as
-/// `unittest.mock`. The `mock` package is deprecated and `unittest.mock`
-/// should be used instead.
+/// `unittest.mock`. The `mock` package is deprecated; use `unittest.mock`
+/// instead.
 ///
 /// ## Example
 /// ```python

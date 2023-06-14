@@ -7,12 +7,12 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for unpacked list comprehensions.
+/// Checks for list comprehensions that are immediately unpacked.
 ///
 /// ## Why is this bad?
 /// There is no reason to use a list comprehension if the result is immediately
-/// unpacked. Instead, a generator expression should be used. This is more
-/// idiomatic and avoids creating an unnecessary list.
+/// unpacked. Instead, use a generator expression, which is more efficient as
+/// it avoids allocating an intermediary list.
 ///
 /// ## Example
 /// ```python

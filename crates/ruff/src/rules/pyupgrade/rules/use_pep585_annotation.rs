@@ -10,12 +10,18 @@ use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for generic type annotations that do not use the PEP 585 syntax.
+/// Checks for the use of generics that can be replaced with standard library
+/// variants based on [PEP 585].
 ///
 /// ## Why is this bad?
-/// PEP 585 introduced a new syntax for generic type annotations by using
-/// generics directly instead of the `typing` module. This is more concise and
-/// easier to read.
+/// [PEP 585] enabled collections in the Python standard library (like `list`)
+/// to be used as generics directly, instead of importing analogous members
+/// from the `typing` module (like `typing.List`).
+///
+/// When available, the [PEP 585] syntax should be used instead of importing
+/// members from the `typing` module, as it's more concise and readable.
+/// Importing those members from `typing` is considered deprecated as of PEP
+/// 585.
 ///
 /// ## Example
 /// ```python
@@ -29,8 +35,7 @@ use crate::registry::AsRule;
 /// foo: list[int] = [1, 2, 3]
 /// ```
 ///
-/// ## References
-/// - [PEP 585](https://peps.python.org/pep-0585/)
+/// [PEP 585]: https://peps.python.org/pep-0585/
 #[violation]
 pub struct NonPEP585Annotation {
     from: String,

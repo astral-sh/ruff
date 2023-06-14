@@ -28,7 +28,8 @@ impl fmt::Display for LiteralType {
 /// Checks for unnecessary calls to `str` and `bytes`.
 ///
 /// ## Why is this bad?
-/// The `str` and `bytes` constructors can be replaced with a literal.
+/// The `str` and `bytes` constructors can be replaced with string and bytes
+/// literals, which are more readable and idiomatic.
 ///
 /// ## Example
 /// ```python

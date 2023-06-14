@@ -11,12 +11,13 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for sending `stdout` and `stderr` to a pipe in `subprocess.run`.
+/// Checks for uses of `subprocess.run` that send `stdout` and `stderr` to a
+/// pipe.
 ///
 /// ## Why is this bad?
 /// As of Python 3.7, `subprocess.run` has a `capture_output` keyword argument
 /// that can be set to `True` to capture `stdout` and `stderr` outputs. This is
-/// equivalent to setting `stdout` and `stderr` to `subprocess.PIPE`, and is
+/// equivalent to setting `stdout` and `stderr` to `subprocess.PIPE`, but is
 /// more explicit and readable.
 ///
 /// ## Example
@@ -42,7 +43,7 @@ pub struct ReplaceStdoutStderr;
 impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Sending stdout and stderr to pipe is deprecated, use `capture_output`")
+        format!("Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`")
     }
 
     fn autofix_title(&self) -> String {

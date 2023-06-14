@@ -7,11 +7,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `io.open`.
+/// Checks for uses of `io.open`.
 ///
 /// ## Why is this bad?
-/// In Python 3, `io.open` is an alias for `open`. Using `io.open` is
-/// unnecessary and less idiomatic.
+/// In Python 3, `io.open` is an alias for `open`. Prefer using `open` directly,
+/// as it is more idiomatic.
 ///
 /// ## Example
 /// ```python
@@ -54,7 +54,7 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
     {
         let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            if checker.semantic().is_available("open") {
+            if checker.semantic().is_builtin("open") {
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     "open".to_string(),
                     func.range(),

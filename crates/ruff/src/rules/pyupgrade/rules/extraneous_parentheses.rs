@@ -13,8 +13,8 @@ use crate::settings::Settings;
 /// Checks for extraneous parentheses.
 ///
 /// ## Why is this bad?
-/// Extraneous parentheses are redundant. They should be removed to improve
-/// readability.
+/// Extraneous parentheses are redundant, and can be removed to improve
+/// readability while retaining identical semantics.
 ///
 /// ## Example
 /// ```python

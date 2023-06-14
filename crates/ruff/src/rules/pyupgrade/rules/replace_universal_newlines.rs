@@ -9,11 +9,14 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `universal_newlines` keyword argument in `subprocess.run` calls.
+/// Checks for uses of `subprocess.run` that set the `universal_newlines`
+/// keyword argument.
 ///
 /// ## Why is this bad?
-/// As of Python 3.7, `text` is an alias for `universal_newlines`. `text` is
-/// more understandable and explicit than `universal_newlines`.
+/// As of Python 3.7, the `universal_newlines` keyword argument has been
+/// renamed to `text`, and now exists for backwards compatibility. The
+/// `universal_newlines` keyword argument may be removed in a future version of
+/// Python. Prefer `text`, which is more explicit and readable.
 ///
 /// ## Example
 /// ```python

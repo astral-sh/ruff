@@ -7,11 +7,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `cElementTree` imports.
+/// Checks for uses of the `xml.etree.cElementTree` module.
 ///
 /// ## Why is this bad?
-/// Since Python 3.3, `cElementTree` has been deprecated in favor of
-/// `ElementTree`.
+/// In Python 3.3, `xml.etree.cElementTree` was deprecated in favor of
+/// `xml.etree.ElementTree`.
 ///
 /// ## Example
 /// ```python

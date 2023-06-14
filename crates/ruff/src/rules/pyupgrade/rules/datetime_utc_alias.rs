@@ -8,11 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `datetime.timezone.utc`.
+/// Checks for uses of `datetime.timezone.utc`.
 ///
 /// ## Why is this bad?
 /// As of Python 3.11, `datetime.UTC` is an alias for `datetime.timezone.utc`.
-/// This alias is less verbose and more readable.
+/// The alias is more readable and generally preferred over the full path.
 ///
 /// ## Example
 /// ```python

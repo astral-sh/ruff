@@ -17,14 +17,15 @@ use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for outdated version blocks.
+/// Checks for conditional blocks gated on `sys.version_info` comparisons
+/// that are outdated for the minimum supported Python version.
 ///
 /// ## Why is this bad?
-/// If the a code block is only executed for a version of Python older than
-/// the oldest supported version, it should be removed.
+/// In Python, code can be conditionally executed based on the active
+/// Python version by comparing against the `sys.version_info` tuple.
 ///
-/// The oldest supported version can be configured using the `target-version`
-/// option.
+/// If a code block is only executed for Python versions older than the
+/// minimum supported version, it should be removed.
 ///
 /// ## Example
 /// ```python
@@ -43,7 +44,6 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-/// - [Ruff documentation: `target-version`](https://beta.ruff.rs/docs/settings/#target-version)
 #[violation]
 pub struct OutdatedVersionBlock;
 

@@ -8,11 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for unnecessary parentheses to `functools.lru_cache`.
+/// Checks for unnecessary parentheses on `functools.lru_cache` decorators.
 ///
 /// ## Why is this bad?
 /// Since Python 3.8, `functools.lru_cache` can be used as a decorator without
-/// parentheses.
+/// trailing parentheses, as long as no arguments are passed to it.
 ///
 /// ## Example
 /// ```python

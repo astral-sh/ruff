@@ -7,11 +7,13 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for unnecessary quotes in type annotations.
+/// Checks for the presence of unnecessary quotes in type annotations.
 ///
 /// ## Why is this bad?
-/// Quotes in type annotations are unnecessary if `from __future__ import
-/// annotations` is used. The quotes should be removed.
+/// In Python, type annotations can be quoted to avoid forward references.
+/// However, if `from __future__ import annotations` is present, Python
+/// will always evaluate type annotations in a deferred manner, making
+/// the quotes unnecessary.
 ///
 /// ## Example
 /// ```python

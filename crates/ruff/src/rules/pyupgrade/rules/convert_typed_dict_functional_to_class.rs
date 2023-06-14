@@ -14,10 +14,14 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `TypedDict` functional syntax.
+/// Checks for `TypedDict` declarations that use functional syntax.
 ///
 /// ## Why is this bad?
-/// Class syntax is more readable than functional syntax.
+/// `TypedDict` subclasses can be defined either through a functional syntax
+/// (`Foo = TypedDict(...)`) or a class syntax (`class Foo(TypedDict): ...`).
+///
+/// The class syntax is more readable and generally preferred over the
+/// functional syntax.
 ///
 /// ## Example
 /// ```python
