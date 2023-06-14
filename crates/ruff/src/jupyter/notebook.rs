@@ -414,8 +414,9 @@ mod test {
     use crate::jupyter::is_jupyter_notebook;
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
-
-    use crate::test::test_resource_path;
+    use crate::registry::Rule;
+    use crate::test::{test_notebook_path, test_resource_path};
+    use crate::{assert_messages, settings};
 
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
     fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
@@ -522,5 +523,16 @@ print("after empty cells")
                 198.into()
             ]
         );
+    }
+
+    #[test]
+    fn test_import_sorting() -> Result<()> {
+        let diagnostics = test_notebook_path(
+            Path::new("isort.ipynb"),
+            Path::new("isort_expected.ipynb"),
+            &settings::Settings::for_rule(Rule::UnsortedImports),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
     }
 }
