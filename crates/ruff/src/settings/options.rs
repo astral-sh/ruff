@@ -288,7 +288,7 @@ pub struct Options {
     /// re-exported with a redundant alias (e.g., `import os as os`).
     pub ignore_init_module_imports: Option<bool>,
     #[option(
-        default = r#"["*.py", "*.pyi"]"#,
+        default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -297,7 +297,9 @@ pub struct Options {
     /// A list of file patterns to include when linting.
     ///
     /// Inclusion are based on globs, and should be single-path patterns, like
-    /// `*.pyw`, to include any file with the `.pyw` extension.
+    /// `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is
+    /// included here not for configuration but because we lint whether e.g. the
+    /// `[project]` matches the schema.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub include: Option<Vec<String>>,
