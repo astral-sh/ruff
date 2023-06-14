@@ -247,21 +247,21 @@ mod test {
             &overrides,
             Cache::Disabled,
             Noqa::Enabled,
-            FixMode::None,
+            FixMode::Generate,
         )?;
 
         let printer = Printer::new(
             SerializationFormat::Text,
             LogLevel::Default,
-            FixMode::None,
+            FixMode::Generate,
             Flags::SHOW_VIOLATIONS,
         );
         let mut writer: Vec<u8> = Vec::new();
-        // Mute the terminal color codes
+        // Mute the terminal color codes.
         colored::control::set_override(false);
         printer.write_once(&diagnostics, &mut writer)?;
         // TODO(konstin): Set jupyter notebooks as none-fixable for now
-        // TODO(konstin) 2: Make jupyter notebooks fixable
+        // TODO(konstin): Make jupyter notebooks fixable
         let expected = format!(
             "{valid_ipynb}:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
 {valid_ipynb}:cell 3:1:24: B006 Do not use mutable data structures for argument defaults

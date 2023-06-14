@@ -110,10 +110,7 @@ pub(crate) fn lint_path(
     // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
-    let metadata = if cache.into()
-        && noqa.into()
-        && matches!(autofix, flags::FixMode::None | flags::FixMode::Generate)
-    {
+    let metadata = if cache.into() && noqa.into() && autofix.is_generate() {
         let metadata = path.metadata()?;
         if let Some((messages, imports)) = cache::get(path, package, &metadata, settings) {
             debug!("Cache hit for: {}", path.display());
@@ -170,23 +167,25 @@ pub(crate) fn lint_path(
             &mut source_kind,
         ) {
             if !fixed.is_empty() {
-                if matches!(autofix, flags::FixMode::Apply) {
-                    match &source_kind {
+                match autofix {
+                    flags::FixMode::Apply => match &source_kind {
                         SourceKind::Python(_) => {
                             write(path, transformed.as_bytes())?;
                         }
                         SourceKind::Jupyter(notebook) => {
                             notebook.write(path)?;
                         }
+                    },
+                    flags::FixMode::Diff => {
+                        let mut stdout = io::stdout().lock();
+                        TextDiff::from_lines(contents.as_str(), &transformed)
+                            .unified_diff()
+                            .header(&fs::relativize_path(path), &fs::relativize_path(path))
+                            .to_writer(&mut stdout)?;
+                        stdout.write_all(b"\n")?;
+                        stdout.flush()?;
                     }
-                } else if matches!(autofix, flags::FixMode::Diff) {
-                    let mut stdout = io::stdout().lock();
-                    TextDiff::from_lines(contents.as_str(), &transformed)
-                        .unified_diff()
-                        .header(&fs::relativize_path(path), &fs::relativize_path(path))
-                        .to_writer(&mut stdout)?;
-                    stdout.write_all(b"\n")?;
-                    stdout.flush()?;
+                    flags::FixMode::Generate => {}
                 }
             }
             (result, fixed)
@@ -269,23 +268,28 @@ pub(crate) fn lint_stdin(
             settings,
             &mut source_kind,
         ) {
-            if matches!(autofix, flags::FixMode::Apply) {
-                // Write the contents to stdout, regardless of whether any errors were fixed.
-                io::stdout().write_all(transformed.as_bytes())?;
-            } else if matches!(autofix, flags::FixMode::Diff) {
-                // But only write a diff if it's non-empty.
-                if !fixed.is_empty() {
-                    let text_diff = TextDiff::from_lines(contents, &transformed);
-                    let mut unified_diff = text_diff.unified_diff();
-                    if let Some(path) = path {
-                        unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
-                    }
-
-                    let mut stdout = io::stdout().lock();
-                    unified_diff.to_writer(&mut stdout)?;
-                    stdout.write_all(b"\n")?;
-                    stdout.flush()?;
+            match autofix {
+                flags::FixMode::Apply => {
+                    // Write the contents to stdout, regardless of whether any errors were fixed.
+                    io::stdout().write_all(transformed.as_bytes())?;
                 }
+                flags::FixMode::Diff => {
+                    // But only write a diff if it's non-empty.
+                    if !fixed.is_empty() {
+                        let text_diff = TextDiff::from_lines(contents, &transformed);
+                        let mut unified_diff = text_diff.unified_diff();
+                        if let Some(path) = path {
+                            unified_diff
+                                .header(&fs::relativize_path(path), &fs::relativize_path(path));
+                        }
+
+                        let mut stdout = io::stdout().lock();
+                        unified_diff.to_writer(&mut stdout)?;
+                        stdout.write_all(b"\n")?;
+                        stdout.flush()?;
+                    }
+                }
+                flags::FixMode::Generate => {}
             }
 
             (result, fixed)
@@ -301,7 +305,7 @@ pub(crate) fn lint_stdin(
             let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
-            if matches!(autofix, flags::FixMode::Apply) {
+            if autofix.is_apply() {
                 io::stdout().write_all(contents.as_bytes())?;
             }
 
