@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -92,7 +93,7 @@ pub(crate) fn run(
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
-                                error += &format!("\n  Caused by: {cause}");
+                                write!(&mut error, "\n  Caused by: {cause}").unwrap();
                             }
                             error
                         })
