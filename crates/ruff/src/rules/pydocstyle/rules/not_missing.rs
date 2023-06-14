@@ -3,7 +3,7 @@ use ruff_text_size::TextRange;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::ranges::identifier_range;
 use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
 };

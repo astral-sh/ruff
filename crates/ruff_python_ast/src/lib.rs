@@ -9,6 +9,7 @@ pub mod helpers;
 pub mod imports;
 pub mod node;
 pub mod prelude;
+pub mod ranges;
 pub mod relocate;
 pub mod source_code;
 pub mod statement_visitor;

@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::ranges::identifier_range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

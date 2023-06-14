@@ -3,7 +3,7 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::ranges::identifier_range;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::autofix::edits::delete_stmt;

@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::ranges::identifier_range;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
