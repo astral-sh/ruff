@@ -106,13 +106,22 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::InvalidClassName, "N801.py")]
     #[test_case(Rule::InvalidFunctionName, "N802.py")]
     #[test_case(Rule::InvalidArgumentName, "N803.py")]
     #[test_case(Rule::InvalidFirstArgumentNameForClassMethod, "N804.py")]
     #[test_case(Rule::InvalidFirstArgumentNameForMethod, "N805.py")]
     #[test_case(Rule::NonLowercaseVariableInFunction, "N806.py")]
+    #[test_case(Rule::DunderFunctionName, "N807.py")]
+    #[test_case(Rule::ConstantImportedAsNonConstant, "N811.py")]
+    #[test_case(Rule::LowercaseImportedAsNonLowercase, "N812.py")]
+    #[test_case(Rule::CamelcaseImportedAsLowercase, "N813.py")]
+    #[test_case(Rule::CamelcaseImportedAsConstant, "N814.py")]
     #[test_case(Rule::MixedCaseVariableInClassScope, "N815.py")]
     #[test_case(Rule::MixedCaseVariableInGlobalScope, "N816.py")]
+    #[test_case(Rule::CamelcaseImportedAsAcronym, "N817.py")]
+    #[test_case(Rule::ErrorSuffixOnExceptionName, "N818.py")]
+    #[test_case(Rule::InvalidModuleName, "N999/badAllowed/__init__.py")]
     fn ignore_names(rule_code: Rule, path: &str) -> Result<()> {
         let snapshot = format!("ignore_names_{}_{path}", rule_code.noqa_code());
         let diagnostics = test_path(
@@ -120,8 +129,10 @@ mod tests {
             &settings::Settings {
                 pep8_naming: pep8_naming::settings::Settings {
                     ignore_names: vec![
-                        IdentifierPattern::new("*Allowed").unwrap(),
-                        IdentifierPattern::new("*ALLOWED").unwrap(),
+                        IdentifierPattern::new("*allowed*").unwrap(),
+                        IdentifierPattern::new("*Allowed*").unwrap(),
+                        IdentifierPattern::new("*ALLOWED*").unwrap(),
+                        IdentifierPattern::new("BA").unwrap(), // For N817.
                     ],
                     ..Default::default()
                 },

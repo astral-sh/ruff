@@ -467,6 +467,7 @@ where
                         self.semantic_model.scope(),
                         stmt,
                         name,
+                        &self.settings.pep8_naming.ignore_names,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -713,9 +714,12 @@ where
                     }
                 }
                 if self.enabled(Rule::InvalidClassName) {
-                    if let Some(diagnostic) =
-                        pep8_naming::rules::invalid_class_name(stmt, name, self.locator)
-                    {
+                    if let Some(diagnostic) = pep8_naming::rules::invalid_class_name(
+                        stmt,
+                        name,
+                        &self.settings.pep8_naming.ignore_names,
+                        self.locator,
+                    ) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -725,6 +729,7 @@ where
                         bases,
                         name,
                         self.locator,
+                        &self.settings.pep8_naming.ignore_names,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -908,7 +913,11 @@ where
                         if self.enabled(Rule::ConstantImportedAsNonConstant) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -918,7 +927,11 @@ where
                         if self.enabled(Rule::LowercaseImportedAsNonLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -928,7 +941,11 @@ where
                         if self.enabled(Rule::CamelcaseImportedAsLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -938,7 +955,11 @@ where
                         if self.enabled(Rule::CamelcaseImportedAsConstant) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -948,7 +969,11 @@ where
                         if self.enabled(Rule::CamelcaseImportedAsAcronym) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1207,6 +1232,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1220,6 +1246,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1233,6 +1260,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1246,6 +1274,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1259,6 +1288,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);

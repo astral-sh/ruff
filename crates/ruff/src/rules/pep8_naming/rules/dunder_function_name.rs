@@ -6,6 +6,8 @@ use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::scope::{Scope, ScopeKind};
 
+use crate::settings::types::IdentifierPattern;
+
 /// ## What it does
 /// Checks for functions with "dunder" names (that is, names with two
 /// leading and trailing underscores) that are not documented.
@@ -45,6 +47,7 @@ pub(crate) fn dunder_function_name(
     scope: &Scope,
     stmt: &Stmt,
     name: &str,
+    ignore_names: &[IdentifierPattern],
     locator: &Locator,
 ) -> Option<Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
@@ -55,6 +58,12 @@ pub(crate) fn dunder_function_name(
     }
     // Allowed under PEP 562 (https://peps.python.org/pep-0562/).
     if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
+        return None;
+    }
+    if ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name.matches(name))
+    {
         return None;
     }
 

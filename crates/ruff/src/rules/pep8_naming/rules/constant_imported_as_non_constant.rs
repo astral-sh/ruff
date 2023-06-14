@@ -4,6 +4,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::str;
 
+use crate::settings::types::IdentifierPattern;
+
 /// ## What it does
 /// Checks for constant imports that are aliased to non-constant-style
 /// names.
@@ -48,7 +50,15 @@ pub(crate) fn constant_imported_as_non_constant(
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
+    ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
+    if ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name.matches(name))
+    {
+        return None;
+    }
+
     if str::is_upper(name) && !str::is_upper(asname) {
         let mut diagnostic = Diagnostic::new(
             ConstantImportedAsNonConstant {
