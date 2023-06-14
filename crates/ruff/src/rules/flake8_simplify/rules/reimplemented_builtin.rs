@@ -230,6 +230,10 @@ pub(crate) fn convert_for_loop_to_any_all(
     stmt: &Stmt,
     sibling: Option<&Stmt>,
 ) {
+    // Don't flag if the loop is in an async context (`any` and `all` are not async).
+    if checker.semantic().in_async_context() {
+        return;
+    }
     // There are two cases to consider:
     // - `for` loop with an `else: return True` or `else: return False`.
     // - `for` loop followed by `return True` or `return False`
