@@ -190,7 +190,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                 if let Some(indentation) =
                                     whitespace::indentation(checker.locator, stmt)
                                 {
-                                    if checker.semantic_model().is_available("msg") {
+                                    if checker.semantic().is_available("msg") {
                                         diagnostic.set_fix(generate_fix(
                                             stmt,
                                             first,
@@ -213,7 +213,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                             if let Some(indentation) =
                                 whitespace::indentation(checker.locator, stmt)
                             {
-                                if checker.semantic_model().is_available("msg") {
+                                if checker.semantic().is_available("msg") {
                                     diagnostic.set_fix(generate_fix(
                                         stmt,
                                         first,
@@ -240,7 +240,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                     if let Some(indentation) =
                                         whitespace::indentation(checker.locator, stmt)
                                     {
-                                        if checker.semantic_model().is_available("msg") {
+                                        if checker.semantic().is_available("msg") {
                                             diagnostic.set_fix(generate_fix(
                                                 stmt,
                                                 first,

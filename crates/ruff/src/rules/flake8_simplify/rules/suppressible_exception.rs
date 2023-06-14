@@ -122,7 +122,7 @@ pub(crate) fn suppressible_exception(
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
                             &ImportRequest::import("contextlib", "suppress"),
                             stmt.start(),
-                            checker.semantic_model(),
+                            checker.semantic(),
                         )?;
                         let replace_try = Edit::range_replacement(
                             format!("with {binding}({exception})"),

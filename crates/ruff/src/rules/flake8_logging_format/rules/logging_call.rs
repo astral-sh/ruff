@@ -106,7 +106,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
         }
         Expr::Call(ast::ExprCall { func, keywords, .. }) => {
             if checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["", "dict"])
             {
@@ -151,7 +151,7 @@ pub(crate) fn logging_call(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !logging::is_logger_candidate(func, checker.semantic_model()) {
+    if !logging::is_logger_candidate(func, checker.semantic()) {
         return;
     }
 
@@ -193,10 +193,10 @@ pub(crate) fn logging_call(
 
             // G201, G202
             if checker.any_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
-                if !checker.semantic_model().in_exception_handler() {
+                if !checker.semantic().in_exception_handler() {
                     return;
                 }
-                let Some(exc_info) = logging::exc_info(keywords, checker.semantic_model()) else {
+                let Some(exc_info) = logging::exc_info(keywords, checker.semantic()) else {
                     return;
                 };
                 if let LoggingCallType::LevelCall(logging_level) = logging_call_type {

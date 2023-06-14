@@ -323,7 +323,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if func_name != "isinstance" {
             continue;
         }
-        if !checker.semantic_model().is_builtin("isinstance") {
+        if !checker.semantic().is_builtin("isinstance") {
             continue;
         }
 
@@ -356,7 +356,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if !contains_effect(target, |id| checker.semantic_model().is_builtin(id)) {
+                if !contains_effect(target, |id| checker.semantic().is_builtin(id)) {
                     // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
                     // in `isinstance(obj, int) or isinstance(obj, str)`).
                     let types: Vec<&Expr> = indices
@@ -478,7 +478,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(expr, |id| checker.semantic_model().is_builtin(id)))
+            .any(|expr| contains_effect(expr, |id| checker.semantic().is_builtin(id)))
         {
             continue;
         }
@@ -569,7 +569,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.semantic_model().is_builtin(id)) {
+    if contains_effect(expr, |id| checker.semantic().is_builtin(id)) {
         return;
     }
 
@@ -624,7 +624,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.semantic_model().is_builtin(id)) {
+    if contains_effect(expr, |id| checker.semantic().is_builtin(id)) {
         return;
     }
 
@@ -693,15 +693,14 @@ fn is_short_circuit(
 
     for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
         // Keep track of the location of the furthest-right, truthy or falsey expression.
-        let value_truthiness =
-            Truthiness::from_expr(value, |id| checker.semantic_model().is_builtin(id));
+        let value_truthiness = Truthiness::from_expr(value, |id| checker.semantic().is_builtin(id));
         let next_value_truthiness =
-            Truthiness::from_expr(next_value, |id| checker.semantic_model().is_builtin(id));
+            Truthiness::from_expr(next_value, |id| checker.semantic().is_builtin(id));
 
         // Keep track of the location of the furthest-right, non-effectful expression.
         if value_truthiness.is_unknown()
-            && (!checker.semantic_model().in_boolean_test()
-                || contains_effect(value, |id| checker.semantic_model().is_builtin(id)))
+            && (!checker.semantic().in_boolean_test()
+                || contains_effect(value, |id| checker.semantic().is_builtin(id)))
         {
             location = next_value.start();
             continue;
@@ -721,7 +720,7 @@ fn is_short_circuit(
                 value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                checker.semantic_model().in_boolean_test(),
+                checker.semantic().in_boolean_test(),
                 checker,
             ));
             break;
@@ -739,7 +738,7 @@ fn is_short_circuit(
                 next_value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                checker.semantic_model().in_boolean_test(),
+                checker.semantic().in_boolean_test(),
                 checker,
             ));
             break;

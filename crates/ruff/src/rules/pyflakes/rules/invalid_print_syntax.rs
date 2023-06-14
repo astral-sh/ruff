@@ -63,7 +63,7 @@ pub(crate) fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if id != "print" {
         return;
     }
-    if !checker.semantic_model().is_builtin("print") {
+    if !checker.semantic().is_builtin("print") {
         return;
     };
     checker

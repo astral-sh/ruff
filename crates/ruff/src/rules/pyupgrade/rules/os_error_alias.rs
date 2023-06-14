@@ -39,8 +39,8 @@ const ALIASES: &[(&str, &str)] = &[
 ];
 
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
-fn is_alias(model: &SemanticModel, expr: &Expr) -> bool {
-    model.resolve_call_path(expr).map_or(false, |call_path| {
+fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(expr).map_or(false, |call_path| {
         ALIASES
             .iter()
             .any(|(module, member)| call_path.as_slice() == [*module, *member])
@@ -48,8 +48,8 @@ fn is_alias(model: &SemanticModel, expr: &Expr) -> bool {
 }
 
 /// Return `true` if an [`Expr`] is `OSError`.
-fn is_os_error(model: &SemanticModel, expr: &Expr) -> bool {
-    model
+fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(expr)
         .map_or(false, |call_path| call_path.as_slice() == ["", "OSError"])
 }
@@ -93,10 +93,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
             .collect();
 
         // If `OSError` itself isn't already in the tuple, add it.
-        if elts
-            .iter()
-            .all(|elt| !is_os_error(checker.semantic_model(), elt))
-        {
+        if elts.iter().all(|elt| !is_os_error(elt, checker.semantic())) {
             let node = ast::ExprName {
                 id: "OSError".into(),
                 ctx: ExprContext::Load,
@@ -136,7 +133,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
         };
         match expr.as_ref() {
             Expr::Name(_) | Expr::Attribute(_) => {
-                if is_alias(checker.semantic_model(), expr) {
+                if is_alias(expr, checker.semantic()) {
                     atom_diagnostic(checker, expr);
                 }
             }
@@ -144,7 +141,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
                 // List of aliases to replace with `OSError`.
                 let mut aliases: Vec<&Expr> = vec![];
                 for elt in elts {
-                    if is_alias(checker.semantic_model(), elt) {
+                    if is_alias(elt, checker.semantic()) {
                         aliases.push(elt);
                     }
                 }
@@ -159,7 +156,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
 
 /// UP024
 pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
-    if is_alias(checker.semantic_model(), func) {
+    if is_alias(func, checker.semantic()) {
         atom_diagnostic(checker, func);
     }
 }
@@ -167,7 +164,7 @@ pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
 /// UP024
 pub(crate) fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
-        if is_alias(checker.semantic_model(), expr) {
+        if is_alias(expr, checker.semantic()) {
             atom_diagnostic(checker, expr);
         }
     }

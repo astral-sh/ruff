@@ -64,10 +64,10 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
-            checker.semantic_model(),
-            scope,
             name,
             decorator_list,
+            scope,
+            checker.semantic(),
             &checker.settings.pep8_naming.classmethod_decorators,
             &checker.settings.pep8_naming.staticmethod_decorators,
         ),

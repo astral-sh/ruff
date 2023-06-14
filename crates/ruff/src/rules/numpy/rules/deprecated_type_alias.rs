@@ -48,25 +48,24 @@ impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
 
 /// NPY001
 pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
-    if let Some(type_name) =
-        checker
-            .semantic_model()
-            .resolve_call_path(expr)
-            .and_then(|call_path| {
-                if call_path.as_slice() == ["numpy", "bool"]
-                    || call_path.as_slice() == ["numpy", "int"]
-                    || call_path.as_slice() == ["numpy", "float"]
-                    || call_path.as_slice() == ["numpy", "complex"]
-                    || call_path.as_slice() == ["numpy", "object"]
-                    || call_path.as_slice() == ["numpy", "str"]
-                    || call_path.as_slice() == ["numpy", "long"]
-                    || call_path.as_slice() == ["numpy", "unicode"]
-                {
-                    Some(call_path[1])
-                } else {
-                    None
-                }
-            })
+    if let Some(type_name) = checker
+        .semantic()
+        .resolve_call_path(expr)
+        .and_then(|call_path| {
+            if call_path.as_slice() == ["numpy", "bool"]
+                || call_path.as_slice() == ["numpy", "int"]
+                || call_path.as_slice() == ["numpy", "float"]
+                || call_path.as_slice() == ["numpy", "complex"]
+                || call_path.as_slice() == ["numpy", "object"]
+                || call_path.as_slice() == ["numpy", "str"]
+                || call_path.as_slice() == ["numpy", "long"]
+                || call_path.as_slice() == ["numpy", "unicode"]
+            {
+                Some(call_path[1])
+            } else {
+                None
+            }
+        })
     {
         let mut diagnostic = Diagnostic::new(
             NumpyDeprecatedTypeAlias {

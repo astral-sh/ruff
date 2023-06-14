@@ -131,7 +131,7 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
 pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     // If the expression is already a child of an addition, we'll have analyzed it already.
     if matches!(
-        checker.semantic_model().expr_parent(),
+        checker.semantic().expr_parent(),
         Some(Expr::BinOp(ast::ExprBinOp {
             op: Operator::Add,
             ..

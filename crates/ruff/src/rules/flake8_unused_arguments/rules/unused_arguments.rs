@@ -218,7 +218,7 @@ fn function(
     argumentable: Argumentable,
     args: &Arguments,
     values: &Scope,
-    model: &SemanticModel,
+    semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -237,7 +237,7 @@ fn function(
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(argumentable, args, values, model, dummy_variable_rgx)
+    call(argumentable, args, values, semantic, dummy_variable_rgx)
 }
 
 /// Check a method for unused arguments.
@@ -245,7 +245,7 @@ fn method(
     argumentable: Argumentable,
     args: &Arguments,
     values: &Scope,
-    model: &SemanticModel,
+    semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -265,21 +265,21 @@ fn method(
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(argumentable, args, values, model, dummy_variable_rgx)
+    call(argumentable, args, values, semantic, dummy_variable_rgx)
 }
 
 fn call<'a>(
     argumentable: Argumentable,
     args: impl Iterator<Item = &'a Arg>,
     values: &Scope,
-    model: &SemanticModel,
+    semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args {
         if let Some(binding) = values
             .get(arg.arg.as_str())
-            .map(|binding_id| model.binding(binding_id))
+            .map(|binding_id| semantic.binding(binding_id))
         {
             if binding.kind.is_argument()
                 && !binding.is_used()
@@ -317,22 +317,22 @@ pub(crate) fn unused_arguments(
             ..
         }) => {
             match function_type::classify(
-                checker.semantic_model(),
-                parent,
                 name,
                 decorator_list,
+                parent,
+                checker.semantic(),
                 &checker.settings.pep8_naming.classmethod_decorators,
                 &checker.settings.pep8_naming.staticmethod_decorators,
             ) {
                 function_type::FunctionType::Function => {
                     if checker.enabled(Argumentable::Function.rule_code())
-                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
+                        && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(
                             Argumentable::Function,
                             args,
                             scope,
-                            checker.semantic_model(),
+                            checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -350,15 +350,15 @@ pub(crate) fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker.semantic_model(), decorator_list)
-                        && !visibility::is_override(checker.semantic_model(), decorator_list)
-                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
+                        && !visibility::is_abstract(decorator_list, checker.semantic())
+                        && !visibility::is_override(decorator_list, checker.semantic())
+                        && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         method(
                             Argumentable::Method,
                             args,
                             scope,
-                            checker.semantic_model(),
+                            checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -376,15 +376,15 @@ pub(crate) fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker.semantic_model(), decorator_list)
-                        && !visibility::is_override(checker.semantic_model(), decorator_list)
-                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
+                        && !visibility::is_abstract(decorator_list, checker.semantic())
+                        && !visibility::is_override(decorator_list, checker.semantic())
+                        && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         method(
                             Argumentable::ClassMethod,
                             args,
                             scope,
-                            checker.semantic_model(),
+                            checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -402,15 +402,15 @@ pub(crate) fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker.semantic_model(), decorator_list)
-                        && !visibility::is_override(checker.semantic_model(), decorator_list)
-                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
+                        && !visibility::is_abstract(decorator_list, checker.semantic())
+                        && !visibility::is_override(decorator_list, checker.semantic())
+                        && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(
                             Argumentable::StaticMethod,
                             args,
                             scope,
-                            checker.semantic_model(),
+                            checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -429,7 +429,7 @@ pub(crate) fn unused_arguments(
                     Argumentable::Lambda,
                     args,
                     scope,
-                    checker.semantic_model(),
+                    checker.semantic(),
                     &checker.settings.dummy_variable_rgx,
                     checker
                         .settings

@@ -78,7 +78,7 @@ pub(crate) fn lambda_assignment(
             // rewritten function definition to be equivalent.
             // See https://github.com/astral-sh/ruff/issues/3046
             if checker.patch(diagnostic.kind.rule())
-                && !checker.semantic_model().scope().kind.is_class()
+                && !checker.semantic().scope().kind.is_class()
                 && !has_leading_content(stmt, checker.locator)
                 && !has_trailing_content(stmt, checker.locator)
             {
@@ -86,11 +86,11 @@ pub(crate) fn lambda_assignment(
                 let indentation = leading_indentation(first_line);
                 let mut indented = String::new();
                 for (idx, line) in function(
-                    checker.semantic_model(),
                     id,
                     args,
                     body,
                     annotation,
+                    checker.semantic(),
                     checker.generator(),
                 )
                 .universal_newlines()
@@ -120,7 +120,7 @@ pub(crate) fn lambda_assignment(
 /// The `Callable` import can be from either `collections.abc` or `typing`.
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
-fn extract_types(model: &SemanticModel, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
+fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Expr>, Expr)> {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
         return None;
     };
@@ -131,10 +131,13 @@ fn extract_types(model: &SemanticModel, annotation: &Expr) -> Option<(Vec<Expr>,
         return None;
     }
 
-    if !model.resolve_call_path(value).map_or(false, |call_path| {
-        call_path.as_slice() == ["collections", "abc", "Callable"]
-            || model.match_typing_call_path(&call_path, "Callable")
-    }) {
+    if !semantic
+        .resolve_call_path(value)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["collections", "abc", "Callable"]
+                || semantic.match_typing_call_path(&call_path, "Callable")
+        })
+    {
         return None;
     }
 
@@ -156,11 +159,11 @@ fn extract_types(model: &SemanticModel, annotation: &Expr) -> Option<(Vec<Expr>,
 }
 
 fn function(
-    model: &SemanticModel,
     name: &str,
     args: &Arguments,
     body: &Expr,
     annotation: Option<&Expr>,
+    semantic: &SemanticModel,
     generator: Generator,
 ) -> String {
     let body = Stmt::Return(ast::StmtReturn {
@@ -168,7 +171,7 @@ fn function(
         range: TextRange::default(),
     });
     if let Some(annotation) = annotation {
-        if let Some((arg_types, return_type)) = extract_types(model, annotation) {
+        if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
             // A `lambda` expression can only have positional and positional-only
             // arguments. The order is always positional-only first, then positional.
             let new_posonlyargs = args

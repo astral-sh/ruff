@@ -50,7 +50,7 @@ pub(crate) fn unnecessary_list_comprehension_set(
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("set", func, args, keywords) else {
         return;
     };
-    if !checker.semantic_model().is_builtin("set") {
+    if !checker.semantic().is_builtin("set") {
         return;
     }
     if argument.is_list_comp_expr() {

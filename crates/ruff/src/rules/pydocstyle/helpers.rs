@@ -40,9 +40,9 @@ pub(super) fn ends_with_backslash(line: &str) -> bool {
 
 /// Check decorator list to see if function should be ignored.
 pub(crate) fn should_ignore_definition(
-    model: &SemanticModel,
     definition: &Definition,
     ignore_decorators: &BTreeSet<String>,
+    semantic: &SemanticModel,
 ) -> bool {
     if ignore_decorators.is_empty() {
         return false;
@@ -55,7 +55,8 @@ pub(crate) fn should_ignore_definition(
     }) = definition
     {
         for decorator in cast::decorator_list(stmt) {
-            if let Some(call_path) = model.resolve_call_path(map_callable(&decorator.expression)) {
+            if let Some(call_path) = semantic.resolve_call_path(map_callable(&decorator.expression))
+            {
                 if ignore_decorators
                     .iter()
                     .any(|decorator| from_qualified_name(decorator) == call_path)

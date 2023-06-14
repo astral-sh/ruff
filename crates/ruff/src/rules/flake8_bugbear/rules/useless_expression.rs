@@ -53,7 +53,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     }
 
     // Ignore statements that have side effects.
-    if contains_effect(value, |id| checker.semantic_model().is_builtin(id)) {
+    if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
         if matches!(value, Expr::Attribute(_)) {

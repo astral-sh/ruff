@@ -22,20 +22,24 @@ pub(super) fn matches_password_name(string: &str) -> bool {
     PASSWORD_CANDIDATE_REGEX.is_match(string)
 }
 
-pub(super) fn is_untyped_exception(type_: Option<&Expr>, model: &SemanticModel) -> bool {
+pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticModel) -> bool {
     type_.map_or(true, |type_| {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
-                model.resolve_call_path(type_).map_or(false, |call_path| {
+                semantic
+                    .resolve_call_path(type_)
+                    .map_or(false, |call_path| {
+                        call_path.as_slice() == ["", "Exception"]
+                            || call_path.as_slice() == ["", "BaseException"]
+                    })
+            })
+        } else {
+            semantic
+                .resolve_call_path(type_)
+                .map_or(false, |call_path| {
                     call_path.as_slice() == ["", "Exception"]
                         || call_path.as_slice() == ["", "BaseException"]
                 })
-            })
-        } else {
-            model.resolve_call_path(type_).map_or(false, |call_path| {
-                call_path.as_slice() == ["", "Exception"]
-                    || call_path.as_slice() == ["", "BaseException"]
-            })
         }
     })
 }

@@ -25,13 +25,13 @@ impl Violation for OpenAlias {
 /// UP020
 pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["io", "open"])
     {
         let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            if checker.semantic_model().is_available("open") {
+            if checker.semantic().is_available("open") {
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     "open".to_string(),
                     func.range(),

@@ -54,7 +54,7 @@ pub(crate) fn all_with_model_form(
 ) -> Option<Diagnostic> {
     if !bases
         .iter()
-        .any(|base| is_model_form(checker.semantic_model(), base))
+        .any(|base| is_model_form(base, checker.semantic()))
     {
         return None;
     }

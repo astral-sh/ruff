@@ -398,12 +398,12 @@ const NORETURN_FUNCS: &[&[&str]] = &[
 ];
 
 /// Return `true` if the `func` is a known function that never returns.
-fn is_noreturn_func(model: &SemanticModel, func: &Expr) -> bool {
-    model.resolve_call_path(func).map_or(false, |call_path| {
+fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
         NORETURN_FUNCS
             .iter()
             .any(|target| call_path.as_slice() == *target)
-            || model.match_typing_call_path(&call_path, "assert_never")
+            || semantic.match_typing_call_path(&call_path, "assert_never")
     })
 }
 
@@ -489,7 +489,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
-                    if is_noreturn_func(checker.semantic_model(), func)
+                    if is_noreturn_func(func, checker.semantic())
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());

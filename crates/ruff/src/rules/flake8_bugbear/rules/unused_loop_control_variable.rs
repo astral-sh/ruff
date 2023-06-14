@@ -20,7 +20,6 @@
 
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -30,7 +29,7 @@ use ruff_python_ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, result_like::BoolLike)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, result_like::BoolLike)]
 enum Certainty {
     Certain,
     Uncertain,
@@ -129,7 +128,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
         let certainty = Certainty::from(!helpers::uses_magic_variable_access(body, |id| {
-            checker.semantic_model().is_builtin(id)
+            checker.semantic().is_builtin(id)
         }));
 
         // Attempt to rename the variable by prepending an underscore, but avoid
@@ -154,10 +153,10 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
                 // Avoid fixing if the variable, or any future bindings to the variable, are
                 // used _after_ the loop.
-                let scope = checker.semantic_model().scope();
+                let scope = checker.semantic().scope();
                 if scope
                     .get_all(name)
-                    .map(|binding_id| checker.semantic_model().binding(binding_id))
+                    .map(|binding_id| checker.semantic().binding(binding_id))
                     .all(|binding| !binding.is_used())
                 {
                     diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

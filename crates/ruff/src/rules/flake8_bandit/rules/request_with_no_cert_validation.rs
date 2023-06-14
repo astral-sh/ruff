@@ -44,7 +44,7 @@ pub(crate) fn request_with_no_cert_validation(
     keywords: &[Keyword],
 ) {
     if let Some(target) = checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .and_then(|call_path| {
             if call_path.len() == 2 {

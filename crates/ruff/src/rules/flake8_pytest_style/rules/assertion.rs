@@ -194,9 +194,9 @@ pub(crate) fn unittest_assertion(
                 if checker.patch(diagnostic.kind.rule()) {
                     // We're converting an expression to a statement, so avoid applying the fix if
                     // the assertion is part of a larger expression.
-                    if checker.semantic_model().stmt().is_expr_stmt()
-                        && checker.semantic_model().expr_parent().is_none()
-                        && !checker.semantic_model().scope().kind.is_lambda()
+                    if checker.semantic().stmt().is_expr_stmt()
+                        && checker.semantic().expr_parent().is_none()
+                        && !checker.semantic().scope().kind.is_lambda()
                         && !has_comments_in(expr.range(), checker.locator)
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
@@ -219,7 +219,7 @@ pub(crate) fn unittest_assertion(
 
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if Truthiness::from_expr(test, |id| checker.semantic_model().is_builtin(id)).is_falsey() {
+    if Truthiness::from_expr(test, |id| checker.semantic().is_builtin(id)).is_falsey() {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));

@@ -88,8 +88,7 @@ pub(crate) fn module_import_not_at_top_of_file(
     stmt: &Stmt,
     locator: &Locator,
 ) {
-    if checker.semantic_model().seen_import_boundary() && locator.is_at_start_of_line(stmt.start())
-    {
+    if checker.semantic().seen_import_boundary() && locator.is_at_start_of_line(stmt.start()) {
         checker
             .diagnostics
             .push(Diagnostic::new(ModuleImportNotAtTopOfFile, stmt.range()));

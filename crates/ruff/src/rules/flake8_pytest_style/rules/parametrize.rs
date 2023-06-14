@@ -419,7 +419,7 @@ fn handle_value_rows(
 
 pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
     for decorator in decorators {
-        if is_pytest_parametrize(checker.semantic_model(), decorator) {
+        if is_pytest_parametrize(decorator, checker.semantic()) {
             if let Expr::Call(ast::ExprCall { args, .. }) = &decorator.expression {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
                     if let Some(names) = args.get(0) {

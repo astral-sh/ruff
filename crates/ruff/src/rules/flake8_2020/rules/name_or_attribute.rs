@@ -18,7 +18,7 @@ impl Violation for SixPY3 {
 /// YTT202
 pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(expr)
         .map_or(false, |call_path| call_path.as_slice() == ["six", "PY3"])
     {

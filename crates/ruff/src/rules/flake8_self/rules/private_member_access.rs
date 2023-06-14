@@ -77,7 +77,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
             // Ignore accesses on instances within special methods (e.g., `__eq__`).
             if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
-                checker.semantic_model().scope().kind
+                checker.semantic().scope().kind
             {
                 if matches!(
                     name.as_str(),
@@ -151,7 +151,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
                 // Ignore accesses on class members from _within_ the class.
                 if checker
-                    .semantic_model()
+                    .semantic()
                     .scopes
                     .iter()
                     .rev()
@@ -162,7 +162,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                     .map_or(false, |name| {
                         if call_path.as_slice() == [name.as_str()] {
                             checker
-                                .semantic_model()
+                                .semantic()
                                 .find_binding(name)
                                 .map_or(false, |binding| {
                                     // TODO(charlie): Could the name ever be bound to a

@@ -52,12 +52,12 @@ impl Violation for NoSlotsInTupleSubclass {
 pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
     if class.bases.iter().any(|base| {
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(map_subscript(base))
             .map_or(false, |call_path| {
                 matches!(call_path.as_slice(), ["" | "builtins", "tuple"])
                     || checker
-                        .semantic_model()
+                        .semantic()
                         .match_typing_call_path(&call_path, "Tuple")
             })
     }) {

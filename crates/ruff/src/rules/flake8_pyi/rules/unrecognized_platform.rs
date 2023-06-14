@@ -103,7 +103,7 @@ pub(crate) fn unrecognized_platform(
     let diagnostic_unrecognized_platform_check =
         Diagnostic::new(UnrecognizedPlatformCheck, expr.range());
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(left)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["sys", "platform"]

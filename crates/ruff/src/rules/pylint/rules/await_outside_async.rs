@@ -44,7 +44,7 @@ impl Violation for AwaitOutsideAsync {
 
 /// PLE1142
 pub(crate) fn await_outside_async(checker: &mut Checker, expr: &Expr) {
-    if !checker.semantic_model().in_async_context() {
+    if !checker.semantic().in_async_context() {
         checker
             .diagnostics
             .push(Diagnostic::new(AwaitOutsideAsync, expr.range()));

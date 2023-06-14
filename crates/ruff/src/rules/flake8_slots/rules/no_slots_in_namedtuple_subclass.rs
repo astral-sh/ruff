@@ -68,7 +68,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
             return false;
         };
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(func)
             .map_or(false, |call_path| {
                 matches!(call_path.as_slice(), ["collections", "namedtuple"])
