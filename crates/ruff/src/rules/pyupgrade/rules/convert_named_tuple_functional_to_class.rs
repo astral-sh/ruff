@@ -37,7 +37,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documenation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
+/// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[violation]
 pub struct ConvertNamedTupleFunctionalToClass {
     name: String,
