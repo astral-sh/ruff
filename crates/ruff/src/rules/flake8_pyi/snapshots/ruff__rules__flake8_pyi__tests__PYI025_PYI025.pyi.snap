@@ -1,50 +1,48 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI025.pyi:5:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
-  |
-3 | from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
-4 | 
-5 | from collections.abc import Set  # PYI025
-  |                             ^^^ PYI025
-6 | 
-7 | from collections.abc import Container, Sized, Set, ValuesView  # PYI025
-  |
-  = help: Alias `Set` to `AbstractSet`
+PYI025.pyi:8:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+   |
+ 7 | def f():
+ 8 |     from collections.abc import Set  # PYI025
+   |                                 ^^^ PYI025
+ 9 | 
+10 | def f():
+   |
+   = help: Alias `Set` to `AbstractSet`
 
 ℹ Suggested fix
-2 2 | 
-3 3 | from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
-4 4 | 
-5   |-from collections.abc import Set  # PYI025
-  5 |+from collections.abc import Set as AbstractSet  # PYI025
+5 5 |     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
 6 6 | 
-7 7 | from collections.abc import Container, Sized, Set, ValuesView  # PYI025
-8 8 | 
+7 7 | def f():
+8   |-    from collections.abc import Set  # PYI025
+  8 |+    from collections.abc import Set as AbstractSet  # PYI025
+9 9 | 
+10 10 | def f():
+11 11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
 
-PYI025.pyi:7:47: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
-  |
-5 | from collections.abc import Set  # PYI025
-6 | 
-7 | from collections.abc import Container, Sized, Set, ValuesView  # PYI025
-  |                                               ^^^ PYI025
-8 | 
-9 | GLOBAL: Set[int] = set()
-  |
-  = help: Alias `Set` to `AbstractSet`
+PYI025.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+   |
+10 | def f():
+11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
+   |                                                   ^^^ PYI025
+12 | 
+13 |     GLOBAL: Set[int] = set()
+   |
+   = help: Alias `Set` to `AbstractSet`
 
 ℹ Suggested fix
-4  4  | 
-5  5  | from collections.abc import Set  # PYI025
-6  6  | 
-7     |-from collections.abc import Container, Sized, Set, ValuesView  # PYI025
-   7  |+from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
-8  8  | 
-9     |-GLOBAL: Set[int] = set()
-   9  |+GLOBAL: AbstractSet[int] = set()
-10 10 | 
-11 11 | class Class:
-12    |-    member: Set[int]
-   12 |+    member: AbstractSet[int]
+8  8  |     from collections.abc import Set  # PYI025
+9  9  | 
+10 10 | def f():
+11    |-    from collections.abc import Container, Sized, Set, ValuesView  # PYI025
+   11 |+    from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
+12 12 | 
+13    |-    GLOBAL: Set[int] = set()
+   13 |+    GLOBAL: AbstractSet[int] = set()
+14 14 | 
+15 15 |     class Class:
+16    |-        member: Set[int]
+   16 |+        member: AbstractSet[int]
 
 
