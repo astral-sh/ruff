@@ -59,7 +59,7 @@ pub struct SemanticModel<'a> {
 
     /// Map from binding ID to binding ID that it shadows (in another scope).
     ///
-    /// For example:
+    /// For example, given:
     /// ```python
     /// import x
     ///
@@ -266,6 +266,7 @@ impl<'a> SemanticModel<'a> {
                     // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                     // `name: str` should be treated as used.
                     BindingKind::Annotation => continue,
+
                     // If it's a deletion, don't treat it as resolved, since the name is now
                     // unbound. For example, given:
                     //
@@ -276,11 +277,15 @@ impl<'a> SemanticModel<'a> {
                     // ```
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException => break,
-                    _ => {}
-                }
+                    BindingKind::Deletion | BindingKind::UnboundException => {
+                        return ResolvedRead::UnboundLocal(binding_id)
+                    }
 
-                return ResolvedRead::Resolved(binding_id);
+                    // Otherwise, treat it as resolved.
+                    _ => {
+                        return ResolvedRead::Resolved(binding_id);
+                    }
+                }
             }
 
             // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
@@ -309,7 +314,7 @@ impl<'a> SemanticModel<'a> {
         }
 
         if import_starred {
-            ResolvedRead::StarImport
+            ResolvedRead::WildcardImport
         } else {
             ResolvedRead::NotFound
         }
@@ -1065,14 +1070,62 @@ pub struct Snapshot {
 #[derive(Debug)]
 pub enum ResolvedRead {
     /// The read reference is resolved to a specific binding.
+    ///
+    /// For example, given:
+    /// ```python
+    /// x = 1
+    /// print(x)
+    /// ```
+    ///
+    /// The `x` in `print(x)` is resolved to the binding of `x` in `x = 1`.
     Resolved(BindingId),
+
     /// The read reference is resolved to a context-specific, implicit global (e.g., `__class__`
     /// within a class scope).
+    ///
+    /// For example, given:
+    /// ```python
+    /// class C:
+    ///    print(__class__)
+    /// ```
+    ///
+    /// The `__class__` in `print(__class__)` is resolved to the implicit global `__class__`.
     ImplicitGlobal,
-    /// The read reference is unresolved, but at least one of the containing scopes contains a star
-    /// import.
-    StarImport,
+
+    /// The read reference is unresolved, but at least one of the containing scopes contains a
+    /// wildcard import.
+    ///
+    /// For example, given:
+    /// ```python
+    /// from x import *
+    ///
+    /// print(y)
+    /// ```
+    ///
+    /// The `y` in `print(y)` is unresolved, but the containing scope contains a wildcard import,
+    /// so `y` _may_ be resolved to a symbol imported by the wildcard import.
+    WildcardImport,
+
+    /// The read reference is resolved, but to an unbound local variable.
+    ///
+    /// For example, given:
+    /// ```python
+    /// x = 1
+    /// del x
+    /// print(x)
+    /// ```
+    ///
+    /// The `x` in `print(x)` is an unbound local.
+    UnboundLocal(BindingId),
+
     /// The read reference is definitively unresolved.
+    ///
+    /// For example, given:
+    /// ```python
+    /// print(x)
+    /// ```
+    ///
+    /// The `x` in `print(x)` is definitively unresolved.
     NotFound,
 }
 
