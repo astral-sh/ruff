@@ -4215,13 +4215,13 @@ impl AnyNodeRef<'_> {
 
     pub const fn is_node_with_body(self) -> bool {
         match self {
-            // TODO(@review): Did i miss any statements with a body? if not, remove this comment
             AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtFor(_)
             | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtWith(_)
             | AnyNodeRef::StmtAsyncWith(_)
+            | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtFunctionDef(_)
             | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_) => true,
