@@ -278,11 +278,11 @@ pub(crate) fn typing_only_runtime_import(
             let import = Import {
                 qualified_name,
                 reference_id,
-                trimmed_range: binding.trimmed_range(checker.semantic(), checker.locator),
+                range: binding.range,
                 parent_range: binding.parent_range(checker.semantic()),
             };
 
-            if checker.rule_is_ignored(rule_for(import_type), import.trimmed_range.start())
+            if checker.rule_is_ignored(rule_for(import_type), import.range.start())
                 || import.parent_range.map_or(false, |parent_range| {
                     checker.rule_is_ignored(rule_for(import_type), parent_range.start())
                 })
@@ -311,14 +311,14 @@ pub(crate) fn typing_only_runtime_import(
 
         for Import {
             qualified_name,
-            trimmed_range,
+            range,
             parent_range,
             ..
         } in imports
         {
             let mut diagnostic = Diagnostic::new(
                 diagnostic_for(import_type, qualified_name.to_string()),
-                trimmed_range,
+                range,
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -335,14 +335,14 @@ pub(crate) fn typing_only_runtime_import(
     for ((_, import_type), imports) in ignores_by_statement {
         for Import {
             qualified_name,
-            trimmed_range,
+            range,
             parent_range,
             ..
         } in imports
         {
             let mut diagnostic = Diagnostic::new(
                 diagnostic_for(import_type, qualified_name.to_string()),
-                trimmed_range,
+                range,
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -359,7 +359,7 @@ struct Import<'a> {
     /// The first reference to the imported symbol.
     reference_id: ReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
-    trimmed_range: TextRange,
+    range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
 }

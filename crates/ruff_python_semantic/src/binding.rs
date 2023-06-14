@@ -5,8 +5,6 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::helpers;
-use ruff_python_ast::source_code::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -138,18 +136,6 @@ impl<'a> Binding<'a> {
                     .map_or(qualified_name, |(module, _)| module),
             ),
             _ => None,
-        }
-    }
-
-    /// Returns the appropriate visual range for highlighting this binding.
-    pub fn trimmed_range(&self, semantic: &SemanticModel, locator: &Locator) -> TextRange {
-        match self.kind {
-            BindingKind::ClassDefinition | BindingKind::FunctionDefinition => {
-                self.source.map_or(self.range, |source| {
-                    helpers::identifier_range(semantic.stmts[source], locator)
-                })
-            }
-            _ => self.range,
         }
     }
 

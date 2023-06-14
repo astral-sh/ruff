@@ -808,6 +808,7 @@ where
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
+                            // NOTE: Incorrect, needs to be the range of the alias.
                             alias.range(),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
@@ -828,6 +829,7 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
+                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.range(),
                             BindingKind::SubmoduleImportation(SubmoduleImportation {
                                 qualified_name,
@@ -839,6 +841,7 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
+                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.range(),
                             BindingKind::Importation(Importation { qualified_name }),
                             if alias
@@ -1084,6 +1087,7 @@ where
 
                         self.add_binding(
                             name,
+                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.range(),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
@@ -1145,6 +1149,7 @@ where
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
+                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.range(),
                             BindingKind::FromImportation(FromImportation { qualified_name }),
                             if alias
@@ -1871,7 +1876,8 @@ where
 
                 self.add_binding(
                     name,
-                    stmt.range(),
+                    // NOTE: Correct!
+                    helpers::identifier_range(stmt, self.locator),
                     BindingKind::FunctionDefinition,
                     BindingFlags::empty(),
                 );
@@ -2094,7 +2100,8 @@ where
                 self.semantic.pop_definition();
                 self.add_binding(
                     name,
-                    stmt.range(),
+                    // NOTE: Correct!
+                    helpers::identifier_range(stmt, self.locator),
                     BindingKind::ClassDefinition,
                     BindingFlags::empty(),
                 );
@@ -3924,6 +3931,7 @@ where
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(
                             name,
+                            // NOTE: Correct, we already extract this.
                             range,
                             BindingKind::Assignment,
                             BindingFlags::empty(),
@@ -3934,6 +3942,7 @@ where
                         // Remove it from the scope immediately after.
                         self.add_binding(
                             name,
+                            // NOTE: Correct
                             range,
                             BindingKind::UnboundException,
                             BindingFlags::empty(),
@@ -4019,6 +4028,7 @@ where
         // upstream.
         self.add_binding(
             &arg.arg,
+            // NOTE: Incorrect, this needs to be the range of the identifier.
             arg.range(),
             BindingKind::Argument,
             BindingFlags::empty(),
@@ -4059,6 +4069,7 @@ where
         {
             self.add_binding(
                 name,
+                // NOTE: Incorrect, this needs to be the range of the identifier.
                 pattern.range(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
@@ -4268,16 +4279,14 @@ impl<'a> Checker<'a> {
                     {
                         if self.enabled(Rule::RedefinedWhileUnused) {
                             #[allow(deprecated)]
-                            let line = self.locator.compute_line_index(
-                                shadowed.trimmed_range(&self.semantic, self.locator).start(),
-                            );
+                            let line = self.locator.compute_line_index(shadowed.range.start());
 
                             let mut diagnostic = Diagnostic::new(
                                 pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
                                     line,
                                 },
-                                binding.trimmed_range(&self.semantic, self.locator),
+                                binding.range,
                             );
                             if let Some(range) = binding.parent_range(&self.semantic) {
                                 diagnostic.set_parent(range.start());
@@ -4438,6 +4447,7 @@ impl<'a> Checker<'a> {
         ) {
             self.add_binding(
                 id,
+                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::Annotation,
                 BindingFlags::empty(),
@@ -4448,6 +4458,7 @@ impl<'a> Checker<'a> {
         if matches!(parent, Stmt::For(_) | Stmt::AsyncFor(_)) {
             self.add_binding(
                 id,
+                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::LoopVar,
                 BindingFlags::empty(),
@@ -4458,6 +4469,7 @@ impl<'a> Checker<'a> {
         if helpers::is_unpacking_assignment(parent, expr) {
             self.add_binding(
                 id,
+                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::UnpackedAssignment,
                 BindingFlags::empty(),
@@ -4511,6 +4523,7 @@ impl<'a> Checker<'a> {
 
             self.add_binding(
                 id,
+                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::Export(Export { names }),
                 BindingFlags::empty(),
@@ -4525,6 +4538,7 @@ impl<'a> Checker<'a> {
         {
             self.add_binding(
                 id,
+                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::NamedExprAssignment,
                 BindingFlags::empty(),
@@ -4534,6 +4548,7 @@ impl<'a> Checker<'a> {
 
         self.add_binding(
             id,
+            // NOTE: Correct, range of the name.
             expr.range(),
             BindingKind::Assignment,
             BindingFlags::empty(),
@@ -4890,9 +4905,7 @@ impl<'a> Checker<'a> {
                         }
 
                         #[allow(deprecated)]
-                        let line = self.locator.compute_line_index(
-                            shadowed.trimmed_range(&self.semantic, self.locator).start(),
-                        );
+                        let line = self.locator.compute_line_index(shadowed.range.start());
 
                         let binding = self.semantic.binding(binding_id);
                         let mut diagnostic = Diagnostic::new(
@@ -4900,7 +4913,7 @@ impl<'a> Checker<'a> {
                                 name: (*name).to_string(),
                                 line,
                             },
-                            binding.trimmed_range(&self.semantic, self.locator),
+                            binding.range,
                         );
                         if let Some(range) = binding.parent_range(&self.semantic) {
                             diagnostic.set_parent(range.start());
