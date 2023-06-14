@@ -73,7 +73,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
         let (Expr::ListComp(ast::ExprListComp { elt, .. } )| Expr::SetComp(ast::ExprSetComp { elt, .. })) = &args[0] else {
             return;
         };
-        if is_async_generator(elt) {
+        if contains_await(elt) {
             return;
         }
         if !checker.semantic().is_builtin(id) {
@@ -89,7 +89,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
     }
 }
 
-/// Return `true` if the `Expr` contains an `await` expression.
-fn is_async_generator(expr: &Expr) -> bool {
-    any_over_expr(expr, &|expr| matches!(expr, Expr::Await(_)))
+/// Return `true` if the [`Expr`] contains an `await` expression.
+fn contains_await(expr: &Expr) -> bool {
+    any_over_expr(expr, &Expr::is_await_expr)
 }
