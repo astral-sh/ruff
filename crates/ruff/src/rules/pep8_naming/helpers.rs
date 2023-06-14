@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{self, Expr, Stmt};
 
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::str::{is_lower, is_upper};
 
 pub(super) fn is_camelcase(name: &str) -> bool {

@@ -4,10 +4,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::Binding;
-use ruff_python_semantic::node::NodeId;
-use ruff_python_semantic::reference::ReferenceId;
-use ruff_python_semantic::scope::Scope;
+use ruff_python_semantic::{Binding, NodeId, ReferenceId, Scope};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;

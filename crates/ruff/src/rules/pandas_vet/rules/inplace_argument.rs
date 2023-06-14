@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{BindingKind, Importation};
+use ruff_python_semantic::{BindingKind, Importation};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

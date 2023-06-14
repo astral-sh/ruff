@@ -6,9 +6,7 @@ use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{cast, helpers};
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::analyze::visibility::Visibility;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
 use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
 
 use crate::checkers::ast::Checker;
@@ -453,7 +451,7 @@ fn check_dynamically_typed<F>(
 pub(crate) fn definition(
     checker: &Checker,
     definition: &Definition,
-    visibility: Visibility,
+    visibility: visibility::Visibility,
 ) -> Vec<Diagnostic> {
     // TODO(charlie): Consider using the AST directly here rather than `Definition`.
     // We could adhere more closely to `flake8-annotations` by defining public
@@ -705,7 +703,7 @@ pub(crate) fn definition(
             }
         } else {
             match visibility {
-                Visibility::Public => {
+                visibility::Visibility::Public => {
                     if checker.enabled(Rule::MissingReturnTypeUndocumentedPublicFunction) {
                         diagnostics.push(Diagnostic::new(
                             MissingReturnTypeUndocumentedPublicFunction {
@@ -715,7 +713,7 @@ pub(crate) fn definition(
                         ));
                     }
                 }
-                Visibility::Private => {
+                visibility::Visibility::Private => {
                     if checker.enabled(Rule::MissingReturnTypePrivateFunction) {
                         diagnostics.push(Diagnostic::new(
                             MissingReturnTypePrivateFunction {

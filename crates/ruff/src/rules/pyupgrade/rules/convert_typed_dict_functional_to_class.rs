@@ -7,7 +7,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::source_code::Generator;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;

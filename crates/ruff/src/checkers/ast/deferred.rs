@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::Expr;
 
-use ruff_python_semantic::model::Snapshot;
+use ruff_python_semantic::Snapshot;
 
 /// A collection of AST nodes that are deferred for later analysis.
 /// Used to, e.g., store functions, whose bodies shouldn't be analyzed until all

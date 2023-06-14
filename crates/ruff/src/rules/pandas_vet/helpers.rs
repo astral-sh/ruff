@@ -1,8 +1,7 @@
 use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
 
-use ruff_python_semantic::binding::{BindingKind, Importation};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::{BindingKind, Importation, SemanticModel};
 
 pub(super) enum Resolution {
     /// The expression resolves to an irrelevant expression type (e.g., a constant).

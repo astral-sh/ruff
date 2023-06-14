@@ -10,7 +10,7 @@ use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_textwrap::indent;
 
 use crate::autofix;

@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::logging;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 /// Collect `logging`-like calls from an AST.
 pub(super) struct LoggerCandidateVisitor<'a, 'b> {

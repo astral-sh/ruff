@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
 use ruff_python_semantic::analyze::logging;
-use ruff_python_semantic::analyze::logging::exc_info;
 use ruff_python_stdlib::logging::LoggingLevel;
 
 use crate::checkers::ast::Checker;
@@ -197,7 +196,7 @@ pub(crate) fn logging_call(
                 if !checker.semantic_model().in_exception_handler() {
                     return;
                 }
-                let Some(exc_info) = exc_info(keywords, checker.semantic_model()) else {
+                let Some(exc_info) = logging::exc_info(keywords, checker.semantic_model()) else {
                     return;
                 };
                 if let LoggingCallType::LevelCall(logging_level) = logging_call_type {

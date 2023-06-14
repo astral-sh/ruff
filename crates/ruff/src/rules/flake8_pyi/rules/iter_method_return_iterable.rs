@@ -4,7 +4,7 @@ use rustpython_parser::ast::{Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::prelude::Expr;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
 

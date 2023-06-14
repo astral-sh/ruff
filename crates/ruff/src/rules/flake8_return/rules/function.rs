@@ -10,7 +10,7 @@ use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::autofix::edits;
 use crate::checkers::ast::Checker;

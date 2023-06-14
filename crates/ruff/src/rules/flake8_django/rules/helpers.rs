@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(model: &SemanticModel, base: &Expr) -> bool {

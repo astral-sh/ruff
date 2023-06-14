@@ -7,7 +7,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::scope::ScopeId;
+use ruff_python_semantic::ScopeId;
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
