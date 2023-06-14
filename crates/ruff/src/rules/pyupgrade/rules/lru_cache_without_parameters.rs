@@ -7,6 +7,36 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary parentheses on `functools.lru_cache` decorators.
+///
+/// ## Why is this bad?
+/// Since Python 3.8, `functools.lru_cache` can be used as a decorator without
+/// trailing parentheses, as long as no arguments are passed to it.
+///
+/// ## Example
+/// ```python
+/// import functools
+///
+///
+/// @functools.lru_cache()
+/// def foo():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import functools
+///
+///
+/// @functools.lru_cache
+/// def foo():
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `@functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
+/// - [Let lru_cache be used as a decorator with no arguments](https://github.com/python/cpython/issues/80953)
 #[violation]
 pub struct LRUCacheWithoutParameters;
 

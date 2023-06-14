@@ -13,6 +13,27 @@ use ruff_python_ast::source_code::Locator;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for redundant `open` mode parameters.
+///
+/// ## Why is this bad?
+/// Redundant `open` mode parameters are unnecessary and should be removed to
+/// avoid confusion.
+///
+/// ## Example
+/// ```python
+/// with open("foo.txt", "r") as f:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with open("foo.txt") as f:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct RedundantOpenModes {
     pub replacement: Option<String>,

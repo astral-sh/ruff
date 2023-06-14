@@ -8,6 +8,30 @@ use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary `__future__` imports.
+///
+/// ## Why is this bad?
+/// The `__future__` module is used to enable features that are not yet
+/// available in the current Python version. If a feature is already
+/// available in the minimum supported Python version, importing it
+/// from `__future__` is unnecessary and should be removed to avoid
+/// confusion.
+///
+/// ## Example
+/// ```python
+/// from __future__ import print_function
+///
+/// print("Hello, world!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[violation]
 pub struct UnnecessaryFutureImport {
     pub names: Vec<String>,

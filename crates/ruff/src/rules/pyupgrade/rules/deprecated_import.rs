@@ -35,6 +35,23 @@ enum Deprecation {
     WithoutRename(WithoutRename),
 }
 
+/// ## What it does
+/// Checks for uses of deprecated imports based on the minimum supported
+/// Python version.
+///
+/// ## Why is this bad?
+/// Deprecated imports may be removed in future versions of Python, and
+/// should be replaced with their new equivalents.
+///
+/// ## Example
+/// ```python
+/// from collections import Sequence
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from collections.abc import Sequence
+/// ```
 #[violation]
 pub struct DeprecatedImport {
     deprecation: Deprecation,

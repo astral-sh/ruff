@@ -8,6 +8,27 @@ use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary imports of builtins.
+///
+/// ## Why is this bad?
+/// Builtins are always available. Importing them is unnecessary and should be
+/// removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// from builtins import str
+///
+/// str(1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// str(1)
+/// ```
+///
+/// ## References
+/// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[violation]
 pub struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,

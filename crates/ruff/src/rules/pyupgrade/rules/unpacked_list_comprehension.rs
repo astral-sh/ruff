@@ -7,6 +7,27 @@ use ruff_python_ast::helpers::any_over_expr;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for list comprehensions that are immediately unpacked.
+///
+/// ## Why is this bad?
+/// There is no reason to use a list comprehension if the result is immediately
+/// unpacked. Instead, use a generator expression, which is more efficient as
+/// it avoids allocating an intermediary list.
+///
+/// ## Example
+/// ```python
+/// a, b, c = [foo(x) for x in items]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a, b, c = (foo(x) for x in items)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Generator expressions](https://docs.python.org/3/reference/expressions.html#generator-expressions)
+/// - [Python documentation: List comprehensions](https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions)
 #[violation]
 pub struct UnpackedListComprehension;
 

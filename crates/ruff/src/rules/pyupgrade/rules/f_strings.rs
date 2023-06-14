@@ -17,6 +17,25 @@ use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
+/// ## What it does
+/// Checks for `str#format` calls that can be replaced with f-strings.
+///
+/// ## Why is this bad?
+/// f-strings are more readable and generally preferred over `str#format`
+/// calls.
+///
+/// ## Example
+/// ```python
+/// "{}".format(foo)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// f"{foo}"
+/// ```
+///
+/// ## References
+/// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct FString;
 

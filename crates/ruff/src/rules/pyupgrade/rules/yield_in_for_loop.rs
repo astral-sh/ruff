@@ -11,6 +11,27 @@ use ruff_python_ast::{statement_visitor, visitor};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `for` loops that can be replaced with `yield from` expressions.
+///
+/// ## Why is this bad?
+/// If a `for` loop only contains a `yield` statement, it can be replaced with a
+/// `yield from` expression, which is more concise and idiomatic.
+///
+/// ## Example
+/// ```python
+/// for x in foo:
+///     yield x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// yield from foo
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `yield` statement](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
+/// - [PEP 380](https://peps.python.org/pep-0380/)
 #[violation]
 pub struct YieldInForLoop;
 

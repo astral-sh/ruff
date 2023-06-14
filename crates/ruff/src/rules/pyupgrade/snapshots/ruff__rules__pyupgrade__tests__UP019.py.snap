@@ -9,7 +9,7 @@ UP019.py:7:22: UP019 [*] `typing.Text` is deprecated, use `str`
   |
   = help: Replace with `str`
 
-ℹ Suggested fix
+ℹ Fix
 4 4 | from typing import Text as Goodbye
 5 5 | 
 6 6 | 
@@ -27,7 +27,7 @@ UP019.py:11:29: UP019 [*] `typing.Text` is deprecated, use `str`
    |
    = help: Replace with `str`
 
-ℹ Suggested fix
+ℹ Fix
 8  8  |     print(word)
 9  9  | 
 10 10 | 
@@ -45,7 +45,7 @@ UP019.py:15:28: UP019 [*] `typing.Text` is deprecated, use `str`
    |
    = help: Replace with `str`
 
-ℹ Suggested fix
+ℹ Fix
 12 12 |     print(word)
 13 13 | 
 14 14 | 
@@ -63,7 +63,7 @@ UP019.py:19:29: UP019 [*] `typing.Text` is deprecated, use `str`
    |
    = help: Replace with `str`
 
-ℹ Suggested fix
+ℹ Fix
 16 16 |     print(word)
 17 17 | 
 18 18 | 

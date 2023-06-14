@@ -13,6 +13,35 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `TypedDict` declarations that use functional syntax.
+///
+/// ## Why is this bad?
+/// `TypedDict` subclasses can be defined either through a functional syntax
+/// (`Foo = TypedDict(...)`) or a class syntax (`class Foo(TypedDict): ...`).
+///
+/// The class syntax is more readable and generally preferred over the
+/// functional syntax.
+///
+/// ## Example
+/// ```python
+/// from typing import TypedDict
+///
+/// Foo = TypedDict("Foo", {"a": int, "b": str})
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import TypedDict
+///
+///
+/// class Foo(TypedDict):
+///     a: int
+///     b: str
+/// ```
+///
+/// ## References
+/// - [Python documentation: `typing.TypedDict`](https://docs.python.org/3/library/typing.html#typing.TypedDict)
 #[violation]
 pub struct ConvertTypedDictFunctionalToClass {
     name: String,

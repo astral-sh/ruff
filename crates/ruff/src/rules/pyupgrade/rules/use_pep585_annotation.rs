@@ -9,6 +9,33 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for the use of generics that can be replaced with standard library
+/// variants based on [PEP 585].
+///
+/// ## Why is this bad?
+/// [PEP 585] enabled collections in the Python standard library (like `list`)
+/// to be used as generics directly, instead of importing analogous members
+/// from the `typing` module (like `typing.List`).
+///
+/// When available, the [PEP 585] syntax should be used instead of importing
+/// members from the `typing` module, as it's more concise and readable.
+/// Importing those members from `typing` is considered deprecated as of PEP
+/// 585.
+///
+/// ## Example
+/// ```python
+/// from typing import List
+///
+/// foo: List[int] = [1, 2, 3]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: list[int] = [1, 2, 3]
+/// ```
+///
+/// [PEP 585]: https://peps.python.org/pep-0585/
 #[violation]
 pub struct NonPEP585Annotation {
     from: String,

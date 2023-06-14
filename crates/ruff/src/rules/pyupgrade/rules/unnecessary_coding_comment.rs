@@ -5,7 +5,25 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_whitespace::Line;
 
-// TODO: document referencing [PEP 3120]: https://peps.python.org/pep-3120/
+/// ## What it does
+/// Checks for unnecessary UTF-8 encoding declarations.
+///
+/// ## Why is this bad?
+/// [PEP 3120] makes UTF-8 the default encoding, so a UTF-8 encoding
+/// declaration is unnecessary.
+///
+/// ## Example
+/// ```python
+/// # -*- coding: utf-8 -*-
+/// print("Hello, world!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")
+/// ```
+///
+/// [PEP 3120]: https://peps.python.org/pep-3120/
 #[violation]
 pub struct UTF8EncodingDeclaration;
 

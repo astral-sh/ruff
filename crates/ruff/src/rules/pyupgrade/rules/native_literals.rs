@@ -24,6 +24,26 @@ impl fmt::Display for LiteralType {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary calls to `str` and `bytes`.
+///
+/// ## Why is this bad?
+/// The `str` and `bytes` constructors can be replaced with string and bytes
+/// literals, which are more readable and idiomatic.
+///
+/// ## Example
+/// ```python
+/// str("foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "foo"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `str`](https://docs.python.org/3/library/stdtypes.html#str)
+/// - [Python documentation: `bytes`](https://docs.python.org/3/library/stdtypes.html#bytes)
 #[violation]
 pub struct NativeLiterals {
     literal_type: LiteralType,

@@ -10,13 +10,40 @@ use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of `subprocess.run` that send `stdout` and `stderr` to a
+/// pipe.
+///
+/// ## Why is this bad?
+/// As of Python 3.7, `subprocess.run` has a `capture_output` keyword argument
+/// that can be set to `True` to capture `stdout` and `stderr` outputs. This is
+/// equivalent to setting `stdout` and `stderr` to `subprocess.PIPE`, but is
+/// more explicit and readable.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.run(["foo"], capture_output=True)
+/// ```
+///
+/// ## References
+/// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
+/// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[violation]
 pub struct ReplaceStdoutStderr;
 
 impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Sending stdout and stderr to pipe is deprecated, use `capture_output`")
+        format!("Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`")
     }
 
     fn autofix_title(&self) -> String {

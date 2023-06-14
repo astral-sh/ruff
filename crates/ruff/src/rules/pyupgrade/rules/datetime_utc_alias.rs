@@ -7,6 +7,29 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of `datetime.timezone.utc`.
+///
+/// ## Why is this bad?
+/// As of Python 3.11, `datetime.UTC` is an alias for `datetime.timezone.utc`.
+/// The alias is more readable and generally preferred over the full path.
+///
+/// ## Example
+/// ```python
+/// import datetime
+///
+/// datetime.timezone.utc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import datetime
+///
+/// datetime.UTC
+/// ```
+///
+/// ## References
+/// - [Python documentation: `datetime.UTC`](https://docs.python.org/3/library/datetime.html#datetime.UTC)
 #[violation]
 pub struct DatetimeTimezoneUTC;
 
