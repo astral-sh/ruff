@@ -4333,11 +4333,11 @@ impl<'a> Checker<'a> {
             // don't treat it as an assignment, but track it as a delayed annotation.
             if self.semantic_model.binding(binding_id).kind.is_annotation() {
                 self.semantic_model
-                    .add_delayed_annotation(binding_id, shadowed_id);
+                    .add_delayed_annotation(shadowed_id, binding_id);
                 return binding_id;
             }
 
-            let shadowed = &self.semantic_model.bindings[binding_id];
+            let shadowed = &self.semantic_model.bindings[shadowed_id];
             match &shadowed.kind {
                 BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException => {
                     // Avoid overriding builtins.

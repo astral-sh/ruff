@@ -80,8 +80,18 @@ pub struct SemanticModel<'a> {
     /// ```
     ///
     /// In this case, the binding created by `x = 1` is annotated by the binding created by
-    /// `x: int`. We don't consider the latter binding to shadow the former, because it doesn't
-    /// change the value of the binding, but we do want to track the annotation.
+    /// `x: int`. We don't consider the latter binding to _shadow_ the former, because it doesn't
+    /// change the value of the binding, and so we don't store in on the scope. But we _do_ want to
+    /// track the annotation in some form, since it's a reference to `x`.
+    ///
+    /// Note that, given:
+    /// ```python
+    /// x: int
+    /// ```
+    ///
+    /// In this case, we _do_ store the binding created by `x: int` directly on the scope, and not
+    /// as a delayed annotation. Annotations are thus treated as bindings only when they are the
+    /// first binding in a scope; any annotations that follow are treated as "delayed" annotations.
     delayed_annotations: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
 
     /// Body iteration; used to peek at siblings.
