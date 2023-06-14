@@ -57,18 +57,18 @@ pub(crate) fn test_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
     settings: &Settings,
-) -> Result<Vec<Message>> {
+) -> Result<(Vec<Message>, SourceKind)> {
     let path = test_resource_path("fixtures/jupyter").join(path);
     let mut source_kind = SourceKind::Jupyter(read_jupyter_notebook(&path)?);
     let messages = test_contents(&mut source_kind, &path, settings);
     let expected_notebook =
         read_jupyter_notebook(&test_resource_path("fixtures/jupyter").join(expected))?;
-    if let SourceKind::Jupyter(notebook) = source_kind {
+    if let SourceKind::Jupyter(notebook) = &source_kind {
         assert_eq!(notebook.cell_offsets(), expected_notebook.cell_offsets());
         assert_eq!(notebook.index(), expected_notebook.index());
         assert_eq!(notebook.content(), expected_notebook.content());
     };
-    Ok(messages)
+    Ok((messages, source_kind))
 }
 
 /// Run [`check_path`] on a snippet of Python code.
@@ -146,7 +146,7 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
-                let output = print_diagnostics(diagnostics, path, &contents);
+                let output = print_diagnostics(diagnostics, path, &contents, source_kind);
 
                 panic!(
                     "Failed to converge after {} iterations. This likely \
@@ -190,12 +190,12 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
             if let Some(fixed_error) = fixed_error {
                 if !source_has_errors {
                     // Previous fix introduced a syntax error, abort
-                    let fixes = print_diagnostics(diagnostics, path, &contents);
+                    let fixes = print_diagnostics(diagnostics, path, &contents, source_kind);
 
                     let mut syntax_diagnostics = Vec::new();
                     syntax_error(&mut syntax_diagnostics, &fixed_error, &locator);
                     let syntax_errors =
-                        print_diagnostics(syntax_diagnostics, path, &fixed_contents);
+                        print_diagnostics(syntax_diagnostics, path, &fixed_contents, source_kind);
 
                     panic!(
                         r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
@@ -249,12 +249,14 @@ Source with applied fixes:
         .collect()
 }
 
-fn print_diagnostics(diagnostics: Vec<Diagnostic>, file_path: &Path, source: &str) -> String {
-    let source_file = SourceFileBuilder::new(
-        file_path.file_name().unwrap().to_string_lossy().as_ref(),
-        source,
-    )
-    .finish();
+fn print_diagnostics(
+    diagnostics: Vec<Diagnostic>,
+    file_path: &Path,
+    source: &str,
+    source_kind: &SourceKind,
+) -> String {
+    let filename = file_path.file_name().unwrap().to_string_lossy();
+    let source_file = SourceFileBuilder::new(filename.as_ref(), source).finish();
 
     let messages: Vec<_> = diagnostics
         .into_iter()
@@ -265,7 +267,35 @@ fn print_diagnostics(diagnostics: Vec<Diagnostic>, file_path: &Path, source: &st
         })
         .collect();
 
-    print_messages(&messages)
+    if source_kind.is_jupyter() {
+        print_jupyter_messages(&messages, &filename, source_kind)
+    } else {
+        print_messages(&messages)
+    }
+}
+
+pub(crate) fn print_jupyter_messages(
+    messages: &[Message],
+    filename: &str,
+    source_kind: &SourceKind,
+) -> String {
+    let mut output = Vec::new();
+
+    TextEmitter::default()
+        .with_show_fix_status(true)
+        .with_show_fix_diff(true)
+        .with_show_source(true)
+        .emit(
+            &mut output,
+            messages,
+            &EmitterContext::new(&FxHashMap::from_iter([(
+                filename.to_string(),
+                source_kind.clone(),
+            )])),
+        )
+        .unwrap();
+
+    String::from_utf8(output).unwrap()
 }
 
 pub(crate) fn print_messages(messages: &[Message]) -> String {
@@ -287,6 +317,13 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
 
 #[macro_export]
 macro_rules! assert_messages {
+    ($value:expr, $path:expr, $source_kind:expr) => {{
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!(
+                $crate::test::print_jupyter_messages(&$value, &$path, &$source_kind)
+            );
+        });
+    }};
     ($value:expr, @$snapshot:literal) => {{
         insta::with_settings!({ omit_expression => true }, {
             insta::assert_snapshot!($crate::test::print_messages(&$value), $snapshot);

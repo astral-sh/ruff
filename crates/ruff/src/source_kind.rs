@@ -1,6 +1,6 @@
 use crate::jupyter::Notebook;
 
-#[derive(Debug, PartialEq, is_macro::Is)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum SourceKind {
     Python(String),
     Jupyter(Notebook),

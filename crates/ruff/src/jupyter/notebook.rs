@@ -75,7 +75,7 @@ impl Cell {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Notebook {
     /// Python source code of the notebook.
     ///
@@ -527,12 +527,13 @@ print("after empty cells")
 
     #[test]
     fn test_import_sorting() -> Result<()> {
-        let diagnostics = test_notebook_path(
-            Path::new("isort.ipynb"),
+        let path = "isort.ipynb".to_string();
+        let (diagnostics, source_kind) = test_notebook_path(
+            &path,
             Path::new("isort_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnsortedImports),
         )?;
-        assert_messages!(diagnostics);
+        assert_messages!(diagnostics, path, source_kind);
         Ok(())
     }
 }
