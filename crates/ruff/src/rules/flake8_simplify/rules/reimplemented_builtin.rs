@@ -5,6 +5,7 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
@@ -224,22 +225,30 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     generator.stmt(&node3.into())
 }
 
+/// Return `true` if the `Expr` contains an `await` expression.
+fn contains_await(expr: &Expr) -> bool {
+    any_over_expr(expr, &|expr| matches!(expr, Expr::Await(_)))
+}
+
 /// SIM110, SIM111
 pub(crate) fn convert_for_loop_to_any_all(
     checker: &mut Checker,
     stmt: &Stmt,
     sibling: Option<&Stmt>,
 ) {
-    // Don't flag if the loop is in an async context (`any` and `all` are not async).
-    if checker.semantic().in_async_context() {
-        return;
-    }
     // There are two cases to consider:
     // - `for` loop with an `else: return True` or `else: return False`.
     // - `for` loop followed by `return True` or `return False`
     if let Some(loop_info) = return_values_for_else(stmt)
         .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
     {
+        // Check if loop_info.target, loop_info.iter, or loop_info.test contains `await`.
+        if contains_await(loop_info.target)
+            || contains_await(loop_info.iter)
+            || contains_await(loop_info.test)
+        {
+            return;
+        }
         if loop_info.return_value && !loop_info.next_return_value {
             if checker.enabled(Rule::ReimplementedBuiltin) {
                 let contents = return_stmt(
