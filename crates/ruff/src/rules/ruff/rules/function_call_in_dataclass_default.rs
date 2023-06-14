@@ -23,9 +23,6 @@ use crate::rules::ruff::rules::helpers::{
 /// If a field needs to be initialized with a mutable object, use the
 /// `field(default_factory=...)` pattern.
 ///
-/// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
-///
 /// ## Examples
 /// ```python
 /// from dataclasses import dataclass
@@ -53,6 +50,9 @@ use crate::rules::ruff::rules::helpers::{
 /// class A:
 ///     mutable_default: list[int] = field(default_factory=creating_list)
 /// ```
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDataclassDefaultArgument {
     pub name: Option<String>,

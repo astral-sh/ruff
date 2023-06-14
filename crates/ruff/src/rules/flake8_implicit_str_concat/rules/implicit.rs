@@ -61,9 +61,6 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// altogether, set the `flake8-implicit-str-concat.allow-multiline` option
 /// to `false`.
 ///
-/// ## Options
-/// - `flake8-implicit-str-concat.allow-multiline`
-///
 /// ## Example
 /// ```python
 /// z = "The quick brown fox jumps over the lazy "\
@@ -77,6 +74,9 @@ impl Violation for SingleLineImplicitStringConcatenation {
 ///     "dog."
 /// )
 /// ```
+///
+/// ## Options
+/// - `flake8-implicit-str-concat.allow-multiline`
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)

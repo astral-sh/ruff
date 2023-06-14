@@ -11,9 +11,6 @@ use crate::settings::Settings;
 /// ## Why is this bad?
 /// Overlong lines can hurt readability.
 ///
-/// ## Options
-/// - `task-tags`
-///
 /// ## Example
 /// ```python
 /// my_function(param1, param2, param3, param4, param5, param6, param7, param8, param9, param10)
@@ -26,6 +23,9 @@ use crate::settings::Settings;
 ///     param6, param7, param8, param9, param10
 /// )
 /// ```
+///
+/// ## Options
+/// - `task-tags`
 #[violation]
 pub struct LineTooLong(pub usize, pub usize);
 

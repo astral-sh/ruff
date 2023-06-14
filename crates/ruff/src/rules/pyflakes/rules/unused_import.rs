@@ -26,10 +26,6 @@ enum UnusedImportContext {
 /// If an import statement is used to check for the availability or existence
 /// of a module, consider using `importlib.util.find_spec` instead.
 ///
-/// ## Options
-///
-/// - `pyflakes.extend-generics`
-///
 /// ## Example
 /// ```python
 /// import numpy as np  # unused import
@@ -54,6 +50,9 @@ enum UnusedImportContext {
 /// else:
 ///     print("numpy is not installed")
 /// ```
+///
+/// ## Options
+/// - `pyflakes.extend-generics`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)

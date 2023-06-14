@@ -20,9 +20,6 @@ use super::super::settings::Quote;
 /// Consistency is good. Use either single or double quotes for inline
 /// strings, but be consistent.
 ///
-/// ## Options
-/// - `flake8-quotes.inline-quotes`
-///
 /// ## Example
 /// ```python
 /// foo = 'bar'
@@ -32,6 +29,9 @@ use super::super::settings::Quote;
 /// ```python
 /// foo = "bar"
 /// ```
+///
+/// ## Options
+/// - `flake8-quotes.inline-quotes`
 #[violation]
 pub struct BadQuotesInlineString {
     quote: Quote,
@@ -65,9 +65,6 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 /// Consistency is good. Use either single or double quotes for multiline
 /// strings, but be consistent.
 ///
-/// ## Options
-/// - `flake8-quotes.multiline-quotes`
-///
 /// ## Example
 /// ```python
 /// foo = '''
@@ -81,6 +78,9 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 /// bar
 /// """
 /// ```
+///
+/// ## Options
+/// - `flake8-quotes.multiline-quotes`
 #[violation]
 pub struct BadQuotesMultilineString {
     quote: Quote,
@@ -113,9 +113,6 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 /// Consistency is good. Use either single or double quotes for docstring
 /// strings, but be consistent.
 ///
-/// ## Options
-/// - `flake8-quotes.docstring-quotes`
-///
 /// ## Example
 /// ```python
 /// '''
@@ -129,6 +126,9 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 /// bar
 /// """
 /// ```
+///
+/// ## Options
+/// - `flake8-quotes.docstring-quotes`
 #[violation]
 pub struct BadQuotesDocstring {
     quote: Quote,

@@ -8,17 +8,14 @@ use ruff_python_ast::source_code::Locator;
 /// ## What it does
 /// Checks for functions with a high `McCabe` complexity.
 ///
+/// ## Why is this bad?
 /// The `McCabe` complexity of a function is a measure of the complexity of
 /// the control flow graph of the function. It is calculated by adding
 /// one to the number of decision points in the function. A decision
 /// point is a place in the code where the program has a choice of two
 /// or more paths to follow.
 ///
-/// ## Why is this bad?
 /// Functions with a high complexity are hard to understand and maintain.
-///
-/// ## Options
-/// - `mccabe.max-complexity`
 ///
 /// ## Example
 /// ```python
@@ -46,6 +43,9 @@ use ruff_python_ast::source_code::Locator;
 ///         return 2
 ///     return 1
 /// ```
+///
+/// ## Options
+/// - `mccabe.max-complexity`
 #[violation]
 pub struct ComplexStructure {
     name: String,

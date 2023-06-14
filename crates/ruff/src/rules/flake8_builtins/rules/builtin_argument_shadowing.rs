@@ -20,10 +20,6 @@ use super::super::helpers::shadows_builtin;
 /// Builtins can be marked as exceptions to this rule via the
 /// [`flake8-builtins.builtins-ignorelist`] configuration option.
 ///
-/// ## Options
-///
-/// - `flake8-builtins.builtins-ignorelist`
-///
 /// ## Example
 /// ```python
 /// def remove_duplicates(list, list2):
@@ -45,6 +41,9 @@ use super::super::helpers::shadows_builtin;
 ///         result.add(value)
 ///     return list(result)
 /// ```
+///
+/// ## Options
+/// - `flake8-builtins.builtins-ignorelist`
 ///
 /// ## References
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)

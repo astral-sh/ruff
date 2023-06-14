@@ -20,10 +20,6 @@ use super::super::helpers::{shadows_builtin, AnyShadowing};
 /// [`flake8-builtins.builtins-ignorelist`] configuration option, or
 /// converted to the appropriate dunder method.
 ///
-/// ## Options
-///
-/// - `flake8-builtins.builtins-ignorelist`
-///
 /// ## Example
 /// ```python
 /// class Shadow:
@@ -45,6 +41,9 @@ use super::super::helpers::{shadows_builtin, AnyShadowing};
 ///     def __int__():
 ///         return 0
 /// ```
+///
+/// ## Options
+/// - `flake8-builtins.builtins-ignorelist`
 ///
 /// ## References
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
