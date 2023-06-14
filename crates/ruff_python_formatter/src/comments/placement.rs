@@ -332,7 +332,20 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
             // else:
             //     b
             // ```
-            CommentPlacement::trailing(preceding, comment)
+            if preceding.is_node_with_body() {
+                // We can't set this as a trailing comment of the function declaration because it
+                // will then move behind the function block instead of sticking with the pass
+                // ```
+                // if True:
+                //     def f():
+                //         pass  # a
+                // else:
+                //     pass
+                // ```
+                CommentPlacement::Default(comment)
+            } else {
+                CommentPlacement::trailing(preceding, comment)
+            }
         } else if following.is_stmt_if() || following.is_except_handler() {
             // The `elif` or except handlers have their own body to which we can attach the trailing comment
             // ```python
