@@ -11,6 +11,46 @@ use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 use crate::binding::{BindingId, StarImportation};
 use crate::globals::GlobalsId;
 
+/// Cases to consider:
+/// ```python
+/// x: int
+/// x = 1
+///
+/// print(x)  # OK
+/// ```
+///
+/// ```python
+/// x = 1
+/// x: int
+///
+/// print(x)  # OK
+/// ```
+///
+/// ```python
+/// x: int
+///
+/// print(x)  # NameError, but the annotation is used
+/// ```
+///
+/// ```python
+/// x: int  # Unused annotation
+/// ```
+///
+/// In each case, we want to track the annotations.
+///
+/// What if we:
+/// - Remove `Annotation` from `Bindings`.
+///
+/// Then, we'd still need a way to get the reference for rewrites.
+/// We'd also be unable to raise "Unused annotation" warnings.
+///
+/// What if we:
+/// - Remove `Annotation` from `Bindings`.
+/// - Add a new `Annotations` map to `Scope`.
+///
+/// I think the lazy thing to do is: keep our current model, but add a vector of annotations
+/// for each binding. This is a bit wasteful, but it's also simple.
+
 #[derive(Debug)]
 pub struct Scope<'a> {
     /// The kind of scope.

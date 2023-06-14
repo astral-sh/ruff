@@ -4328,10 +4328,16 @@ impl<'a> Checker<'a> {
         }
 
         // If there's an existing binding in this scope, copy its references.
-        if let Some(shadowed) = self.semantic_model.scopes[scope_id]
-            .get(name)
-            .map(|binding_id| &self.semantic_model.bindings[binding_id])
-        {
+        if let Some(shadowed_id) = self.semantic_model.scopes[scope_id].get(name) {
+            // If this is an annotation, and we already have an existing value in the same scope,
+            // don't treat it as an assignment, but track it as a delayed annotation.
+            if self.semantic_model.binding(binding_id).kind.is_annotation() {
+                self.semantic_model
+                    .add_delayed_annotation(binding_id, shadowed_id);
+                return binding_id;
+            }
+
+            let shadowed = &self.semantic_model.bindings[binding_id];
             match &shadowed.kind {
                 BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException => {
                     // Avoid overriding builtins.
@@ -4347,12 +4353,6 @@ impl<'a> Checker<'a> {
                     let references = shadowed.references.clone();
                     self.semantic_model.bindings[binding_id].references = references;
                 }
-            }
-
-            // If this is an annotation, and we already have an existing value in the same scope,
-            // don't treat it as an assignment (i.e., avoid adding it to the scope).
-            if self.semantic_model.binding(binding_id).kind.is_annotation() {
-                return binding_id;
             }
         }
 
