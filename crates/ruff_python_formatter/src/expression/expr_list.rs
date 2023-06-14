@@ -1,4 +1,4 @@
-use crate::comments::{dangling_comments, Comments};
+use crate::comments::{dangling_comments, CommentTextPosition, Comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -18,6 +18,39 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             ctx: _,
         } = item;
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item.into());
+
+        // The empty list is special because there can be dangling comments, and they can be in two
+        // positions:
+        // ```
+        // a3 = [  # end-of-line
+        //     # own line
+        // ]
+        // ```
+        // In all other cases comments get assigned to a list element
+        if elts.is_empty() {
+            let partition_point = dangling
+                .partition_point(|comment| comment.position() == CommentTextPosition::EndOfLine);
+            debug_assert!(dangling[partition_point..]
+                .iter()
+                .all(|comment| comment.position() == CommentTextPosition::OwnLine));
+            return write!(
+                f,
+                [group(&format_args![
+                    text("["),
+                    dangling_comments(&dangling[..partition_point]),
+                    soft_block_indent(&dangling_comments(&dangling[partition_point..])),
+                    text("]")
+                ])]
+            );
+        } else {
+            debug_assert!(
+                dangling.is_empty(),
+                "A non-empty expression list has dangling comments"
+            );
+        }
+
         let items = format_with(|f| {
             let mut iter = elts.iter();
 
@@ -36,14 +69,10 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             Ok(())
         });
 
-        let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item.into());
-
         write!(
             f,
             [group(&format_args![
                 text("["),
-                dangling_comments(dangling),
                 soft_block_indent(&items),
                 text("]")
             ])]
