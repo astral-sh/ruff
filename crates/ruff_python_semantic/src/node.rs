@@ -28,7 +28,7 @@ struct Node<'a> {
 
 /// The nodes of a program indexed by [`NodeId`]
 #[derive(Debug, Default)]
-pub struct Nodes<'a> {
+pub(crate) struct Nodes<'a> {
     nodes: IndexVec<NodeId, Node<'a>>,
     node_to_id: FxHashMap<RefEquality<'a, Stmt>, NodeId>,
 }

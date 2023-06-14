@@ -12,7 +12,7 @@ use ruff_python_ast::cast;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::NewlineWithTrailingNewline;
 use ruff_textwrap::dedent;
 

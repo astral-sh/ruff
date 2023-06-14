@@ -10,8 +10,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::{Scope, ScopeKind};
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

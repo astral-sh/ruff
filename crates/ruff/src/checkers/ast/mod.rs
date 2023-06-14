@@ -22,15 +22,15 @@ use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::branch_detection;
 use ruff_python_semantic::analyze::typing::{Callable, SubscriptKind};
 use ruff_python_semantic::analyze::visibility::ModuleSource;
-use ruff_python_semantic::binding::{
+use ruff_python_semantic::ExecutionContext;
+use ruff_python_semantic::Globals;
+use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImportation,
     Importation, StarImportation, SubmoduleImportation,
 };
-use ruff_python_semantic::context::ExecutionContext;
-use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
-use ruff_python_semantic::globals::Globals;
-use ruff_python_semantic::model::{ResolvedRead, SemanticModel, SemanticModelFlags};
-use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
+use ruff_python_semantic::{ContextualizedDefinition, Module, ModuleKind};
+use ruff_python_semantic::{ResolvedRead, SemanticModel, SemanticModelFlags};
+use ruff_python_semantic::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 

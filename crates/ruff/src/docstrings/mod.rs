@@ -4,7 +4,7 @@ use std::ops::Deref;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, Ranged};
 
-use ruff_python_semantic::definition::Definition;
+use ruff_python_semantic::Definition;
 
 pub(crate) mod extraction;
 pub(crate) mod google;

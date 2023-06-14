@@ -7,8 +7,8 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{cast, helpers};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::analyze::visibility::Visibility;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
 
 use crate::checkers::ast::Checker;

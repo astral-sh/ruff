@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_semantic::scope::ScopeKind;
+use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
 

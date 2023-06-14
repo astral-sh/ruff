@@ -8,7 +8,7 @@ use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPat
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::is_immutable_func;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;

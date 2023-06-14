@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::scope::{Scope, ScopeKind};
+use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::settings::types::IdentifierPattern;
 

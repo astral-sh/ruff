@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{self, Constant, Expr};
 
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(^|_)(?i)(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)($|_)").unwrap()

@@ -4,8 +4,8 @@ use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::str::is_implicit_concatenation;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::UniversalNewlines;
 
 /// Return the index of the first logical line in a string.

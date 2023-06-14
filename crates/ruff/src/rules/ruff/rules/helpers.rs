@@ -1,7 +1,7 @@
 use ruff_python_ast::helpers::map_callable;
 use rustpython_parser::ast::{self, Expr};
 
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 pub(super) fn is_mutable_expr(expr: &Expr) -> bool {
     matches!(

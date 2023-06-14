@@ -1,4 +1,4 @@
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use rustpython_parser::ast::Expr;
 
 pub(super) fn is_sys(model: &SemanticModel, expr: &Expr, target: &str) -> bool {

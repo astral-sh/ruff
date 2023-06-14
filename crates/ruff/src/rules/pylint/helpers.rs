@@ -1,7 +1,7 @@
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
-use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::ScopeKind;
+use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::SemanticModel;
 use rustpython_parser::ast;
 use rustpython_parser::ast::Cmpop;
 use std::fmt;

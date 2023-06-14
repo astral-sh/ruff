@@ -9,7 +9,7 @@ use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, Comparable
 use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
 use crate::checkers::ast::Checker;

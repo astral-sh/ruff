@@ -14,7 +14,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
 use ruff_python_semantic::analyze::visibility::is_abstract;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
