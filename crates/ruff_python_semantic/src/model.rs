@@ -71,6 +71,29 @@ pub struct SemanticModel<'a> {
     /// despite the fact that they're in different scopes.
     pub shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
 
+    /// Map from binding index to indexes of bindings that annotate it (in the same scope).
+    ///
+    /// For example:
+    /// ```python
+    /// x = 1
+    /// x: int
+    /// ```
+    ///
+    /// In this case, the binding created by `x = 1` is annotated by the binding created by
+    /// `x: int`. We don't consider the latter binding to _shadow_ the former, because it doesn't
+    /// change the value of the binding, and so we don't store in on the scope. But we _do_ want to
+    /// track the annotation in some form, since it's a reference to `x`.
+    ///
+    /// Note that, given:
+    /// ```python
+    /// x: int
+    /// ```
+    ///
+    /// In this case, we _do_ store the binding created by `x: int` directly on the scope, and not
+    /// as a delayed annotation. Annotations are thus treated as bindings only when they are the
+    /// first binding in a scope; any annotations that follow are treated as "delayed" annotations.
+    delayed_annotations: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
+
     /// Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -99,6 +122,7 @@ impl<'a> SemanticModel<'a> {
             references: References::default(),
             globals: GlobalsArena::default(),
             shadowed_bindings: IntMap::default(),
+            delayed_annotations: IntMap::default(),
             body: &[],
             body_index: 0,
             flags: SemanticModelFlags::new(path),
@@ -727,6 +751,19 @@ impl<'a> SemanticModel<'a> {
     ) {
         let reference_id = self.references.push(ScopeId::global(), range, context);
         self.bindings[binding_id].references.push(reference_id);
+    }
+
+    /// Add a [`BindingId`] to the list of delayed annotations for the given [`BindingId`].
+    pub fn add_delayed_annotation(&mut self, binding_id: BindingId, annotation_id: BindingId) {
+        self.delayed_annotations
+            .entry(binding_id)
+            .or_insert_with(Vec::new)
+            .push(annotation_id);
+    }
+
+    /// Return the list of delayed annotations for the given [`BindingId`].
+    pub fn delayed_annotations(&self, binding_id: BindingId) -> Option<&[BindingId]> {
+        self.delayed_annotations.get(&binding_id).map(Vec::as_slice)
     }
 
     /// Return the [`ExecutionContext`] of the current scope.
