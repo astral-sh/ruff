@@ -850,7 +850,12 @@ fn find_pos_only_slash_offset(
                 return Some(maybe_slash.start());
             }
 
-            debug_assert_eq!(maybe_slash.kind(), TokenKind::RParen);
+            debug_assert_eq!(
+                maybe_slash.kind(),
+                TokenKind::RParen,
+                "{:?}",
+                maybe_slash.kind()
+            );
         }
     }
 

@@ -86,7 +86,7 @@ if True:
 else:
     pass
 
-# Make sure the star is emitted
+# Make sure the star is printed
 # Regression test for https://github.com/python/cpython/blob/7199584ac8632eab57612f595a7162ab8d2ebbc0/Lib/warnings.py#L513
 def f(arg1=1, *, kwonlyarg1, kwonlyarg2=2):
     pass
