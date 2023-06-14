@@ -198,14 +198,9 @@ impl nohash_hasher::IsEnabled for BindingId {}
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
-    /// Pushes a new binding and returns its id
+    /// Pushes a new [`Binding`] and returns its [`BindingId`].
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
-    }
-
-    /// Returns the id that will be assigned when pushing the next binding
-    pub fn next_id(&self) -> BindingId {
-        self.0.next_index()
     }
 }
 

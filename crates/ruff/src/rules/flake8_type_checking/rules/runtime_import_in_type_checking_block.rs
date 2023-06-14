@@ -75,7 +75,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     let mut ignores_by_statement: FxHashMap<NodeId, Vec<Import>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
-        let binding = &checker.semantic_model().bindings[binding_id];
+        let binding = checker.semantic_model().binding(binding_id);
 
         let Some(qualified_name) = binding.qualified_name() else {
             continue;

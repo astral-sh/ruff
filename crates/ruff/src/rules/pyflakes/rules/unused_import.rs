@@ -104,7 +104,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<Import>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
-        let binding = &checker.semantic_model().bindings[binding_id];
+        let binding = checker.semantic_model().binding(binding_id);
 
         if binding.is_used() || binding.is_explicit_export() {
             continue;

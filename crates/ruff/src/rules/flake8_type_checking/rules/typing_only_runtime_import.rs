@@ -197,7 +197,7 @@ pub(crate) fn typing_only_runtime_import(
         FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
-        let binding = &checker.semantic_model().bindings[binding_id];
+        let binding = checker.semantic_model().binding(binding_id);
 
         // If we're in un-strict mode, don't flag typing-only imports that are
         // implicitly loaded by way of a valid runtime import.

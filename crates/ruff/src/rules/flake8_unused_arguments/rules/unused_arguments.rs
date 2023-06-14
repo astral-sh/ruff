@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::binding::Bindings;
+use ruff_python_semantic::model::SemanticModel;
 use ruff_python_semantic::scope::{Scope, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -221,7 +221,7 @@ fn function(
     argumentable: Argumentable,
     args: &Arguments,
     values: &Scope,
-    bindings: &Bindings,
+    model: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -240,7 +240,7 @@ fn function(
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(argumentable, args, values, bindings, dummy_variable_rgx)
+    call(argumentable, args, values, model, dummy_variable_rgx)
 }
 
 /// Check a method for unused arguments.
@@ -248,7 +248,7 @@ fn method(
     argumentable: Argumentable,
     args: &Arguments,
     values: &Scope,
-    bindings: &Bindings,
+    model: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -268,21 +268,21 @@ fn method(
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(argumentable, args, values, bindings, dummy_variable_rgx)
+    call(argumentable, args, values, model, dummy_variable_rgx)
 }
 
 fn call<'a>(
     argumentable: Argumentable,
     args: impl Iterator<Item = &'a Arg>,
     values: &Scope,
-    bindings: &Bindings,
+    model: &SemanticModel,
     dummy_variable_rgx: &Regex,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args {
         if let Some(binding) = values
             .get(arg.arg.as_str())
-            .map(|binding_id| &bindings[binding_id])
+            .map(|binding_id| model.binding(binding_id))
         {
             if binding.kind.is_argument()
                 && !binding.is_used()
@@ -303,7 +303,6 @@ pub(crate) fn unused_arguments(
     checker: &Checker,
     parent: &Scope,
     scope: &Scope,
-    bindings: &Bindings,
 ) -> Vec<Diagnostic> {
     match &scope.kind {
         ScopeKind::Function(ast::StmtFunctionDef {
@@ -336,7 +335,7 @@ pub(crate) fn unused_arguments(
                             Argumentable::Function,
                             args,
                             scope,
-                            bindings,
+                            checker.semantic_model(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -362,7 +361,7 @@ pub(crate) fn unused_arguments(
                             Argumentable::Method,
                             args,
                             scope,
-                            bindings,
+                            checker.semantic_model(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -388,7 +387,7 @@ pub(crate) fn unused_arguments(
                             Argumentable::ClassMethod,
                             args,
                             scope,
-                            bindings,
+                            checker.semantic_model(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -414,7 +413,7 @@ pub(crate) fn unused_arguments(
                             Argumentable::StaticMethod,
                             args,
                             scope,
-                            bindings,
+                            checker.semantic_model(),
                             &checker.settings.dummy_variable_rgx,
                             checker
                                 .settings
@@ -433,7 +432,7 @@ pub(crate) fn unused_arguments(
                     Argumentable::Lambda,
                     args,
                     scope,
-                    bindings,
+                    checker.semantic_model(),
                     &checker.settings.dummy_variable_rgx,
                     checker
                         .settings
