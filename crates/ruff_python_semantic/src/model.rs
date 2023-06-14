@@ -187,7 +187,6 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
-        // NOTE(charlie): This is fine because it gates on the binding kind, so will be `false` for deletions.
         self.find_binding(member)
             .map_or(false, |binding| binding.kind.is_builtin())
     }
@@ -195,7 +194,6 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
     /// in the current scope, or in any containing scope.
     pub fn is_available(&self, member: &str) -> bool {
-        // NOTE(charlie): This should intentionally exclude deletions, because deletions _might_ be bound.
         self.find_binding(member)
             .map_or(true, |binding| binding.kind.is_builtin())
     }
@@ -205,7 +203,6 @@ impl<'a> SemanticModel<'a> {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
-            // NOTE(charlie): Skip deletions here.
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
@@ -363,7 +360,6 @@ impl<'a> SemanticModel<'a> {
     pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
         let call_path = collect_call_path(value)?;
         let head = call_path.first()?;
-        // NOTE(charlie): No change necessary (we're gating on kinds).
         let binding = self.find_binding(head)?;
         match &binding.kind {
             BindingKind::Importation(Importation {

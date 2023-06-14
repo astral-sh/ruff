@@ -284,7 +284,6 @@ fn call<'a>(
             .get(arg.arg.as_str())
             .map(|binding_id| &bindings[binding_id])
         {
-            // NOTE(charlie): No change necessary (we're gating on `is_argument()`).
             if binding.kind.is_argument()
                 && !binding.is_used()
                 && !dummy_variable_rgx.is_match(arg.arg.as_str())

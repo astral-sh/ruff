@@ -29,7 +29,6 @@ pub(super) fn test_expression(expr: &Expr, model: &SemanticModel) -> Resolution 
         | Expr::GeneratorExp(_) => Resolution::IrrelevantExpression,
         Expr::Name(ast::ExprName { id, .. }) => {
             model
-                // NOTE(charlie): No change necessary (we're gating on kinds).
                 .find_binding(id)
                 .map_or(Resolution::IrrelevantBinding, |binding| {
                     match binding.kind {

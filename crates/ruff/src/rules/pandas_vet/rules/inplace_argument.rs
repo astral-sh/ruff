@@ -66,7 +66,6 @@ pub(crate) fn inplace_argument(
         let module = call_path[0];
         is_pandas = checker
             .semantic_model()
-            // NOTE(charlie): This is fine because we're gating on `importation`.
             .find_binding(module)
             .map_or(false, |binding| {
                 matches!(

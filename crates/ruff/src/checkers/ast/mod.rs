@@ -299,7 +299,6 @@ where
                             .ancestors(self.semantic_model.scope_id)
                             .skip(1)
                             .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
-                            // NOTE(charlie): Intentionally include deletions here.
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
@@ -4425,7 +4424,6 @@ impl<'a> Checker<'a> {
                     .scope()
                     .get(id)
                     .map_or(false, |binding_id| {
-                        // NOTE(charlie): No change necessary (we're gating on `is_global`).
                         self.semantic_model.bindings[binding_id].kind.is_global()
                     })
                 {
@@ -4806,7 +4804,6 @@ impl<'a> Checker<'a> {
         };
 
         for (name, range) in &exports {
-            // NOTE(charlie): It's fine to include deletions here.
             if let Some(binding_id) = self.semantic_model.global_scope().get(name) {
                 self.semantic_model.add_global_reference(
                     binding_id,
@@ -5055,7 +5052,6 @@ impl<'a> Checker<'a> {
         let exports: Option<Vec<&str>> = {
             let global_scope = self.semantic_model.global_scope();
             global_scope
-                // NOTE(charlie): No change necessary (we're gating on `is_export()`).
                 .bindings_for_name("__all__")
                 .map(|binding_id| &self.semantic_model.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {
