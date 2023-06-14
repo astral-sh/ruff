@@ -47,8 +47,8 @@ impl Violation for PytestRaisesWithoutException {
     }
 }
 
-fn is_pytest_raises(func: &Expr, model: &SemanticModel) -> bool {
-    model.resolve_call_path(func).map_or(false, |call_path| {
+fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
         call_path.as_slice() == ["pytest", "raises"]
     })
 }
@@ -64,7 +64,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_raises(func, checker.semantic_model()) {
+    if is_pytest_raises(func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
             if args.is_empty() && keywords.is_empty() {
                 checker
@@ -100,7 +100,7 @@ pub(crate) fn complex_raises(
     let mut is_too_complex = false;
 
     let raises_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic_model()),
+        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
         _ => false,
     });
 
@@ -141,7 +141,7 @@ pub(crate) fn complex_raises(
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
     if let Some(call_path) = checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(exception)
         .and_then(|call_path| {
             let is_broad_exception = checker

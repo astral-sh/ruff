@@ -37,7 +37,7 @@ pub(crate) fn jinja2_autoescape_false(
     keywords: &[Keyword],
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["jinja2", "Environment"]

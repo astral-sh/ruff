@@ -73,7 +73,7 @@ impl Violation for FunctionCallInDefaultArgument {
 }
 
 struct ArgumentDefaultVisitor<'a> {
-    model: &'a SemanticModel<'a>,
+    semantic: &'a SemanticModel<'a>,
     extend_immutable_calls: Vec<CallPath<'a>>,
     diagnostics: Vec<(DiagnosticKind, TextRange)>,
 }
@@ -81,7 +81,7 @@ struct ArgumentDefaultVisitor<'a> {
 impl<'a> ArgumentDefaultVisitor<'a> {
     fn new(model: &'a SemanticModel<'a>, extend_immutable_calls: Vec<CallPath<'a>>) -> Self {
         Self {
-            model,
+            semantic: model,
             extend_immutable_calls,
             diagnostics: Vec::new(),
         }
@@ -95,8 +95,8 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if !is_mutable_func(self.model, func)
-                    && !is_immutable_func(self.model, func, &self.extend_immutable_calls)
+                if !is_mutable_func(func, self.semantic)
+                    && !is_immutable_func(func, self.semantic, &self.extend_immutable_calls)
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
@@ -125,8 +125,7 @@ pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &
         .map(|target| from_qualified_name(target))
         .collect();
     let diagnostics = {
-        let mut visitor =
-            ArgumentDefaultVisitor::new(checker.semantic_model(), extend_immutable_calls);
+        let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), extend_immutable_calls);
         for expr in arguments
             .defaults
             .iter()

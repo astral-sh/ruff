@@ -75,7 +75,7 @@ pub(crate) fn function_call_in_dataclass_default(
     checker: &mut Checker,
     class_def: &ast::StmtClassDef,
 ) {
-    if !is_dataclass(checker.semantic_model(), class_def) {
+    if !is_dataclass(class_def, checker.semantic()) {
         return;
     }
 
@@ -95,9 +95,9 @@ pub(crate) fn function_call_in_dataclass_default(
         }) = statement
         {
             if let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() {
-                if !is_class_var_annotation(checker.semantic_model(), annotation)
-                    && !is_immutable_func(checker.semantic_model(), func, &extend_immutable_calls)
-                    && !is_allowed_dataclass_function(checker.semantic_model(), func)
+                if !is_class_var_annotation(annotation, checker.semantic())
+                    && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
+                    && !is_allowed_dataclass_function(func, checker.semantic())
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {

@@ -75,7 +75,7 @@ pub(crate) fn setattr_with_constant(
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
         range: _,
-    }) = checker.semantic_model().stmt()
+    }) = checker.semantic().stmt()
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());

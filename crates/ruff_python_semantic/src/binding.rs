@@ -142,11 +142,11 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the appropriate visual range for highlighting this binding.
-    pub fn trimmed_range(&self, semantic_model: &SemanticModel, locator: &Locator) -> TextRange {
+    pub fn trimmed_range(&self, semantic: &SemanticModel, locator: &Locator) -> TextRange {
         match self.kind {
             BindingKind::ClassDefinition | BindingKind::FunctionDefinition => {
                 self.source.map_or(self.range, |source| {
-                    helpers::identifier_range(semantic_model.stmts[source], locator)
+                    helpers::identifier_range(semantic.stmts[source], locator)
                 })
             }
             _ => self.range,
@@ -154,9 +154,9 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the range of the binding's parent.
-    pub fn parent_range(&self, semantic_model: &SemanticModel) -> Option<TextRange> {
+    pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
         self.source
-            .map(|node_id| semantic_model.stmts[node_id])
+            .map(|node_id| semantic.stmts[node_id])
             .and_then(|parent| {
                 if parent.is_import_from_stmt() {
                     Some(parent.range())

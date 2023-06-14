@@ -38,14 +38,14 @@ pub(crate) fn unsafe_yaml_load(
     keywords: &[Keyword],
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["yaml", "load"])
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(loader_arg) = call_args.argument("Loader", 1) {
             if !checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(loader_arg)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["yaml", "SafeLoader"]

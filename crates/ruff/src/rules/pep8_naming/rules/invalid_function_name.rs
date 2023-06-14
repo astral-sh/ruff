@@ -55,7 +55,7 @@ pub(crate) fn invalid_function_name(
     name: &str,
     decorator_list: &[Decorator],
     ignore_names: &[IdentifierPattern],
-    model: &SemanticModel,
+    semantic: &SemanticModel,
     locator: &Locator,
 ) -> Option<Diagnostic> {
     // Ignore any explicitly-ignored function names.
@@ -73,7 +73,7 @@ pub(crate) fn invalid_function_name(
 
     // Ignore any functions that are explicitly `@override`. These are defined elsewhere,
     // so if they're first-party, we'll flag them at the definition site.
-    if visibility::is_override(model, decorator_list) {
+    if visibility::is_override(decorator_list, semantic) {
         return None;
     }
 

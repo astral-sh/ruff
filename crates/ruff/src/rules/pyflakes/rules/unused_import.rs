@@ -102,7 +102,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<Import>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
-        let binding = checker.semantic_model().binding(binding_id);
+        let binding = checker.semantic().binding(binding_id);
 
         if binding.is_used() || binding.is_explicit_export() {
             continue;
@@ -118,8 +118,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         let import = Import {
             qualified_name,
-            trimmed_range: binding.trimmed_range(checker.semantic_model(), checker.locator),
-            parent_range: binding.parent_range(checker.semantic_model()),
+            trimmed_range: binding.trimmed_range(checker.semantic(), checker.locator),
+            parent_range: binding.parent_range(checker.semantic()),
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.trimmed_range.start())
@@ -222,8 +222,8 @@ struct Import<'a> {
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
 fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
-    let stmt = checker.semantic_model().stmts[stmt_id];
-    let parent = checker.semantic_model().stmts.parent(stmt);
+    let stmt = checker.semantic().stmts[stmt_id];
+    let parent = checker.semantic().stmts.parent(stmt);
     let edit = autofix::edits::remove_unused_imports(
         imports
             .iter()

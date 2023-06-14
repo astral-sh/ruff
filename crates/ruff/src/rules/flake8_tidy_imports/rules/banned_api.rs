@@ -86,7 +86,7 @@ pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if let Some((banned_path, ban)) =
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(expr)
             .and_then(|call_path| {
                 banned_api

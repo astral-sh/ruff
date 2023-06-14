@@ -502,7 +502,7 @@ pub(crate) fn fix_unnecessary_collection_call(
 /// this method will pad the start and end of an expression as needed to
 /// avoid producing invalid syntax.
 fn pad_expression(content: String, range: TextRange, checker: &Checker) -> String {
-    if !checker.semantic_model().in_f_string() {
+    if !checker.semantic().in_f_string() {
         return content;
     }
 

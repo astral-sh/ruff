@@ -145,20 +145,20 @@ enum TypingTarget<'a> {
 }
 
 impl<'a> TypingTarget<'a> {
-    fn try_from_expr(model: &SemanticModel, expr: &'a Expr) -> Option<Self> {
+    fn try_from_expr(expr: &'a Expr, semantic: &SemanticModel) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                if model.match_typing_expr(value, "Optional") {
+                if semantic.match_typing_expr(value, "Optional") {
                     return Some(TypingTarget::Optional);
                 }
                 let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else{
                     return None;
                 };
-                if model.match_typing_expr(value, "Literal") {
+                if semantic.match_typing_expr(value, "Literal") {
                     Some(TypingTarget::Literal(elements.iter().collect()))
-                } else if model.match_typing_expr(value, "Union") {
+                } else if semantic.match_typing_expr(value, "Union") {
                     Some(TypingTarget::Union(elements.iter().collect()))
-                } else if model.match_typing_expr(value, "Annotated") {
+                } else if semantic.match_typing_expr(value, "Annotated") {
                     elements.first().map(TypingTarget::Annotated)
                 } else {
                     None
@@ -171,8 +171,8 @@ impl<'a> TypingTarget<'a> {
                 value: Constant::None,
                 ..
             }) => Some(TypingTarget::None),
-            _ => model.resolve_call_path(expr).and_then(|call_path| {
-                if model.match_typing_call_path(&call_path, "Any") {
+            _ => semantic.resolve_call_path(expr).and_then(|call_path| {
+                if semantic.match_typing_call_path(&call_path, "Any") {
                     Some(TypingTarget::Any)
                 } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
                     Some(TypingTarget::Object)
@@ -184,40 +184,40 @@ impl<'a> TypingTarget<'a> {
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `None`.
-    fn contains_none(&self, model: &SemanticModel) -> bool {
+    fn contains_none(&self, semantic: &SemanticModel) -> bool {
         match self {
             TypingTarget::None
             | TypingTarget::Optional
             | TypingTarget::Any
             | TypingTarget::Object => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(model, element) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
                 return false;
             };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match new_target {
                     TypingTarget::None => true,
-                    TypingTarget::Literal(_) => new_target.contains_none(model),
+                    TypingTarget::Literal(_) => new_target.contains_none(semantic),
                     _ => false,
                 }
             }),
             TypingTarget::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(model, element) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
                 return false;
             };
                 match new_target {
                     TypingTarget::None => true,
-                    _ => new_target.contains_none(model),
+                    _ => new_target.contains_none(semantic),
                 }
             }),
             TypingTarget::Annotated(element) => {
-                let Some(new_target) = TypingTarget::try_from_expr(model, element) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
                 return false;
             };
                 match new_target {
                     TypingTarget::None => true,
-                    _ => new_target.contains_none(model),
+                    _ => new_target.contains_none(semantic),
                 }
             }
         }
@@ -232,10 +232,10 @@ impl<'a> TypingTarget<'a> {
 ///
 /// This function assumes that the annotation is a valid typing annotation expression.
 fn type_hint_explicitly_allows_none<'a>(
-    model: &SemanticModel,
     annotation: &'a Expr,
+    semantic: &SemanticModel,
 ) -> Option<&'a Expr> {
-    let Some(target) = TypingTarget::try_from_expr(model, annotation) else {
+    let Some(target) = TypingTarget::try_from_expr(annotation, semantic) else {
         return Some(annotation);
     };
     match target {
@@ -245,9 +245,9 @@ fn type_hint_explicitly_allows_none<'a>(
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should
         // be returned.
-        TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(model, expr),
+        TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(expr, semantic),
         _ => {
-            if target.contains_none(model) {
+            if target.contains_none(semantic) {
                 None
             } else {
                 Some(annotation)
@@ -280,7 +280,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let (import_edit, binding) = checker.importer.get_or_import_symbol(
                 &ImportRequest::import_from("typing", "Optional"),
                 expr.start(),
-                checker.semantic_model(),
+                checker.semantic(),
             )?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
@@ -329,7 +329,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         let Some(annotation) = &arg.annotation else {
             continue
         };
-        let Some(expr) = type_hint_explicitly_allows_none(checker.semantic_model(), annotation) else {
+        let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic()) else {
             continue;
         };
         let conversion_type = checker.settings.target_version.into();

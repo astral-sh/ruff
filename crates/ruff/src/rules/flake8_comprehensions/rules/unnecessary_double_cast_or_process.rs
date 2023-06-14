@@ -90,7 +90,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
     let Some(inner) = helpers::expr_name(func) else {
         return;
     };
-    if !checker.semantic_model().is_builtin(inner) || !checker.semantic_model().is_builtin(outer) {
+    if !checker.semantic().is_builtin(inner) || !checker.semantic().is_builtin(outer) {
         return;
     }
 

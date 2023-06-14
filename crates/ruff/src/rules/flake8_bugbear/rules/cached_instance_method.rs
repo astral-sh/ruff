@@ -18,8 +18,8 @@ impl Violation for CachedInstanceMethod {
     }
 }
 
-fn is_cache_func(model: &SemanticModel, expr: &Expr) -> bool {
-    model.resolve_call_path(expr).map_or(false, |call_path| {
+fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(expr).map_or(false, |call_path| {
         call_path.as_slice() == ["functools", "lru_cache"]
             || call_path.as_slice() == ["functools", "cache"]
     })
@@ -27,7 +27,7 @@ fn is_cache_func(model: &SemanticModel, expr: &Expr) -> bool {
 
 /// B019
 pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Decorator]) {
-    if !checker.semantic_model().scope().kind.is_class() {
+    if !checker.semantic().scope().kind.is_class() {
         return;
     }
     for decorator in decorator_list {
@@ -41,11 +41,11 @@ pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[De
     }
     for decorator in decorator_list {
         if is_cache_func(
-            checker.semantic_model(),
             match &decorator.expression {
                 Expr::Call(ast::ExprCall { func, .. }) => func,
                 _ => &decorator.expression,
             },
+            checker.semantic(),
         ) {
             checker
                 .diagnostics

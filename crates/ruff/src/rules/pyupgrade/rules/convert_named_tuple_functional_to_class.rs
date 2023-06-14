@@ -36,9 +36,9 @@ impl Violation for ConvertNamedTupleFunctionalToClass {
 
 /// Return the typename, args, keywords, and base class.
 fn match_named_tuple_assign<'a>(
-    model: &SemanticModel,
     targets: &'a [Expr],
     value: &'a Expr,
+    semantic: &SemanticModel,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
     let Expr::Name(ast::ExprName { id: typename, .. }) = target else {
@@ -52,7 +52,7 @@ fn match_named_tuple_assign<'a>(
     }) = value else {
         return None;
     };
-    if !model.resolve_call_path(func).map_or(false, |call_path| {
+    if !semantic.resolve_call_path(func).map_or(false, |call_path| {
         call_path.as_slice() == ["typing", "NamedTuple"]
     }) {
         return None;
@@ -189,7 +189,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     value: &Expr,
 ) {
     let Some((typename, args, keywords, base_class)) =
-        match_named_tuple_assign(checker.semantic_model(), targets, value) else
+        match_named_tuple_assign(targets, value, checker.semantic()) else
     {
         return;
     };

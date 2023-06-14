@@ -101,7 +101,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
     };
 
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(annotation)
         .map_or(false, |call_path| {
             if async_ {

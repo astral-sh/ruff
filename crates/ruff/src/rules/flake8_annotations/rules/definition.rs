@@ -431,15 +431,15 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 
 /// ANN401
 fn check_dynamically_typed<F>(
-    model: &SemanticModel,
     annotation: &Expr,
     func: F,
     diagnostics: &mut Vec<Diagnostic>,
     is_overridden: bool,
+    semantic: &SemanticModel,
 ) where
     F: FnOnce() -> String,
 {
-    if !is_overridden && model.match_typing_expr(annotation, "Any") {
+    if !is_overridden && semantic.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
             AnyType { name: func() },
             annotation.range(),
@@ -480,7 +480,7 @@ pub(crate) fn definition(
     // unless configured to suppress ANN* for declarations that are fully untyped.
     let mut diagnostics = Vec::new();
 
-    let is_overridden = visibility::is_override(checker.semantic_model(), decorator_list);
+    let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
     // ANN001, ANN401
     for arg in args
@@ -492,10 +492,7 @@ pub(crate) fn definition(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 is_method
-                    && !visibility::is_staticmethod(
-                        checker.semantic_model(),
-                        cast::decorator_list(stmt),
-                    ),
+                    && !visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic()),
             ),
         )
     {
@@ -504,11 +501,11 @@ pub(crate) fn definition(
             has_any_typed_arg = true;
             if checker.enabled(Rule::AnyType) {
                 check_dynamically_typed(
-                    checker.semantic_model(),
                     annotation,
                     || arg.arg.to_string(),
                     &mut diagnostics,
                     is_overridden,
+                    checker.semantic(),
                 );
             }
         } else {
@@ -535,11 +532,11 @@ pub(crate) fn definition(
                 if checker.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
-                        checker.semantic_model(),
                         expr,
                         || format!("*{name}"),
                         &mut diagnostics,
                         is_overridden,
+                        checker.semantic(),
                     );
                 }
             }
@@ -567,11 +564,11 @@ pub(crate) fn definition(
                 if checker.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
-                        checker.semantic_model(),
                         expr,
                         || format!("**{name}"),
                         &mut diagnostics,
                         is_overridden,
+                        checker.semantic(),
                     );
                 }
             }
@@ -592,13 +589,10 @@ pub(crate) fn definition(
     }
 
     // ANN101, ANN102
-    if is_method
-        && !visibility::is_staticmethod(checker.semantic_model(), cast::decorator_list(stmt))
-    {
+    if is_method && !visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic()) {
         if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
             if arg.annotation.is_none() {
-                if visibility::is_classmethod(checker.semantic_model(), cast::decorator_list(stmt))
-                {
+                if visibility::is_classmethod(cast::decorator_list(stmt), checker.semantic()) {
                     if checker.enabled(Rule::MissingTypeCls) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeCls {
@@ -628,11 +622,11 @@ pub(crate) fn definition(
         has_typed_return = true;
         if checker.enabled(Rule::AnyType) {
             check_dynamically_typed(
-                checker.semantic_model(),
                 expr,
                 || name.to_string(),
                 &mut diagnostics,
                 is_overridden,
+                checker.semantic(),
             );
         }
     } else if !(
@@ -640,9 +634,7 @@ pub(crate) fn definition(
         // (explicitly or implicitly).
         checker.settings.flake8_annotations.suppress_none_returning && is_none_returning(body)
     ) {
-        if is_method
-            && visibility::is_classmethod(checker.semantic_model(), cast::decorator_list(stmt))
-        {
+        if is_method && visibility::is_classmethod(cast::decorator_list(stmt), checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeClassMethod) {
                 diagnostics.push(Diagnostic::new(
                     MissingReturnTypeClassMethod {
@@ -652,7 +644,7 @@ pub(crate) fn definition(
                 ));
             }
         } else if is_method
-            && visibility::is_staticmethod(checker.semantic_model(), cast::decorator_list(stmt))
+            && visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic())
         {
             if checker.enabled(Rule::MissingReturnTypeStaticMethod) {
                 diagnostics.push(Diagnostic::new(

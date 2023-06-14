@@ -470,7 +470,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    let Some(reason) = checker.semantic_model().resolve_call_path(func).and_then(|call_path| {
+    let Some(reason) = checker.semantic().resolve_call_path(func).and_then(|call_path| {
         for module in SUSPICIOUS_MEMBERS {
             for member in module.members {
                 if call_path.as_slice() == *member {

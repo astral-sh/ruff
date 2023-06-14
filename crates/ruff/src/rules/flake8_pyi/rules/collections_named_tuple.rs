@@ -51,7 +51,7 @@ impl Violation for CollectionsNamedTuple {
 /// PYI024
 pub(crate) fn collections_named_tuple(checker: &mut Checker, expr: &Expr) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(expr)
         .map_or(false, |call_path| {
             matches!(call_path.as_slice(), ["collections", "namedtuple"])

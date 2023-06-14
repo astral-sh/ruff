@@ -34,7 +34,7 @@ pub(crate) fn blind_except(
         return;
     };
     for exception in ["BaseException", "Exception"] {
-        if id == exception && checker.semantic_model().is_builtin(exception) {
+        if id == exception && checker.semantic().is_builtin(exception) {
             // If the exception is re-raised, don't flag an error.
             if body.iter().any(|stmt| {
                 if let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt {
@@ -58,7 +58,7 @@ pub(crate) fn blind_except(
             if body.iter().any(|stmt| {
                 if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
                     if let Expr::Call(ast::ExprCall { func, keywords, .. }) = value.as_ref() {
-                        if logging::is_logger_candidate(func, checker.semantic_model()) {
+                        if logging::is_logger_candidate(func, checker.semantic()) {
                             if let Some(attribute) = func.as_attribute_expr() {
                                 let attr = attribute.attr.as_str();
                                 if attr == "exception" {

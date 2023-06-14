@@ -19,7 +19,7 @@ impl Violation for PytestFailWithoutMessage {
 }
 
 pub(crate) fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_fail(checker.semantic_model(), func) {
+    if is_pytest_fail(func, checker.semantic()) {
         let call_args = SimpleCallArgs::new(args, keywords);
 
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or

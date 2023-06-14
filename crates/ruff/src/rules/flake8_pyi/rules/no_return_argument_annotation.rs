@@ -56,10 +56,7 @@ pub(crate) fn no_return_argument_annotation(checker: &mut Checker, args: &Argume
     )
     .filter_map(|arg| arg.annotation.as_ref())
     {
-        if checker
-            .semantic_model()
-            .match_typing_expr(annotation, "NoReturn")
-        {
+        if checker.semantic().match_typing_expr(annotation, "NoReturn") {
             checker.diagnostics.push(Diagnostic::new(
                 NoReturnArgumentAnnotationInStub {
                     module: if checker.settings.target_version >= Py311 {

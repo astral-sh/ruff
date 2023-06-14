@@ -47,11 +47,11 @@ pub(crate) fn use_pep585_annotation(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !checker.semantic_model().in_complex_string_type_definition() {
+        if !checker.semantic().in_complex_string_type_definition() {
             match replacement {
                 ModuleMember::BuiltIn(name) => {
                     // Built-in type, like `list`.
-                    if checker.semantic_model().is_builtin(name) {
+                    if checker.semantic().is_builtin(name) {
                         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                             (*name).to_string(),
                             expr.range(),
@@ -64,7 +64,7 @@ pub(crate) fn use_pep585_annotation(
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
                             &ImportRequest::import_from(module, member),
                             expr.start(),
-                            checker.semantic_model(),
+                            checker.semantic(),
                         )?;
                         let reference_edit = Edit::range_replacement(binding, expr.range());
                         Ok(Fix::suggested_edits(import_edit, [reference_edit]))

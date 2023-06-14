@@ -176,7 +176,7 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
                 // Check for single-target assignments which are of the
                 // form `x = cast(..., x)`.
                 if targets.first().map_or(false, |target| {
-                    assignment_is_cast_expr(self.context, value, target)
+                    assignment_is_cast_expr(value, target, self.context)
                 }) {
                     return;
                 }
@@ -236,7 +236,7 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
 ///
 /// x = cast(int, x)
 /// ```
-fn assignment_is_cast_expr(model: &SemanticModel, value: &Expr, target: &Expr) -> bool {
+fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
         return false;
     };
@@ -252,7 +252,7 @@ fn assignment_is_cast_expr(model: &SemanticModel, value: &Expr, target: &Expr) -
     if arg_id != target_id {
         return false;
     }
-    model.match_typing_expr(func, "cast")
+    semantic.match_typing_expr(func, "cast")
 }
 
 fn assignment_targets_from_expr<'a, U>(
@@ -345,7 +345,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: checker.semantic_model(),
+                    context: checker.semantic(),
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };
@@ -365,7 +365,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: checker.semantic_model(),
+                    context: checker.semantic(),
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };

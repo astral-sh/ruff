@@ -38,7 +38,7 @@ pub(crate) fn useless_object_inheritance(
         if id != "object" {
             continue;
         }
-        if !checker.semantic_model().is_builtin("object") {
+        if !checker.semantic().is_builtin("object") {
             continue;
         }
 

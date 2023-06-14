@@ -158,7 +158,7 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(checker.semantic_model(), cast::decorator_list(stmt)) {
+            if is_overload(cast::decorator_list(stmt), checker.semantic()) {
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicFunction) {
@@ -175,8 +175,8 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(checker.semantic_model(), cast::decorator_list(stmt))
-                || is_override(checker.semantic_model(), cast::decorator_list(stmt))
+            if is_overload(cast::decorator_list(stmt), checker.semantic())
+                || is_override(cast::decorator_list(stmt), checker.semantic())
             {
                 true
             } else if is_init(cast::name(stmt)) {

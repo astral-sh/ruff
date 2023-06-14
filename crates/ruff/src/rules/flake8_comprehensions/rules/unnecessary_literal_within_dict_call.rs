@@ -76,7 +76,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(
     let Some(argument) = helpers::first_argument_with_matching_function("dict", func, args) else {
         return;
     };
-    if !checker.semantic_model().is_builtin("dict") {
+    if !checker.semantic().is_builtin("dict") {
         return;
     }
     let argument_kind = match argument {

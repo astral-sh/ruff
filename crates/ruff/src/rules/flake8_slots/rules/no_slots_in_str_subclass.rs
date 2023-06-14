@@ -52,7 +52,7 @@ impl Violation for NoSlotsInStrSubclass {
 pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
     if class.bases.iter().any(|base| {
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(base)
             .map_or(false, |call_path| {
                 matches!(call_path.as_slice(), ["" | "builtins", "str"])

@@ -79,7 +79,7 @@ pub(crate) fn repeated_isinstance_calls(
         let [obj, types] = &args[..] else {
             continue;
         };
-        if !checker.semantic_model().is_builtin("isinstance") {
+        if !checker.semantic().is_builtin("isinstance") {
             return;
         }
         let (num_calls, matches) = obj_to_types

@@ -42,14 +42,14 @@ pub(crate) fn super_call_with_parameters(
     if !is_super_call_with_arguments(func, args) {
         return;
     }
-    let scope = checker.semantic_model().scope();
+    let scope = checker.semantic().scope();
 
     // Check: are we in a Function scope?
     if !scope.kind.is_any_function() {
         return;
     }
 
-    let mut parents = checker.semantic_model().parents();
+    let mut parents = checker.semantic().parents();
 
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first

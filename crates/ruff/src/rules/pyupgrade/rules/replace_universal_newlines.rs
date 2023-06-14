@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 /// UP021
 pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["subprocess", "run"]

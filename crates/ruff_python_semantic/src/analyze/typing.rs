@@ -29,7 +29,7 @@ pub enum SubscriptKind {
 
 pub fn match_annotated_subscript<'a>(
     expr: &Expr,
-    semantic_model: &SemanticModel,
+    semantic: &SemanticModel,
     typing_modules: impl Iterator<Item = &'a str>,
     extend_generics: &[String],
 ) -> Option<SubscriptKind> {
@@ -37,39 +37,37 @@ pub fn match_annotated_subscript<'a>(
         return None;
     }
 
-    semantic_model
-        .resolve_call_path(expr)
-        .and_then(|call_path| {
-            if SUBSCRIPTS.contains(&call_path.as_slice())
-                || extend_generics
-                    .iter()
-                    .map(|target| from_qualified_name(target))
-                    .any(|target| call_path == target)
-            {
-                return Some(SubscriptKind::AnnotatedSubscript);
-            }
-            if PEP_593_SUBSCRIPTS.contains(&call_path.as_slice()) {
-                return Some(SubscriptKind::PEP593AnnotatedSubscript);
-            }
+    semantic.resolve_call_path(expr).and_then(|call_path| {
+        if SUBSCRIPTS.contains(&call_path.as_slice())
+            || extend_generics
+                .iter()
+                .map(|target| from_qualified_name(target))
+                .any(|target| call_path == target)
+        {
+            return Some(SubscriptKind::AnnotatedSubscript);
+        }
+        if PEP_593_SUBSCRIPTS.contains(&call_path.as_slice()) {
+            return Some(SubscriptKind::PEP593AnnotatedSubscript);
+        }
 
-            for module in typing_modules {
-                let module_call_path: CallPath = from_unqualified_name(module);
-                if call_path.starts_with(&module_call_path) {
-                    for subscript in SUBSCRIPTS.iter() {
-                        if call_path.last() == subscript.last() {
-                            return Some(SubscriptKind::AnnotatedSubscript);
-                        }
+        for module in typing_modules {
+            let module_call_path: CallPath = from_unqualified_name(module);
+            if call_path.starts_with(&module_call_path) {
+                for subscript in SUBSCRIPTS.iter() {
+                    if call_path.last() == subscript.last() {
+                        return Some(SubscriptKind::AnnotatedSubscript);
                     }
-                    for subscript in PEP_593_SUBSCRIPTS.iter() {
-                        if call_path.last() == subscript.last() {
-                            return Some(SubscriptKind::PEP593AnnotatedSubscript);
-                        }
+                }
+                for subscript in PEP_593_SUBSCRIPTS.iter() {
+                    if call_path.last() == subscript.last() {
+                        return Some(SubscriptKind::PEP593AnnotatedSubscript);
                     }
                 }
             }
+        }
 
-            None
-        })
+        None
+    })
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -91,32 +89,30 @@ impl std::fmt::Display for ModuleMember {
 
 /// Returns the PEP 585 standard library generic variant for a `typing` module reference, if such
 /// a variant exists.
-pub fn to_pep585_generic(expr: &Expr, semantic_model: &SemanticModel) -> Option<ModuleMember> {
-    semantic_model
-        .resolve_call_path(expr)
-        .and_then(|call_path| {
-            let [module, name] = call_path.as_slice() else {
+pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<ModuleMember> {
+    semantic.resolve_call_path(expr).and_then(|call_path| {
+        let [module, name] = call_path.as_slice() else {
             return None;
         };
-            PEP_585_GENERICS.iter().find_map(
-                |((from_module, from_member), (to_module, to_member))| {
-                    if module == from_module && name == from_member {
-                        if to_module.is_empty() {
-                            Some(ModuleMember::BuiltIn(to_member))
-                        } else {
-                            Some(ModuleMember::Member(to_module, to_member))
-                        }
+        PEP_585_GENERICS
+            .iter()
+            .find_map(|((from_module, from_member), (to_module, to_member))| {
+                if module == from_module && name == from_member {
+                    if to_module.is_empty() {
+                        Some(ModuleMember::BuiltIn(to_member))
                     } else {
-                        None
+                        Some(ModuleMember::Member(to_module, to_member))
                     }
-                },
-            )
-        })
+                } else {
+                    None
+                }
+            })
+    })
 }
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
-pub fn is_pep585_generic(expr: &Expr, model: &SemanticModel) -> bool {
-    if let Some(call_path) = model.resolve_call_path(expr) {
+pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
+    if let Some(call_path) = semantic.resolve_call_path(expr) {
         let [module, name] = call_path.as_slice() else {
             return false;
         };
@@ -141,7 +137,7 @@ pub enum Pep604Operator {
 pub fn to_pep604_operator(
     value: &Expr,
     slice: &Expr,
-    semantic_model: &SemanticModel,
+    semantic: &SemanticModel,
 ) -> Option<Pep604Operator> {
     /// Returns `true` if any argument in the slice is a string.
     fn any_arg_is_str(slice: &Expr) -> bool {
@@ -161,13 +157,13 @@ pub fn to_pep604_operator(
         return None;
     }
 
-    semantic_model
+    semantic
         .resolve_call_path(value)
         .as_ref()
         .and_then(|call_path| {
-            if semantic_model.match_typing_call_path(call_path, "Optional") {
+            if semantic.match_typing_call_path(call_path, "Optional") {
                 Some(Pep604Operator::Optional)
-            } else if semantic_model.match_typing_call_path(call_path, "Union") {
+            } else if semantic.match_typing_call_path(call_path, "Union") {
                 Some(Pep604Operator::Union)
             } else {
                 None
@@ -177,19 +173,17 @@ pub fn to_pep604_operator(
 
 /// Return `true` if `Expr` represents a reference to a type annotation that resolves to an
 /// immutable type.
-pub fn is_immutable_annotation(semantic_model: &SemanticModel, expr: &Expr) -> bool {
+pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
-            semantic_model
-                .resolve_call_path(expr)
-                .map_or(false, |call_path| {
-                    IMMUTABLE_TYPES
-                        .iter()
-                        .chain(IMMUTABLE_GENERIC_TYPES)
-                        .any(|target| call_path.as_slice() == *target)
-                })
+            semantic.resolve_call_path(expr).map_or(false, |call_path| {
+                IMMUTABLE_TYPES
+                    .iter()
+                    .chain(IMMUTABLE_GENERIC_TYPES)
+                    .any(|target| call_path.as_slice() == *target)
+            })
         }
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic_model
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
             .resolve_call_path(value)
             .map_or(false, |call_path| {
                 if IMMUTABLE_GENERIC_TYPES
@@ -200,16 +194,16 @@ pub fn is_immutable_annotation(semantic_model: &SemanticModel, expr: &Expr) -> b
                 } else if call_path.as_slice() == ["typing", "Union"] {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.iter()
-                            .all(|elt| is_immutable_annotation(semantic_model, elt))
+                            .all(|elt| is_immutable_annotation(elt, semantic))
                     } else {
                         false
                     }
                 } else if call_path.as_slice() == ["typing", "Optional"] {
-                    is_immutable_annotation(semantic_model, slice)
+                    is_immutable_annotation(slice, semantic)
                 } else if call_path.as_slice() == ["typing", "Annotated"] {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first()
-                            .map_or(false, |elt| is_immutable_annotation(semantic_model, elt))
+                            .map_or(false, |elt| is_immutable_annotation(elt, semantic))
                     } else {
                         false
                     }
@@ -222,10 +216,7 @@ pub fn is_immutable_annotation(semantic_model: &SemanticModel, expr: &Expr) -> b
             op: Operator::BitOr,
             right,
             range: _range,
-        }) => {
-            is_immutable_annotation(semantic_model, left)
-                && is_immutable_annotation(semantic_model, right)
-        }
+        }) => is_immutable_annotation(left, semantic) && is_immutable_annotation(right, semantic),
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
             ..
@@ -257,24 +248,22 @@ const IMMUTABLE_FUNCS: &[&[&str]] = &[
 
 /// Return `true` if `func` is a function that returns an immutable object.
 pub fn is_immutable_func(
-    semantic_model: &SemanticModel,
     func: &Expr,
+    semantic: &SemanticModel,
     extend_immutable_calls: &[CallPath],
 ) -> bool {
-    semantic_model
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            IMMUTABLE_FUNCS
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
+        IMMUTABLE_FUNCS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+            || extend_immutable_calls
                 .iter()
-                .any(|target| call_path.as_slice() == *target)
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| call_path == *target)
-        })
+                .any(|target| call_path == *target)
+    })
 }
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
-pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic_model: &SemanticModel) -> bool {
+pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
     // Ex) `if False:`
@@ -300,12 +289,9 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic_model: &SemanticModel
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
-    if semantic_model
-        .resolve_call_path(test)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TYPE_CHECKING"]
-        })
-    {
+    if semantic.resolve_call_path(test).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TYPE_CHECKING"]
+    }) {
         return true;
     }
 

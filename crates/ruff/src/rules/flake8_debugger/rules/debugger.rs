@@ -44,7 +44,7 @@ const DEBUGGERS: &[&[&str]] = &[
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let Some(target) = checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .and_then(|call_path| {
             DEBUGGERS

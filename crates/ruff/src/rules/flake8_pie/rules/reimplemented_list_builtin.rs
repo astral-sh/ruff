@@ -69,7 +69,7 @@ pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambd
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    if checker.semantic_model().is_builtin("list") {
+                    if checker.semantic().is_builtin("list") {
                         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                             "list".to_string(),
                             expr.range(),
