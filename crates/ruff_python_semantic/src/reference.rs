@@ -36,11 +36,11 @@ pub struct ReferenceId;
 
 /// The references of a program indexed by [`ReferenceId`].
 #[derive(Debug, Default)]
-pub struct References(IndexVec<ReferenceId, Reference>);
+pub(crate) struct References(IndexVec<ReferenceId, Reference>);
 
 impl References {
     /// Pushes a new [`Reference`] and returns its [`ReferenceId`].
-    pub fn push(
+    pub(crate) fn push(
         &mut self,
         scope_id: ScopeId,
         range: TextRange,

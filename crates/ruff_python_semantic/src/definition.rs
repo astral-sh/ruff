@@ -115,7 +115,7 @@ impl<'a> Definitions<'a> {
     ///
     /// Members are assumed to be pushed in traversal order, such that parents are pushed before
     /// their children.
-    pub fn push_member(&mut self, member: Member<'a>) -> DefinitionId {
+    pub(crate) fn push_member(&mut self, member: Member<'a>) -> DefinitionId {
         self.0.push(Definition::Member(member))
     }
 

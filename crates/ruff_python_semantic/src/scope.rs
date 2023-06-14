@@ -124,12 +124,12 @@ impl<'a> Scope<'a> {
     }
 
     /// Set the globals pointer for this scope.
-    pub fn set_globals_id(&mut self, globals: GlobalsId) {
+    pub(crate) fn set_globals_id(&mut self, globals: GlobalsId) {
         self.globals_id = Some(globals);
     }
 
     /// Returns the globals pointer for this scope.
-    pub fn globals_id(&self) -> Option<GlobalsId> {
+    pub(crate) fn globals_id(&self) -> Option<GlobalsId> {
         self.globals_id
     }
 
@@ -196,17 +196,17 @@ pub struct Scopes<'a>(IndexVec<ScopeId, Scope<'a>>);
 
 impl<'a> Scopes<'a> {
     /// Returns a reference to the global scope
-    pub fn global(&self) -> &Scope<'a> {
+    pub(crate) fn global(&self) -> &Scope<'a> {
         &self[ScopeId::global()]
     }
 
     /// Returns a mutable reference to the global scope
-    pub fn global_mut(&mut self) -> &mut Scope<'a> {
+    pub(crate) fn global_mut(&mut self) -> &mut Scope<'a> {
         &mut self[ScopeId::global()]
     }
 
     /// Pushes a new scope and returns its unique id
-    pub fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
+    pub(crate) fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
         let next_id = ScopeId::new(self.0.len());
         self.0.push(Scope::local(kind, parent));
         next_id
