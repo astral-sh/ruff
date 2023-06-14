@@ -24,6 +24,7 @@ use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
 
+#[cfg(not(fuzzing))]
 fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
     Notebook::read(path).map_err(|err| {
         anyhow::anyhow!(
