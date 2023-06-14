@@ -126,8 +126,8 @@ pub(crate) fn unnecessary_builtin_import(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let stmt = checker.semantic_model().stmt();
-            let parent = checker.semantic_model().stmt_parent();
+            let stmt = checker.semantic().stmt();
+            let parent = checker.semantic().stmt_parent();
             let unused_imports: Vec<String> = unused_imports
                 .iter()
                 .map(|alias| format!("{module}.{}", alias.name))

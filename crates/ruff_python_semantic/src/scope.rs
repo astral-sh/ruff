@@ -38,9 +38,6 @@ pub struct Scope<'a> {
     /// In this case, the binding created by `x = 2` shadows the binding created by `x = 1`.
     shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
 
-    /// A list of all names that have been deleted in this scope.
-    deleted_symbols: Vec<&'a str>,
-
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
 
@@ -56,7 +53,6 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
-            deleted_symbols: Vec::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }
@@ -69,7 +65,6 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
-            deleted_symbols: Vec::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }
@@ -90,40 +85,43 @@ impl<'a> Scope<'a> {
         }
     }
 
-    /// Removes the binding with the given name.
-    pub fn delete(&mut self, name: &'a str) -> Option<BindingId> {
-        self.deleted_symbols.push(name);
-        self.bindings.remove(name)
-    }
-
     /// Returns `true` if this scope has a binding with the given name.
     pub fn has(&self, name: &str) -> bool {
         self.bindings.contains_key(name)
     }
 
-    /// Returns `true` if the scope declares a symbol with the given name.
-    ///
-    /// Unlike [`Scope::has`], the name may no longer be bound to a value (e.g., it could be
-    /// deleted).
-    pub fn declares(&self, name: &str) -> bool {
-        self.has(name) || self.deleted_symbols.contains(&name)
-    }
-
-    /// Returns the ids of all bindings defined in this scope.
+    /// Returns the IDs of all bindings defined in this scope.
     pub fn binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
         self.bindings.values().copied()
     }
 
-    /// Returns a tuple of the name and id of all bindings defined in this scope.
+    /// Returns a tuple of the name and ID of all bindings defined in this scope.
     pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
         self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
-    /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
+    /// Like [`Scope::get`], but returns all bindings with the given name, including
     /// those that were shadowed by later bindings.
-    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
+    pub fn get_all(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
         std::iter::successors(self.bindings.get(name).copied(), |id| {
             self.shadowed_bindings.get(id).copied()
+        })
+    }
+
+    /// Like [`Scope::binding_ids`], but returns all bindings that were added to the scope,
+    /// including those that were shadowed by later bindings.
+    pub fn all_binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
+        self.bindings.values().copied().flat_map(|id| {
+            std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
+        })
+    }
+
+    /// Like [`Scope::bindings`], but returns all bindings added to the scope, including those that
+    /// were shadowed by later bindings.
+    pub fn all_bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+        self.bindings.iter().flat_map(|(&name, &id)| {
+            std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
+                .map(move |id| (name, id))
         })
     }
 
@@ -143,12 +141,12 @@ impl<'a> Scope<'a> {
     }
 
     /// Set the globals pointer for this scope.
-    pub fn set_globals_id(&mut self, globals: GlobalsId) {
+    pub(crate) fn set_globals_id(&mut self, globals: GlobalsId) {
         self.globals_id = Some(globals);
     }
 
     /// Returns the globals pointer for this scope.
-    pub fn globals_id(&self) -> Option<GlobalsId> {
+    pub(crate) fn globals_id(&self) -> Option<GlobalsId> {
         self.globals_id
     }
 
@@ -215,17 +213,17 @@ pub struct Scopes<'a>(IndexVec<ScopeId, Scope<'a>>);
 
 impl<'a> Scopes<'a> {
     /// Returns a reference to the global scope
-    pub fn global(&self) -> &Scope<'a> {
+    pub(crate) fn global(&self) -> &Scope<'a> {
         &self[ScopeId::global()]
     }
 
     /// Returns a mutable reference to the global scope
-    pub fn global_mut(&mut self) -> &mut Scope<'a> {
+    pub(crate) fn global_mut(&mut self) -> &mut Scope<'a> {
         &mut self[ScopeId::global()]
     }
 
     /// Pushes a new scope and returns its unique id
-    pub fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
+    pub(crate) fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
         let next_id = ScopeId::new(self.0.len());
         self.0.push(Scope::local(kind, parent));
         next_id

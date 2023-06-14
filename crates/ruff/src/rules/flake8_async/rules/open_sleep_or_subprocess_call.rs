@@ -59,10 +59,10 @@ const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
 
 /// ASYNC101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
-    if checker.semantic_model().in_async_context() {
+    if checker.semantic().in_async_context() {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             let is_open_sleep_or_subprocess_call = checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(func)
                 .map_or(false, |path| {
                     OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&path.as_slice())

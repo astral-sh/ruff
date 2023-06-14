@@ -5,6 +5,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
 
+use crate::settings::types::IdentifierPattern;
+
 /// ## What it does
 /// Checks for class names that do not follow the `CamelCase` convention.
 ///
@@ -51,8 +53,16 @@ impl Violation for InvalidClassName {
 pub(crate) fn invalid_class_name(
     class_def: &Stmt,
     name: &str,
+    ignore_names: &[IdentifierPattern],
     locator: &Locator,
 ) -> Option<Diagnostic> {
+    if ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name.matches(name))
+    {
+        return None;
+    }
+
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
         return Some(Diagnostic::new(

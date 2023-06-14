@@ -102,7 +102,7 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if !logging::is_logger_candidate(func, checker.semantic_model()) {
+    if !logging::is_logger_candidate(func, checker.semantic()) {
         return;
     }
 

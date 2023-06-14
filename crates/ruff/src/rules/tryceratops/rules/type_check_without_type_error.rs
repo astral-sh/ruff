@@ -77,7 +77,7 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 /// Returns `true` if an [`Expr`] is a call to check types.
 fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
     checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(call)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["", "isinstance"]
@@ -101,7 +101,7 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
 /// Returns `true` if `exc` is a reference to a builtin exception.
 fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
     return checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(exc)
         .map_or(false, |call_path| {
             [

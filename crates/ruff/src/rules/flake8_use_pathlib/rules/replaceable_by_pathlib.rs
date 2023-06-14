@@ -15,7 +15,7 @@ use crate::settings::types::PythonVersion;
 pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
     if let Some(diagnostic_kind) =
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(expr)
             .and_then(|call_path| match call_path.as_slice() {
                 ["os", "path", "abspath"] => Some(OsPathAbspath.into()),

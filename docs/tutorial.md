@@ -46,7 +46,7 @@ Ruff identified an unused import, which is a common error in Python code. Ruff c
 
 ```shell
 ❯ ruff check --fix .
-Found 1 error (1 fixed, 0 renumbersing).
+Found 1 error (1 fixed, 0 remaining).
 ```
 
 Running `git diff` shows the following:

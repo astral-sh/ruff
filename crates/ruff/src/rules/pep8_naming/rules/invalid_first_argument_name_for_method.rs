@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Arguments, Decorator, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::function_type;
-use ruff_python_semantic::scope::Scope;
+use ruff_python_semantic::Scope;
 
 use crate::checkers::ast::Checker;
 
@@ -61,10 +61,10 @@ pub(crate) fn invalid_first_argument_name_for_method(
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
-            checker.semantic_model(),
-            scope,
             name,
             decorator_list,
+            scope,
+            checker.semantic(),
             &checker.settings.pep8_naming.classmethod_decorators,
             &checker.settings.pep8_naming.staticmethod_decorators,
         ),

@@ -8,7 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
@@ -41,9 +41,9 @@ pub(crate) fn non_imperative_mood(
 
     if is_test(cast::name(stmt))
         || is_property(
-            checker.semantic_model(),
             cast::decorator_list(stmt),
             &property_decorators,
+            checker.semantic(),
         )
     {
         return;

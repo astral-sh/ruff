@@ -59,7 +59,7 @@ pub struct SemanticModel<'a> {
 
     /// Map from binding ID to binding ID that it shadows (in another scope).
     ///
-    /// For example:
+    /// For example, given:
     /// ```python
     /// import x
     ///
@@ -70,6 +70,29 @@ pub struct SemanticModel<'a> {
     /// In this case, the binding created by `x = 1` shadows the binding created by `import x`,
     /// despite the fact that they're in different scopes.
     pub shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
+
+    /// Map from binding index to indexes of bindings that annotate it (in the same scope).
+    ///
+    /// For example:
+    /// ```python
+    /// x = 1
+    /// x: int
+    /// ```
+    ///
+    /// In this case, the binding created by `x = 1` is annotated by the binding created by
+    /// `x: int`. We don't consider the latter binding to _shadow_ the former, because it doesn't
+    /// change the value of the binding, and so we don't store in on the scope. But we _do_ want to
+    /// track the annotation in some form, since it's a reference to `x`.
+    ///
+    /// Note that, given:
+    /// ```python
+    /// x: int
+    /// ```
+    ///
+    /// In this case, we _do_ store the binding created by `x: int` directly on the scope, and not
+    /// as a delayed annotation. Annotations are thus treated as bindings only when they are the
+    /// first binding in a scope; any annotations that follow are treated as "delayed" annotations.
+    delayed_annotations: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
 
     /// Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
@@ -99,11 +122,24 @@ impl<'a> SemanticModel<'a> {
             references: References::default(),
             globals: GlobalsArena::default(),
             shadowed_bindings: IntMap::default(),
+            delayed_annotations: IntMap::default(),
             body: &[],
             body_index: 0,
             flags: SemanticModelFlags::new(path),
             handled_exceptions: Vec::default(),
         }
+    }
+
+    /// Return the [`Binding`] for the given [`BindingId`].
+    #[inline]
+    pub fn binding(&self, id: BindingId) -> &Binding {
+        &self.bindings[id]
+    }
+
+    /// Resolve the [`Reference`] for the given [`ReferenceId`].
+    #[inline]
+    pub fn reference(&self, id: ReferenceId) -> &Reference {
+        &self.references[id]
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -191,8 +227,9 @@ impl<'a> SemanticModel<'a> {
             .map_or(false, |binding| binding.kind.is_builtin())
     }
 
-    /// Return `true` if `member` is unbound.
-    pub fn is_unbound(&self, member: &str) -> bool {
+    /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
+    /// in the current scope, or in any containing scope.
+    pub fn is_available(&self, member: &str) -> bool {
         self.find_binding(member)
             .map_or(true, |binding| binding.kind.is_builtin())
     }
@@ -203,7 +240,7 @@ impl<'a> SemanticModel<'a> {
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
-                if !self.bindings[binding_id].kind.is_annotation() {
+                if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let context = self.execution_context();
                     let reference_id = self.references.push(ScopeId::global(), range, context);
@@ -254,20 +291,37 @@ impl<'a> SemanticModel<'a> {
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
-                // But if it's a type annotation, don't treat it as resolved. For example, given:
-                //
-                // ```python
-                // name: str
-                // print(name)
-                // ```
-                //
-                // The `name` in `print(name)` should be treated as unresolved, but the `name` in
-                // `name: str` should be treated as used.
-                if self.bindings[binding_id].kind.is_annotation() {
-                    continue;
-                }
+                match self.bindings[binding_id].kind {
+                    // If it's a type annotation, don't treat it as resolved. For example, given:
+                    //
+                    // ```python
+                    // name: str
+                    // print(name)
+                    // ```
+                    //
+                    // The `name` in `print(name)` should be treated as unresolved, but the `name` in
+                    // `name: str` should be treated as used.
+                    BindingKind::Annotation => continue,
 
-                return ResolvedRead::Resolved(binding_id);
+                    // If it's a deletion, don't treat it as resolved, since the name is now
+                    // unbound. For example, given:
+                    //
+                    // ```python
+                    // x = 1
+                    // del x
+                    // print(x)
+                    // ```
+                    //
+                    // The `x` in `print(x)` should be treated as unresolved.
+                    BindingKind::Deletion | BindingKind::UnboundException => {
+                        return ResolvedRead::UnboundLocal(binding_id)
+                    }
+
+                    // Otherwise, treat it as resolved.
+                    _ => {
+                        return ResolvedRead::Resolved(binding_id);
+                    }
+                }
             }
 
             // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
@@ -296,7 +350,7 @@ impl<'a> SemanticModel<'a> {
         }
 
         if import_starred {
-            ResolvedRead::StarImport
+            ResolvedRead::WildcardImport
         } else {
             ResolvedRead::NotFound
         }
@@ -618,9 +672,11 @@ impl<'a> SemanticModel<'a> {
     pub fn set_globals(&mut self, globals: Globals<'a>) {
         // If any global bindings don't already exist in the global scope, add them.
         for (name, range) in globals.iter() {
-            if self.global_scope().get(name).map_or(true, |binding_id| {
-                self.bindings[binding_id].kind.is_annotation()
-            }) {
+            if self
+                .global_scope()
+                .get(name)
+                .map_or(true, |binding_id| self.bindings[binding_id].is_unbound())
+            {
                 let id = self.bindings.push(Binding {
                     kind: BindingKind::Assignment,
                     range: *range,
@@ -697,9 +753,17 @@ impl<'a> SemanticModel<'a> {
         self.bindings[binding_id].references.push(reference_id);
     }
 
-    /// Resolve a [`ReferenceId`].
-    pub fn reference(&self, reference_id: ReferenceId) -> &Reference {
-        self.references.resolve(reference_id)
+    /// Add a [`BindingId`] to the list of delayed annotations for the given [`BindingId`].
+    pub fn add_delayed_annotation(&mut self, binding_id: BindingId, annotation_id: BindingId) {
+        self.delayed_annotations
+            .entry(binding_id)
+            .or_insert_with(Vec::new)
+            .push(annotation_id);
+    }
+
+    /// Return the list of delayed annotations for the given [`BindingId`].
+    pub fn delayed_annotations(&self, binding_id: BindingId) -> Option<&[BindingId]> {
+        self.delayed_annotations.get(&binding_id).map(Vec::as_slice)
     }
 
     /// Return the [`ExecutionContext`] of the current scope.
@@ -1050,14 +1114,62 @@ pub struct Snapshot {
 #[derive(Debug)]
 pub enum ResolvedRead {
     /// The read reference is resolved to a specific binding.
+    ///
+    /// For example, given:
+    /// ```python
+    /// x = 1
+    /// print(x)
+    /// ```
+    ///
+    /// The `x` in `print(x)` is resolved to the binding of `x` in `x = 1`.
     Resolved(BindingId),
+
     /// The read reference is resolved to a context-specific, implicit global (e.g., `__class__`
     /// within a class scope).
+    ///
+    /// For example, given:
+    /// ```python
+    /// class C:
+    ///    print(__class__)
+    /// ```
+    ///
+    /// The `__class__` in `print(__class__)` is resolved to the implicit global `__class__`.
     ImplicitGlobal,
-    /// The read reference is unresolved, but at least one of the containing scopes contains a star
-    /// import.
-    StarImport,
+
+    /// The read reference is unresolved, but at least one of the containing scopes contains a
+    /// wildcard import.
+    ///
+    /// For example, given:
+    /// ```python
+    /// from x import *
+    ///
+    /// print(y)
+    /// ```
+    ///
+    /// The `y` in `print(y)` is unresolved, but the containing scope contains a wildcard import,
+    /// so `y` _may_ be resolved to a symbol imported by the wildcard import.
+    WildcardImport,
+
+    /// The read reference is resolved, but to an unbound local variable.
+    ///
+    /// For example, given:
+    /// ```python
+    /// x = 1
+    /// del x
+    /// print(x)
+    /// ```
+    ///
+    /// The `x` in `print(x)` is an unbound local.
+    UnboundLocal(BindingId),
+
     /// The read reference is definitively unresolved.
+    ///
+    /// For example, given:
+    /// ```python
+    /// print(x)
+    /// ```
+    ///
+    /// The `x` in `print(x)` is definitively unresolved.
     NotFound,
 }
 

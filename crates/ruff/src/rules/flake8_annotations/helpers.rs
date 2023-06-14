@@ -2,8 +2,7 @@ use rustpython_parser::ast::{self, Arguments, Expr, Stmt};
 
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
 
 pub(super) fn match_function_def(
     stmt: &Stmt,
@@ -36,14 +35,14 @@ pub(super) fn match_function_def(
 }
 
 /// Return the name of the function, if it's overloaded.
-pub(crate) fn overloaded_name(model: &SemanticModel, definition: &Definition) -> Option<String> {
+pub(crate) fn overloaded_name(definition: &Definition, semantic: &SemanticModel) -> Option<String> {
     if let Definition::Member(Member {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
     }) = definition
     {
-        if visibility::is_overload(model, cast::decorator_list(stmt)) {
+        if visibility::is_overload(cast::decorator_list(stmt), semantic) {
             let (name, ..) = match_function_def(stmt);
             Some(name.to_string())
         } else {
@@ -57,9 +56,9 @@ pub(crate) fn overloaded_name(model: &SemanticModel, definition: &Definition) ->
 /// Return `true` if the definition is the implementation for an overloaded
 /// function.
 pub(crate) fn is_overload_impl(
-    model: &SemanticModel,
     definition: &Definition,
     overloaded_name: &str,
+    semantic: &SemanticModel,
 ) -> bool {
     if let Definition::Member(Member {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
@@ -67,7 +66,7 @@ pub(crate) fn is_overload_impl(
         ..
     }) = definition
     {
-        if visibility::is_overload(model, cast::decorator_list(stmt)) {
+        if visibility::is_overload(cast::decorator_list(stmt), semantic) {
             false
         } else {
             let (name, ..) = match_function_def(stmt);

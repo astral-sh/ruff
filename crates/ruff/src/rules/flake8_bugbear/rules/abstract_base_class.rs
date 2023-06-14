@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -36,16 +36,16 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(model: &SemanticModel, bases: &[Expr], keywords: &[Keyword]) -> bool {
+fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
     keywords.iter().any(|keyword| {
         keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass")
-            && model
+            && semantic
                 .resolve_call_path(&keyword.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["abc", "ABCMeta"]
                 })
     }) || bases.iter().any(|base| {
-        model
+        semantic
             .resolve_call_path(base)
             .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
@@ -80,7 +80,7 @@ pub(crate) fn abstract_base_class(
     if bases.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(checker.semantic_model(), bases, keywords) {
+    if !is_abc_class(bases, keywords, checker.semantic()) {
         return;
     }
 
@@ -109,7 +109,7 @@ pub(crate) fn abstract_base_class(
             continue;
         };
 
-        let has_abstract_decorator = is_abstract(checker.semantic_model(), decorator_list);
+        let has_abstract_decorator = is_abstract(decorator_list, checker.semantic());
         has_abstract_method |= has_abstract_decorator;
 
         if !checker.enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
@@ -118,7 +118,7 @@ pub(crate) fn abstract_base_class(
 
         if !has_abstract_decorator
             && is_empty_body(body)
-            && !is_overload(checker.semantic_model(), decorator_list)
+            && !is_overload(decorator_list, checker.semantic())
         {
             checker.diagnostics.push(Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {

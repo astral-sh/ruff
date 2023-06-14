@@ -87,7 +87,7 @@ pub(crate) fn replace_stdout_stderr(
     keywords: &[Keyword],
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["subprocess", "run"]
@@ -103,13 +103,13 @@ pub(crate) fn replace_stdout_stderr(
 
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(&stdout.value)
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["subprocess", "PIPE"]
             })
             || !checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(&stderr.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["subprocess", "PIPE"]

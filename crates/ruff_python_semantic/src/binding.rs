@@ -41,9 +41,18 @@ impl<'a> Binding<'a> {
     }
 
     /// Return `true` if this [`Binding`] represents an explicit re-export
-    /// (e.g., `import FastAPI as FastAPI`).
+    /// (e.g., `FastAPI` in `from fastapi import FastAPI as FastAPI`).
     pub const fn is_explicit_export(&self) -> bool {
         self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
+    }
+
+    /// Return `true` if this [`Binding`] represents an unbound variable
+    /// (e.g., `x` in `x = 1; del x`).
+    pub const fn is_unbound(&self) -> bool {
+        matches!(
+            self.kind,
+            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException
+        )
     }
 
     /// Return `true` if this binding redefines the given binding.
@@ -83,10 +92,10 @@ impl<'a> Binding<'a> {
                     _ => {}
                 }
             }
-            BindingKind::Annotation => {
-                return false;
-            }
-            BindingKind::FutureImportation => {
+            BindingKind::Deletion
+            | BindingKind::Annotation
+            | BindingKind::FutureImportation
+            | BindingKind::Builtin => {
                 return false;
             }
             _ => {}
@@ -95,7 +104,6 @@ impl<'a> Binding<'a> {
             existing.kind,
             BindingKind::ClassDefinition
                 | BindingKind::FunctionDefinition
-                | BindingKind::Builtin
                 | BindingKind::Importation(..)
                 | BindingKind::FromImportation(..)
                 | BindingKind::SubmoduleImportation(..)
@@ -134,11 +142,11 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the appropriate visual range for highlighting this binding.
-    pub fn trimmed_range(&self, semantic_model: &SemanticModel, locator: &Locator) -> TextRange {
+    pub fn trimmed_range(&self, semantic: &SemanticModel, locator: &Locator) -> TextRange {
         match self.kind {
             BindingKind::ClassDefinition | BindingKind::FunctionDefinition => {
                 self.source.map_or(self.range, |source| {
-                    helpers::identifier_range(semantic_model.stmts[source], locator)
+                    helpers::identifier_range(semantic.stmts[source], locator)
                 })
             }
             _ => self.range,
@@ -146,9 +154,9 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the range of the binding's parent.
-    pub fn parent_range(&self, semantic_model: &SemanticModel) -> Option<TextRange> {
+    pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
         self.source
-            .map(|node_id| semantic_model.stmts[node_id])
+            .map(|node_id| semantic.stmts[node_id])
             .and_then(|parent| {
                 if parent.is_import_from_stmt() {
                     Some(parent.range())
@@ -190,14 +198,9 @@ impl nohash_hasher::IsEnabled for BindingId {}
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
-    /// Pushes a new binding and returns its id
+    /// Pushes a new [`Binding`] and returns its [`BindingId`].
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
-    }
-
-    /// Returns the id that will be assigned when pushing the next binding
-    pub fn next_id(&self) -> BindingId {
-        self.0.next_index()
     }
 }
 
@@ -367,6 +370,24 @@ pub enum BindingKind<'a> {
     /// import foo.bar
     /// ```
     SubmoduleImportation(SubmoduleImportation<'a>),
+
+    /// A binding for a deletion, like `x` in:
+    /// ```python
+    /// del x
+    /// ```
+    Deletion,
+
+    /// A binding to unbind the local variable, like `x` in:
+    /// ```python
+    /// try:
+    ///    ...
+    /// except Exception as x:
+    ///   ...
+    /// ```
+    ///
+    /// After the `except` block, `x` is unbound, despite the lack
+    /// of an explicit `del` statement.
+    UnboundException,
 }
 
 bitflags! {

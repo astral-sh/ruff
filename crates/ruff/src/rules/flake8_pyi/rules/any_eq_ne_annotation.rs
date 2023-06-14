@@ -66,14 +66,11 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Arg
         return;
     };
 
-    if !checker.semantic_model().scope().kind.is_class() {
+    if !checker.semantic().scope().kind.is_class() {
         return;
     }
 
-    if checker
-        .semantic_model()
-        .match_typing_expr(annotation, "Any")
-    {
+    if checker.semantic().match_typing_expr(annotation, "Any") {
         let mut diagnostic = Diagnostic::new(
             AnyEqNeAnnotation {
                 method_name: name.to_string(),
@@ -82,7 +79,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Arg
         );
         if checker.patch(diagnostic.kind.rule()) {
             // Ex) `def __eq__(self, obj: Any): ...`
-            if checker.semantic_model().is_builtin("object") {
+            if checker.semantic().is_builtin("object") {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     "object".to_string(),
                     annotation.range(),

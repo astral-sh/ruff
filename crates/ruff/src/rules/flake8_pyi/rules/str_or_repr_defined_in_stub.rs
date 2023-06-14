@@ -62,7 +62,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if !checker.semantic_model().scope().kind.is_class() {
+    if !checker.semantic().scope().kind.is_class() {
         return;
     }
 
@@ -72,12 +72,12 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if is_abstract(checker.semantic_model(), decorator_list) {
+    if is_abstract(decorator_list, checker.semantic()) {
         return;
     }
 
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(returns)
         .map_or(true, |call_path| {
             !matches!(call_path.as_slice(), ["" | "builtins", "str"])
@@ -93,8 +93,8 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         identifier_range(stmt, checker.locator),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic_model().stmt();
-        let parent = checker.semantic_model().stmt_parent();
+        let stmt = checker.semantic().stmt();
+        let parent = checker.semantic().stmt_parent();
         let edit = delete_stmt(
             stmt,
             parent,
@@ -103,7 +103,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
             checker.stylist,
         );
         diagnostic.set_fix(
-            Fix::automatic(edit).isolate(checker.isolation(checker.semantic_model().stmt_parent())),
+            Fix::automatic(edit).isolate(checker.isolation(checker.semantic().stmt_parent())),
         );
     }
     checker.diagnostics.push(diagnostic);

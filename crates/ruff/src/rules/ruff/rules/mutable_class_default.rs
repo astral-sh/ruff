@@ -53,9 +53,9 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                 ..
             }) => {
                 if is_mutable_expr(value)
-                    && !is_class_var_annotation(checker.semantic_model(), annotation)
-                    && !is_immutable_annotation(checker.semantic_model(), annotation)
-                    && !is_dataclass(checker.semantic_model(), class_def)
+                    && !is_class_var_annotation(annotation, checker.semantic())
+                    && !is_immutable_annotation(annotation, checker.semantic())
+                    && !is_dataclass(class_def, checker.semantic())
                 {
                     checker
                         .diagnostics

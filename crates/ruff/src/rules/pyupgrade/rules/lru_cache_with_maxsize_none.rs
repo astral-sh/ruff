@@ -68,7 +68,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
         if args.is_empty()
             && keywords.len() == 1
             && checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["functools", "lru_cache"]
@@ -98,7 +98,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
                             &ImportRequest::import("functools", "cache"),
                             decorator.start(),
-                            checker.semantic_model(),
+                            checker.semantic(),
                         )?;
                         let reference_edit =
                             Edit::range_replacement(binding, decorator.expression.range());

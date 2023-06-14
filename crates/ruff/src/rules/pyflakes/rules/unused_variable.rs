@@ -7,7 +7,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::scope::ScopeId;
+use ruff_python_semantic::ScopeId;
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -199,7 +199,7 @@ fn remove_unused_variable(
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
             if target.is_name_expr() {
                 return if targets.len() > 1
-                    || contains_effect(value, |id| checker.semantic_model().is_builtin(id))
+                    || contains_effect(value, |id| checker.semantic().is_builtin(id))
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
@@ -231,7 +231,7 @@ fn remove_unused_variable(
     }) = stmt
     {
         if target.is_name_expr() {
-            return if contains_effect(value, |id| checker.semantic_model().is_builtin(id)) {
+            return if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 let start = stmt.start();
@@ -285,14 +285,14 @@ fn remove_unused_variable(
 
 /// F841
 pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
-    let scope = &checker.semantic_model().scopes[scope];
+    let scope = &checker.semantic().scopes[scope];
     if scope.uses_locals() && scope.kind.is_any_function() {
         return;
     }
 
     let bindings: Vec<_> = scope
         .bindings()
-        .map(|(name, binding_id)| (name, &checker.semantic_model().bindings[binding_id]))
+        .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
         .filter_map(|(name, binding)| {
             if (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
                 && !binding.is_used()
@@ -313,8 +313,8 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
         let mut diagnostic = Diagnostic::new(UnusedVariable { name }, range);
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(source) = source {
-                let stmt = checker.semantic_model().stmts[source];
-                let parent = checker.semantic_model().stmts.parent(stmt);
+                let stmt = checker.semantic().stmts[source];
+                let parent = checker.semantic().stmts.parent(stmt);
                 if let Some(fix) = remove_unused_variable(stmt, parent, range, checker) {
                     diagnostic.set_fix(fix);
                 }

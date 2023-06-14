@@ -37,7 +37,7 @@ impl<'a> Nodes<'a> {
     /// Inserts a new node into the node tree and returns its unique id.
     ///
     /// Panics if a node with the same pointer already exists.
-    pub fn insert(&mut self, stmt: &'a Stmt, parent: Option<NodeId>) -> NodeId {
+    pub(crate) fn insert(&mut self, stmt: &'a Stmt, parent: Option<NodeId>) -> NodeId {
         let next_id = self.nodes.next_index();
         if let Some(existing_id) = self.node_to_id.insert(RefEquality(stmt), next_id) {
             panic!("Node already exists with id {existing_id:?}");
@@ -61,22 +61,22 @@ impl<'a> Nodes<'a> {
         self.nodes[node_id].parent
     }
 
-    /// Return the depth of the node.
-    #[inline]
-    pub fn depth(&self, node_id: NodeId) -> u32 {
-        self.nodes[node_id].depth
-    }
-
-    /// Returns an iterator over all [`NodeId`] ancestors, starting from the given [`NodeId`].
-    pub fn ancestor_ids(&self, node_id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
-        std::iter::successors(Some(node_id), |&node_id| self.nodes[node_id].parent)
-    }
-
     /// Return the parent of the given node.
     pub fn parent(&self, node: &'a Stmt) -> Option<&'a Stmt> {
         let node_id = self.node_to_id.get(&RefEquality(node))?;
         let parent_id = self.nodes[*node_id].parent?;
         Some(self[parent_id])
+    }
+
+    /// Return the depth of the node.
+    #[inline]
+    pub(crate) fn depth(&self, node_id: NodeId) -> u32 {
+        self.nodes[node_id].depth
+    }
+
+    /// Returns an iterator over all [`NodeId`] ancestors, starting from the given [`NodeId`].
+    pub(crate) fn ancestor_ids(&self, node_id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
+        std::iter::successors(Some(node_id), |&node_id| self.nodes[node_id].parent)
     }
 }
 

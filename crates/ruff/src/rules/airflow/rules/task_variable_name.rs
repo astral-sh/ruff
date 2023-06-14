@@ -67,7 +67,7 @@ pub(crate) fn variable_name_task_id(
 
     // If the function doesn't come from Airflow, we can't do anything.
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| matches!(call_path[0], "airflow"))
     {

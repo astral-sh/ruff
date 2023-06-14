@@ -81,11 +81,11 @@ pub(crate) fn native_literals(
     }
 
     // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
-    if checker.semantic_model().in_nested_f_string() {
+    if checker.semantic().in_nested_f_string() {
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.semantic_model().is_builtin(id) {
+    if (id == "str" || id == "bytes") && checker.semantic().is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str

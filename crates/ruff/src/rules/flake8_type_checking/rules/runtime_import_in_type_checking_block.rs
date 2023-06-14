@@ -4,9 +4,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::node::NodeId;
-use ruff_python_semantic::reference::ReferenceId;
-use ruff_python_semantic::scope::Scope;
+use ruff_python_semantic::{NodeId, ReferenceId, Scope};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -75,7 +73,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     let mut ignores_by_statement: FxHashMap<NodeId, Vec<Import>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
-        let binding = &checker.semantic_model().bindings[binding_id];
+        let binding = checker.semantic().binding(binding_id);
 
         let Some(qualified_name) = binding.qualified_name() else {
             continue;
@@ -88,7 +86,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
         if binding.context.is_typing()
             && binding.references().any(|reference_id| {
                 checker
-                    .semantic_model()
+                    .semantic()
                     .reference(reference_id)
                     .context()
                     .is_runtime()
@@ -101,8 +99,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
             let import = Import {
                 qualified_name,
                 reference_id,
-                trimmed_range: binding.trimmed_range(checker.semantic_model(), checker.locator),
-                parent_range: binding.parent_range(checker.semantic_model()),
+                trimmed_range: binding.trimmed_range(checker.semantic(), checker.locator),
+                parent_range: binding.parent_range(checker.semantic()),
             };
 
             if checker.rule_is_ignored(
@@ -190,8 +188,8 @@ struct Import<'a> {
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
 fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
-    let stmt = checker.semantic_model().stmts[stmt_id];
-    let parent = checker.semantic_model().stmts.parent(stmt);
+    let stmt = checker.semantic().stmts[stmt_id];
+    let parent = checker.semantic().stmts.parent(stmt);
     let qualified_names: Vec<&str> = imports
         .iter()
         .map(|Import { qualified_name, .. }| *qualified_name)
@@ -201,11 +199,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
     let at = imports
         .iter()
         .map(|Import { reference_id, .. }| {
-            checker
-                .semantic_model()
-                .reference(*reference_id)
-                .range()
-                .start()
+            checker.semantic().reference(*reference_id).range().start()
         })
         .min()
         .expect("Expected at least one import");

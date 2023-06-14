@@ -46,7 +46,7 @@ impl Violation for UndefinedLocal {
 /// F823
 pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
     // If the name hasn't already been defined in the current scope...
-    let current = checker.semantic_model().scope();
+    let current = checker.semantic().scope();
     if !current.kind.is_any_function() || current.has(name) {
         return;
     }
@@ -57,7 +57,7 @@ pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
 
     // For every function and module scope above us...
     let local_access = checker
-        .semantic_model()
+        .semantic()
         .scopes
         .ancestors(parent)
         .find_map(|scope| {
@@ -68,15 +68,12 @@ pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
             // If the name was defined in that scope...
             if let Some(binding) = scope
                 .get(name)
-                .map(|binding_id| &checker.semantic_model().bindings[binding_id])
+                .map(|binding_id| checker.semantic().binding(binding_id))
             {
                 // And has already been accessed in the current scope...
                 if let Some(range) = binding.references().find_map(|reference_id| {
-                    let reference = checker.semantic_model().reference(reference_id);
-                    if checker
-                        .semantic_model()
-                        .is_current_scope(reference.scope_id())
-                    {
+                    let reference = checker.semantic().reference(reference_id);
+                    if checker.semantic().is_current_scope(reference.scope_id()) {
                         Some(reference.range())
                     } else {
                         None

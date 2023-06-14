@@ -4,7 +4,7 @@ use rustpython_parser::ast::Ranged;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
-use ruff_python_semantic::definition::{Definition, Member};
+use ruff_python_semantic::{Definition, Member};
 use ruff_python_whitespace::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;

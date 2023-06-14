@@ -18,19 +18,13 @@ use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, str, visitor};
-use ruff_python_semantic::analyze;
-use ruff_python_semantic::analyze::branch_detection;
-use ruff_python_semantic::analyze::typing::{Callable, SubscriptKind};
-use ruff_python_semantic::analyze::visibility::ModuleSource;
-use ruff_python_semantic::binding::{
-    Binding, BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImportation,
-    Importation, StarImportation, SubmoduleImportation,
+use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
+use ruff_python_semantic::{
+    Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
+    ExecutionContext, Export, FromImportation, Globals, Importation, Module, ModuleKind,
+    ResolvedRead, Scope, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImportation,
+    SubmoduleImportation,
 };
-use ruff_python_semantic::context::ExecutionContext;
-use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
-use ruff_python_semantic::globals::Globals;
-use ruff_python_semantic::model::{ResolvedRead, SemanticModel, SemanticModelFlags};
-use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -73,7 +67,7 @@ pub(crate) struct Checker<'a> {
     pub(crate) indexer: &'a Indexer,
     pub(crate) importer: Importer<'a>,
     // Stateful fields.
-    semantic_model: SemanticModel<'a>,
+    semantic: SemanticModel<'a>,
     deferred: Deferred<'a>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Check-specific state.
@@ -106,7 +100,7 @@ impl<'a> Checker<'a> {
             stylist,
             indexer,
             importer,
-            semantic_model: SemanticModel::new(&settings.typing_modules, path, module),
+            semantic: SemanticModel::new(&settings.typing_modules, path, module),
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
@@ -149,7 +143,7 @@ impl<'a> Checker<'a> {
     ///
     /// If the current expression in the context is not an f-string, returns ``None``.
     pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
-        let model = &self.semantic_model;
+        let model = &self.semantic;
         if !model.in_f_string() {
             return None;
         }
@@ -175,14 +169,14 @@ impl<'a> Checker<'a> {
     /// thus be applied whenever we delete a statement, but can otherwise be omitted.
     pub(crate) fn isolation(&self, parent: Option<&Stmt>) -> IsolationLevel {
         parent
-            .and_then(|stmt| self.semantic_model.stmts.node_id(stmt))
+            .and_then(|stmt| self.semantic.stmts.node_id(stmt))
             .map_or(IsolationLevel::default(), |node_id| {
                 IsolationLevel::Group(node_id.into())
             })
     }
 
-    pub(crate) const fn semantic_model(&self) -> &SemanticModel<'a> {
-        &self.semantic_model
+    pub(crate) const fn semantic(&self) -> &SemanticModel<'a> {
+        &self.semantic
     }
 
     pub(crate) const fn package(&self) -> Option<&'a Path> {
@@ -211,7 +205,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        self.semantic_model.push_stmt(stmt);
+        self.semantic.push_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -222,50 +216,50 @@ where
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
-                        self.semantic_model.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
+                        self.semantic.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
                     }
                 } else {
-                    self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
+                    self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 }
             }
             Stmt::Import(_) => {
-                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
+                self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
-                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
-                if !self.semantic_model.seen_import_boundary()
+                self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
+                if !self.semantic.seen_import_boundary()
                     && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !helpers::in_nested_block(self.semantic_model.parents())
+                    && !helpers::in_nested_block(self.semantic.parents())
                 {
-                    self.semantic_model.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
+                    self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
             }
         }
 
         // Track each top-level import, to guide import insertions.
         if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
-            if self.semantic_model.at_top_level() {
+            if self.semantic.at_top_level() {
                 self.importer.visit_import(stmt);
             }
         }
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
-        let flags_snapshot = self.semantic_model.flags;
+        let flags_snapshot = self.semantic.flags;
 
         // Pre-visit.
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !self.semantic_model.scope_id.is_global() {
+                if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let binding_id = self.semantic_model.push_binding(
+                        let binding_id = self.semantic.push_binding(
                             *range,
                             BindingKind::Global,
                             BindingFlags::empty(),
                         );
-                        let scope = self.semantic_model.scope_mut();
+                        let scope = self.semantic.scope_mut();
                         scope.add(name, binding_id);
                     }
                 }
@@ -278,15 +272,15 @@ where
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !self.semantic_model.scope_id.is_global() {
+                if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let binding_id = self.semantic_model.push_binding(
+                        let binding_id = self.semantic.push_binding(
                             *range,
                             BindingKind::Nonlocal,
                             BindingFlags::empty(),
                         );
-                        let scope = self.semantic_model.scope_mut();
+                        let scope = self.semantic.scope_mut();
                         scope.add(name, binding_id);
                     }
 
@@ -294,31 +288,21 @@ where
                     // and the current scope, and, per standard resolution rules, any class scopes.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let binding_id = self
-                            .semantic_model
+                            .semantic
                             .scopes
-                            .ancestors(self.semantic_model.scope_id)
+                            .ancestors(self.semantic.scope_id)
                             .skip(1)
                             .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
-                            self.semantic_model.add_local_reference(
+                            self.semantic.add_local_reference(
                                 binding_id,
                                 stmt.range(),
                                 ExecutionContext::Runtime,
                             );
-                        }
-
-                        // Ensure that every nonlocal has an existing binding from a parent scope.
-                        if self.enabled(Rule::NonlocalWithoutBinding) {
-                            if self
-                                .semantic_model
-                                .scopes
-                                .ancestors(self.semantic_model.scope_id)
-                                .skip(1)
-                                .take_while(|scope| !scope.kind.is_module())
-                                .all(|scope| !scope.declares(name.as_str()))
-                            {
+                        } else {
+                            if self.enabled(Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
@@ -340,7 +324,7 @@ where
                 if self.enabled(Rule::BreakOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
                         stmt,
-                        &mut self.semantic_model.parents().skip(1),
+                        &mut self.semantic.parents().skip(1),
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -350,7 +334,7 @@ where
                 if self.enabled(Rule::ContinueOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                         stmt,
-                        &mut self.semantic_model.parents().skip(1),
+                        &mut self.semantic.parents().skip(1),
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -376,7 +360,7 @@ where
                     self.diagnostics
                         .extend(flake8_django::rules::non_leading_receiver_decorator(
                             decorator_list,
-                            |expr| self.semantic_model.resolve_call_path(expr),
+                            |expr| self.semantic.resolve_call_path(expr),
                         ));
                 }
 
@@ -398,7 +382,7 @@ where
                         name,
                         decorator_list,
                         &self.settings.pep8_naming.ignore_names,
-                        &self.semantic_model,
+                        &self.semantic,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -408,7 +392,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_class_method(
                             self,
-                            self.semantic_model.scope(),
+                            self.semantic.scope(),
                             name,
                             decorator_list,
                             args,
@@ -421,7 +405,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_method(
                             self,
-                            self.semantic_model.scope(),
+                            self.semantic.scope(),
                             name,
                             decorator_list,
                             args,
@@ -464,9 +448,10 @@ where
                 }
                 if self.enabled(Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                        self.semantic_model.scope(),
+                        self.semantic.scope(),
                         stmt,
                         name,
+                        &self.settings.pep8_naming.ignore_names,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -629,7 +614,7 @@ where
                 if self.enabled(Rule::YieldInForLoop) {
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
-                if let ScopeKind::Class(class_def) = self.semantic_model.scope().kind {
+                if let ScopeKind::Class(class_def) = self.semantic.scope().kind {
                     if self.enabled(Rule::BuiltinAttributeShadowing) {
                         flake8_builtins::rules::builtin_attribute_shadowing(
                             self,
@@ -713,9 +698,12 @@ where
                     }
                 }
                 if self.enabled(Rule::InvalidClassName) {
-                    if let Some(diagnostic) =
-                        pep8_naming::rules::invalid_class_name(stmt, name, self.locator)
-                    {
+                    if let Some(diagnostic) = pep8_naming::rules::invalid_class_name(
+                        stmt,
+                        name,
+                        &self.settings.pep8_naming.ignore_names,
+                        self.locator,
+                    ) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -725,6 +713,7 @@ where
                         bases,
                         name,
                         self.locator,
+                        &self.settings.pep8_naming.ignore_names,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -825,7 +814,7 @@ where
                         );
 
                         if self.enabled(Rule::LateFutureImport) {
-                            if self.semantic_model.seen_futures_boundary() {
+                            if self.semantic.seen_futures_boundary() {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::LateFutureImport,
                                     stmt.range(),
@@ -908,7 +897,11 @@ where
                         if self.enabled(Rule::ConstantImportedAsNonConstant) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -918,7 +911,11 @@ where
                         if self.enabled(Rule::LowercaseImportedAsNonLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -928,7 +925,11 @@ where
                         if self.enabled(Rule::CamelcaseImportedAsLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -938,7 +939,11 @@ where
                         if self.enabled(Rule::CamelcaseImportedAsConstant) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -948,7 +953,11 @@ where
                         if self.enabled(Rule::CamelcaseImportedAsAcronym) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    name, asname, alias, stmt,
+                                    name,
+                                    asname,
+                                    alias,
+                                    stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1085,7 +1094,7 @@ where
                         }
 
                         if self.enabled(Rule::LateFutureImport) {
-                            if self.semantic_model.seen_futures_boundary() {
+                            if self.semantic.seen_futures_boundary() {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::LateFutureImport,
                                     stmt.range(),
@@ -1093,12 +1102,12 @@ where
                             }
                         }
                     } else if &alias.name == "*" {
-                        self.semantic_model
+                        self.semantic
                             .scope_mut()
                             .add_star_import(StarImportation { level, module });
 
                         if self.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
-                            let scope = self.semantic_model.scope();
+                            let scope = self.semantic.scope();
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
@@ -1207,6 +1216,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1220,6 +1230,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1233,6 +1244,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1246,6 +1258,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1259,6 +1272,7 @@ where
                                     asname,
                                     alias,
                                     stmt,
+                                    &self.settings.pep8_naming.ignore_names,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1356,14 +1370,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.semantic_model.stmt_parent(),
+                        self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::IfWithSameArms) {
                     flake8_simplify::rules::if_with_same_arms(
                         self,
                         stmt,
-                        self.semantic_model.stmt_parent(),
+                        self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::NeedlessBool) {
@@ -1376,14 +1390,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.semantic_model.stmt_parent(),
+                        self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfIfExp) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
-                        self.semantic_model.stmt_parent(),
+                        self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfDictGet) {
@@ -1393,7 +1407,7 @@ where
                         test,
                         body,
                         orelse,
-                        self.semantic_model.stmt_parent(),
+                        self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::TypeCheckWithoutTypeError) {
@@ -1402,7 +1416,7 @@ where
                         body,
                         test,
                         orelse,
-                        self.semantic_model.stmt_parent(),
+                        self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::OutdatedVersionBlock) {
@@ -1421,7 +1435,7 @@ where
                 msg,
                 range: _,
             }) => {
-                if !self.semantic_model.in_type_checking_block() {
+                if !self.semantic.in_type_checking_block() {
                     if self.enabled(Rule::Assert) {
                         self.diagnostics
                             .push(flake8_bandit::rules::assert_used(stmt));
@@ -1464,7 +1478,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.semantic_model.stmt_parent(),
+                        self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::RedefinedLoopName) {
@@ -1494,7 +1508,7 @@ where
                 ..
             }) => {
                 if self.enabled(Rule::UnusedLoopControlVariable) {
-                    self.deferred.for_loops.push(self.semantic_model.snapshot());
+                    self.deferred.for_loops.push(self.semantic.snapshot());
                 }
                 if self.enabled(Rule::LoopVariableOverridesIterator) {
                     flake8_bugbear::rules::loop_variable_overrides_iterator(self, target, iter);
@@ -1519,7 +1533,7 @@ where
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
-                            self.semantic_model.sibling_stmt(),
+                            self.semantic.sibling_stmt(),
                         );
                     }
                     if self.enabled(Rule::InDictKeys) {
@@ -1660,7 +1674,7 @@ where
                     ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
                         if !self
-                            .semantic_model
+                            .semantic
                             .scopes()
                             .any(|scope| scope.kind.is_any_function())
                         {
@@ -1709,7 +1723,7 @@ where
                         if self.enabled(Rule::AssignmentDefaultInStub) {
                             // Ignore assignments in function bodies; those are covered by other rules.
                             if !self
-                                .semantic_model
+                                .semantic
                                 .scopes()
                                 .any(|scope| scope.kind.is_any_function())
                             {
@@ -1725,10 +1739,7 @@ where
                             );
                         }
                     }
-                    if self
-                        .semantic_model
-                        .match_typing_expr(annotation, "TypeAlias")
-                    {
+                    if self.semantic.match_typing_expr(annotation, "TypeAlias") {
                         if self.enabled(Rule::SnakeCaseTypeAlias) {
                             flake8_pyi::rules::snake_case_type_alias(self, target);
                         }
@@ -1762,7 +1773,7 @@ where
                 }
                 if self.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
-                        self.semantic_model.resolve_call_path(expr)
+                        self.semantic.resolve_call_path(expr)
                     }) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -1797,7 +1808,7 @@ where
 
                 // Function annotations are always evaluated at runtime, unless future annotations
                 // are enabled.
-                let runtime_annotation = !self.semantic_model.future_annotations();
+                let runtime_annotation = !self.semantic.future_annotations();
 
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.annotation {
@@ -1868,22 +1879,22 @@ where
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Function,
                     stmt,
-                    self.semantic_model.definition_id,
-                    &self.semantic_model.definitions,
+                    self.semantic.definition_id,
+                    &self.semantic.definitions,
                 );
-                self.semantic_model.push_definition(definition);
+                self.semantic.push_definition(definition);
 
-                self.semantic_model.push_scope(match &stmt {
+                self.semantic.push_scope(match &stmt {
                     Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
                     Stmt::AsyncFunctionDef(stmt) => ScopeKind::AsyncFunction(stmt),
                     _ => unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef"),
                 });
 
-                self.deferred.functions.push(self.semantic_model.snapshot());
+                self.deferred.functions.push(self.semantic.snapshot());
 
                 // Extract any global bindings from the function body.
                 if let Some(globals) = Globals::from_body(body) {
-                    self.semantic_model.set_globals(globals);
+                    self.semantic.set_globals(globals);
                 }
             }
             Stmt::ClassDef(
@@ -1908,16 +1919,16 @@ where
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Class,
                     stmt,
-                    self.semantic_model.definition_id,
-                    &self.semantic_model.definitions,
+                    self.semantic.definition_id,
+                    &self.semantic.definitions,
                 );
-                self.semantic_model.push_definition(definition);
+                self.semantic.push_definition(definition);
 
-                self.semantic_model.push_scope(ScopeKind::Class(class_def));
+                self.semantic.push_scope(ScopeKind::Class(class_def));
 
                 // Extract any global bindings from the class body.
                 if let Some(globals) = Globals::from_body(body) {
-                    self.semantic_model.set_globals(globals);
+                    self.semantic.set_globals(globals);
                 }
 
                 self.visit_body(body);
@@ -1938,7 +1949,7 @@ where
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(call_path) = self.semantic_model.resolve_call_path(type_) {
+                    if let Some(call_path) = self.semantic.resolve_call_path(type_) {
                         match call_path.as_slice() {
                             ["", "NameError"] => {
                                 handled_exceptions |= Exceptions::NAME_ERROR;
@@ -1954,9 +1965,7 @@ where
                     }
                 }
 
-                self.semantic_model
-                    .handled_exceptions
-                    .push(handled_exceptions);
+                self.semantic.handled_exceptions.push(handled_exceptions);
 
                 if self.enabled(Rule::JumpStatementInFinally) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
@@ -1968,9 +1977,9 @@ where
                 }
 
                 self.visit_body(body);
-                self.semantic_model.handled_exceptions.pop();
+                self.semantic.handled_exceptions.pop();
 
-                self.semantic_model.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
+                self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
@@ -1987,8 +1996,8 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = if self.semantic_model.future_annotations() {
-                    if self.semantic_model.scope().kind.is_class() {
+                let runtime_annotation = if self.semantic.future_annotations() {
+                    if self.semantic.scope().kind.is_class() {
                         let baseclasses = &self
                             .settings
                             .flake8_type_checking
@@ -1998,16 +2007,16 @@ where
                             .flake8_type_checking
                             .runtime_evaluated_decorators;
                         flake8_type_checking::helpers::runtime_evaluated(
-                            &self.semantic_model,
                             baseclasses,
                             decorators,
+                            &self.semantic,
                         )
                     } else {
                         false
                     }
                 } else {
                     matches!(
-                        self.semantic_model.scope().kind,
+                        self.semantic.scope().kind,
                         ScopeKind::Class(_) | ScopeKind::Module
                     )
                 };
@@ -2018,10 +2027,7 @@ where
                     self.visit_annotation(annotation);
                 }
                 if let Some(expr) = value {
-                    if self
-                        .semantic_model
-                        .match_typing_expr(annotation, "TypeAlias")
-                    {
+                    if self.semantic.match_typing_expr(annotation, "TypeAlias") {
                         self.visit_type_definition(expr);
                     } else {
                         self.visit_expr(expr);
@@ -2059,8 +2065,8 @@ where
             ) => {
                 self.visit_boolean_test(test);
 
-                if analyze::typing::is_type_checking_block(stmt_if, &self.semantic_model) {
-                    if self.semantic_model.at_top_level() {
+                if typing::is_type_checking_block(stmt_if, &self.semantic) {
+                    if self.semantic.at_top_level() {
                         self.importer.visit_type_checking_block(stmt);
                     }
                     if self.enabled(Rule::EmptyTypeCheckingBlock) {
@@ -2080,12 +2086,12 @@ where
         // Post-visit.
         match stmt {
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
-                self.semantic_model.pop_scope();
-                self.semantic_model.pop_definition();
+                self.semantic.pop_scope();
+                self.semantic.pop_definition();
             }
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                self.semantic_model.pop_scope();
-                self.semantic_model.pop_definition();
+                self.semantic.pop_scope();
+                self.semantic.pop_definition();
                 self.add_binding(
                     name,
                     stmt.range(),
@@ -2096,22 +2102,22 @@ where
             _ => {}
         }
 
-        self.semantic_model.flags = flags_snapshot;
-        self.semantic_model.pop_stmt();
+        self.semantic.flags = flags_snapshot;
+        self.semantic.pop_stmt();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
-        let flags_snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= SemanticModelFlags::ANNOTATION;
+        let flags_snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::ANNOTATION;
         self.visit_type_definition(expr);
-        self.semantic_model.flags = flags_snapshot;
+        self.semantic.flags = flags_snapshot;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if !self.semantic_model.in_f_string()
-            && !self.semantic_model.in_deferred_type_definition()
-            && self.semantic_model.in_type_definition()
-            && self.semantic_model.future_annotations()
+        if !self.semantic.in_f_string()
+            && !self.semantic.in_deferred_type_definition()
+            && self.semantic.in_type_definition()
+            && self.semantic.future_annotations()
         {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
@@ -2121,21 +2127,21 @@ where
                 self.deferred.string_type_definitions.push((
                     expr.range(),
                     value,
-                    self.semantic_model.snapshot(),
+                    self.semantic.snapshot(),
                 ));
             } else {
                 self.deferred
                     .future_type_definitions
-                    .push((expr, self.semantic_model.snapshot()));
+                    .push((expr, self.semantic.snapshot()));
             }
             return;
         }
 
-        self.semantic_model.push_expr(expr);
+        self.semantic.push_expr(expr);
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
-        let flags_snapshot = self.semantic_model.flags;
+        let flags_snapshot = self.semantic.flags;
 
         // If we're in a boolean test (e.g., the `test` of a `Stmt::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
@@ -2147,7 +2153,7 @@ where
                     ..
                 })
         ) {
-            self.semantic_model.flags -= SemanticModelFlags::BOOLEAN_TEST;
+            self.semantic.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
         // Pre-visit.
@@ -2158,14 +2164,13 @@ where
                     Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP604Annotation,
                 ]) {
-                    if let Some(operator) =
-                        analyze::typing::to_pep604_operator(value, slice, &self.semantic_model)
+                    if let Some(operator) = typing::to_pep604_operator(value, slice, &self.semantic)
                     {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
-                                && !self.semantic_model.future_annotations()
-                                && self.semantic_model.in_annotation()
+                                && !self.semantic.future_annotations()
+                                && self.semantic.in_annotation()
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, value,
@@ -2175,8 +2180,8 @@ where
                         if self.enabled(Rule::NonPEP604Annotation) {
                             if self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
-                                    && self.semantic_model.future_annotations()
-                                    && self.semantic_model.in_annotation())
+                                    && self.semantic.future_annotations()
+                                    && self.semantic.in_annotation())
                             {
                                 pyupgrade::rules::use_pep604_annotation(
                                     self, expr, slice, operator,
@@ -2189,9 +2194,9 @@ where
                 // Ex) list[...]
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
                     if self.settings.target_version < PythonVersion::Py39
-                        && !self.semantic_model.future_annotations()
-                        && self.semantic_model.in_annotation()
-                        && analyze::typing::is_pep585_generic(value, &self.semantic_model)
+                        && !self.semantic.future_annotations()
+                        && self.semantic.in_annotation()
+                        && typing::is_pep585_generic(value, &self.semantic)
                     {
                         flake8_future_annotations::rules::future_required_type_annotation(
                             self,
@@ -2201,8 +2206,8 @@ where
                     }
                 }
 
-                if self.semantic_model.match_typing_expr(value, "Literal") {
-                    self.semantic_model.flags |= SemanticModelFlags::LITERAL;
+                if self.semantic.match_typing_expr(value, "Literal") {
+                    self.semantic.flags |= SemanticModelFlags::LITERAL;
                 }
                 if self.any_enabled(&[
                     Rule::SysVersionSlice3,
@@ -2264,13 +2269,13 @@ where
                             Rule::NonPEP585Annotation,
                         ]) {
                             if let Some(replacement) =
-                                analyze::typing::to_pep585_generic(expr, &self.semantic_model)
+                                typing::to_pep585_generic(expr, &self.semantic)
                             {
                                 if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                                     if self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
-                                        && !self.semantic_model.future_annotations()
-                                        && self.semantic_model.in_annotation()
+                                        && !self.semantic.future_annotations()
+                                        && self.semantic.in_annotation()
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
                                             self, expr,
@@ -2280,8 +2285,8 @@ where
                                 if self.enabled(Rule::NonPEP585Annotation) {
                                     if self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
-                                            && self.semantic_model.future_annotations()
-                                            && self.semantic_model.in_annotation())
+                                            && self.semantic.future_annotations()
+                                            && self.semantic.in_annotation())
                                     {
                                         pyupgrade::rules::use_pep585_annotation(
                                             self,
@@ -2304,7 +2309,7 @@ where
                             }
                         }
 
-                        if let ScopeKind::Class(class_def) = self.semantic_model.scope().kind {
+                        if let ScopeKind::Class(class_def) = self.semantic.scope().kind {
                             if self.enabled(Rule::BuiltinAttributeShadowing) {
                                 flake8_builtins::rules::builtin_attribute_shadowing(
                                     self,
@@ -2340,14 +2345,12 @@ where
                     Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP585Annotation,
                 ]) {
-                    if let Some(replacement) =
-                        analyze::typing::to_pep585_generic(expr, &self.semantic_model)
-                    {
+                    if let Some(replacement) = typing::to_pep585_generic(expr, &self.semantic) {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
-                                && !self.semantic_model.future_annotations()
-                                && self.semantic_model.in_annotation()
+                                && !self.semantic.future_annotations()
+                                && self.semantic.in_annotation()
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, expr,
@@ -2357,8 +2360,8 @@ where
                         if self.enabled(Rule::NonPEP585Annotation) {
                             if self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
-                                    && self.semantic_model.future_annotations()
-                                    && self.semantic_model.in_annotation())
+                                    && self.semantic.future_annotations()
+                                    && self.semantic.in_annotation())
                             {
                                 pyupgrade::rules::use_pep585_annotation(self, expr, &replacement);
                             }
@@ -2403,7 +2406,7 @@ where
             }) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = self.semantic_model.scope_mut();
+                        let scope = self.semantic.scope_mut();
                         scope.set_uses_locals();
                     }
                 }
@@ -2735,7 +2738,7 @@ where
                     flake8_comprehensions::rules::unnecessary_map(
                         self,
                         expr,
-                        self.semantic_model.expr_parent(),
+                        self.semantic.expr_parent(),
                         func,
                         args,
                     );
@@ -3138,8 +3141,8 @@ where
                 // Ex) `str | None`
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
                     if self.settings.target_version < PythonVersion::Py310
-                        && !self.semantic_model.future_annotations()
-                        && self.semantic_model.in_annotation()
+                        && !self.semantic.future_annotations()
+                        && self.semantic.in_annotation()
                     {
                         flake8_future_annotations::rules::future_required_type_annotation(
                             self,
@@ -3151,8 +3154,8 @@ where
 
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
-                        && self.semantic_model.in_type_definition()
-                        && self.semantic_model.expr_parent().map_or(true, |parent| {
+                        && self.semantic.in_type_definition()
+                        && self.semantic.expr_parent().map_or(true, |parent| {
                             !matches!(
                                 parent,
                                 Expr::BinOp(ast::ExprBinOp {
@@ -3303,14 +3306,14 @@ where
                 kind,
                 range: _,
             }) => {
-                if self.semantic_model.in_type_definition()
-                    && !self.semantic_model.in_literal()
-                    && !self.semantic_model.in_f_string()
+                if self.semantic.in_type_definition()
+                    && !self.semantic.in_literal()
+                    && !self.semantic.in_f_string()
                 {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
                         value,
-                        self.semantic_model.snapshot(),
+                        self.semantic.snapshot(),
                     ));
                 }
                 if self.enabled(Rule::HardcodedBindAllInterfaces) {
@@ -3354,7 +3357,7 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
-                self.semantic_model.push_scope(ScopeKind::Lambda(lambda));
+                self.semantic.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -3528,9 +3531,7 @@ where
                 self.visit_expr(value);
             }
             Expr::Lambda(_) => {
-                self.deferred
-                    .lambdas
-                    .push((expr, self.semantic_model.snapshot()));
+                self.deferred.lambdas.push((expr, self.semantic.snapshot()));
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -3548,55 +3549,43 @@ where
                 keywords,
                 range: _,
             }) => {
-                let callable = self
-                    .semantic_model
-                    .resolve_call_path(func)
-                    .and_then(|call_path| {
-                        if self
-                            .semantic_model
-                            .match_typing_call_path(&call_path, "cast")
-                        {
-                            Some(Callable::Cast)
-                        } else if self
-                            .semantic_model
-                            .match_typing_call_path(&call_path, "NewType")
-                        {
-                            Some(Callable::NewType)
-                        } else if self
-                            .semantic_model
-                            .match_typing_call_path(&call_path, "TypeVar")
-                        {
-                            Some(Callable::TypeVar)
-                        } else if self
-                            .semantic_model
-                            .match_typing_call_path(&call_path, "NamedTuple")
-                        {
-                            Some(Callable::NamedTuple)
-                        } else if self
-                            .semantic_model
-                            .match_typing_call_path(&call_path, "TypedDict")
-                        {
-                            Some(Callable::TypedDict)
-                        } else if [
-                            "Arg",
-                            "DefaultArg",
-                            "NamedArg",
-                            "DefaultNamedArg",
-                            "VarArg",
-                            "KwArg",
-                        ]
-                        .iter()
-                        .any(|target| call_path.as_slice() == ["mypy_extensions", target])
-                        {
-                            Some(Callable::MypyExtension)
-                        } else if call_path.as_slice() == ["", "bool"] {
-                            Some(Callable::Bool)
-                        } else {
-                            None
-                        }
-                    });
+                let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
+                    if self.semantic.match_typing_call_path(&call_path, "cast") {
+                        Some(typing::Callable::Cast)
+                    } else if self.semantic.match_typing_call_path(&call_path, "NewType") {
+                        Some(typing::Callable::NewType)
+                    } else if self.semantic.match_typing_call_path(&call_path, "TypeVar") {
+                        Some(typing::Callable::TypeVar)
+                    } else if self
+                        .semantic
+                        .match_typing_call_path(&call_path, "NamedTuple")
+                    {
+                        Some(typing::Callable::NamedTuple)
+                    } else if self
+                        .semantic
+                        .match_typing_call_path(&call_path, "TypedDict")
+                    {
+                        Some(typing::Callable::TypedDict)
+                    } else if [
+                        "Arg",
+                        "DefaultArg",
+                        "NamedArg",
+                        "DefaultNamedArg",
+                        "VarArg",
+                        "KwArg",
+                    ]
+                    .iter()
+                    .any(|target| call_path.as_slice() == ["mypy_extensions", target])
+                    {
+                        Some(typing::Callable::MypyExtension)
+                    } else if call_path.as_slice() == ["", "bool"] {
+                        Some(typing::Callable::Bool)
+                    } else {
+                        None
+                    }
+                });
                 match callable {
-                    Some(Callable::Bool) => {
+                    Some(typing::Callable::Bool) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3606,7 +3595,7 @@ where
                             self.visit_expr(arg);
                         }
                     }
-                    Some(Callable::Cast) => {
+                    Some(typing::Callable::Cast) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3616,7 +3605,7 @@ where
                             self.visit_expr(arg);
                         }
                     }
-                    Some(Callable::NewType) => {
+                    Some(typing::Callable::NewType) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3626,7 +3615,7 @@ where
                             self.visit_type_definition(arg);
                         }
                     }
-                    Some(Callable::TypeVar) => {
+                    Some(typing::Callable::TypeVar) => {
                         self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3650,7 +3639,7 @@ where
                             }
                         }
                     }
-                    Some(Callable::NamedTuple) => {
+                    Some(typing::Callable::NamedTuple) => {
                         self.visit_expr(func);
 
                         // Ex) NamedTuple("a", [("a", int)])
@@ -3687,7 +3676,7 @@ where
                             self.visit_type_definition(value);
                         }
                     }
-                    Some(Callable::TypedDict) => {
+                    Some(typing::Callable::TypedDict) => {
                         self.visit_expr(func);
 
                         // Ex) TypedDict("a", {"a": int})
@@ -3719,7 +3708,7 @@ where
                             self.visit_type_definition(value);
                         }
                     }
-                    Some(Callable::MypyExtension) => {
+                    Some(typing::Callable::MypyExtension) => {
                         self.visit_expr(func);
 
                         let mut args = args.iter();
@@ -3775,28 +3764,28 @@ where
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
                 // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
                 // the `ExprContext` at the top-level.
-                if self.semantic_model.in_subscript() {
+                if self.semantic.in_subscript() {
                     visitor::walk_expr(self, expr);
                 } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
-                    self.semantic_model.flags |= SemanticModelFlags::SUBSCRIPT;
+                    self.semantic.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
-                    match analyze::typing::match_annotated_subscript(
+                    match typing::match_annotated_subscript(
                         value,
-                        &self.semantic_model,
+                        &self.semantic,
                         self.settings.typing_modules.iter().map(String::as_str),
                         &self.settings.pyflakes.extend_generics,
                     ) {
                         Some(subscript) => {
                             match subscript {
                                 // Ex) Optional[int]
-                                SubscriptKind::AnnotatedSubscript => {
+                                typing::SubscriptKind::AnnotatedSubscript => {
                                     self.visit_expr(value);
                                     self.visit_type_definition(slice);
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
-                                SubscriptKind::PEP593AnnotatedSubscript => {
+                                typing::SubscriptKind::PEP593AnnotatedSubscript => {
                                     // First argument is a type (including forward references); the
                                     // rest are arbitrary Python objects.
                                     self.visit_expr(value);
@@ -3827,7 +3816,7 @@ where
                 }
             }
             Expr::JoinedStr(_) => {
-                self.semantic_model.flags |= if self.semantic_model.in_f_string() {
+                self.semantic.flags |= if self.semantic.in_f_string() {
                     SemanticModelFlags::NESTED_F_STRING
                 } else {
                     SemanticModelFlags::F_STRING
@@ -3844,13 +3833,13 @@ where
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
-                self.semantic_model.pop_scope();
+                self.semantic.pop_scope();
             }
             _ => {}
         };
 
-        self.semantic_model.flags = flags_snapshot;
-        self.semantic_model.pop_expr();
+        self.semantic.flags = flags_snapshot;
+        self.semantic.pop_expr();
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
@@ -3932,7 +3921,7 @@ where
                         }
 
                         // Add the bound exception name to the scope.
-                        self.add_binding(
+                        let binding_id = self.add_binding(
                             name,
                             range,
                             BindingKind::Assignment,
@@ -3942,27 +3931,30 @@ where
                         walk_excepthandler(self, excepthandler);
 
                         // Remove it from the scope immediately after.
-                        if let Some(binding_id) = {
-                            let scope = self.semantic_model.scope_mut();
-                            scope.delete(name)
-                        } {
-                            if !self.semantic_model.is_used(binding_id) {
-                                if self.enabled(Rule::UnusedVariable) {
-                                    let mut diagnostic = Diagnostic::new(
-                                        pyflakes::rules::UnusedVariable { name: name.into() },
-                                        range,
-                                    );
-                                    if self.patch(Rule::UnusedVariable) {
-                                        diagnostic.try_set_fix(|| {
-                                            let edit = pyflakes::fixes::remove_exception_handler_assignment(
-                                                excepthandler,
-                                                self.locator,
-                                            )?;
-                                            Ok(Fix::automatic(edit))
-                                        });
-                                    }
-                                    self.diagnostics.push(diagnostic);
+                        self.add_binding(
+                            name,
+                            range,
+                            BindingKind::UnboundException,
+                            BindingFlags::empty(),
+                        );
+
+                        // If the exception name wasn't used in the scope, emit a diagnostic.
+                        if !self.semantic.is_used(binding_id) {
+                            if self.enabled(Rule::UnusedVariable) {
+                                let mut diagnostic = Diagnostic::new(
+                                    pyflakes::rules::UnusedVariable { name: name.into() },
+                                    range,
+                                );
+                                if self.patch(Rule::UnusedVariable) {
+                                    diagnostic.try_set_fix(|| {
+                                        pyflakes::fixes::remove_exception_handler_assignment(
+                                            excepthandler,
+                                            self.locator,
+                                        )
+                                        .map(Fix::automatic)
+                                    });
                                 }
+                                self.diagnostics.push(diagnostic);
                             }
                         }
                     }
@@ -4080,18 +4072,18 @@ where
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
-        let prev_body = self.semantic_model.body;
-        let prev_body_index = self.semantic_model.body_index;
-        self.semantic_model.body = body;
-        self.semantic_model.body_index = 0;
+        let prev_body = self.semantic.body;
+        let prev_body_index = self.semantic.body_index;
+        self.semantic.body = body;
+        self.semantic.body_index = 0;
 
         for stmt in body {
             self.visit_stmt(stmt);
-            self.semantic_model.body_index += 1;
+            self.semantic.body_index += 1;
         }
 
-        self.semantic_model.body = prev_body;
-        self.semantic_model.body_index = prev_body_index;
+        self.semantic.body = prev_body;
+        self.semantic.body_index = prev_body_index;
     }
 }
 
@@ -4142,7 +4134,7 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.semantic_model.push_scope(ScopeKind::Generator);
+        self.semantic.push_scope(ScopeKind::Generator);
         self.visit_expr(&generator.target);
         for expr in &generator.ifs {
             self.visit_boolean_test(expr);
@@ -4159,36 +4151,36 @@ impl<'a> Checker<'a> {
 
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
-        let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
-        self.semantic_model.flags = snapshot;
+        self.semantic.flags = snapshot;
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
-        let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION;
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
-        self.semantic_model.flags = snapshot;
+        self.semantic.flags = snapshot;
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
     fn visit_non_type_definition(&mut self, expr: &'a Expr) {
-        let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags -= SemanticModelFlags::TYPE_DEFINITION;
+        let snapshot = self.semantic.flags;
+        self.semantic.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
-        self.semantic_model.flags = snapshot;
+        self.semantic.flags = snapshot;
     }
 
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
     fn visit_boolean_test(&mut self, expr: &'a Expr) {
-        let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= SemanticModelFlags::BOOLEAN_TEST;
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
-        self.semantic_model.flags = snapshot;
+        self.semantic.flags = snapshot;
     }
 
     /// Add a [`Binding`] to the current scope, bound to the given name.
@@ -4204,35 +4196,42 @@ impl<'a> Checker<'a> {
         // expressions in generators and comprehensions bind to the scope that contains the
         // outermost comprehension.
         let scope_id = if kind.is_named_expr_assignment() {
-            self.semantic_model
+            self.semantic
                 .scopes
-                .ancestor_ids(self.semantic_model.scope_id)
-                .find_or_last(|scope_id| !self.semantic_model.scopes[*scope_id].kind.is_generator())
-                .unwrap_or(self.semantic_model.scope_id)
+                .ancestor_ids(self.semantic.scope_id)
+                .find_or_last(|scope_id| !self.semantic.scopes[*scope_id].kind.is_generator())
+                .unwrap_or(self.semantic.scope_id)
         } else {
-            self.semantic_model.scope_id
+            self.semantic.scope_id
         };
 
         // Create the `Binding`.
-        let binding_id = self.semantic_model.push_binding(range, kind, flags);
-        let binding = &self.semantic_model.bindings[binding_id];
+        let binding_id = self.semantic.push_binding(range, kind, flags);
+        let binding = self.semantic.binding(binding_id);
 
         // Determine whether the binding shadows any existing bindings.
         if let Some((stack_index, shadowed_id)) = self
-            .semantic_model
+            .semantic
             .scopes
-            .ancestors(self.semantic_model.scope_id)
+            .ancestors(self.semantic.scope_id)
             .enumerate()
             .find_map(|(stack_index, scope)| {
-                scope.get(name).map(|binding_id| (stack_index, binding_id))
+                scope.get(name).and_then(|binding_id| {
+                    let binding = self.semantic.binding(binding_id);
+                    if binding.is_unbound() {
+                        None
+                    } else {
+                        Some((stack_index, binding_id))
+                    }
+                })
             })
         {
-            let shadowed = &self.semantic_model.bindings[shadowed_id];
+            let shadowed = self.semantic.binding(shadowed_id);
             let in_current_scope = stack_index == 0;
             if !shadowed.kind.is_builtin()
                 && shadowed.source.map_or(true, |left| {
                     binding.source.map_or(true, |right| {
-                        !branch_detection::different_forks(left, right, &self.semantic_model.stmts)
+                        !branch_detection::different_forks(left, right, &self.semantic.stmts)
                     })
                 })
             {
@@ -4261,19 +4260,15 @@ impl<'a> Checker<'a> {
                         && binding.redefines(shadowed)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || shadows_import)
                         && !(shadowed.kind.is_function_definition()
-                            && analyze::visibility::is_overload(
-                                &self.semantic_model,
-                                cast::decorator_list(
-                                    self.semantic_model.stmts[shadowed.source.unwrap()],
-                                ),
+                            && visibility::is_overload(
+                                cast::decorator_list(self.semantic.stmts[shadowed.source.unwrap()]),
+                                &self.semantic,
                             ))
                     {
                         if self.enabled(Rule::RedefinedWhileUnused) {
                             #[allow(deprecated)]
                             let line = self.locator.compute_line_index(
-                                shadowed
-                                    .trimmed_range(&self.semantic_model, self.locator)
-                                    .start(),
+                                shadowed.trimmed_range(&self.semantic, self.locator).start(),
                             );
 
                             let mut diagnostic = Diagnostic::new(
@@ -4281,16 +4276,16 @@ impl<'a> Checker<'a> {
                                     name: name.to_string(),
                                     line,
                                 },
-                                binding.trimmed_range(&self.semantic_model, self.locator),
+                                binding.trimmed_range(&self.semantic, self.locator),
                             );
-                            if let Some(range) = binding.parent_range(&self.semantic_model) {
+                            if let Some(range) = binding.parent_range(&self.semantic) {
                                 diagnostic.set_parent(range.start());
                             }
                             self.diagnostics.push(diagnostic);
                         }
                     }
                 } else if shadows_import && binding.redefines(shadowed) {
-                    self.semantic_model
+                    self.semantic
                         .shadowed_bindings
                         .insert(binding_id, shadowed_id);
                 }
@@ -4298,39 +4293,36 @@ impl<'a> Checker<'a> {
         }
 
         // If there's an existing binding in this scope, copy its references.
-        if let Some(shadowed) = self.semantic_model.scopes[scope_id]
-            .get(name)
-            .map(|binding_id| &self.semantic_model.bindings[binding_id])
-        {
+        if let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
+            // If this is an annotation, and we already have an existing value in the same scope,
+            // don't treat it as an assignment, but track it as a delayed annotation.
+            if self.semantic.binding(binding_id).kind.is_annotation() {
+                self.semantic
+                    .add_delayed_annotation(shadowed_id, binding_id);
+                return binding_id;
+            }
+
+            let shadowed = &self.semantic.bindings[shadowed_id];
             match &shadowed.kind {
-                BindingKind::Builtin => {
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException => {
                     // Avoid overriding builtins.
                 }
                 kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
                     // If the original binding was a global or nonlocal, then the new binding is
                     // too.
                     let references = shadowed.references.clone();
-                    self.semantic_model.bindings[binding_id].kind = kind.clone();
-                    self.semantic_model.bindings[binding_id].references = references;
+                    self.semantic.bindings[binding_id].kind = kind.clone();
+                    self.semantic.bindings[binding_id].references = references;
                 }
                 _ => {
                     let references = shadowed.references.clone();
-                    self.semantic_model.bindings[binding_id].references = references;
+                    self.semantic.bindings[binding_id].references = references;
                 }
-            }
-
-            // If this is an annotation, and we already have an existing value in the same scope,
-            // don't treat it as an assignment (i.e., avoid adding it to the scope).
-            if self.semantic_model.bindings[binding_id]
-                .kind
-                .is_annotation()
-            {
-                return binding_id;
             }
         }
 
         // Add the binding to the scope.
-        let scope = &mut self.semantic_model.scopes[scope_id];
+        let scope = &mut self.semantic.scopes[scope_id];
         scope.add(name, binding_id);
 
         binding_id
@@ -4344,25 +4336,25 @@ impl<'a> Checker<'a> {
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
             // Add the builtin to the scope.
-            let binding_id = self.semantic_model.push_builtin();
-            let scope = self.semantic_model.scope_mut();
+            let binding_id = self.semantic.push_builtin();
+            let scope = self.semantic.scope_mut();
             scope.add(builtin, binding_id);
         }
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
-        match self.semantic_model.resolve_read(id, expr.range()) {
-            ResolvedRead::Resolved(..) | ResolvedRead::ImplicitGlobal => {
+        match self.semantic.resolve_read(id, expr.range()) {
+            ResolvedRead::Resolved(_) | ResolvedRead::ImplicitGlobal => {
                 // Nothing to do.
             }
-            ResolvedRead::StarImport => {
+            ResolvedRead::WildcardImport => {
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = self
-                        .semantic_model
+                        .semantic
                         .scopes
                         .iter()
                         .flat_map(Scope::star_imports)
@@ -4381,7 +4373,7 @@ impl<'a> Checker<'a> {
                     ));
                 }
             }
-            ResolvedRead::NotFound => {
+            ResolvedRead::NotFound | ResolvedRead::UnboundLocal(_) => {
                 // F821
                 if self.enabled(Rule::UndefinedName) {
                     // Allow __path__.
@@ -4391,7 +4383,7 @@ impl<'a> Checker<'a> {
 
                     // Avoid flagging if `NameError` is handled.
                     if self
-                        .semantic_model
+                        .semantic
                         .handled_exceptions
                         .iter()
                         .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
@@ -4411,37 +4403,30 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
-        let parent = self.semantic_model.stmt();
+        let parent = self.semantic.stmt();
 
         if self.enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(self, id);
         }
         if self.enabled(Rule::NonLowercaseVariableInFunction) {
-            if self.semantic_model.scope().kind.is_any_function() {
+            if self.semantic.scope().kind.is_any_function() {
                 // Ignore globals.
-                if !self
-                    .semantic_model
-                    .scope()
-                    .get(id)
-                    .map_or(false, |binding_id| {
-                        self.semantic_model.bindings[binding_id].kind.is_global()
-                    })
-                {
+                if !self.semantic.scope().get(id).map_or(false, |binding_id| {
+                    self.semantic.binding(binding_id).kind.is_global()
+                }) {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
             }
         }
         if self.enabled(Rule::MixedCaseVariableInClassScope) {
-            if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) =
-                &self.semantic_model.scope().kind
-            {
+            if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = &self.semantic.scope().kind {
                 pep8_naming::rules::mixed_case_variable_in_class_scope(
                     self, expr, parent, id, bases,
                 );
             }
         }
         if self.enabled(Rule::MixedCaseVariableInGlobalScope) {
-            if matches!(self.semantic_model.scope().kind, ScopeKind::Module) {
+            if matches!(self.semantic.scope().kind, ScopeKind::Module) {
                 pep8_naming::rules::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
         }
@@ -4479,7 +4464,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let scope = self.semantic_model.scope();
+        let scope = self.semantic.scope();
 
         if scope.kind.is_module()
             && match parent {
@@ -4507,8 +4492,7 @@ impl<'a> Checker<'a> {
                 _ => false,
             }
         {
-            let (names, flags) =
-                extract_all_names(parent, |name| self.semantic_model.is_builtin(name));
+            let (names, flags) = extract_all_names(parent, |name| self.semantic.is_builtin(name));
 
             if self.enabled(Rule::InvalidAllFormat) {
                 if matches!(flags, AllNamesFlags::INVALID_FORMAT) {
@@ -4534,7 +4518,7 @@ impl<'a> Checker<'a> {
         }
 
         if self
-            .semantic_model
+            .semantic
             .expr_ancestors()
             .any(|expr| matches!(expr, Expr::NamedExpr(_)))
         {
@@ -4559,12 +4543,26 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        if helpers::on_conditional_branch(&mut self.semantic_model.parents()) {
-            return;
-        }
 
-        let scope = self.semantic_model.scope_mut();
-        if scope.delete(id.as_str()).is_none() {
+        // Treat the deletion of a name as a reference to that name.
+        if let Some(binding_id) = self.semantic.scope().get(id) {
+            self.semantic
+                .add_local_reference(binding_id, expr.range(), ExecutionContext::Runtime);
+
+            // If the name is unbound, then it's an error.
+            if self.enabled(Rule::UndefinedName) {
+                let binding = self.semantic.binding(binding_id);
+                if binding.is_unbound() {
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedName {
+                            name: id.to_string(),
+                        },
+                        expr.range(),
+                    ));
+                }
+            }
+        } else {
+            // If the name isn't bound at all, then it's an error.
             if self.enabled(Rule::UndefinedName) {
                 self.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedName {
@@ -4574,15 +4572,26 @@ impl<'a> Checker<'a> {
                 ));
             }
         }
+
+        if helpers::on_conditional_branch(&mut self.semantic.parents()) {
+            return;
+        }
+
+        // Create a binding to model the deletion.
+        let binding_id =
+            self.semantic
+                .push_binding(expr.range(), BindingKind::Deletion, BindingFlags::empty());
+        let scope = self.semantic.scope_mut();
+        scope.add(id, binding_id);
     }
 
     fn check_deferred_future_type_definitions(&mut self) {
         while !self.deferred.future_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.future_type_definitions);
             for (expr, snapshot) in type_definitions {
-                self.semantic_model.restore(snapshot);
+                self.semantic.restore(snapshot);
 
-                self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION
+                self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION
                     | SemanticModelFlags::FUTURE_TYPE_DEFINITION;
                 self.visit_expr(expr);
             }
@@ -4596,11 +4605,9 @@ impl<'a> Checker<'a> {
                 if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
                     let expr = allocator.alloc(expr);
 
-                    self.semantic_model.restore(snapshot);
+                    self.semantic.restore(snapshot);
 
-                    if self.semantic_model.in_annotation()
-                        && self.semantic_model.future_annotations()
-                    {
+                    if self.semantic.in_annotation() && self.semantic.future_annotations() {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -4618,7 +4625,7 @@ impl<'a> Checker<'a> {
                         }
                     };
 
-                    self.semantic_model.flags |=
+                    self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                     self.visit_expr(expr);
                 } else {
@@ -4639,9 +4646,9 @@ impl<'a> Checker<'a> {
         while !self.deferred.functions.is_empty() {
             let deferred_functions = std::mem::take(&mut self.deferred.functions);
             for snapshot in deferred_functions {
-                self.semantic_model.restore(snapshot);
+                self.semantic.restore(snapshot);
 
-                match &self.semantic_model.stmt() {
+                match &self.semantic.stmt() {
                     Stmt::FunctionDef(ast::StmtFunctionDef { body, args, .. })
                     | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, args, .. }) => {
                         self.visit_arguments(args);
@@ -4661,7 +4668,7 @@ impl<'a> Checker<'a> {
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
             for (expr, snapshot) in lambdas {
-                self.semantic_model.restore(snapshot);
+                self.semantic.restore(snapshot);
 
                 if let Expr::Lambda(ast::ExprLambda {
                     args,
@@ -4684,13 +4691,13 @@ impl<'a> Checker<'a> {
         while !self.deferred.assignments.is_empty() {
             let assignments = std::mem::take(&mut self.deferred.assignments);
             for snapshot in assignments {
-                self.semantic_model.restore(snapshot);
+                self.semantic.restore(snapshot);
 
                 if self.enabled(Rule::UnusedVariable) {
-                    pyflakes::rules::unused_variable(self, self.semantic_model.scope_id);
+                    pyflakes::rules::unused_variable(self, self.semantic.scope_id);
                 }
                 if self.enabled(Rule::UnusedAnnotation) {
-                    pyflakes::rules::unused_annotation(self, self.semantic_model.scope_id);
+                    pyflakes::rules::unused_annotation(self, self.semantic.scope_id);
                 }
                 if !self.is_stub {
                     if self.any_enabled(&[
@@ -4700,14 +4707,11 @@ impl<'a> Checker<'a> {
                         Rule::UnusedStaticMethodArgument,
                         Rule::UnusedLambdaArgument,
                     ]) {
-                        let scope = &self.semantic_model.scopes[self.semantic_model.scope_id];
-                        let parent = &self.semantic_model.scopes[scope.parent.unwrap()];
+                        let scope = &self.semantic.scopes[self.semantic.scope_id];
+                        let parent = &self.semantic.scopes[scope.parent.unwrap()];
                         self.diagnostics
                             .extend(flake8_unused_arguments::rules::unused_arguments(
-                                self,
-                                parent,
-                                scope,
-                                &self.semantic_model.bindings,
+                                self, parent, scope,
                             ));
                     }
                 }
@@ -4720,11 +4724,10 @@ impl<'a> Checker<'a> {
             let for_loops = std::mem::take(&mut self.deferred.for_loops);
 
             for snapshot in for_loops {
-                self.semantic_model.restore(snapshot);
+                self.semantic.restore(snapshot);
 
                 if let Stmt::For(ast::StmtFor { target, body, .. })
-                | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) =
-                    &self.semantic_model.stmt()
+                | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) = &self.semantic.stmt()
                 {
                     if self.enabled(Rule::UnusedLoopControlVariable) {
                         flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
@@ -4759,10 +4762,10 @@ impl<'a> Checker<'a> {
 
         // Mark anything referenced in `__all__` as used.
         let exports: Vec<(&str, TextRange)> = {
-            let global_scope = self.semantic_model.global_scope();
-            global_scope
-                .bindings_for_name("__all__")
-                .map(|binding_id| &self.semantic_model.bindings[binding_id])
+            self.semantic
+                .global_scope()
+                .get_all("__all__")
+                .map(|binding_id| &self.semantic.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {
                     BindingKind::Export(Export { names }) => {
                         Some(names.iter().map(|name| (*name, binding.range)))
@@ -4774,12 +4777,9 @@ impl<'a> Checker<'a> {
         };
 
         for (name, range) in &exports {
-            if let Some(binding_id) = self.semantic_model.global_scope().get(name) {
-                self.semantic_model.add_global_reference(
-                    binding_id,
-                    *range,
-                    ExecutionContext::Runtime,
-                );
+            if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                self.semantic
+                    .add_global_reference(binding_id, *range, ExecutionContext::Runtime);
             }
         }
 
@@ -4790,17 +4790,17 @@ impl<'a> Checker<'a> {
             if self.settings.flake8_type_checking.strict {
                 vec![]
             } else {
-                self.semantic_model
+                self.semantic
                     .scopes
                     .iter()
                     .map(|scope| {
                         scope
                             .binding_ids()
-                            .map(|binding_id| &self.semantic_model.bindings[binding_id])
+                            .map(|binding_id| self.semantic.binding(binding_id))
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(
-                                    &self.semantic_model,
                                     binding,
+                                    &self.semantic,
                                 )
                             })
                             .collect()
@@ -4812,8 +4812,8 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope_id in self.semantic_model.dead_scopes.iter().rev() {
-            let scope = &self.semantic_model.scopes[*scope_id];
+        for scope_id in self.semantic.dead_scopes.iter().rev() {
+            let scope = &self.semantic.scopes[*scope_id];
 
             if scope.kind.is_module() {
                 // F822
@@ -4855,10 +4855,10 @@ impl<'a> Checker<'a> {
             // PLW0602
             if self.enabled(Rule::GlobalVariableNotAssigned) {
                 for (name, binding_id) in scope.bindings() {
-                    let binding = &self.semantic_model.bindings[binding_id];
+                    let binding = self.semantic.binding(binding_id);
                     if binding.kind.is_global() {
                         if let Some(source) = binding.source {
-                            let stmt = &self.semantic_model.stmts[source];
+                            let stmt = &self.semantic.stmts[source];
                             if stmt.is_global_stmt() {
                                 diagnostics.push(Diagnostic::new(
                                     pylint::rules::GlobalVariableNotAssigned {
@@ -4882,28 +4882,26 @@ impl<'a> Checker<'a> {
             // the bindings are in different scopes.
             if self.enabled(Rule::RedefinedWhileUnused) {
                 for (name, binding_id) in scope.bindings() {
-                    if let Some(shadowed_id) = self.semantic_model.shadowed_binding(binding_id) {
-                        let shadowed = &self.semantic_model.bindings[shadowed_id];
+                    if let Some(shadowed_id) = self.semantic.shadowed_binding(binding_id) {
+                        let shadowed = self.semantic.binding(shadowed_id);
                         if shadowed.is_used() {
                             continue;
                         }
 
                         #[allow(deprecated)]
                         let line = self.locator.compute_line_index(
-                            shadowed
-                                .trimmed_range(&self.semantic_model, self.locator)
-                                .start(),
+                            shadowed.trimmed_range(&self.semantic, self.locator).start(),
                         );
 
-                        let binding = &self.semantic_model.bindings[binding_id];
+                        let binding = self.semantic.binding(binding_id);
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::RedefinedWhileUnused {
                                 name: (*name).to_string(),
                                 line,
                             },
-                            binding.trimmed_range(&self.semantic_model, self.locator),
+                            binding.trimmed_range(&self.semantic, self.locator),
                         );
-                        if let Some(range) = binding.parent_range(&self.semantic_model) {
+                        if let Some(range) = binding.parent_range(&self.semantic) {
                             diagnostic.set_parent(range.start());
                         }
                         diagnostics.push(diagnostic);
@@ -4915,7 +4913,7 @@ impl<'a> Checker<'a> {
                 let runtime_imports: Vec<&Binding> = if self.settings.flake8_type_checking.strict {
                     vec![]
                 } else {
-                    self.semantic_model
+                    self.semantic
                         .scopes
                         .ancestor_ids(*scope_id)
                         .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
@@ -5020,10 +5018,10 @@ impl<'a> Checker<'a> {
 
         // Compute visibility of all definitions.
         let exports: Option<Vec<&str>> = {
-            let global_scope = self.semantic_model.global_scope();
+            let global_scope = self.semantic.global_scope();
             global_scope
-                .bindings_for_name("__all__")
-                .map(|binding_id| &self.semantic_model.bindings[binding_id])
+                .get_all("__all__")
+                .map(|binding_id| &self.semantic.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {
                     BindingKind::Export(Export { names }) => Some(names.iter().copied()),
                     _ => None,
@@ -5033,7 +5031,7 @@ impl<'a> Checker<'a> {
                 })
         };
 
-        let definitions = std::mem::take(&mut self.semantic_model.definitions);
+        let definitions = std::mem::take(&mut self.semantic.definitions);
         let mut overloaded_name: Option<String> = None;
         for ContextualizedDefinition {
             definition,
@@ -5051,9 +5049,9 @@ impl<'a> Checker<'a> {
                 // classes, etc.).
                 if !overloaded_name.map_or(false, |overloaded_name| {
                     flake8_annotations::helpers::is_overload_impl(
-                        &self.semantic_model,
                         definition,
                         &overloaded_name,
+                        &self.semantic,
                     )
                 }) {
                     self.diagnostics
@@ -5064,7 +5062,7 @@ impl<'a> Checker<'a> {
                         ));
                 }
                 overloaded_name =
-                    flake8_annotations::helpers::overloaded_name(&self.semantic_model, definition);
+                    flake8_annotations::helpers::overloaded_name(definition, &self.semantic);
             }
 
             // flake8-pyi
@@ -5082,9 +5080,9 @@ impl<'a> Checker<'a> {
             // pydocstyle
             if enforce_docstrings {
                 if pydocstyle::helpers::should_ignore_definition(
-                    &self.semantic_model,
                     definition,
                     &self.settings.pydocstyle.ignore_decorators,
+                    &self.semantic,
                 ) {
                     continue;
                 }
@@ -5244,9 +5242,9 @@ pub(crate) fn check_ast(
             ModuleKind::Module
         },
         source: if let Some(module_path) = module_path.as_ref() {
-            ModuleSource::Path(module_path)
+            visibility::ModuleSource::Path(module_path)
         } else {
-            ModuleSource::File(path)
+            visibility::ModuleSource::File(path)
         },
         python_ast,
     };
@@ -5288,8 +5286,8 @@ pub(crate) fn check_ast(
     checker.check_definitions();
 
     // Reset the scope to module-level, and check all consumed scopes.
-    checker.semantic_model.scope_id = ScopeId::global();
-    checker.semantic_model.dead_scopes.push(ScopeId::global());
+    checker.semantic.scope_id = ScopeId::global();
+    checker.semantic.dead_scopes.push(ScopeId::global());
     checker.check_dead_scopes();
 
     checker.diagnostics

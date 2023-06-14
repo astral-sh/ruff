@@ -14,7 +14,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
 use ruff_python_semantic::analyze::visibility::is_abstract;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
@@ -245,11 +245,11 @@ where
 }
 
 fn get_fixture_decorator<'a>(
-    model: &SemanticModel,
     decorators: &'a [Decorator],
+    semantic: &SemanticModel,
 ) -> Option<&'a Decorator> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(model, decorator) || is_pytest_yield_fixture(model, decorator)
+        is_pytest_fixture(decorator, semantic) || is_pytest_yield_fixture(decorator, semantic)
     })
 }
 
@@ -436,7 +436,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 
 /// PT020
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
-    if is_pytest_yield_fixture(checker.semantic_model(), decorator) {
+    if is_pytest_yield_fixture(decorator, checker.semantic()) {
         checker.diagnostics.push(Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
@@ -504,7 +504,7 @@ pub(crate) fn fixture(
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
-    let decorator = get_fixture_decorator(checker.semantic_model(), decorators);
+    let decorator = get_fixture_decorator(decorators, checker.semantic());
     if let Some(decorator) = decorator {
         if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
             || checker.enabled(Rule::PytestFixturePositionalArgs)
@@ -522,7 +522,7 @@ pub(crate) fn fixture(
         if (checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
             || checker.enabled(Rule::PytestIncorrectFixtureNameUnderscore)
             || checker.enabled(Rule::PytestUselessYieldFixture))
-            && !is_abstract(checker.semantic_model(), decorators)
+            && !is_abstract(decorators, checker.semantic())
         {
             check_fixture_returns(checker, stmt, name, body);
         }

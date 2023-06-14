@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Constant, Decorator, Expr, Keyword};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::PythonWhitespace;
 
 pub(super) fn get_mark_decorators(
@@ -20,41 +20,41 @@ pub(super) fn get_mark_decorators(
     })
 }
 
-pub(super) fn is_pytest_fail(model: &SemanticModel, call: &Expr) -> bool {
-    model.resolve_call_path(call).map_or(false, |call_path| {
+pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(call).map_or(false, |call_path| {
         call_path.as_slice() == ["pytest", "fail"]
     })
 }
 
-pub(super) fn is_pytest_fixture(model: &SemanticModel, decorator: &Decorator) -> bool {
-    model
+pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "fixture"]
         })
 }
 
-pub(super) fn is_pytest_yield_fixture(model: &SemanticModel, decorator: &Decorator) -> bool {
-    model
+pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "yield_fixture"]
         })
 }
 
-pub(super) fn is_pytest_parametrize(model: &SemanticModel, decorator: &Decorator) -> bool {
-    model
+pub(super) fn is_pytest_parametrize(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "mark", "parametrize"]
         })
 }
 
-pub(super) fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
+pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
     if let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(string),
         ..
-    }) = &kw.value
+    }) = &keyword.value
     {
         string == literal
     } else {

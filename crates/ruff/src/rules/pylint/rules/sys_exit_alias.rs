@@ -65,7 +65,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         if id != name {
             continue;
         }
-        if !checker.semantic_model().is_builtin(name) {
+        if !checker.semantic().is_builtin(name) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(
@@ -79,7 +79,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                 let (import_edit, binding) = checker.importer.get_or_import_symbol(
                     &ImportRequest::import("sys", "exit"),
                     func.start(),
-                    checker.semantic_model(),
+                    checker.semantic(),
                 )?;
                 let reference_edit = Edit::range_replacement(binding, func.range());
                 #[allow(deprecated)]

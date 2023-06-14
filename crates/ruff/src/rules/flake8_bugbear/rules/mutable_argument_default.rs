@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Arguments, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::is_immutable_annotation;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -26,15 +26,15 @@ const MUTABLE_FUNCS: &[&[&str]] = &[
     &["collections", "deque"],
 ];
 
-pub(crate) fn is_mutable_func(model: &SemanticModel, func: &Expr) -> bool {
-    model.resolve_call_path(func).map_or(false, |call_path| {
+pub(crate) fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
         MUTABLE_FUNCS
             .iter()
             .any(|target| call_path.as_slice() == *target)
     })
 }
 
-fn is_mutable_expr(model: &SemanticModel, expr: &Expr) -> bool {
+fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::List(_)
         | Expr::Dict(_)
@@ -42,7 +42,7 @@ fn is_mutable_expr(model: &SemanticModel, expr: &Expr) -> bool {
         | Expr::ListComp(_)
         | Expr::DictComp(_)
         | Expr::SetComp(_) => true,
-        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(model, func),
+        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(func, semantic),
         _ => false,
     }
 }
@@ -64,9 +64,9 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Argume
                 .zip(arguments.defaults.iter().rev()),
         )
     {
-        if is_mutable_expr(checker.semantic_model(), default)
+        if is_mutable_expr(default, checker.semantic())
             && !arg.annotation.as_ref().map_or(false, |expr| {
-                is_immutable_annotation(checker.semantic_model(), expr)
+                is_immutable_annotation(expr, checker.semantic())
             })
         {
             checker

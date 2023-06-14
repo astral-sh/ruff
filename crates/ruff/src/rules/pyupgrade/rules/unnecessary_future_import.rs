@@ -115,8 +115,8 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
                 .iter()
                 .map(|alias| format!("__future__.{}", alias.name))
                 .collect();
-            let stmt = checker.semantic_model().stmt();
-            let parent = checker.semantic_model().stmt_parent();
+            let stmt = checker.semantic().stmt();
+            let parent = checker.semantic().stmt_parent();
             let edit = autofix::edits::remove_unused_imports(
                 unused_imports.iter().map(String::as_str),
                 stmt,

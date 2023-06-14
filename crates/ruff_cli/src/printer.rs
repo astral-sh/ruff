@@ -141,9 +141,9 @@ impl Printer {
                     .sum::<usize>();
                 if fixed > 0 {
                     let s = if fixed == 1 { "" } else { "s" };
-                    if matches!(self.autofix_level, flags::FixMode::Apply) {
+                    if self.autofix_level.is_apply() {
                         writeln!(stdout, "Fixed {fixed} error{s}.")?;
-                    } else if matches!(self.autofix_level, flags::FixMode::Diff) {
+                    } else {
                         writeln!(stdout, "Would fix {fixed} error{s}.")?;
                     }
                 }
@@ -391,7 +391,7 @@ const fn show_fix_status(autofix_level: flags::FixMode) -> bool {
     // this pass! (We're occasionally unable to determine whether a specific
     // violation is fixable without trying to fix it, so if autofix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    !matches!(autofix_level, flags::FixMode::Apply)
+    !autofix_level.is_apply()
 }
 
 fn print_fix_summary<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) -> Result<()> {

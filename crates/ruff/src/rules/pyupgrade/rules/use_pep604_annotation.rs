@@ -79,8 +79,8 @@ pub(crate) fn use_pep604_annotation(
     operator: Pep604Operator,
 ) {
     // Avoid fixing forward references, or types not in an annotation.
-    let fixable = checker.semantic_model().in_type_definition()
-        && !checker.semantic_model().in_complex_string_type_definition();
+    let fixable = checker.semantic().in_type_definition()
+        && !checker.semantic().in_complex_string_type_definition();
     match operator {
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());

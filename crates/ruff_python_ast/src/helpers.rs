@@ -1393,7 +1393,7 @@ impl<'a> SimpleCallArgs<'a> {
     }
 }
 
-/// Check if a node is parent of a conditional branch.
+/// Check if a node is part of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
         if matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)) {

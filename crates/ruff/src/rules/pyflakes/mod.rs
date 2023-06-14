@@ -356,6 +356,15 @@ mod tests {
             "#,
         "print_after_shadowing_except"
     )]
+    #[test_case(
+        r#"
+        def f():
+            x = 1
+            del x
+            del x
+            "#,
+        "double_del"
+    )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(contents, &Settings::for_rules(&Linter::Pyflakes));
         assert_messages!(snapshot, diagnostics);

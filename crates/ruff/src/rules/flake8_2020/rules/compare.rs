@@ -69,7 +69,7 @@ impl Violation for SysVersionCmpStr10 {
 pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
     match left {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
-            if is_sys(checker.semantic_model(), value, "version_info") =>
+            if is_sys(value, "version_info", checker.semantic()) =>
         {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(i),
@@ -111,7 +111,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
         }
 
         Expr::Attribute(ast::ExprAttribute { value, attr, .. })
-            if is_sys(checker.semantic_model(), value, "version_info") && attr == "minor" =>
+            if is_sys(value, "version_info", checker.semantic()) && attr == "minor" =>
         {
             if let (
                 [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
@@ -132,7 +132,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
         _ => {}
     }
 
-    if is_sys(checker.semantic_model(), left, "version") {
+    if is_sys(left, "version", checker.semantic()) {
         if let (
             [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
             [Expr::Constant(ast::ExprConstant {

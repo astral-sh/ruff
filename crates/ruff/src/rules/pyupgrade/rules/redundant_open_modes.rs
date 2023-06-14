@@ -194,7 +194,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
 /// UP015
 pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
-    if !checker.semantic_model().is_builtin(OPEN_FUNC_NAME) {
+    if !checker.semantic().is_builtin(OPEN_FUNC_NAME) {
         return;
     }
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);

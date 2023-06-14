@@ -216,8 +216,8 @@ fn fix_py2_block(
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
-        let stmt = checker.semantic_model().stmt();
-        let parent = checker.semantic_model().stmt_parent();
+        let stmt = checker.semantic().stmt();
+        let parent = checker.semantic().stmt_parent();
         let edit = delete_stmt(
             stmt,
             if matches!(block.leading_token.tok, StartTok::If) { parent } else { None },
@@ -364,7 +364,7 @@ pub(crate) fn outdated_version_block(
     };
 
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(left)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["sys", "version_info"]

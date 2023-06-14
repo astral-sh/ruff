@@ -5,6 +5,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
 
+use crate::settings::types::IdentifierPattern;
+
 /// ## What it does
 /// Checks for custom exception definitions that omit the `Error` suffix.
 ///
@@ -47,7 +49,15 @@ pub(crate) fn error_suffix_on_exception_name(
     bases: &[Expr],
     name: &str,
     locator: &Locator,
+    ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
+    if ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name.matches(name))
+    {
+        return None;
+    }
+
     if !bases.iter().any(|base| {
         if let Expr::Name(ast::ExprName { id, .. }) = &base {
             id == "Exception" || id.ends_with("Error")

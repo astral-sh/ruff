@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_semantic::analyze::visibility::is_overload;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -27,7 +27,7 @@ pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     }) = docstring.definition else {
         return;
     };
-    if !is_overload(checker.semantic_model(), cast::decorator_list(stmt)) {
+    if !is_overload(cast::decorator_list(stmt), checker.semantic()) {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(

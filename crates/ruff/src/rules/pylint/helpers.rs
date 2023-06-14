@@ -1,15 +1,15 @@
-use ruff_python_semantic::analyze::function_type;
-use ruff_python_semantic::analyze::function_type::FunctionType;
-use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::ScopeKind;
+use std::fmt;
+
 use rustpython_parser::ast;
 use rustpython_parser::ast::Cmpop;
-use std::fmt;
+
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::settings::Settings;
 
-pub(super) fn in_dunder_init(model: &SemanticModel, settings: &Settings) -> bool {
-    let scope = model.scope();
+pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &Settings) -> bool {
+    let scope = semantic.scope();
     let (
         ScopeKind::Function(ast::StmtFunctionDef {
             name,
@@ -27,20 +27,20 @@ pub(super) fn in_dunder_init(model: &SemanticModel, settings: &Settings) -> bool
     if name != "__init__" {
         return false;
     }
-    let Some(parent) = scope.parent.map(|scope_id| &model.scopes[scope_id]) else {
+    let Some(parent) = scope.parent.map(|scope_id| &semantic.scopes[scope_id]) else {
         return false;
     };
 
     if !matches!(
         function_type::classify(
-            model,
-            parent,
             name,
             decorator_list,
+            parent,
+            semantic,
             &settings.pep8_naming.classmethod_decorators,
             &settings.pep8_naming.staticmethod_decorators,
         ),
-        FunctionType::Method
+        function_type::FunctionType::Method
     ) {
         return false;
     }
