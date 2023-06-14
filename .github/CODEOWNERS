@@ -85,5 +85,3 @@
 /crates/ruff/src/rules/pyupgrade/
 /crates/ruff/src/rules/ruff/
 /crates/ruff/src/rules/tryceratops/
-
-/some/foo/bar/
