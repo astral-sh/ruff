@@ -6,11 +6,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use ruff::message::Message;
 use ruff::settings::Settings;
+use ruff::warn_user;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_python_ast::imports::ImportMap;
@@ -45,7 +46,7 @@ impl PackageCache {
         cache_dir: &Path,
         package_root: PathBuf,
         settings: &Settings,
-    ) -> Result<PackageCache> {
+    ) -> PackageCache {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let mut buf = itoa::Buffer::new();
@@ -56,32 +57,42 @@ impl PackageCache {
             Ok(file) => file,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // No cache exist yet, return an empty cache.
-                return Ok(PackageCache {
-                    path,
-                    package_root,
-                    files: Mutex::new(HashMap::new()),
-                });
+                return PackageCache::empty(path, package_root);
             }
             Err(err) => {
-                return Err(err)
-                    .with_context(|| format!("Failed to open cache file '{}'", path.display()))?
+                warn_user!("Failed to open cache file '{}': {err}", path.display());
+                return PackageCache::empty(path, package_root);
             }
         };
 
-        let mut cache: PackageCache = bincode::deserialize_from(BufReader::new(file))
-            .with_context(|| format!("Failed parse cache file '{}'", path.display()))?;
+        let mut cache: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
+            Ok(cache) => cache,
+            Err(err) => {
+                warn_user!("Failed parse cache file '{}': {err}", path.display());
+                return PackageCache::empty(path, package_root);
+            }
+        };
 
         // Sanity check.
         if cache.package_root != package_root {
-            return Err(anyhow!(
+            warn_user!(
                 "Different package root in cache: expected '{}', got '{}'",
                 package_root.display(),
                 cache.package_root.display(),
-            ));
+            );
+            cache.files.lock().unwrap().clear();
         }
 
         cache.path = path;
-        Ok(cache)
+        cache
+    }
+
+    pub(crate) fn empty(path: PathBuf, package_root: PathBuf) -> PackageCache {
+        PackageCache {
+            path,
+            package_root,
+            files: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Store the cache to disk.

@@ -100,7 +100,7 @@ pub(crate) fn run(
                     &settings.cli.cache_dir,
                     package_root.to_owned(),
                     &settings.lib,
-                )?;
+                );
                 entry.insert(cache);
             }
         }
