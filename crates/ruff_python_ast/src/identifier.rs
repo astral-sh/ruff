@@ -20,7 +20,7 @@ use std::ops::{Add, Sub};
 use std::str::Chars;
 
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{Alias, Arg};
+use rustpython_ast::{Alias, Arg, Pattern};
 use rustpython_parser::ast::{self, Excepthandler, Ranged, Stmt};
 
 use ruff_python_whitespace::is_python_whitespace;
@@ -28,7 +28,14 @@ use ruff_python_whitespace::is_python_whitespace;
 use crate::source_code::Locator;
 
 pub trait Identifier {
+    /// Return the [`TextRange`] of the identifier in the given AST node.
     fn identifier(&self, locator: &Locator) -> TextRange;
+}
+
+pub trait TryIdentifier {
+    /// Return the [`TextRange`] of the identifier in the given AST node, or `None` if
+    /// the node does not have an identifier.
+    fn try_identifier(&self, locator: &Locator) -> Option<TextRange>;
 }
 
 impl Identifier for Stmt {
@@ -117,13 +124,122 @@ impl Identifier for Alias {
             // The second identifier is the "as" keyword.
             // The third identifier is the alias name.
             IdentifierTokenizer::new(locator.contents(), self.range())
-                .nth(2)
+                .last()
                 .expect("Failed to find alias identifier")
         }
     }
 }
 
-impl Identifier for Excepthandler {
+impl TryIdentifier for Pattern {
+    /// Return the [`TextRange`] of the identifier in the given pattern.
+    ///
+    /// For example, return the range of `z` in:
+    /// ```python
+    /// match x:
+    ///     # Pattern::MatchAs
+    ///     case z:
+    ///         ...
+    /// ```
+    ///
+    /// Or:
+    /// ```python
+    /// match x:
+    ///     # Pattern::MatchAs
+    ///     case y as z:
+    ///         ...
+    /// ```
+    ///
+    /// Or :
+    /// ```python
+    /// match x:
+    ///     # Pattern::MatchMapping
+    ///     case {"a": 1, **z}
+    ///         ...
+    /// ```
+    ///
+    /// Or :
+    /// ```python
+    /// match x:
+    ///     # Pattern::MatchStar
+    ///     case *z:
+    ///         ...
+    /// ```
+    fn try_identifier(&self, locator: &Locator) -> Option<TextRange> {
+        match self {
+            Pattern::MatchAs(ast::PatternMatchAs {
+                name: Some(_),
+                pattern,
+                range,
+            }) => {
+                Some(if let Some(pattern) = pattern {
+                    // Identify `z` in:
+                    // ```python
+                    // match x:
+                    //     case Foo(bar) as z:
+                    //         ...
+                    // ```
+                    IdentifierTokenizer::starts_at(pattern.end(), locator.contents())
+                        .nth(1)
+                        .expect("Unable to identify identifier in pattern")
+                } else {
+                    // Identify `z` in:
+                    // ```python
+                    // match x:
+                    //     case z:
+                    //         ...
+                    // ```
+                    *range
+                })
+            }
+            Pattern::MatchMapping(ast::PatternMatchMapping {
+                patterns,
+                rest: Some(_),
+                ..
+            }) => {
+                Some(if let Some(pattern) = patterns.last() {
+                    // Identify `z` in:
+                    // ```python
+                    // match x:
+                    //     case {"a": 1, **z}
+                    //         ...
+                    // ```
+                    //
+                    // A mapping pattern can contain at most one double-star pattern,
+                    // and it must be the last pattern in the mapping.
+                    IdentifierTokenizer::starts_at(pattern.end(), locator.contents())
+                        .next()
+                        .expect("Unable to identify identifier in pattern")
+                } else {
+                    // Identify `z` in:
+                    // ```python
+                    // match x:
+                    //     case {**z}
+                    //         ...
+                    // ```
+                    IdentifierTokenizer::starts_at(self.start(), locator.contents())
+                        .next()
+                        .expect("Unable to identify identifier in pattern")
+                })
+            }
+            Pattern::MatchStar(ast::PatternMatchStar { name: Some(_), .. }) => {
+                // Identify `z` in:
+                // ```python
+                // match x:
+                //     case *z:
+                //         ...
+                // ```
+                Some(
+                    IdentifierTokenizer::starts_at(self.start(), locator.contents())
+                        .next()
+                        .expect("Unable to identify identifier in pattern"),
+                )
+            }
+            _ => None,
+        }
+    }
+}
+
+impl TryIdentifier for Excepthandler {
     /// Return the [`TextRange`] of a named exception in an [`Excepthandler`].
     ///
     /// For example, return the range of `e` in:
@@ -133,16 +249,30 @@ impl Identifier for Excepthandler {
     /// except ValueError as e:
     ///     ...
     /// ```
-    fn identifier(&self, locator: &Locator) -> TextRange {
+    fn try_identifier(&self, locator: &Locator) -> Option<TextRange> {
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, name, .. }) =
+            self;
+
+        if name.is_none() {
+            return None;
+        }
+
+        let Some(type_) = type_ else {
+            return None;
+        };
+
         // The exception name is the first identifier token after the `as` keyword.
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = self;
-        IdentifierTokenizer::starts_at(type_.as_ref().unwrap().end(), locator.contents())
-            .nth(1)
-            .expect("Failed to find exception identifier in exception handler")
+        Some(
+            IdentifierTokenizer::starts_at(type_.end(), locator.contents())
+                .nth(1)
+                .expect("Failed to find exception identifier in exception handler"),
+        )
     }
 }
 
-/// Return the ranges of [`Tok::Name`] tokens within a specified node.
+/// Return the [`TextRange`] for every name in a [`Stmt`].
+///
+/// Intended to be used for `global` and `nonlocal` statements.
 ///
 /// For example, return the ranges of `x` and `y` in:
 /// ```python
@@ -161,17 +291,50 @@ pub fn except(handler: &Excepthandler, locator: &Locator) -> TextRange {
         .expect("Failed to find `except` token in `Excepthandler`")
 }
 
-/// Return `true` if the given character is a valid identifier character.
-fn is_python_identifier(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '.'
+/// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
+pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
+    let (Stmt::For(ast::StmtFor { body, orelse, .. })
+        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+        | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt else {
+        return None;
+    };
+
+    if orelse.is_empty() {
+        return None;
+    }
+
+    IdentifierTokenizer::starts_at(
+        body.last().expect("Expected body to be non-empty").end(),
+        locator.contents(),
+    )
+    .next()
+}
+
+/// Return `true` if the given character starts a valid Python identifier.
+///
+/// Python identifiers must start with an alphabetic character or an underscore.
+fn is_python_identifier_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+/// Return `true` if the given character is a valid Python identifier continuation character.
+///
+/// Python identifiers can contain alphanumeric characters and underscores, but cannot start with a
+/// number.
+fn is_python_identifier_continue(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }
 
 /// Simple zero allocation tokenizer for Python identifiers.
 ///
-/// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
+/// The tokenizer must operate over a range that can only contain identifiers, keywords, and
+/// comments (along with whitespace and continuation characters). It does not support other tokens,
+/// like operators, literals, or delimiters. It also does not differentiate between keywords and
+/// identifiers, treating every valid token as an "identifier".
 ///
-/// The tokenizer doesn't guarantee any correctness after it returned a [`TokenKind::Other`]. That's why it
-/// will return [`TokenKind::Bogus`] for every character after until it reaches the end of the file.
+/// This is useful for cases like, e.g., identifying the alias name in an aliased import (`bar` in
+/// `import foo as bar`), where we're guaranteed to only have identifiers and keywords in the
+/// relevant range.
 pub(crate) struct IdentifierTokenizer<'a> {
     cursor: Cursor<'a>,
     offset: TextSize,
@@ -193,9 +356,9 @@ impl<'a> IdentifierTokenizer<'a> {
     fn next_token(&mut self) -> Option<TextRange> {
         while let Some(c) = self.cursor.bump() {
             match c {
-                c if is_python_identifier(c) => {
+                c if is_python_identifier_start(c) => {
                     let start = self.offset.add(self.cursor.offset()).sub(c.text_len());
-                    self.cursor.eat_while(is_python_identifier);
+                    self.cursor.eat_while(is_python_identifier_continue);
                     let end = self.offset.add(self.cursor.offset());
                     return Some(TextRange::new(start, end));
                 }
@@ -300,11 +463,11 @@ impl<'a> Cursor<'a> {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_text_size::{TextLen, TextRange, TextSize};
+    use ruff_text_size::{TextRange, TextSize};
     use rustpython_ast::Stmt;
     use rustpython_parser::Parse;
 
-    use crate::helpers::{elif_else_range, else_range, first_colon_range};
+    use crate::identifier;
     use crate::identifier::Identifier;
     use crate::source_code::Locator;
 
@@ -447,54 +610,12 @@ else:
         .trim();
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
-        let range = else_range(&stmt, &locator).unwrap();
+        let range = identifier::else_(&stmt, &locator).unwrap();
         assert_eq!(&contents[range], "else");
         assert_eq!(
             range,
             TextRange::new(TextSize::from(21), TextSize::from(25))
         );
-        Ok(())
-    }
-
-    #[test]
-    fn extract_first_colon_range() {
-        let contents = "with a: pass";
-        let locator = Locator::new(contents);
-        let range = first_colon_range(
-            TextRange::new(TextSize::from(0), contents.text_len()),
-            &locator,
-        )
-        .unwrap();
-        assert_eq!(&contents[range], ":");
-        assert_eq!(range, TextRange::new(TextSize::from(6), TextSize::from(7)));
-    }
-
-    #[test]
-    fn extract_elif_else_range() -> Result<()> {
-        let contents = "if a:
-    ...
-elif b:
-    ...
-";
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let locator = Locator::new(contents);
-        let range = elif_else_range(stmt, &locator).unwrap();
-        assert_eq!(range.start(), TextSize::from(14));
-        assert_eq!(range.end(), TextSize::from(18));
-
-        let contents = "if a:
-    ...
-else:
-    ...
-";
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let locator = Locator::new(contents);
-        let range = elif_else_range(stmt, &locator).unwrap();
-        assert_eq!(range.start(), TextSize::from(14));
-        assert_eq!(range.end(), TextSize::from(18));
-
         Ok(())
     }
 }

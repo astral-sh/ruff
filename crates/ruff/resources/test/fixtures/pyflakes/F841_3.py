@@ -108,3 +108,33 @@ def f():
 
 def f():
     toplevel = tt = 1
+
+
+def f(provided: int) -> int:
+    match provided:
+        case [_, *x]:
+            pass
+
+
+def f(provided: int) -> int:
+    match provided:
+        case x:
+            pass
+
+
+def f(provided: int) -> int:
+    match provided:
+        case Foo(bar) as x:
+            pass
+
+
+def f(provided: int) -> int:
+    match provided:
+        case {"foo": 0, **x}:
+            pass
+
+
+def f(provided: int) -> int:
+    match provided:
+        case {**x}:
+            pass

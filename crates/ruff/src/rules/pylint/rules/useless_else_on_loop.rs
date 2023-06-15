@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Excepthandler, MatchCase, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
+use ruff_python_ast::identifier;
 
 use crate::checkers::ast::Checker;
 
@@ -102,7 +102,7 @@ pub(crate) fn useless_else_on_loop(
     if !orelse.is_empty() && !loop_exits_early(body) {
         checker.diagnostics.push(Diagnostic::new(
             UselessElseOnLoop,
-            helpers::else_range(stmt, checker.locator).unwrap(),
+            identifier::else_(stmt, checker.locator).unwrap(),
         ));
     }
 }

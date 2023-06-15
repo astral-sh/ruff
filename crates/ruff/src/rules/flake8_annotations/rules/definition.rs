@@ -2,10 +2,10 @@ use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::cast;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{cast};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
 use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;

@@ -12,8 +12,8 @@ use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::prelude::Decorator;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{visitor};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
 

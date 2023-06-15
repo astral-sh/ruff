@@ -42,6 +42,7 @@ where
             range: _range,
         }) = expr
         {
+            // Ex) `list()`
             if args.is_empty() && keywords.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
@@ -1069,30 +1070,6 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
     }
 }
 
-/// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
-pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    match stmt {
-        Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. })
-            if !orelse.is_empty() =>
-        {
-            let body_end = body.last().expect("Expected body to be non-empty").end();
-            let or_else_start = orelse
-                .first()
-                .expect("Expected orelse to be non-empty")
-                .start();
-            let contents = &locator.contents()[TextRange::new(body_end, or_else_start)];
-
-            lexer::lex_starts_at(contents, Mode::Module, body_end)
-                .flatten()
-                .find(|(kind, _)| matches!(kind, Tok::Else))
-                .map(|(_, range)| range)
-        }
-        _ => None,
-    }
-}
-
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRange> {
     let contents = &locator.contents()[range];
@@ -1398,8 +1375,10 @@ impl Truthiness {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         if args.is_empty() && keywords.is_empty() {
+                            // Ex) `list()`
                             Some(false)
                         } else if args.len() == 1 && keywords.is_empty() {
+                            // Ex) `list([1, 2, 3])`
                             Self::from_expr(&args[0], is_builtin).into()
                         } else {
                             None
@@ -1521,13 +1500,14 @@ mod tests {
     use std::borrow::Cow;
 
     use anyhow::Result;
-    use ruff_text_size::TextSize;
-    use rustpython_ast::{Cmpop, Expr};
+    use ruff_text_size::{TextLen, TextRange, TextSize};
+    use rustpython_ast::{Cmpop, Expr, Stmt};
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
     use crate::helpers::{
-        has_trailing_content, locate_cmpops, resolve_imported_module_path, LocatedCmpop,
+        elif_else_range, first_colon_range, has_trailing_content, locate_cmpops,
+        resolve_imported_module_path, LocatedCmpop,
     };
     use crate::source_code::Locator;
 
@@ -1605,6 +1585,48 @@ y = 2
             resolve_imported_module_path(Some(2), Some("foo"), Some(&["bar".to_string()])),
             None
         );
+    }
+
+    #[test]
+    fn extract_first_colon_range() {
+        let contents = "with a: pass";
+        let locator = Locator::new(contents);
+        let range = first_colon_range(
+            TextRange::new(TextSize::from(0), contents.text_len()),
+            &locator,
+        )
+        .unwrap();
+        assert_eq!(&contents[range], ":");
+        assert_eq!(range, TextRange::new(TextSize::from(6), TextSize::from(7)));
+    }
+
+    #[test]
+    fn extract_elif_else_range() -> Result<()> {
+        let contents = "if a:
+    ...
+elif b:
+    ...
+";
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
+        let locator = Locator::new(contents);
+        let range = elif_else_range(stmt, &locator).unwrap();
+        assert_eq!(range.start(), TextSize::from(14));
+        assert_eq!(range.end(), TextSize::from(18));
+
+        let contents = "if a:
+    ...
+else:
+    ...
+";
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
+        let locator = Locator::new(contents);
+        let range = elif_else_range(stmt, &locator).unwrap();
+        assert_eq!(range.start(), TextSize::from(14));
+        assert_eq!(range.end(), TextSize::from(18));
+
+        Ok(())
     }
 
     #[test]

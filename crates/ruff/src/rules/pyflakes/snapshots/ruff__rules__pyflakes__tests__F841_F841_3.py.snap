@@ -502,6 +502,9 @@ F841_3.py:110:5: F841 [*] Local variable `toplevel` is assigned to but never use
 109 109 | def f():
 110     |-    toplevel = tt = 1
     110 |+    tt = 1
+111 111 | 
+112 112 | 
+113 113 | def f(provided: int) -> int:
 
 F841_3.py:110:16: F841 [*] Local variable `tt` is assigned to but never used
     |
@@ -517,5 +520,68 @@ F841_3.py:110:16: F841 [*] Local variable `tt` is assigned to but never used
 109 109 | def f():
 110     |-    toplevel = tt = 1
     110 |+    toplevel = 1
+111 111 | 
+112 112 | 
+113 113 | def f(provided: int) -> int:
+
+F841_3.py:115:19: F841 Local variable `x` is assigned to but never used
+    |
+113 | def f(provided: int) -> int:
+114 |     match provided:
+115 |         case [_, *x]:
+    |                   ^ F841
+116 |             pass
+    |
+    = help: Remove assignment to unused variable `x`
+
+F841_3.py:121:14: F841 Local variable `x` is assigned to but never used
+    |
+119 | def f(provided: int) -> int:
+120 |     match provided:
+121 |         case x:
+    |              ^ F841
+122 |             pass
+    |
+    = help: Remove assignment to unused variable `x`
+
+F841_3.py:127:18: F841 Local variable `bar` is assigned to but never used
+    |
+125 | def f(provided: int) -> int:
+126 |     match provided:
+127 |         case Foo(bar) as x:
+    |                  ^^^ F841
+128 |             pass
+    |
+    = help: Remove assignment to unused variable `bar`
+
+F841_3.py:127:26: F841 Local variable `x` is assigned to but never used
+    |
+125 | def f(provided: int) -> int:
+126 |     match provided:
+127 |         case Foo(bar) as x:
+    |                          ^ F841
+128 |             pass
+    |
+    = help: Remove assignment to unused variable `x`
+
+F841_3.py:133:27: F841 Local variable `x` is assigned to but never used
+    |
+131 | def f(provided: int) -> int:
+132 |     match provided:
+133 |         case {"foo": 0, **x}:
+    |                           ^ F841
+134 |             pass
+    |
+    = help: Remove assignment to unused variable `x`
+
+F841_3.py:139:17: F841 Local variable `x` is assigned to but never used
+    |
+137 | def f(provided: int) -> int:
+138 |     match provided:
+139 |         case {**x}:
+    |                 ^ F841
+140 |             pass
+    |
+    = help: Remove assignment to unused variable `x`
 
 

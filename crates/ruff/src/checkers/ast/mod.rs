@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::identifier::{Identifier, TryIdentifier};
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
@@ -809,7 +809,6 @@ where
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
-                            // NOTE: Incorrect, needs to be the range of the alias.
                             alias.identifier(self.locator),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
@@ -830,7 +829,6 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.identifier(self.locator),
                             BindingKind::SubmoduleImportation(SubmoduleImportation {
                                 qualified_name,
@@ -842,7 +840,6 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.identifier(self.locator),
                             BindingKind::Importation(Importation { qualified_name }),
                             if alias
@@ -1088,7 +1085,6 @@ where
 
                         self.add_binding(
                             name,
-                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.identifier(self.locator),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
@@ -1150,7 +1146,6 @@ where
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
-                            // NOTE: Incorrect, needs to be the range of `name`.
                             alias.identifier(self.locator),
                             BindingKind::FromImportation(FromImportation { qualified_name }),
                             if alias
@@ -1877,7 +1872,6 @@ where
 
                 self.add_binding(
                     name,
-                    // NOTE: Correct!
                     stmt.identifier(self.locator),
                     BindingKind::FunctionDefinition,
                     BindingFlags::empty(),
@@ -2101,7 +2095,6 @@ where
                 self.semantic.pop_definition();
                 self.add_binding(
                     name,
-                    // NOTE: Correct!
                     stmt.identifier(self.locator),
                     BindingKind::ClassDefinition,
                     BindingFlags::empty(),
@@ -3910,7 +3903,7 @@ where
                 }
                 match name {
                     Some(name) => {
-                        let range = excepthandler.identifier(self.locator);
+                        let range = excepthandler.try_identifier(self.locator).unwrap();
 
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
@@ -3931,7 +3924,6 @@ where
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(
                             name,
-                            // NOTE: Correct, we already extract this.
                             range,
                             BindingKind::Assignment,
                             BindingFlags::empty(),
@@ -3942,7 +3934,6 @@ where
                         // Remove it from the scope immediately after.
                         self.add_binding(
                             name,
-                            // NOTE: Correct
                             range,
                             BindingKind::UnboundException,
                             BindingFlags::empty(),
@@ -4068,9 +4059,7 @@ where
         {
             self.add_binding(
                 name,
-                // TODO(charlie): This needs to use the range of the identifier, not the range of
-                // the pattern.
-                pattern.range(),
+                pattern.try_identifier(self.locator).unwrap(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
             );
@@ -4447,7 +4436,6 @@ impl<'a> Checker<'a> {
         ) {
             self.add_binding(
                 id,
-                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::Annotation,
                 BindingFlags::empty(),
@@ -4458,7 +4446,6 @@ impl<'a> Checker<'a> {
         if matches!(parent, Stmt::For(_) | Stmt::AsyncFor(_)) {
             self.add_binding(
                 id,
-                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::LoopVar,
                 BindingFlags::empty(),
@@ -4469,7 +4456,6 @@ impl<'a> Checker<'a> {
         if helpers::is_unpacking_assignment(parent, expr) {
             self.add_binding(
                 id,
-                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::UnpackedAssignment,
                 BindingFlags::empty(),
@@ -4523,7 +4509,6 @@ impl<'a> Checker<'a> {
 
             self.add_binding(
                 id,
-                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::Export(Export { names }),
                 BindingFlags::empty(),
@@ -4538,7 +4523,6 @@ impl<'a> Checker<'a> {
         {
             self.add_binding(
                 id,
-                // NOTE: Correct, range of the name.
                 expr.range(),
                 BindingKind::NamedExprAssignment,
                 BindingFlags::empty(),
@@ -4548,7 +4532,6 @@ impl<'a> Checker<'a> {
 
         self.add_binding(
             id,
-            // NOTE: Correct, range of the name.
             expr.range(),
             BindingKind::Assignment,
             BindingFlags::empty(),
