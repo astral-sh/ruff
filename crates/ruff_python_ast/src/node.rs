@@ -4212,6 +4212,22 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Decorator(_) => false,
         }
     }
+
+    pub const fn is_node_with_body(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::StmtIf(_)
+                | AnyNodeRef::StmtFor(_)
+                | AnyNodeRef::StmtAsyncFor(_)
+                | AnyNodeRef::StmtWhile(_)
+                | AnyNodeRef::StmtWith(_)
+                | AnyNodeRef::StmtAsyncWith(_)
+                | AnyNodeRef::StmtMatch(_)
+                | AnyNodeRef::StmtFunctionDef(_)
+                | AnyNodeRef::StmtAsyncFunctionDef(_)
+                | AnyNodeRef::StmtClassDef(_)
+        )
+    }
 }
 
 impl<'a> From<&'a ModModule> for AnyNodeRef<'a> {

@@ -58,6 +58,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 last_node = Some(default.map_or_else(|| argument.into(), AnyNodeRef::from));
             }
 
+            // kw only args need either a `*args` ahead of them capturing all var args or a `*`
+            // pseudo-argument capturing all fields. We can also have `*args` without any kwargs
+            // afterwards.
             if let Some(vararg) = vararg {
                 joiner.entry(&format_args![
                     leading_node_comments(vararg.as_ref()),
@@ -65,6 +68,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                     vararg.format()
                 ]);
                 last_node = Some(vararg.as_any_node_ref());
+            } else if !kwonlyargs.is_empty() {
+                joiner.entry(&text("*"));
             }
 
             debug_assert!(defaults.next().is_none());

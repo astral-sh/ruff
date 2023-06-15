@@ -126,7 +126,7 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -14,135 +13,86 @@
+@@ -14,135 +13,87 @@
      b
      c
      if True:
@@ -161,8 +161,8 @@ def __await__(): return (yield)
      number: int,
      no_annotation=None,
 -    text: str = "default",
--    *,
 +    text: str = "NOT_YET_IMPLEMENTED_STRING",
+     *,
      debug: bool = False,
      **kwargs,
  ) -> str:
@@ -339,6 +339,7 @@ def function_signature_stress_test(
     number: int,
     no_annotation=None,
     text: str = "NOT_YET_IMPLEMENTED_STRING",
+    *,
     debug: bool = False,
     **kwargs,
 ) -> str:
