@@ -14,7 +14,7 @@ docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quote
   |
   = help: Replace double multiline quotes with single quotes
 
-ℹ Suggested fix
+ℹ Possible fix
 2 2 | Double quotes multiline module docstring
 3 3 | """
 4 4 | 
@@ -41,7 +41,7 @@ docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quot
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Suggested fix
+ℹ Possible fix
 13 13 |     Double quotes multiline class docstring
 14 14 |     """
 15 15 | 
@@ -66,7 +66,7 @@ docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quo
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Suggested fix
+ℹ Possible fix
 18 18 |     """
 19 19 | 
 20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
@@ -92,7 +92,7 @@ docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quot
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Suggested fix
+ℹ Possible fix
 27 27 | 
 28 28 |         some_expression = 'hello world'
 29 29 | 
@@ -117,7 +117,7 @@ docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quo
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Suggested fix
+ℹ Possible fix
 32 32 |         """
 33 33 | 
 34 34 |         if l:
