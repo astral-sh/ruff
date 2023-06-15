@@ -25,7 +25,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_python_stdlib::path::is_project_toml;
 
-use crate::cache;
+use crate::cache::{FileCache, PackageCache};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -100,7 +100,7 @@ pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
-    cache: flags::Cache,
+    package_cache: Option<&PackageCache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
@@ -110,15 +110,19 @@ pub(crate) fn lint_path(
     // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
-    let metadata = if cache.into() && noqa.into() && autofix.is_generate() {
-        let metadata = path.metadata()?;
-        if let Some((messages, imports)) = cache::get(path, package, &metadata, settings) {
-            debug!("Cache hit for: {}", path.display());
-            return Ok(Diagnostics::new(messages, imports));
+    let caching = match package_cache {
+        Some(package_cache) if noqa.into() && autofix.is_generate() => {
+            let relative_path = package_cache
+                .relative_path(path)
+                .expect("wrong package cache for file");
+            let last_modified = path.metadata()?.modified()?;
+            if let Some(cache) = package_cache.get(relative_path, last_modified) {
+                return Ok(cache.into_diagnostics(path));
+            }
+
+            Some((package_cache, relative_path, last_modified))
         }
-        Some(metadata)
-    } else {
-        None
+        _ => None,
     };
 
     debug!("Checking: {}", path.display());
@@ -203,6 +207,18 @@ pub(crate) fn lint_path(
 
     let imports = imports.unwrap_or_default();
 
+    if let Some((package_cache, relative_path, file_last_modified)) = caching {
+        if parse_error.is_some() {
+            // Currently we don't cache parsing error, so we remove the old
+            // file cache (if any).
+            // TODO: cache parse errors?
+            package_cache.remove(relative_path);
+        } else {
+            let file_cache = FileCache::new(file_last_modified, &messages, &imports);
+            package_cache.update(relative_path.to_owned(), file_cache);
+        }
+    }
+
     if let Some(err) = parse_error {
         error!(
             "{}",
@@ -212,16 +228,6 @@ pub(crate) fn lint_path(
                 Some(&source_kind),
             )
         );
-
-        // Purge the cache.
-        if let Some(metadata) = metadata {
-            cache::del(path, package, &metadata, settings);
-        }
-    } else {
-        // Re-populate the cache.
-        if let Some(metadata) = metadata {
-            cache::set(path, package, &metadata, settings, &messages, &imports);
-        }
     }
 
     Ok(Diagnostics {
