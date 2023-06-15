@@ -13,7 +13,6 @@ pub struct RuleSet([u64; RULESET_SIZE]);
 
 impl RuleSet {
     const EMPTY: [u64; RULESET_SIZE] = [0; RULESET_SIZE];
-
     // 64 fits into a u16 without truncation
     #[allow(clippy::cast_possible_truncation)]
     const SLICE_BITS: u16 = u64::BITS as u16;
@@ -290,8 +289,8 @@ impl Extend<Rule> for RuleSet {
 }
 
 impl IntoIterator for RuleSet {
-    type Item = Rule;
     type IntoIter = RuleSetIterator;
+    type Item = Rule;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -299,8 +298,8 @@ impl IntoIterator for RuleSet {
 }
 
 impl IntoIterator for &RuleSet {
-    type Item = Rule;
     type IntoIter = RuleSetIterator;
+    type Item = Rule;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()

@@ -163,6 +163,7 @@ impl NeedsParentheses for Expr {
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
     type Format<'a> = FormatRefWithRule<'a, Expr, FormatExpr, PyFormatContext<'ast>>;
+
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatExpr::default())
     }
@@ -170,6 +171,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
     type Format = FormatOwnedWithRule<Expr, FormatExpr, PyFormatContext<'ast>>;
+
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatExpr::default())
     }

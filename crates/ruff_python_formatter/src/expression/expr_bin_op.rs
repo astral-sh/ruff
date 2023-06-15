@@ -142,6 +142,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Operator {
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Operator {
     type Format = FormatOwnedWithRule<Operator, FormatOperator, PyFormatContext<'ast>>;
+
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatOperator)
     }

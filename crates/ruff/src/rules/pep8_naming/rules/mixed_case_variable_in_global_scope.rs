@@ -20,7 +20,7 @@ use crate::rules::pep8_naming::helpers;
 /// > Modules that are designed for use via from M import * should use the
 /// __all__ mechanism to prevent exporting globals, or use the older
 /// convention of prefixing such globals with an underscore (which you might
-///want to do to indicate these globals are “module non-public”).
+/// want to do to indicate these globals are “module non-public”).
 /// >
 /// > ### Function and Variable Names
 /// > Function names should be lowercase, with words separated by underscores

@@ -656,7 +656,7 @@ fn handle_positional_only_arguments_separator_comment<'a>(
 /// Handles comments between the left side and the operator of a binary expression (trailing comments of the left),
 /// and trailing end-of-line comments that are on the same line as the operator.
 ///
-///```python
+/// ```python
 /// a = (
 ///     5 # trailing left comment
 ///     + # trailing operator comment

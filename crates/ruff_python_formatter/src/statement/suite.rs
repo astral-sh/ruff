@@ -178,6 +178,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
     type Format = FormatOwnedWithRule<Suite, FormatSuite, PyFormatContext<'ast>>;
+
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
     }

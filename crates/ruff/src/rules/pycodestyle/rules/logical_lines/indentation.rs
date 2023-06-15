@@ -82,7 +82,6 @@ impl Violation for IndentationWithInvalidMultipleComment {
 /// ```python
 /// for item in items:
 /// pass
-///
 /// ```
 ///
 /// Use instead:

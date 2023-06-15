@@ -145,8 +145,8 @@ impl From<RuleCodePrefix> for RuleSelector {
 }
 
 impl IntoIterator for &RuleSelector {
-    type Item = Rule;
     type IntoIter = RuleSelectorIter;
+    type Item = Rule;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {

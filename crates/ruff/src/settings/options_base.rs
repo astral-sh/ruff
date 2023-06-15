@@ -70,7 +70,7 @@ impl OptionGroup {
     ///
     /// ### Find a nested options
     ///
-    ///```rust
+    /// ```rust
     /// # use ruff::settings::options_base::{OptionGroup, OptionEntry, OptionField};
     ///
     /// const ignore_options: [(&'static str, OptionEntry); 2] = [
@@ -134,8 +134,8 @@ impl OptionGroup {
 }
 
 impl<'a> IntoIterator for &'a OptionGroup {
-    type Item = &'a (&'a str, OptionEntry);
     type IntoIter = std::slice::Iter<'a, (&'a str, OptionEntry)>;
+    type Item = &'a (&'a str, OptionEntry);
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
@@ -143,8 +143,8 @@ impl<'a> IntoIterator for &'a OptionGroup {
 }
 
 impl IntoIterator for OptionGroup {
-    type Item = &'static (&'static str, OptionEntry);
     type IntoIter = std::slice::Iter<'static, (&'static str, OptionEntry)>;
+    type Item = &'static (&'static str, OptionEntry);
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()

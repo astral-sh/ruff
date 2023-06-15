@@ -245,12 +245,11 @@ impl IndexKind {
 pub struct OneIndexed(NonZeroUsize);
 
 impl OneIndexed {
+    /// The largest value that can be represented by this integer type
+    pub const MAX: Self = unwrap(Self::new(usize::MAX));
     // SAFETY: These constants are being initialized with non-zero values
     /// The smallest value that can be represented by this integer type.
     pub const MIN: Self = unwrap(Self::new(1));
-    /// The largest value that can be represented by this integer type
-    pub const MAX: Self = unwrap(Self::new(usize::MAX));
-
     pub const ONE: NonZeroUsize = unwrap(NonZeroUsize::new(1));
 
     /// Creates a non-zero if the given value is not zero.
