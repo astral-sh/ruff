@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_whitespace::NewlineWithTrailingNewline;
+use ruff_python_whitespace::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
@@ -277,13 +277,10 @@ impl Notebook {
                 .unwrap_or_else(|| {
                     panic!("Transformed content out of bounds ({start:?}..{end:?}) for cell {pos}");
                 });
-            self.raw.cells[pos as usize].source = SourceValue::String(
-                cell_content
-                    // We only need to strip the trailing newline which we added
-                    // while concatenating the cell contents.
-                    .strip_suffix('\n')
-                    .unwrap_or(cell_content)
-                    .to_string(),
+            self.raw.cells[pos as usize].source = SourceValue::StringArray(
+                UniversalNewlineIterator::from(cell_content)
+                    .map(|line| line.as_full_str().to_string())
+                    .collect::<Vec<_>>(),
             );
         }
     }
