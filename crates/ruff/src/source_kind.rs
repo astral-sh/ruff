@@ -1,3 +1,7 @@
+use std::path::Path;
+
+use ruff_diagnostics::Diagnostic;
+
 use crate::jupyter::Notebook;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -23,4 +27,11 @@ impl SourceKind {
             None
         }
     }
+}
+
+pub trait CodeExtractor<T>
+where
+    T: Sized,
+{
+    fn extract_code(path: &Path) -> Result<T, Box<Diagnostic>>;
 }

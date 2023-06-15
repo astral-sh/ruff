@@ -20,7 +20,7 @@ use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::pyproject_toml::lint_pyproject_toml;
 use ruff::settings::{flags, AllSettings, Settings};
-use ruff::source_kind::SourceKind;
+use ruff::source_kind::{CodeExtractor, SourceKind};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_python_stdlib::path::is_project_toml;
@@ -67,7 +67,7 @@ impl AddAssign for Diagnostics {
 
 /// Returns either an indexed python jupyter notebook or a diagnostic (which is empty if we skip)
 fn load_jupyter_notebook(path: &Path) -> Result<Notebook, Box<Diagnostics>> {
-    let notebook = match Notebook::read(path) {
+    let notebook = match Notebook::extract_code(path) {
         Ok(notebook) => {
             if !notebook.is_python_notebook() {
                 // Not a python notebook, this could e.g. be an R notebook which we want to just skip
