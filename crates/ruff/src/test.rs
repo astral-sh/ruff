@@ -22,11 +22,11 @@ use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
-use crate::source_kind::SourceKind;
+use crate::source_kind::{CodeExtractor, SourceKind};
 
 #[cfg(not(fuzzing))]
-fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
-    Notebook::read(path).map_err(|err| {
+fn extract_code_from_jupyter_notebook(path: &Path) -> Result<Notebook> {
+    Notebook::extract_code(path).map_err(|err| {
         anyhow::anyhow!(
             "Failed to read notebook file `{}`: {:?}",
             path.display(),
@@ -59,10 +59,10 @@ pub(crate) fn test_notebook_path(
     settings: &Settings,
 ) -> Result<(Vec<Message>, SourceKind)> {
     let path = test_resource_path("fixtures/jupyter").join(path);
-    let mut source_kind = SourceKind::Jupyter(read_jupyter_notebook(&path)?);
+    let mut source_kind = SourceKind::Jupyter(extract_code_from_jupyter_notebook(&path)?);
     let messages = test_contents(&mut source_kind, &path, settings);
     let expected_notebook =
-        read_jupyter_notebook(&test_resource_path("fixtures/jupyter").join(expected))?;
+        extract_code_from_jupyter_notebook(&test_resource_path("fixtures/jupyter").join(expected))?;
     if let SourceKind::Jupyter(notebook) = &source_kind {
         assert_eq!(notebook.cell_offsets(), expected_notebook.cell_offsets());
         assert_eq!(notebook.index(), expected_notebook.index());

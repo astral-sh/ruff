@@ -418,11 +418,9 @@ mod test {
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
+    use crate::source_kind::CodeExtractor;
     use crate::test::{test_notebook_path, test_resource_path};
     use crate::{assert_messages, settings};
-
-    use crate::source_kind::CodeExtractor;
-    use crate::test::test_resource_path;
 
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
     fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
