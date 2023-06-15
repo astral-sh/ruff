@@ -10,7 +10,21 @@ def f():
 def f():
     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
 
-    GLOBAL: Set[int] = set()
+def f():
+    if True:
+        from collections.abc import Set
+    else:
+        Set = 1
 
-    class Class:
-        member: Set[int]
+    x: Set = set()
+
+    x: Set
+
+    del Set
+
+    def f():
+        print(Set)
+
+        def Set():
+            pass
+        print(Set)

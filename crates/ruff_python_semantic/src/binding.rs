@@ -44,6 +44,18 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
     }
 
+    /// Return `true` if this [`Binding`] represents an external symbol
+    /// (e.g., `FastAPI` in `from fastapi import FastAPI`).
+    pub const fn is_external(&self) -> bool {
+        self.flags.contains(BindingFlags::EXTERNAL)
+    }
+
+    /// Return `true` if this [`Binding`] represents an aliased symbol
+    /// (e.g., `app` in `from fastapi import FastAPI as app`).
+    pub const fn is_alias(&self) -> bool {
+        self.flags.contains(BindingFlags::ALIAS)
+    }
+
     /// Return `true` if this [`Binding`] represents an unbound variable
     /// (e.g., `x` in `x = 1; del x`).
     pub const fn is_unbound(&self) -> bool {
@@ -161,9 +173,25 @@ bitflags! {
         ///
         /// For example, the binding could be `FastAPI` in:
         /// ```python
-        /// import FastAPI as FastAPI
+        /// from fastapi import FastAPI as FastAPI
         /// ```
         const EXPLICIT_EXPORT = 1 << 0;
+
+        /// The binding represents an external symbol, like an import or a builtin.
+        ///
+        /// For example, the binding could be `FastAPI` in:
+        /// ```python
+        /// from fastapi import FastAPI
+        /// ```
+        const EXTERNAL = 1 << 1;
+
+        /// The binding is an aliased symbol.
+        ///
+        /// For example, the binding could be `app` in:
+        /// ```python
+        /// from fastapi import FastAPI as app
+        /// ```
+        const ALIAS = 1 << 2;
     }
 }
 

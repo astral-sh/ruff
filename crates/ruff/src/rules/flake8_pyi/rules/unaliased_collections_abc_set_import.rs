@@ -1,10 +1,10 @@
-use itertools::Itertools;
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{BindingKind, FromImportation, Scope};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::renamer::Renamer;
 
 /// ## What it does
 /// Checks for `from collections.abc import Set` imports that do not alias
@@ -66,19 +66,11 @@ pub(crate) fn unaliased_collections_abc_set_import(
         let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range);
         if checker.patch(diagnostic.kind.rule()) {
             if checker.semantic().is_available("AbstractSet") {
-                // Create an edit to alias `Set` to `AbstractSet`.
-                let binding_edit =
-                    Edit::insertion(" as AbstractSet".to_string(), binding.range.end());
-
-                // Create an edit to replace all references to `Set` with `AbstractSet`.
-                let reference_edits: Vec<Edit> = binding
-                    .references()
-                    .map(|reference_id| checker.semantic().reference(reference_id).range())
-                    .dedup()
-                    .map(|range| Edit::range_replacement("AbstractSet".to_string(), range))
-                    .collect();
-
-                diagnostic.set_fix(Fix::suggested_edits(binding_edit, reference_edits));
+                diagnostic.try_set_fix(|| {
+                    let (edit, rest) =
+                        Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
+                    Ok(Fix::suggested_edits(edit, rest))
+                });
             }
         }
         diagnostics.push(diagnostic);

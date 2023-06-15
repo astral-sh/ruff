@@ -27,7 +27,7 @@ PYI025.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet
 11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
    |                                                   ^^^ PYI025
 12 | 
-13 |     GLOBAL: Set[int] = set()
+13 | def f():
    |
    = help: Alias `Set` to `AbstractSet`
 
@@ -38,11 +38,44 @@ PYI025.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet
 11    |-    from collections.abc import Container, Sized, Set, ValuesView  # PYI025
    11 |+    from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
 12 12 | 
-13    |-    GLOBAL: Set[int] = set()
-   13 |+    GLOBAL: AbstractSet[int] = set()
-14 14 | 
-15 15 |     class Class:
-16    |-        member: Set[int]
-   16 |+        member: AbstractSet[int]
+13 13 | def f():
+14 14 |     if True:
+
+PYI025.pyi:15:37: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+   |
+13 | def f():
+14 |     if True:
+15 |         from collections.abc import Set
+   |                                     ^^^ PYI025
+16 |     else:
+17 |         Set = 1
+   |
+   = help: Alias `Set` to `AbstractSet`
+
+ℹ Suggested fix
+12 12 | 
+13 13 | def f():
+14 14 |     if True:
+15    |-        from collections.abc import Set
+   15 |+        from collections.abc import Set as AbstractSet
+16 16 |     else:
+17    |-        Set = 1
+   17 |+        AbstractSet = 1
+18 18 | 
+19    |-    x: Set = set()
+   19 |+    x: AbstractSet = set()
+20 20 | 
+21    |-    x: Set
+   21 |+    x: AbstractSet
+22 22 | 
+23    |-    del Set
+   23 |+    del AbstractSet
+24 24 | 
+25 25 |     def f():
+26    |-        print(Set)
+   26 |+        print(AbstractSet)
+27 27 | 
+28 28 |         def Set():
+29 29 |             pass
 
 

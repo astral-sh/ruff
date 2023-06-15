@@ -817,24 +817,28 @@ where
                             BindingKind::SubmoduleImportation(SubmoduleImportation {
                                 qualified_name,
                             }),
-                            BindingFlags::empty(),
+                            BindingFlags::EXTERNAL,
                         );
                     } else {
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.name)
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
                             BindingKind::Importation(Importation { qualified_name }),
-                            if alias
-                                .asname
-                                .as_ref()
-                                .map_or(false, |asname| asname == &alias.name)
-                            {
-                                BindingFlags::EXPLICIT_EXPORT
-                            } else {
-                                BindingFlags::empty()
-                            },
+                            flags,
                         );
 
                         if let Some(asname) = &alias.asname {
@@ -1113,6 +1117,18 @@ where
                             }
                         }
 
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.name)
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
                         // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
@@ -1123,15 +1139,7 @@ where
                             name,
                             alias.identifier(self.locator),
                             BindingKind::FromImportation(FromImportation { qualified_name }),
-                            if alias
-                                .asname
-                                .as_ref()
-                                .map_or(false, |asname| asname == &alias.name)
-                            {
-                                BindingFlags::EXPLICIT_EXPORT
-                            } else {
-                                BindingFlags::empty()
-                            },
+                            flags,
                         );
                     }
                     if self.enabled(Rule::RelativeImports) {
