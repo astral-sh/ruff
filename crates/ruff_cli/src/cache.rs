@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hasher;
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io::{self, BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
@@ -244,15 +244,12 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     fs::create_dir_all(path)?;
 
     // Add the CACHEDIR.TAG.
-    if !cachedir::is_tagged(path)? {
-        cachedir::add_tag(path)?;
-    }
+    cachedir::ensure_tag(path)?;
 
     // Add the .gitignore.
     let gitignore_path = path.join(".gitignore");
     if !gitignore_path.exists() {
-        let mut file = fs::File::create(gitignore_path)?;
-        file.write_all(b"*")?;
+        fs::write(gitignore_path, b"*")?;
     }
 
     Ok(())
