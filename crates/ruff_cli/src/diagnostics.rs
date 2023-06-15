@@ -209,9 +209,8 @@ pub(crate) fn lint_path(
 
     if let Some((package_cache, relative_path, file_last_modified)) = caching {
         if parse_error.is_some() {
-            // Currently we don't cache parsing error, so we remove the old
-            // file cache (if any).
-            // TODO: cache parse errors?
+            // We don't cache parsing error, so we remove the old file cache (if
+            // any).
             package_cache.remove(relative_path);
         } else {
             let file_cache = FileCache::new(file_last_modified, &messages, &imports);

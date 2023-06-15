@@ -24,7 +24,7 @@ use crate::diagnostics::Diagnostics;
 pub(crate) struct PackageCache {
     /// Location of the cache.
     ///
-    /// Not store to disk, just used as a storage location.
+    /// Not stored on disk, just used as a storage location.
     #[serde(skip)]
     path: PathBuf,
     /// Path to the root of the package.
