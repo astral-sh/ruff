@@ -238,8 +238,7 @@ fn fix_py2_block(
             let end = orelse.last()?;
             if indentation(checker.locator, start).is_none() {
                 // Inline `else` block (e.g., `else: x = 1`).
-                #[allow(deprecated)]
-                Some(Fix::unspecified(Edit::range_replacement(
+                Some(Fix::suggested(Edit::range_replacement(
                     checker
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
@@ -258,8 +257,7 @@ fn fix_py2_block(
                         .ok()
                     })
                     .map(|contents| {
-                        #[allow(deprecated)]
-                        Fix::unspecified(Edit::replacement(
+                        Fix::suggested(Edit::replacement(
                             contents,
                             checker.locator.line_start(stmt.start()),
                             stmt.end(),
@@ -271,21 +269,13 @@ fn fix_py2_block(
             // If we have an `if` and an `elif`, turn the `elif` into an `if`.
             let start_location = leading_token.range.start();
             let end_location = trailing_token.range.start() + TextSize::from(2);
-            #[allow(deprecated)]
-            Some(Fix::unspecified(Edit::deletion(
-                start_location,
-                end_location,
-            )))
+            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
         }
         (StartTok::Elif, _) => {
             // If we have an `elif`, delete up to the `else` or the end of the statement.
             let start_location = leading_token.range.start();
             let end_location = trailing_token.range.start();
-            #[allow(deprecated)]
-            Some(Fix::unspecified(Edit::deletion(
-                start_location,
-                end_location,
-            )))
+            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
         }
     }
 }
@@ -306,8 +296,7 @@ fn fix_py3_block(
             let end = body.last()?;
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
-                #[allow(deprecated)]
-                Some(Fix::unspecified(Edit::range_replacement(
+                Some(Fix::suggested(Edit::range_replacement(
                     checker
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
@@ -326,8 +315,7 @@ fn fix_py3_block(
                         .ok()
                     })
                     .map(|contents| {
-                        #[allow(deprecated)]
-                        Fix::unspecified(Edit::replacement(
+                        Fix::suggested(Edit::replacement(
                             contents,
                             checker.locator.line_start(stmt.start()),
                             stmt.end(),
@@ -340,8 +328,7 @@ fn fix_py3_block(
             // the rest.
             let end = body.last()?;
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
-            #[allow(deprecated)]
-            Some(Fix::unspecified(Edit::range_replacement(
+            Some(Fix::suggested(Edit::range_replacement(
                 format!("else{text}"),
                 stmt.range(),
             )))

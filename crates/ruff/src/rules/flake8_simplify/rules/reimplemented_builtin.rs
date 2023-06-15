@@ -102,8 +102,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                     TextRange::new(stmt.start(), loop_info.terminal),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("any") {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::replacement(
                         contents,
                         stmt.start(),
                         loop_info.terminal,
@@ -193,8 +192,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                     TextRange::new(stmt.start(), loop_info.terminal),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("all") {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::replacement(
                         contents,
                         stmt.start(),
                         loop_info.terminal,

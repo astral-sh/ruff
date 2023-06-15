@@ -35,8 +35,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::deletion(func.end(), range.end())));
+                diagnostic.set_fix(Fix::automatic(Edit::deletion(func.end(), range.end())));
             }
             checker.diagnostics.push(diagnostic);
         }

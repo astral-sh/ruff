@@ -9,7 +9,7 @@ confusables.py:1:6: RUF001 [*] String contains ambiguous `𝐁` (MATHEMATICAL BO
   |
   = help: Replace `𝐁` (MATHEMATICAL BOLD CAPITAL B) with `B` (LATIN CAPITAL LETTER B)
 
-ℹ Suggested fix
+ℹ Possible fix
 1   |-x = "𝐁ad string"
   1 |+x = "Bad string"
 2 2 | y = "−"
@@ -26,7 +26,7 @@ confusables.py:6:56: RUF002 [*] Docstring contains ambiguous `）` (FULLWIDTH RI
   |
   = help: Replace `）` (FULLWIDTH RIGHT PARENTHESIS) with `)` (RIGHT PARENTHESIS)
 
-ℹ Suggested fix
+ℹ Possible fix
 3 3 | 
 4 4 | 
 5 5 | def f():
@@ -46,7 +46,7 @@ confusables.py:7:62: RUF003 [*] Comment contains ambiguous `᜵` (PHILIPPINE SIN
   |
   = help: Replace `᜵` (PHILIPPINE SINGLE PUNCTUATION) with `/` (SOLIDUS)
 
-ℹ Suggested fix
+ℹ Possible fix
 4 4 | 
 5 5 | def f():
 6 6 |     """Here's a docstring with an unusual parenthesis: ）"""
@@ -64,7 +64,7 @@ confusables.py:17:6: RUF001 [*] String contains ambiguous `𝐁` (MATHEMATICAL B
    |
    = help: Replace `𝐁` (MATHEMATICAL BOLD CAPITAL B) with `B` (LATIN CAPITAL LETTER B)
 
-ℹ Suggested fix
+ℹ Possible fix
 14 14 |     ...
 15 15 | 
 16 16 | 
@@ -85,7 +85,7 @@ confusables.py:26:10: RUF001 [*] String contains ambiguous `α` (GREEK SMALL LET
    |
    = help: Replace `α` (GREEK SMALL LETTER ALPHA) with `a` (LATIN SMALL LETTER A)
 
-ℹ Suggested fix
+ℹ Possible fix
 23 23 | 
 24 24 | # The first word should be ignored, while the second should be included, since it
 25 25 | # contains ASCII.
@@ -104,7 +104,7 @@ confusables.py:31:6: RUF001 [*] String contains ambiguous `Р` (CYRILLIC CAPITAL
    |
    = help: Replace `Р` (CYRILLIC CAPITAL LETTER ER) with `P` (LATIN CAPITAL LETTER P)
 
-ℹ Suggested fix
+ℹ Possible fix
 28 28 | # The two characters should be flagged here. The first character is a "word"
 29 29 | # consisting of a single ambiguous character, while the second character is a "word
 30 30 | # boundary" (whitespace) that it itself ambiguous.
@@ -120,7 +120,7 @@ confusables.py:31:7: RUF001 [*] String contains ambiguous ` ` (EN QUAD). Did y
    |
    = help: Replace ` ` (EN QUAD) with ` ` (SPACE)
 
-ℹ Suggested fix
+ℹ Possible fix
 28 28 | # The two characters should be flagged here. The first character is a "word"
 29 29 | # consisting of a single ambiguous character, while the second character is a "word
 30 30 | # boundary" (whitespace) that it itself ambiguous.

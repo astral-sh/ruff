@@ -143,8 +143,8 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
         }
         prev = range.end();
     }
-    #[allow(deprecated)]
-    Fix::unspecified(Edit::range_replacement(replacement, expr.range()))
+
+    Fix::automatic(Edit::range_replacement(replacement, expr.range()))
 }
 
 /// UP012
@@ -187,8 +187,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -197,6 +196,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -209,8 +209,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -219,6 +218,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -238,8 +238,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -248,6 +247,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -260,8 +260,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -270,6 +269,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);

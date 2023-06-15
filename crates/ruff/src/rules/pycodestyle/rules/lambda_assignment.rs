@@ -103,8 +103,7 @@ pub(crate) fn lambda_assignment(
                         indented.push_str(&line);
                     }
                 }
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     indented,
                     stmt.range(),
                 )));

@@ -9,7 +9,7 @@ F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
   |
   = help: Use `raise NotImplementedError`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | def f() -> None:
 2   |-    raise NotImplemented()
   2 |+    raise NotImplementedError()
@@ -25,7 +25,7 @@ F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
   |
   = help: Use `raise NotImplementedError`
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | 
 4 4 | 
 5 5 | def g() -> None:

@@ -168,8 +168,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    #[allow(deprecated)]
-                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                                    diagnostic.set_fix(Fix::suggested(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
                                     )));
@@ -193,8 +192,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    #[allow(deprecated)]
-                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                                    diagnostic.set_fix(Fix::suggested(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
                                     )));

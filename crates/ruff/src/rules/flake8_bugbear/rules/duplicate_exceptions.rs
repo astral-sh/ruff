@@ -89,8 +89,7 @@ fn duplicate_handler_exceptions<'a>(
                 expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     if unique_elts.len() == 1 {
                         checker.generator().expr(unique_elts[0])
                     } else {

@@ -256,8 +256,7 @@ impl Candidate {
             );
             if settings.rules.enabled(diagnostic.kind.rule()) {
                 if settings.rules.should_fix(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                         self.representant.to_string(),
                         char_range,
                     )));

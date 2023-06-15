@@ -58,12 +58,13 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwa
             matches!(call_path.as_slice(), ["subprocess", "run"])
         })
     {
-        let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
+        let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else {
+            return;
+        };
         let range = TextRange::at(kwarg.start(), "universal_newlines".text_len());
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 "text".to_string(),
                 range,
             )));
