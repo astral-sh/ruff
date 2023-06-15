@@ -42,6 +42,9 @@ use crate::settings::types::PythonVersion;
 /// print("py3")
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]

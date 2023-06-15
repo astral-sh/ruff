@@ -28,6 +28,9 @@ use crate::registry::AsRule;
 /// foo: int | str = 1
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
 pub struct NonPEP604Annotation;
