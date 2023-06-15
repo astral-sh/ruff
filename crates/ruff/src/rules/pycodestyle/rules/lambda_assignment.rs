@@ -33,8 +33,7 @@ use crate::registry::AsRule;
 ///     return 2 * x
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[violation]
 pub struct LambdaAssignment {
     name: String,

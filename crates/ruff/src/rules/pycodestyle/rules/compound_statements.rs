@@ -13,7 +13,7 @@ use crate::settings::Settings;
 /// Checks for compound statements (multiple statements on the same line).
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "compound statements are generally discouraged".
+/// According to [PEP 8], "compound statements are generally discouraged".
 ///
 /// ## Example
 /// ```python
@@ -25,9 +25,8 @@ use crate::settings::Settings;
 /// if foo == "blah":
 ///     do_blah_thing()
 /// ```
-///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct MultipleStatementsOnOneLineColon;
 
@@ -42,7 +41,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// Checks for multiline statements on one line.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, including multi-clause statements on the same line is
+/// According to [PEP 8], including multi-clause statements on the same line is
 /// discouraged.
 ///
 /// ## Example
@@ -57,8 +56,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// do_three()
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct MultipleStatementsOnOneLineSemicolon;
 

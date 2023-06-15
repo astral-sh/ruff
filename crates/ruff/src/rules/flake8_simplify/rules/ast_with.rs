@@ -40,7 +40,7 @@ use super::fix_with;
 /// ```
 ///
 /// ## References
-/// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
+/// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[violation]
 pub struct MultipleWithStatements;
 

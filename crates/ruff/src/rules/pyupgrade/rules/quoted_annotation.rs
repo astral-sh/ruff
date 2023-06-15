@@ -35,7 +35,7 @@ use crate::registry::Rule;
 ///
 /// ## References
 /// - [PEP 563](https://peps.python.org/pep-0563/)
-/// - [Python documentation: `__future__` - Future statement definitions](https://docs.python.org/3/library/__future__.html#module-__future__)
+/// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html#module-__future__)
 #[violation]
 pub struct QuotedAnnotation;
 

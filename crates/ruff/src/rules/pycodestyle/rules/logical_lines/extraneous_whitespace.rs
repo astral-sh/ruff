@@ -14,7 +14,7 @@ use super::{LogicalLine, Whitespace};
 /// Checks for the use of extraneous whitespace after "(".
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the omission of whitespace in the following cases:
+/// [PEP 8] recommends the omission of whitespace in the following cases:
 /// - "Immediately inside parentheses, brackets or braces."
 /// - "Immediately before a comma, semicolon, or colon."
 ///
@@ -30,8 +30,7 @@ use super::{LogicalLine, Whitespace};
 /// spam(ham[1], {eggs: 2})
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#pet-peeves)
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[violation]
 pub struct WhitespaceAfterOpenBracket {
     symbol: char,
@@ -54,7 +53,7 @@ impl AlwaysAutofixableViolation for WhitespaceAfterOpenBracket {
 /// Checks for the use of extraneous whitespace before ")".
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the omission of whitespace in the following cases:
+/// [PEP 8] recommends the omission of whitespace in the following cases:
 /// - "Immediately inside parentheses, brackets or braces."
 /// - "Immediately before a comma, semicolon, or colon."
 ///
@@ -70,8 +69,7 @@ impl AlwaysAutofixableViolation for WhitespaceAfterOpenBracket {
 /// spam(ham[1], {eggs: 2})
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#pet-peeves)
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[violation]
 pub struct WhitespaceBeforeCloseBracket {
     symbol: char,
@@ -94,7 +92,7 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeCloseBracket {
 /// Checks for the use of extraneous whitespace before ",", ";" or ":".
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the omission of whitespace in the following cases:
+/// [PEP 8] recommends the omission of whitespace in the following cases:
 /// - "Immediately inside parentheses, brackets or braces."
 /// - "Immediately before a comma, semicolon, or colon."
 ///
@@ -108,8 +106,7 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeCloseBracket {
 /// if x == 4: print(x, y); x, y = y, x
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#pet-peeves)
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[violation]
 pub struct WhitespaceBeforePunctuation {
     symbol: char,

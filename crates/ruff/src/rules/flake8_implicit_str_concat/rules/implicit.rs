@@ -51,7 +51,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// Checks for implicitly concatenated strings that span multiple lines.
 ///
 /// ## Why is this bad?
-/// For string literals that wrap across multiple lines, PEP 8 recommends
+/// For string literals that wrap across multiple lines, [PEP 8] recommends
 /// the use of implicit string concatenation within parentheses instead of
 /// using a backslash for line continuation, as the former is more readable
 /// than the latter.
@@ -78,8 +78,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// ## Options
 /// - `flake8-implicit-str-concat.allow-multiline`
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
+/// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
 pub struct MultiLineImplicitStringConcatenation;
 

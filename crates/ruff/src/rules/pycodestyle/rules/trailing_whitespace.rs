@@ -11,7 +11,7 @@ use crate::settings::Settings;
 /// Checks for superfluous trailing whitespace.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "avoid trailing whitespace anywhere. Because it’s usually
+/// According to [PEP 8], "avoid trailing whitespace anywhere. Because it’s usually
 /// invisible, it can be confusing"
 ///
 /// ## Example
@@ -24,8 +24,7 @@ use crate::settings::Settings;
 /// spam(1)\n#
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct TrailingWhitespace;
 
@@ -44,7 +43,7 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
 /// Checks for superfluous whitespace in blank lines.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "avoid trailing whitespace anywhere. Because it’s usually
+/// According to [PEP 8], "avoid trailing whitespace anywhere. Because it’s usually
 /// invisible, it can be confusing"
 ///
 /// ## Example
@@ -57,8 +56,7 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
 /// class Foo(object):\n\n    bang = 12
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct BlankLineWithWhitespace;
 

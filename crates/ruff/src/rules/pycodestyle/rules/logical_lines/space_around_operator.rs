@@ -12,7 +12,7 @@ use super::{LogicalLine, Whitespace};
 /// Checks for extraneous tabs before an operator.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// According to [PEP 8], operators should be surrounded by at most a single space on either
 /// side.
 ///
 /// ## Example
@@ -25,8 +25,7 @@ use super::{LogicalLine, Whitespace};
 /// a = 12 + 3
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+/// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[violation]
 pub struct TabBeforeOperator;
 
@@ -41,7 +40,7 @@ impl Violation for TabBeforeOperator {
 /// Checks for extraneous whitespace before an operator.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// According to [PEP 8], operators should be surrounded by at most a single space on either
 /// side.
 ///
 /// ## Example
@@ -54,8 +53,7 @@ impl Violation for TabBeforeOperator {
 /// a = 12 + 3
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+/// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[violation]
 pub struct MultipleSpacesBeforeOperator;
 
@@ -70,7 +68,7 @@ impl Violation for MultipleSpacesBeforeOperator {
 /// Checks for extraneous tabs after an operator.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// According to [PEP 8], operators should be surrounded by at most a single space on either
 /// side.
 ///
 /// ## Example
@@ -83,8 +81,7 @@ impl Violation for MultipleSpacesBeforeOperator {
 /// a = 12 + 3
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+/// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[violation]
 pub struct TabAfterOperator;
 
@@ -99,7 +96,7 @@ impl Violation for TabAfterOperator {
 /// Checks for extraneous whitespace after an operator.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// According to [PEP 8], operators should be surrounded by at most a single space on either
 /// side.
 ///
 /// ## Example
@@ -112,8 +109,7 @@ impl Violation for TabAfterOperator {
 /// a = 12 + 3
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+/// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[violation]
 pub struct MultipleSpacesAfterOperator;
 
