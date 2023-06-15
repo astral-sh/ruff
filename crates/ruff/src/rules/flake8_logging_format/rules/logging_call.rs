@@ -177,8 +177,7 @@ pub(crate) fn logging_call(
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                         "warning".to_string(),
                         level_call_range,
                     )));
