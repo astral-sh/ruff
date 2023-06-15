@@ -20,14 +20,14 @@ use crate::registry::AsRule;
 /// ```python
 /// items = (1, 2, 3)
 /// for i in list(items):
-///    print(i)
+///     print(i)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// items = (1, 2, 3)
 /// for i in items:
-///    print(i)
+///     print(i)
 /// ```
 #[violation]
 pub struct UnnecessaryListCast;
