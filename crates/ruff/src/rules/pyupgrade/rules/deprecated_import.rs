@@ -237,6 +237,9 @@ const TYPING_TO_RENAME_PY39: &[(&str, &str)] = &[
 
 // Python 3.10+
 
+// Members of `typing` that were deprecated.
+const TYPING_DEPRECATED_310: &[(&str, &str)] = &[("Union", "|")];
+
 // Members of `typing` that were moved to `collections.abc`.
 const TYPING_TO_COLLECTIONS_ABC_310: &[&str] = &["Callable"];
 
@@ -275,6 +278,9 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "reveal_type",
 ];
 
+// Members of `typing` that were deprecated.
+const TYPING_DEPRECATED_311: &[(&str, &str)] = &[("NoReturn", "typing.Never")];
+
 struct ImportReplacer<'a> {
     stmt: &'a Stmt,
     module: &'a str,
@@ -305,11 +311,22 @@ impl<'a> ImportReplacer<'a> {
 
     /// Return a list of deprecated imports whose members were renamed.
     fn with_renames(&self) -> Vec<WithRename> {
+        let mut deprecations = vec![];
+        if self.version >= PythonVersion::Py39 {
+            deprecations.extend(TYPING_TO_RENAME_PY39);
+        };
+        if self.version >= PythonVersion::Py310 {
+            deprecations.extend(TYPING_DEPRECATED_310);
+        };
+        if self.version >= PythonVersion::Py311 {
+            deprecations.extend(TYPING_DEPRECATED_311);
+        };
+
         let mut operations = vec![];
         if self.module == "typing" {
             if self.version >= PythonVersion::Py39 {
                 for member in self.members {
-                    if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
+                    if let Some(target) = deprecations.iter().find_map(|(name, target)| {
                         if &member.name == *name {
                             Some(*target)
                         } else {

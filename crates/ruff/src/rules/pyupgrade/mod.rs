@@ -149,4 +149,17 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn typing_noreturn_deprecated_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP035_py311.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py311,
+                ..settings::Settings::for_rule(Rule::DeprecatedImport)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 }

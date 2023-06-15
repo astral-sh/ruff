@@ -420,4 +420,11 @@ UP035.py:46:10: UP035 Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
+UP035.py:53:1: UP035 `typing.Union` is deprecated, use `|` instead
+   |
+52 | # Deprecated in 3.10
+53 | from typing import Union
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |
+
 

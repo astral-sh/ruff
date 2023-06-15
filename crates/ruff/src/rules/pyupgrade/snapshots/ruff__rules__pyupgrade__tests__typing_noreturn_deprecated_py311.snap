@@ -1,0 +1,11 @@
+---
+source: crates/ruff/src/rules/pyupgrade/mod.rs
+---
+UP035_py311.py:2:1: UP035 `typing.NoReturn` is deprecated, use `typing.Never` instead
+  |
+1 | # Deprecated in 3.11, use typing.Never
+2 | from typing import NoReturn
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  |
+
+

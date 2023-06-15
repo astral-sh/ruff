@@ -48,3 +48,6 @@ if True: from collections import (
 
 # OK
 from a import b
+
+# Deprecated in 3.10
+from typing import Union
