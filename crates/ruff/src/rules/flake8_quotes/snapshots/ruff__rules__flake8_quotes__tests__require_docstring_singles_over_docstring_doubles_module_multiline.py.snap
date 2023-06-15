@@ -12,7 +12,7 @@ docstring_doubles_module_multiline.py:1:1: Q002 [*] Double quote docstring found
   |
   = help: Replace double quotes docstring with single quotes
 
-ℹ Suggested fix
+ℹ Fix
 1   |-"""
   1 |+'''
 2 2 | Double quotes multiline module docstring
