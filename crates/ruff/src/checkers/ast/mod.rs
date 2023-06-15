@@ -1481,6 +1481,9 @@ where
                 if self.enabled(Rule::IncorrectDictIterator) {
                     perflint::rules::incorrect_dict_iterator(self, target, iter);
                 }
+                if self.enabled(Rule::UnnecessaryListCast) {
+                    perflint::rules::unnecessary_list_cast(self, iter);
+                }
             }
             Stmt::Try(ast::StmtTry {
                 body,
