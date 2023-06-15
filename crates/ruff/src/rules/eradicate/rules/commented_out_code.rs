@@ -14,13 +14,13 @@ use super::super::detection::comment_contains_code;
 /// Commented-out code is dead code, and is often included inadvertently.
 /// It should be removed.
 ///
-/// ## Options
-/// - `task-tags`
-///
 /// ## Example
 /// ```python
 /// # print('foo')
 /// ```
+///
+/// ## Options
+/// - `task-tags`
 #[violation]
 pub struct CommentedOutCode;
 

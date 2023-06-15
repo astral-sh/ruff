@@ -24,9 +24,6 @@ use crate::registry::AsRule;
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`dummy-variable-rgx`] pattern.
 ///
-/// ## Options
-/// - `dummy-variable-rgx`
-///
 /// ## Example
 /// ```python
 /// def foo():
@@ -41,6 +38,9 @@ use crate::registry::AsRule;
 ///     x = 1
 ///     return x
 /// ```
+///
+/// ## Options
+/// - `dummy-variable-rgx`
 #[violation]
 pub struct UnusedVariable {
     pub name: String,

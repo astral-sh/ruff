@@ -20,9 +20,6 @@ use crate::checkers::ast::Checker;
 /// versions, that it will have the same type, or that it will have the same
 /// behavior. Instead, use the class's public interface.
 ///
-/// ## Options
-/// - `flake8-self.ignore-names`
-///
 /// ## Example
 /// ```python
 /// class Class:
@@ -44,6 +41,9 @@ use crate::checkers::ast::Checker;
 /// var = Class()
 /// print(var.public_member)
 /// ```
+///
+/// ## Options
+/// - `flake8-self.ignore-names`
 ///
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)

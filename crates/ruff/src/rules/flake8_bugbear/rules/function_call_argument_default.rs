@@ -21,9 +21,6 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// once, at definition time. The returned value will then be reused by all
 /// calls to the function, which can lead to unexpected behaviour.
 ///
-/// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
-///
 /// ## Example
 /// ```python
 /// def create_list() -> list[int]:
@@ -45,16 +42,8 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 ///     return arg
 /// ```
 ///
-/// Alternatively, if shared behavior is desirable, clarify the intent by
-/// assigning to a module-level variable:
-/// ```python
-/// I_KNOW_THIS_IS_SHARED_STATE = create_list()
-///
-///
-/// def mutable_default(arg: list[int] = I_KNOW_THIS_IS_SHARED_STATE) -> list[int]:
-///     arg.append(4)
-///     return arg
-/// ```
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDefaultArgument {
     pub name: Option<String>,

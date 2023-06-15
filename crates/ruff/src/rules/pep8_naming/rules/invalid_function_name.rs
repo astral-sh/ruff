@@ -20,9 +20,6 @@ use crate::settings::types::IdentifierPattern;
 /// > improve readability. mixedCase is allowed only in contexts where that’s already the
 /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
 ///
-/// ## Options
-/// - `pep8-naming.ignore-names`
-///
 /// ## Example
 /// ```python
 /// def myFunction():
@@ -34,6 +31,9 @@ use crate::settings::types::IdentifierPattern;
 /// def my_function():
 ///     pass
 /// ```
+///
+/// ## Options
+/// - `pep8-naming.ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[violation]

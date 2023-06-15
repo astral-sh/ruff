@@ -31,9 +31,6 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// > from .sibling import example
 /// > ```
 ///
-/// ## Options
-/// - `flake8-tidy-imports.ban-relative-imports`
-///
 /// ## Example
 /// ```python
 /// from .. import foo
@@ -43,6 +40,9 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// ```python
 /// from mypkg import foo
 /// ```
+///
+/// ## Options
+/// - `flake8-tidy-imports.ban-relative-imports`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
