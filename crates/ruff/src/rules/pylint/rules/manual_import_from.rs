@@ -25,7 +25,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/import.html#submodules)
+/// - [Python documentation: Submodules](https://docs.python.org/3/reference/import.html#submodules)
 #[violation]
 pub struct ManualFromImport {
     module: String,

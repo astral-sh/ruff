@@ -44,7 +44,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/errors.html)
+/// - [Python documentation: Errors and Exceptions](https://docs.python.org/3/tutorial/errors.html)
 #[violation]
 pub struct TryConsiderElse;
 

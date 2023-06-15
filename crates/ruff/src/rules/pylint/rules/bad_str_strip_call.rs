@@ -28,7 +28,7 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
+/// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[violation]
 pub struct BadStrStripCall {
     strip: StripKind,

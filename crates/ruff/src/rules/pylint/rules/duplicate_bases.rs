@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
+/// - [Python documentation: Class definitions](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
 #[violation]
 pub struct DuplicateBases {
     base: String,

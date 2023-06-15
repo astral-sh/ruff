@@ -33,7 +33,7 @@ use crate::registry::AsRule;
 ///         ...
 /// ```
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/typing.html#the-any-type)
+/// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
 /// - [Mypy documentation](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
 #[violation]
 pub struct AnyEqNeAnnotation {

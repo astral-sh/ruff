@@ -34,7 +34,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/functions.html#func-list)
+/// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
 #[violation]
 pub struct ReimplementedListBuiltin;
 

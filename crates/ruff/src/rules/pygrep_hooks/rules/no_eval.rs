@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/functions.html#eval)
+/// - [Python documentation: `eval`](https://docs.python.org/3/library/functions.html#eval)
 /// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
 #[violation]
 pub struct Eval;

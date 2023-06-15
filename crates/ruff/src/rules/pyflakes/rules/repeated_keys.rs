@@ -39,7 +39,7 @@ use crate::registry::{AsRule, Rule};
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
+/// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
     name: String,
@@ -96,7 +96,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
+/// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
     name: String,

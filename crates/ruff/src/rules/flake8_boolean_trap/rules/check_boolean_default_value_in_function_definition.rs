@@ -46,7 +46,7 @@ use super::super::helpers::FUNC_DEF_NAME_ALLOWLIST;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[violation]
 pub struct BooleanDefaultValueInFunctionDefinition;

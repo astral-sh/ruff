@@ -20,7 +20,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)
+/// - [Python documentation: Naming and binding](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)
 #[violation]
 pub struct UndefinedName {
     pub(crate) name: String,

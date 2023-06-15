@@ -38,8 +38,8 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.startswith)
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.endswith)
+/// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
+/// - [Python documentation: `str.endswith`](https://docs.python.org/3/library/stdtypes.html#str.endswith)
 #[violation]
 pub struct MultipleStartsEndsWith {
     attr: String,

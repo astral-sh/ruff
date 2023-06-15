@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
+/// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 #[violation]
 pub struct IfTuple;
 

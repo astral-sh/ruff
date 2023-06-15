@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/exceptions.html#exception-context)
+/// - [Python documentation: Exception context](https://docs.python.org/3/library/exceptions.html#exception-context)
 #[violation]
 pub struct ReraiseNoCause;
 
