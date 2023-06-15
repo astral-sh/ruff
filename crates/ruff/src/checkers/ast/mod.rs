@@ -805,24 +805,7 @@ where
                 }
 
                 for alias in names {
-                    if &alias.name == "__future__" {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        self.add_binding(
-                            name,
-                            alias.identifier(self.locator),
-                            BindingKind::FutureImportation,
-                            BindingFlags::empty(),
-                        );
-
-                        if self.enabled(Rule::LateFutureImport) {
-                            if self.semantic.seen_futures_boundary() {
-                                self.diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::LateFutureImport,
-                                    stmt.range(),
-                                ));
-                            }
-                        }
-                    } else if alias.name.contains('.') && alias.asname.is_none() {
+                    if alias.name.contains('.') && alias.asname.is_none() {
                         // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
                         // "foo.bar".
                         let name = alias.name.split('.').next().unwrap();
