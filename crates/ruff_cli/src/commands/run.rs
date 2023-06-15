@@ -1,7 +1,8 @@
-use std::collections::{hash_map, HashMap};
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use anyhow::Result;
@@ -77,37 +78,8 @@ pub(crate) fn run(
         pyproject_config,
     );
 
-    // Create a cache per package, if enabled.
-    let package_caches = if cache.into() {
-        let mut caches = HashMap::new();
-        // TODO(thomas): try to merge this with the detection of package roots
-        // above or with the parallel iteration below.
-        for entry in &paths {
-            let Ok(entry) = entry else { continue };
-            let path = entry.path();
-            let package = path
-                .parent()
-                .and_then(|parent| package_roots.get(parent))
-                .and_then(|package| *package);
-            // For paths not in a package, e.g. scripts, we use the path as
-            // the package root.
-            let package_root = package.unwrap_or(path);
-
-            let settings = resolver.resolve_all(path, pyproject_config);
-
-            if let hash_map::Entry::Vacant(entry) = caches.entry(package_root) {
-                let cache = PackageCache::open(
-                    &settings.cli.cache_dir,
-                    package_root.to_owned(),
-                    &settings.lib,
-                );
-                entry.insert(cache);
-            }
-        }
-        Some(caches)
-    } else {
-        None
-    };
+    // The package caches are created lazily below.
+    let package_caches = bool::from(cache).then(|| Mutex::new(HashMap::new()));
 
     let start = Instant::now();
     let mut diagnostics: Diagnostics = paths
@@ -121,15 +93,39 @@ pub(crate) fn run(
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
 
-                    let package_cache = package_caches.as_ref().map(|package_caches| {
-                        let package_root = package.unwrap_or(path);
-                        let package_cache = package_caches
-                            .get(package_root)
-                            .expect("failed to get package cache");
-                        package_cache
-                    });
-
                     let settings = resolver.resolve_all(path, pyproject_config);
+
+                    // Lazily create a cache per package, if enabled.
+                    //
+                    // This uses a mutex areound a hash map containing
+                    // `OnceLock`s, which is more complex than it needs to be.
+                    //
+                    // We can't hold the lock around the `package_caches`
+                    // hashmap because that would effectively mean we're only
+                    // running this part sequentially. So, we lock the hashmap
+                    // briefly to insert and/or retrieve a `OnceLock`. We use a
+                    // `OnceLock` to create a lock per package so that we still
+                    // ensure that the cache for a package is only opened once,
+                    // while block only the thread interested in the same
+                    // package cache.
+                    let package_root = package.unwrap_or(path);
+                    let package_cache_init = package_caches.as_ref().map(|package_caches| {
+                        package_caches
+                            .lock()
+                            .unwrap()
+                            .entry(package_root)
+                            .or_insert_with(|| Arc::new(OnceLock::new()))
+                            .clone()
+                    });
+                    let package_cache = package_cache_init.as_ref().map(|package_cache| {
+                        package_cache.get_or_init(|| {
+                            PackageCache::open(
+                                &settings.cli.cache_dir,
+                                package_root.to_owned(),
+                                &settings.lib,
+                            )
+                        })
+                    });
 
                     lint_path(path, package, settings, package_cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
@@ -190,8 +186,10 @@ pub(crate) fn run(
 
     // Store the package caches.
     if let Some(package_caches) = package_caches {
-        for package_cache in package_caches.values() {
-            package_cache.store()?;
+        for package_cache in package_caches.into_inner().unwrap().values() {
+            if let Some(package_cache) = package_cache.get() {
+                package_cache.store()?;
+            }
         }
     }
 
