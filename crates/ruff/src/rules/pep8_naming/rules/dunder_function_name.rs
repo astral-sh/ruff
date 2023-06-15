@@ -2,7 +2,7 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::{Scope, ScopeKind};
 
@@ -69,6 +69,6 @@ pub(crate) fn dunder_function_name(
 
     Some(Diagnostic::new(
         DunderFunctionName,
-        statement(stmt, locator),
+        stmt.identifier(locator),
     ))
 }

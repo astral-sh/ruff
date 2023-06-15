@@ -3,8 +3,9 @@ use rustpython_parser::ast::{Expr, Ranged, Stmt};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{cast, identifier};
+use ruff_python_ast::{cast};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
 use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
@@ -640,7 +641,7 @@ pub(crate) fn definition(
                     MissingReturnTypeClassMethod {
                         name: name.to_string(),
                     },
-                    identifier::statement(stmt, checker.locator),
+                    stmt.identifier(checker.locator),
                 ));
             }
         } else if is_method
@@ -651,7 +652,7 @@ pub(crate) fn definition(
                     MissingReturnTypeStaticMethod {
                         name: name.to_string(),
                     },
-                    identifier::statement(stmt, checker.locator),
+                    stmt.identifier(checker.locator),
                 ));
             }
         } else if is_method && visibility::is_init(name) {
@@ -663,7 +664,7 @@ pub(crate) fn definition(
                         MissingReturnTypeSpecialMethod {
                             name: name.to_string(),
                         },
-                        identifier::statement(stmt, checker.locator),
+                        stmt.identifier(checker.locator),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         #[allow(deprecated)]
@@ -680,7 +681,7 @@ pub(crate) fn definition(
                     MissingReturnTypeSpecialMethod {
                         name: name.to_string(),
                     },
-                    identifier::statement(stmt, checker.locator),
+                    stmt.identifier(checker.locator),
                 );
                 let return_type = SIMPLE_MAGIC_RETURN_TYPES.get(name);
                 if let Some(return_type) = return_type {
@@ -701,7 +702,7 @@ pub(crate) fn definition(
                             MissingReturnTypeUndocumentedPublicFunction {
                                 name: name.to_string(),
                             },
-                            identifier::statement(stmt, checker.locator),
+                            stmt.identifier(checker.locator),
                         ));
                     }
                 }
@@ -711,7 +712,7 @@ pub(crate) fn definition(
                             MissingReturnTypePrivateFunction {
                                 name: name.to_string(),
                             },
-                            identifier::statement(stmt, checker.locator),
+                            stmt.identifier(checker.locator),
                         ));
                     }
                 }

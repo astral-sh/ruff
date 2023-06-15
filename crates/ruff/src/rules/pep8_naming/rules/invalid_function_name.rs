@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Decorator, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
@@ -81,6 +81,6 @@ pub(crate) fn invalid_function_name(
         InvalidFunctionName {
             name: name.to_string(),
         },
-        statement(stmt, locator),
+        stmt.identifier(locator),
     ))
 }

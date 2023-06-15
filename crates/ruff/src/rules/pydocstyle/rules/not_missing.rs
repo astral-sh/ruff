@@ -3,7 +3,7 @@ use ruff_text_size::TextRange;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
 };
@@ -135,7 +135,7 @@ pub(crate) fn not_missing(
             if checker.enabled(Rule::UndocumentedPublicClass) {
                 checker.diagnostics.push(Diagnostic::new(
                     UndocumentedPublicClass,
-                    statement(stmt, checker.locator),
+                    stmt.identifier(checker.locator),
                 ));
             }
             false
@@ -148,7 +148,7 @@ pub(crate) fn not_missing(
             if checker.enabled(Rule::UndocumentedPublicNestedClass) {
                 checker.diagnostics.push(Diagnostic::new(
                     UndocumentedPublicNestedClass,
-                    statement(stmt, checker.locator),
+                    stmt.identifier(checker.locator),
                 ));
             }
             false
@@ -164,7 +164,7 @@ pub(crate) fn not_missing(
                 if checker.enabled(Rule::UndocumentedPublicFunction) {
                     checker.diagnostics.push(Diagnostic::new(
                         UndocumentedPublicFunction,
-                        statement(stmt, checker.locator),
+                        stmt.identifier(checker.locator),
                     ));
                 }
                 false
@@ -183,7 +183,7 @@ pub(crate) fn not_missing(
                 if checker.enabled(Rule::UndocumentedPublicInit) {
                     checker.diagnostics.push(Diagnostic::new(
                         UndocumentedPublicInit,
-                        statement(stmt, checker.locator),
+                        stmt.identifier(checker.locator),
                     ));
                 }
                 true
@@ -191,7 +191,7 @@ pub(crate) fn not_missing(
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
                     checker.diagnostics.push(Diagnostic::new(
                         UndocumentedPublicMethod,
-                        statement(stmt, checker.locator),
+                        stmt.identifier(checker.locator),
                     ));
                 }
                 true
@@ -199,7 +199,7 @@ pub(crate) fn not_missing(
                 if checker.enabled(Rule::UndocumentedMagicMethod) {
                     checker.diagnostics.push(Diagnostic::new(
                         UndocumentedMagicMethod,
-                        statement(stmt, checker.locator),
+                        stmt.identifier(checker.locator),
                     ));
                 }
                 true
@@ -207,7 +207,7 @@ pub(crate) fn not_missing(
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
                     checker.diagnostics.push(Diagnostic::new(
                         UndocumentedPublicMethod,
-                        statement(stmt, checker.locator),
+                        stmt.identifier(checker.locator),
                     ));
                 }
                 true

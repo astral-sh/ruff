@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Excepthandler};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::except_range;
+use ruff_python_ast::identifier::except;
 use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
@@ -63,7 +63,7 @@ pub(crate) fn default_except_not_last(
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Diagnostic::new(
                 DefaultExceptNotLast,
-                except_range(handler, locator),
+                except(handler, locator),
             ));
         }
     }

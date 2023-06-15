@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Excepthandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
@@ -152,7 +152,7 @@ pub(crate) fn function_is_too_complex(
                 complexity,
                 max_complexity,
             },
-            statement(stmt, locator),
+            stmt.identifier(locator),
         ))
     } else {
         None

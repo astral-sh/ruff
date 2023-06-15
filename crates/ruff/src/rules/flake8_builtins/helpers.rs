@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Excepthandler, Expr, Ranged, Stmt};
 
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_stdlib::builtins::BUILTINS;
 
@@ -20,7 +20,7 @@ impl AnyShadowing<'_> {
     pub(crate) fn range(self, locator: &Locator) -> TextRange {
         match self {
             AnyShadowing::Expression(expr) => expr.range(),
-            AnyShadowing::Statement(stmt) => statement(stmt, locator),
+            AnyShadowing::Statement(stmt) => stmt.identifier(locator),
             AnyShadowing::ExceptHandler(handler) => handler.range(),
         }
     }

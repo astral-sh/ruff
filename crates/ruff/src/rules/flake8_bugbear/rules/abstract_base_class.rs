@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::SemanticModel;
 
@@ -134,7 +134,7 @@ pub(crate) fn abstract_base_class(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
-                statement(stmt, checker.locator),
+                stmt.identifier(checker.locator),
             ));
         }
     }

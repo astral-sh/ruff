@@ -27,87 +27,118 @@ use ruff_python_whitespace::is_python_whitespace;
 
 use crate::source_code::Locator;
 
-/// Return the [`TextRange`] of the identifier in the given statement.
-///
-/// For example, return the range of `f` in:
-/// ```python
-/// def f():
-///     ...
-/// ```
-pub fn statement(stmt: &Stmt, locator: &Locator) -> TextRange {
-    match stmt {
-        Stmt::ClassDef(ast::StmtClassDef {
-            decorator_list,
-            range,
-            ..
-        })
-        | Stmt::FunctionDef(ast::StmtFunctionDef {
-            decorator_list,
-            range,
-            ..
-        }) => {
-            let range = decorator_list.last().map_or(*range, |last_decorator| {
-                TextRange::new(last_decorator.end(), range.end())
-            });
+pub trait Identifier {
+    fn identifier(&self, locator: &Locator) -> TextRange;
+}
 
-            // The first "identifier" is the `def` or `class` keyword.
-            // The second "identifier" is the function or class name.
-            IdentifierTokenizer::starts_at(range.start(), locator.contents())
-                .nth(1)
-                .expect("Unable to identify identifier in function or class definition")
-        }
-        Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            decorator_list,
-            range,
-            ..
-        }) => {
-            let range = decorator_list.last().map_or(*range, |last_decorator| {
-                TextRange::new(last_decorator.end(), range.end())
-            });
+impl Identifier for Stmt {
+    /// Return the [`TextRange`] of the identifier in the given statement.
+    ///
+    /// For example, return the range of `f` in:
+    /// ```python
+    /// def f():
+    ///     ...
+    /// ```
+    fn identifier(&self, locator: &Locator) -> TextRange {
+        match self {
+            Stmt::ClassDef(ast::StmtClassDef {
+                decorator_list,
+                range,
+                ..
+            })
+            | Stmt::FunctionDef(ast::StmtFunctionDef {
+                decorator_list,
+                range,
+                ..
+            }) => {
+                let range = decorator_list.last().map_or(*range, |last_decorator| {
+                    TextRange::new(last_decorator.end(), range.end())
+                });
 
-            // The first "identifier" is the `async` keyword.
-            // The second "identifier" is the `def` or `class` keyword.
-            // The third "identifier" is the function or class name.
-            IdentifierTokenizer::starts_at(range.start(), locator.contents())
-                .nth(2)
-                .expect("Unable to identify identifier in function or class definition")
+                // The first "identifier" is the `def` or `class` keyword.
+                // The second "identifier" is the function or class name.
+                IdentifierTokenizer::starts_at(range.start(), locator.contents())
+                    .nth(1)
+                    .expect("Unable to identify identifier in function or class definition")
+            }
+            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+                decorator_list,
+                range,
+                ..
+            }) => {
+                let range = decorator_list.last().map_or(*range, |last_decorator| {
+                    TextRange::new(last_decorator.end(), range.end())
+                });
+
+                // The first "identifier" is the `async` keyword.
+                // The second "identifier" is the `def` or `class` keyword.
+                // The third "identifier" is the function or class name.
+                IdentifierTokenizer::starts_at(range.start(), locator.contents())
+                    .nth(2)
+                    .expect("Unable to identify identifier in function or class definition")
+            }
+            _ => self.range(),
         }
-        _ => stmt.range(),
     }
 }
 
-/// Return the [`TextRange`] for the identifier defining an [`Arg`].
-///
-/// For example, return the range of `x` in:
-/// ```python
-/// def f(x: int = 0):
-///     ...
-/// ```
-pub fn arg(arg: &Arg, locator: &Locator) -> TextRange {
-    IdentifierTokenizer::new(locator.contents(), arg.range())
-        .next()
-        .expect("Failed to find argument identifier")
+impl Identifier for Arg {
+    /// Return the [`TextRange`] for the identifier defining an [`Arg`].
+    ///
+    /// For example, return the range of `x` in:
+    /// ```python
+    /// def f(x: int = 0):
+    ///     ...
+    /// ```
+    fn identifier(&self, locator: &Locator) -> TextRange {
+        IdentifierTokenizer::new(locator.contents(), self.range())
+            .next()
+            .expect("Failed to find argument identifier")
+    }
 }
 
-/// Return the [`TextRange`] for the identifier defining an [`Alias`].
-///
-/// For example, return the range of `x` in:
-/// ```python
-/// from foo import bar as x
-/// ```
-pub fn alias(alias: &Alias, locator: &Locator) -> TextRange {
-    if alias.asname.is_none() {
-        // The first identifier is the module name.
-        IdentifierTokenizer::new(locator.contents(), alias.range())
-            .next()
-            .expect("Failed to find alias identifier")
-    } else {
-        // The first identifier is the module name.
-        // The second identifier is the "as" keyword.
-        // The third identifier is the alias name.
-        IdentifierTokenizer::new(locator.contents(), alias.range())
-            .nth(2)
-            .expect("Failed to find alias identifier")
+impl Identifier for Alias {
+    /// Return the [`TextRange`] for the identifier defining an [`Alias`].
+    ///
+    /// For example, return the range of `x` in:
+    /// ```python
+    /// from foo import bar as x
+    /// ```
+    fn identifier(&self, locator: &Locator) -> TextRange {
+        if matches!(self.name.as_str(), "*") {
+            self.range()
+        } else if self.asname.is_none() {
+            // The first identifier is the module name.
+            IdentifierTokenizer::new(locator.contents(), self.range())
+                .next()
+                .expect("Failed to find alias identifier")
+        } else {
+            // The first identifier is the module name.
+            // The second identifier is the "as" keyword.
+            // The third identifier is the alias name.
+            IdentifierTokenizer::new(locator.contents(), self.range())
+                .nth(2)
+                .expect("Failed to find alias identifier")
+        }
+    }
+}
+
+impl Identifier for Excepthandler {
+    /// Return the [`TextRange`] of a named exception in an [`Excepthandler`].
+    ///
+    /// For example, return the range of `e` in:
+    /// ```python
+    /// try:
+    ///     ...
+    /// except ValueError as e:
+    ///     ...
+    /// ```
+    fn identifier(&self, locator: &Locator) -> TextRange {
+        // The exception name is the first identifier token after the `as` keyword.
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = self;
+        IdentifierTokenizer::starts_at(type_.as_ref().unwrap().end(), locator.contents())
+            .nth(1)
+            .expect("Failed to find exception identifier in exception handler")
     }
 }
 
@@ -123,28 +154,8 @@ pub fn names<'a>(stmt: &Stmt, locator: &'a Locator<'a>) -> impl Iterator<Item = 
     IdentifierTokenizer::new(locator.contents(), stmt.range()).skip(1)
 }
 
-/// Return the [`TextRange`] of a named exception in an [`Excepthandler`].
-///
-/// For example, return the range of `e` in:
-/// ```python
-/// try:
-///     ...
-/// except ValueError as e:
-///     ...
-/// ```
-pub fn exception_range(handler: &Excepthandler, locator: &Locator) -> Option<TextRange> {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = handler;
-
-    let Some(type_) = type_ else {
-        return None;
-    };
-
-    // The exception name is the first identifier token after the `as` keyword.
-    IdentifierTokenizer::starts_at(type_.end(), locator.contents()).nth(1)
-}
-
 /// Return the [`TextRange`] of the `except` token in an [`Excepthandler`].
-pub fn except_range(handler: &Excepthandler, locator: &Locator) -> TextRange {
+pub fn except(handler: &Excepthandler, locator: &Locator) -> TextRange {
     IdentifierTokenizer::new(locator.contents(), handler.range())
         .next()
         .expect("Failed to find `except` token in `Excepthandler`")
@@ -155,7 +166,7 @@ fn is_python_identifier(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '.'
 }
 
-/// Simple zero allocation tokenizer for tokenizing trivia (and some tokens).
+/// Simple zero allocation tokenizer for Python identifiers.
 ///
 /// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
 ///
@@ -294,7 +305,7 @@ mod tests {
     use rustpython_parser::Parse;
 
     use crate::helpers::{elif_else_range, else_range, first_colon_range};
-    use crate::identifier;
+    use crate::identifier::Identifier;
     use crate::source_code::Locator;
 
     #[test]
@@ -306,7 +317,7 @@ mod tests {
         let arg = &args[0];
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::arg(arg, &locator),
+            arg.identifier(&locator),
             TextRange::new(TextSize::from(6), TextSize::from(7))
         );
 
@@ -317,7 +328,7 @@ mod tests {
         let arg = &args[0];
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::arg(arg, &locator),
+            arg.identifier(&locator),
             TextRange::new(TextSize::from(6), TextSize::from(7))
         );
 
@@ -334,7 +345,7 @@ def f(
         let arg = &args[0];
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::arg(arg, &locator),
+            arg.identifier(&locator),
             TextRange::new(TextSize::from(11), TextSize::from(12))
         );
 
@@ -347,7 +358,7 @@ def f(
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(4), TextSize::from(5))
         );
 
@@ -355,7 +366,7 @@ def f(
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(10), TextSize::from(11))
         );
 
@@ -368,7 +379,7 @@ def \
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(8), TextSize::from(9))
         );
 
@@ -376,7 +387,7 @@ def \
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
@@ -384,7 +395,7 @@ def \
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(6), TextSize::from(11))
         );
 
@@ -397,7 +408,7 @@ class Class():
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(19), TextSize::from(24))
         );
 
@@ -410,7 +421,7 @@ class Class():
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(30), TextSize::from(35))
         );
 
@@ -418,7 +429,7 @@ class Class():
         let stmt = Stmt::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            identifier::statement(&stmt, &locator),
+            stmt.identifier(&locator),
             TextRange::new(TextSize::from(0), TextSize::from(9))
         );
 

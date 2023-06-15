@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Arguments, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 
@@ -72,7 +72,7 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: 
                 c_args: num_args,
                 max_args: checker.settings.pylint.max_args,
             },
-            statement(stmt, checker.locator),
+            stmt.identifier(checker.locator),
         ));
     }
 }

@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -53,7 +53,7 @@ pub(crate) fn unnecessary_class_parentheses(
         return;
     }
 
-    let offset = statement(stmt, checker.locator).start();
+    let offset = stmt.identifier(checker.locator).start();
     let contents = checker.locator.after(offset);
 
     // Find the open and closing parentheses between the class name and the colon, if they exist.

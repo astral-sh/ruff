@@ -3,7 +3,7 @@ use rustpython_parser::ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::identifier;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 
@@ -32,6 +32,6 @@ pub(crate) fn stub_body_multiple_statements(checker: &mut Checker, stmt: &Stmt, 
 
     checker.diagnostics.push(Diagnostic::new(
         StubBodyMultipleStatements,
-        identifier::statement(stmt, checker.locator),
+        stmt.identifier(checker.locator),
     ));
 }

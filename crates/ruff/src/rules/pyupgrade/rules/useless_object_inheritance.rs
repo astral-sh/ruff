@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::statement;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
@@ -73,7 +73,7 @@ pub(crate) fn useless_object_inheritance(
             diagnostic.try_set_fix(|| {
                 let edit = remove_argument(
                     checker.locator,
-                    statement(stmt, checker.locator).start(),
+                    stmt.identifier(checker.locator).start(),
                     expr.range(),
                     &class_def.bases,
                     &class_def.keywords,
