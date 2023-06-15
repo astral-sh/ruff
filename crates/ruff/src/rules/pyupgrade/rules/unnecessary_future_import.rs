@@ -30,6 +30,9 @@ use crate::registry::AsRule;
 /// print("Hello, world!")
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[violation]

@@ -36,6 +36,9 @@ use crate::registry::AsRule;
 ///     ...
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `@functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 #[violation]

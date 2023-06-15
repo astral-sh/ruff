@@ -53,6 +53,9 @@ impl CallKind {
 /// isinstance(x, int | float)
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 /// - [Python documentation: `issubclass`](https://docs.python.org/3/library/functions.html#issubclass)

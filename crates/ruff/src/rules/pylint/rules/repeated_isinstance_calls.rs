@@ -36,6 +36,9 @@ use crate::settings::types::PythonVersion;
 ///     return isinstance(x, int | float | complex)
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]

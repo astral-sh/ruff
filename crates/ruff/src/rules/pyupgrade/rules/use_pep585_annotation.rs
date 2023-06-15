@@ -35,6 +35,9 @@ use crate::registry::AsRule;
 /// foo: list[int] = [1, 2, 3]
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// [PEP 585]: https://peps.python.org/pep-0585/
 #[violation]
 pub struct NonPEP585Annotation {

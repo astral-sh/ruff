@@ -28,6 +28,9 @@ use crate::registry::AsRule;
 /// datetime.UTC
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `datetime.UTC`](https://docs.python.org/3/library/datetime.html#datetime.UTC)
 #[violation]

@@ -55,6 +55,9 @@ use crate::settings::types::PythonVersion;
 ///     pass
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
 #[violation]
 pub struct ImplicitOptional {

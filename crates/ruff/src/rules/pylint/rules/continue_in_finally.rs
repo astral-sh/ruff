@@ -32,6 +32,9 @@ use crate::checkers::ast::Checker;
 ///     else:
 ///         continue
 /// ```
+///
+/// ## Options
+/// - `target-version`
 #[violation]
 pub struct ContinueInFinally;
 

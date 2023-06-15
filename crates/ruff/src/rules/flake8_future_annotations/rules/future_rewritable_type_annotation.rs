@@ -49,6 +49,9 @@ use crate::checkers::ast::Checker;
 /// def func(obj: dict[str, int | None]) -> None:
 ///     ...
 /// ```
+///
+/// ## Options
+/// - `target-version`
 #[violation]
 pub struct FutureRewritableTypeAnnotation {
     name: String,
