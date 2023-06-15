@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import sysconfig
 from pathlib import Path
@@ -31,4 +32,5 @@ def find_ruff_bin() -> Path:
 
 if __name__ == "__main__":
     ruff = find_ruff_bin()
-    sys.exit(os.spawnv(os.P_WAIT, ruff, ["ruff", *sys.argv[1:]]))
+    completed_process = subprocess.run([ruff, *sys.argv[1:]])
+    sys.exit(completed_process.returncode)
