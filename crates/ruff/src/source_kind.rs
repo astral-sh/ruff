@@ -29,9 +29,6 @@ impl SourceKind {
     }
 }
 
-pub trait CodeExtractor<T>
-where
-    T: Sized,
-{
+pub trait CodeExtractor<T> {
     fn extract_code(path: &Path) -> Result<T, Box<Diagnostic>>;
 }
