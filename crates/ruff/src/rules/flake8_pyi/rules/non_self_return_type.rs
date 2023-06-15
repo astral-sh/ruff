@@ -2,7 +2,8 @@ use rustpython_parser::ast::{self, Arguments, Decorator, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{identifier_range, map_subscript};
+use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
@@ -147,7 +148,7 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(checker.locator),
             ));
         }
         return;
@@ -161,7 +162,7 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(checker.locator),
             ));
         }
         return;
@@ -176,7 +177,7 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(checker.locator),
             ));
         }
         return;
@@ -192,7 +193,7 @@ pub(crate) fn non_self_return_type(
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    identifier_range(stmt, checker.locator),
+                    stmt.identifier(checker.locator),
                 ));
             }
         }
@@ -205,7 +206,7 @@ pub(crate) fn non_self_return_type(
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    identifier_range(stmt, checker.locator),
+                    stmt.identifier(checker.locator),
                 ));
             }
         }

@@ -10,7 +10,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::NewlineWithTrailingNewline;
@@ -759,7 +759,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
             UndocumentedParam { names },
-            identifier_range(stmt, checker.locator),
+            stmt.identifier(checker.locator),
         ));
     }
 }

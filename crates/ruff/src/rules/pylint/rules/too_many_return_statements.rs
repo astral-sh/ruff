@@ -2,7 +2,8 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{identifier_range, ReturnStatementVisitor};
+use ruff_python_ast::helpers::ReturnStatementVisitor;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
@@ -89,7 +90,7 @@ pub(crate) fn too_many_return_statements(
                 returns,
                 max_returns,
             },
-            identifier_range(stmt, locator),
+            stmt.identifier(locator),
         ))
     } else {
         None

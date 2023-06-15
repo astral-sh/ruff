@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::prelude::Stmt;
 
 use crate::checkers::ast::Checker;
@@ -77,7 +77,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
         if !has_slots(&class.body) {
             checker.diagnostics.push(Diagnostic::new(
                 NoSlotsInNamedtupleSubclass,
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(checker.locator),
             ));
         }
     }

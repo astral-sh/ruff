@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Arguments, Decorator, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 
@@ -70,7 +70,7 @@ pub(crate) fn property_with_parameters(
     {
         checker.diagnostics.push(Diagnostic::new(
             PropertyWithParameters,
-            identifier_range(stmt, checker.locator),
+            stmt.identifier(checker.locator),
         ));
     }
 }

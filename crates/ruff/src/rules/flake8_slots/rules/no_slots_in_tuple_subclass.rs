@@ -2,7 +2,8 @@ use rustpython_parser::ast::{Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{identifier_range, map_subscript};
+use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -64,7 +65,7 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, cla
         if !has_slots(&class.body) {
             checker.diagnostics.push(Diagnostic::new(
                 NoSlotsInTupleSubclass,
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(checker.locator),
             ));
         }
     }

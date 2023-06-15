@@ -1,15 +1,13 @@
 use std::borrow::Cow;
-use std::ops::{Add, Sub};
+use std::ops::Sub;
 use std::path::Path;
 
-use itertools::Itertools;
-use log::error;
 use num_traits::Zero;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::Cmpop;
 use rustpython_parser::ast::{
-    self, Arguments, Cmpop, Constant, Excepthandler, Expr, Keyword, MatchCase, Pattern, Ranged,
-    Stmt,
+    self, Arguments, Constant, Excepthandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
 };
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
@@ -44,6 +42,7 @@ where
             range: _range,
         }) = expr
         {
+            // Ex) `list()`
             if args.is_empty() && keywords.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
@@ -1071,185 +1070,6 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
     }
 }
 
-/// Return `true` if the given character is a valid identifier character.
-fn is_identifier(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
-}
-
-#[derive(Debug)]
-enum IdentifierState {
-    /// We're in a comment, awaiting the identifier at the given index.
-    InComment { index: usize },
-    /// We're looking for the identifier at the given index.
-    AwaitingIdentifier { index: usize },
-    /// We're in the identifier at the given index, starting at the given character.
-    InIdentifier { index: usize, start: TextSize },
-}
-
-/// Return the appropriate visual `Range` for any message that spans a `Stmt`.
-/// Specifically, this method returns the range of a function or class name,
-/// rather than that of the entire function or class body.
-pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
-    match stmt {
-        Stmt::ClassDef(ast::StmtClassDef {
-            decorator_list,
-            range,
-            ..
-        })
-        | Stmt::FunctionDef(ast::StmtFunctionDef {
-            decorator_list,
-            range,
-            ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            decorator_list,
-            range,
-            ..
-        }) => {
-            let header_range = decorator_list.last().map_or(*range, |last_decorator| {
-                TextRange::new(last_decorator.end(), range.end())
-            });
-
-            // If the statement is an async function, we're looking for the third
-            // keyword-or-identifier (`foo` in `async def foo()`). Otherwise, it's the
-            // second keyword-or-identifier (`foo` in `def foo()` or `Foo` in `class Foo`).
-            let name_index = if stmt.is_async_function_def_stmt() {
-                2
-            } else {
-                1
-            };
-
-            let mut state = IdentifierState::AwaitingIdentifier { index: 0 };
-            for (char_index, char) in locator.slice(header_range).char_indices() {
-                match state {
-                    IdentifierState::InComment { index } => match char {
-                        // Read until the end of the comment.
-                        '\r' | '\n' => {
-                            state = IdentifierState::AwaitingIdentifier { index };
-                        }
-                        _ => {}
-                    },
-                    IdentifierState::AwaitingIdentifier { index } => match char {
-                        // Read until we hit an identifier.
-                        '#' => {
-                            state = IdentifierState::InComment { index };
-                        }
-                        c if is_identifier(c) => {
-                            state = IdentifierState::InIdentifier {
-                                index,
-                                start: TextSize::try_from(char_index).unwrap(),
-                            };
-                        }
-                        _ => {}
-                    },
-                    IdentifierState::InIdentifier { index, start } => {
-                        // We've reached the end of the identifier.
-                        if !is_identifier(char) {
-                            if index == name_index {
-                                // We've found the identifier we're looking for.
-                                let end = TextSize::try_from(char_index).unwrap();
-                                return TextRange::new(
-                                    header_range.start().add(start),
-                                    header_range.start().add(end),
-                                );
-                            }
-
-                            // We're looking for a different identifier.
-                            state = IdentifierState::AwaitingIdentifier { index: index + 1 };
-                        }
-                    }
-                }
-            }
-
-            error!("Failed to find identifier for {:?}", stmt);
-            header_range
-        }
-        _ => stmt.range(),
-    }
-}
-
-/// Return the ranges of [`Tok::Name`] tokens within a specified node.
-pub fn find_names<'a, T>(
-    located: &'a T,
-    locator: &'a Locator,
-) -> impl Iterator<Item = TextRange> + 'a
-where
-    T: Ranged,
-{
-    let contents = locator.slice(located.range());
-
-    lexer::lex_starts_at(contents, Mode::Module, located.start())
-        .flatten()
-        .filter(|(tok, _)| matches!(tok, Tok::Name { .. }))
-        .map(|(_, range)| range)
-}
-
-/// Return the `Range` of `name` in `Excepthandler`.
-pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> Option<TextRange> {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
-        name,
-        type_,
-        body,
-        range: _range,
-    }) = handler;
-
-    match (name, type_) {
-        (Some(_), Some(type_)) => {
-            let contents = &locator.contents()[TextRange::new(type_.end(), body[0].start())];
-
-            lexer::lex_starts_at(contents, Mode::Module, type_.end())
-                .flatten()
-                .tuple_windows()
-                .find(|(tok, next_tok)| {
-                    matches!(tok.0, Tok::As) && matches!(next_tok.0, Tok::Name { .. })
-                })
-                .map(|((..), (_, range))| range)
-        }
-        _ => None,
-    }
-}
-
-/// Return the `Range` of `except` in `Excepthandler`.
-pub fn except_range(handler: &Excepthandler, locator: &Locator) -> TextRange {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, type_, .. }) = handler;
-    let end = if let Some(type_) = type_ {
-        type_.end()
-    } else {
-        body.first().expect("Expected body to be non-empty").start()
-    };
-    let contents = &locator.contents()[TextRange::new(handler.start(), end)];
-
-    lexer::lex_starts_at(contents, Mode::Module, handler.start())
-        .flatten()
-        .find(|(kind, _)| matches!(kind, Tok::Except { .. }))
-        .map(|(_, range)| range)
-        .expect("Failed to find `except` range")
-}
-
-/// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
-pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    match stmt {
-        Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. })
-            if !orelse.is_empty() =>
-        {
-            let body_end = body.last().expect("Expected body to be non-empty").end();
-            let or_else_start = orelse
-                .first()
-                .expect("Expected orelse to be non-empty")
-                .start();
-            let contents = &locator.contents()[TextRange::new(body_end, or_else_start)];
-
-            lexer::lex_starts_at(contents, Mode::Module, body_end)
-                .flatten()
-                .find(|(kind, _)| matches!(kind, Tok::Else))
-                .map(|(_, range)| range)
-        }
-        _ => None,
-    }
-}
-
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRange> {
     let contents = &locator.contents()[range];
@@ -1482,7 +1302,101 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
+pub enum Truthiness {
+    // An expression evaluates to `False`.
+    Falsey,
+    // An expression evaluates to `True`.
+    Truthy,
+    // An expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
+    Unknown,
+}
+
+impl From<Option<bool>> for Truthiness {
+    fn from(value: Option<bool>) -> Self {
+        match value {
+            Some(true) => Truthiness::Truthy,
+            Some(false) => Truthiness::Falsey,
+            None => Truthiness::Unknown,
+        }
+    }
+}
+
+impl From<Truthiness> for Option<bool> {
+    fn from(truthiness: Truthiness) -> Self {
+        match truthiness {
+            Truthiness::Truthy => Some(true),
+            Truthiness::Falsey => Some(false),
+            Truthiness::Unknown => None,
+        }
+    }
+}
+
+impl Truthiness {
+    pub fn from_expr<F>(expr: &Expr, is_builtin: F) -> Self
+    where
+        F: Fn(&str) -> bool,
+    {
+        match expr {
+            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
+                Constant::Bool(value) => Some(*value),
+                Constant::None => Some(false),
+                Constant::Str(string) => Some(!string.is_empty()),
+                Constant::Bytes(bytes) => Some(!bytes.is_empty()),
+                Constant::Int(int) => Some(!int.is_zero()),
+                Constant::Float(float) => Some(*float != 0.0),
+                Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
+                Constant::Ellipsis => Some(true),
+                Constant::Tuple(elts) => Some(!elts.is_empty()),
+            },
+            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _range }) => {
+                if values.is_empty() {
+                    Some(false)
+                } else if values.iter().any(|value| {
+                    let Expr::Constant(ast::ExprConstant { value: Constant::Str(string), .. } )= &value else {
+                        return false;
+                    };
+                    !string.is_empty()
+                }) {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            Expr::List(ast::ExprList { elts, range: _range, .. })
+            | Expr::Set(ast::ExprSet { elts, range: _range })
+            | Expr::Tuple(ast::ExprTuple { elts,  range: _range,.. }) => Some(!elts.is_empty()),
+            Expr::Dict(ast::ExprDict { keys, range: _range, .. }) => Some(!keys.is_empty()),
+            Expr::Call(ast::ExprCall {
+                func,
+                args,
+                keywords, range: _range,
+            }) => {
+                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                        if args.is_empty() && keywords.is_empty() {
+                            // Ex) `list()`
+                            Some(false)
+                        } else if args.len() == 1 && keywords.is_empty() {
+                            // Ex) `list([1, 2, 3])`
+                            Self::from_expr(&args[0], is_builtin).into()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+        .into()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocatedCmpop {
     pub range: TextRange,
     pub op: Cmpop,
@@ -1581,111 +1495,19 @@ pub fn locate_cmpops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpop> {
     ops
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Truthiness {
-    // An expression evaluates to `False`.
-    Falsey,
-    // An expression evaluates to `True`.
-    Truthy,
-    // An expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
-    Unknown,
-}
-
-impl From<Option<bool>> for Truthiness {
-    fn from(value: Option<bool>) -> Self {
-        match value {
-            Some(true) => Truthiness::Truthy,
-            Some(false) => Truthiness::Falsey,
-            None => Truthiness::Unknown,
-        }
-    }
-}
-
-impl From<Truthiness> for Option<bool> {
-    fn from(truthiness: Truthiness) -> Self {
-        match truthiness {
-            Truthiness::Truthy => Some(true),
-            Truthiness::Falsey => Some(false),
-            Truthiness::Unknown => None,
-        }
-    }
-}
-
-impl Truthiness {
-    pub fn from_expr<F>(expr: &Expr, is_builtin: F) -> Self
-    where
-        F: Fn(&str) -> bool,
-    {
-        match expr {
-            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                Constant::Bool(value) => Some(*value),
-                Constant::None => Some(false),
-                Constant::Str(string) => Some(!string.is_empty()),
-                Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(!int.is_zero()),
-                Constant::Float(float) => Some(*float != 0.0),
-                Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
-                Constant::Ellipsis => Some(true),
-                Constant::Tuple(elts) => Some(!elts.is_empty()),
-            },
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _range }) => {
-                if values.is_empty() {
-                    Some(false)
-                } else if values.iter().any(|value| {
-                    let Expr::Constant(ast::ExprConstant { value: Constant::Str(string), .. } )= &value else {
-                        return false;
-                    };
-                    !string.is_empty()
-                }) {
-                    Some(true)
-                } else {
-                    None
-                }
-            }
-            Expr::List(ast::ExprList { elts, range: _range, .. })
-            | Expr::Set(ast::ExprSet { elts, range: _range })
-            | Expr::Tuple(ast::ExprTuple { elts,  range: _range,.. }) => Some(!elts.is_empty()),
-            Expr::Dict(ast::ExprDict { keys, range: _range, .. }) => Some(!keys.is_empty()),
-            Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords, range: _range,
-            }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        if args.is_empty() && keywords.is_empty() {
-                            Some(false)
-                        } else if args.len() == 1 && keywords.is_empty() {
-                            Self::from_expr(&args[0], is_builtin).into()
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-        .into()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_ast::{Expr, Stmt, Suite};
-    use rustpython_parser::ast::Cmpop;
+    use rustpython_ast::{Cmpop, Expr, Stmt};
+    use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
     use crate::helpers::{
-        elif_else_range, else_range, first_colon_range, has_trailing_content, identifier_range,
-        locate_cmpops, resolve_imported_module_path, LocatedCmpop,
+        elif_else_range, first_colon_range, has_trailing_content, locate_cmpops,
+        resolve_imported_module_path, LocatedCmpop,
     };
     use crate::source_code::Locator;
 
@@ -1729,90 +1551,6 @@ y = 2
     }
 
     #[test]
-    fn extract_identifier_range() -> Result<()> {
-        let contents = "def f(): pass".trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(4), TextSize::from(5))
-        );
-
-        let contents = "async def f(): pass".trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(10), TextSize::from(11))
-        );
-
-        let contents = r#"
-def \
-  f():
-  pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(8), TextSize::from(9))
-        );
-
-        let contents = "class Class(): pass".trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(6), TextSize::from(11))
-        );
-
-        let contents = "class Class: pass".trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(6), TextSize::from(11))
-        );
-
-        let contents = r#"
-@decorator()
-class Class():
-  pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(19), TextSize::from(24))
-        );
-
-        let contents = r#"
-@decorator()  # Comment
-class Class():
-  pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(30), TextSize::from(35))
-        );
-
-        let contents = r#"x = y + 1"#.trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            identifier_range(&stmt, &locator),
-            TextRange::new(TextSize::from(0), TextSize::from(9))
-        );
-
-        Ok(())
-    }
-
-    #[test]
     fn resolve_import() {
         // Return the module directly.
         assert_eq!(
@@ -1847,26 +1585,6 @@ class Class():
             resolve_imported_module_path(Some(2), Some("foo"), Some(&["bar".to_string()])),
             None
         );
-    }
-
-    #[test]
-    fn extract_else_range() -> Result<()> {
-        let contents = r#"
-for x in y:
-    pass
-else:
-    pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        let range = else_range(&stmt, &locator).unwrap();
-        assert_eq!(&contents[range], "else");
-        assert_eq!(
-            range,
-            TextRange::new(TextSize::from(21), TextSize::from(25))
-        );
-        Ok(())
     }
 
     #[test]

@@ -9,10 +9,11 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::collect_arg_names;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::prelude::Decorator;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{helpers, visitor};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
 
@@ -378,7 +379,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestIncorrectFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            helpers::identifier_range(stmt, checker.locator),
+            stmt.identifier(checker.locator),
         ));
     } else if checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
         && !visitor.has_return_with_value
@@ -389,7 +390,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestMissingFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            helpers::identifier_range(stmt, checker.locator),
+            stmt.identifier(checker.locator),
         ));
     }
 

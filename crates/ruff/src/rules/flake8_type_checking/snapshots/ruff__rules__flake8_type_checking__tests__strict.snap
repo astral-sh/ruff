@@ -117,12 +117,12 @@ strict.py:62:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
 64 67 | 
 65 68 |     def test(value: pkg.A):
 
-strict.py:71:12: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
+strict.py:71:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
    |
 69 | def f():
 70 |     # In un-strict mode, this shouldn't raise an error, since `pkg.foo.bar` is used at runtime.
 71 |     import pkg.foo as F
-   |            ^^^^^^^^^^^^ TCH002
+   |                       ^ TCH002
 72 |     import pkg.foo.bar as B
    |
    = help: Move into type-checking block
@@ -201,12 +201,12 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
 93 96 | 
 94 97 |     def test(value: pkg.A):
 
-strict.py:101:12: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
+strict.py:101:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
     |
  99 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
 100 |     import pkg.bar as B
 101 |     import pkg.foo as F
-    |            ^^^^^^^^^^^^ TCH002
+    |                       ^ TCH002
 102 | 
 103 |     def test(value: F.Foo):
     |

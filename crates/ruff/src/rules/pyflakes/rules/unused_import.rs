@@ -117,11 +117,11 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         let import = Import {
             qualified_name,
-            trimmed_range: binding.trimmed_range(checker.semantic(), checker.locator),
+            range: binding.range,
             parent_range: binding.parent_range(checker.semantic()),
         };
 
-        if checker.rule_is_ignored(Rule::UnusedImport, import.trimmed_range.start())
+        if checker.rule_is_ignored(Rule::UnusedImport, import.range.start())
             || import.parent_range.map_or(false, |parent_range| {
                 checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
             })
@@ -156,7 +156,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         for Import {
             qualified_name,
-            trimmed_range,
+            range,
             parent_range,
         } in imports
         {
@@ -172,7 +172,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     },
                     multiple,
                 },
-                trimmed_range,
+                range,
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -190,7 +190,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     // suppression comments aren't marked as unused.
     for Import {
         qualified_name,
-        trimmed_range,
+        range,
         parent_range,
     } in ignored.into_values().flatten()
     {
@@ -200,7 +200,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                 context: None,
                 multiple: false,
             },
-            trimmed_range,
+            range,
         );
         if let Some(range) = parent_range {
             diagnostic.set_parent(range.start());
@@ -214,7 +214,7 @@ struct Import<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     qualified_name: &'a str,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
-    trimmed_range: TextRange,
+    range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
 }

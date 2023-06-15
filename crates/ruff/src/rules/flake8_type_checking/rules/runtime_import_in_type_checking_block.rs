@@ -99,17 +99,18 @@ pub(crate) fn runtime_import_in_type_checking_block(
             let import = Import {
                 qualified_name,
                 reference_id,
-                trimmed_range: binding.trimmed_range(checker.semantic(), checker.locator),
+                range: binding.range,
                 parent_range: binding.parent_range(checker.semantic()),
             };
 
-            if checker.rule_is_ignored(
-                Rule::RuntimeImportInTypeCheckingBlock,
-                import.trimmed_range.start(),
-            ) || import.parent_range.map_or(false, |parent_range| {
-                checker
-                    .rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, parent_range.start())
-            }) {
+            if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.range.start())
+                || import.parent_range.map_or(false, |parent_range| {
+                    checker.rule_is_ignored(
+                        Rule::RuntimeImportInTypeCheckingBlock,
+                        parent_range.start(),
+                    )
+                })
+            {
                 ignores_by_statement
                     .entry(stmt_id)
                     .or_default()
@@ -131,7 +132,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
 
         for Import {
             qualified_name,
-            trimmed_range,
+            range,
             parent_range,
             ..
         } in imports
@@ -140,7 +141,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 RuntimeImportInTypeCheckingBlock {
                     qualified_name: qualified_name.to_string(),
                 },
-                trimmed_range,
+                range,
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -156,7 +157,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     // suppression comments aren't marked as unused.
     for Import {
         qualified_name,
-        trimmed_range,
+        range,
         parent_range,
         ..
     } in ignores_by_statement.into_values().flatten()
@@ -165,7 +166,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
             RuntimeImportInTypeCheckingBlock {
                 qualified_name: qualified_name.to_string(),
             },
-            trimmed_range,
+            range,
         );
         if let Some(range) = parent_range {
             diagnostic.set_parent(range.start());
@@ -181,7 +182,7 @@ struct Import<'a> {
     /// The first reference to the imported symbol.
     reference_id: ReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
-    trimmed_range: TextRange,
+    range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
 }

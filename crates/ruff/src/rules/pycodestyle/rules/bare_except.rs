@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Excepthandler, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::except_range;
+use ruff_python_ast::identifier::except;
 use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
@@ -66,7 +66,7 @@ pub(crate) fn bare_except(
             .iter()
             .any(|stmt| matches!(stmt, Stmt::Raise(ast::StmtRaise { exc: None, .. })))
     {
-        Some(Diagnostic::new(BareExcept, except_range(handler, locator)))
+        Some(Diagnostic::new(BareExcept, except(handler, locator)))
     } else {
         None
     }

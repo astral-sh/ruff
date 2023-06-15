@@ -1,11 +1,11 @@
 ---
 source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 ---
-TCH002.py:5:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TCH002.py:5:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
   |
 4 | def f():
 5 |     import pandas as pd  # TCH002
-  |            ^^^^^^^^^^^^ TCH002
+  |                      ^^ TCH002
 6 | 
 7 |     x: pd.DataFrame
   |
@@ -53,11 +53,11 @@ TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 13 16 |     x: DataFrame
 14 17 | 
 
-TCH002.py:17:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TCH002.py:17:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 16 | def f():
 17 |     from pandas import DataFrame as df  # TCH002
-   |                        ^^^^^^^^^^^^^^^ TCH002
+   |                                     ^^ TCH002
 18 | 
 19 |     x: df
    |
@@ -81,11 +81,11 @@ TCH002.py:17:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 19 22 |     x: df
 20 23 | 
 
-TCH002.py:23:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TCH002.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
 22 | def f():
 23 |     import pandas as pd  # TCH002
-   |            ^^^^^^^^^^^^ TCH002
+   |                      ^^ TCH002
 24 | 
 25 |     x: pd.DataFrame = 1
    |
@@ -137,11 +137,11 @@ TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 31 34 |     x: DataFrame = 2
 32 35 | 
 
-TCH002.py:35:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TCH002.py:35:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 34 | def f():
 35 |     from pandas import DataFrame as df  # TCH002
-   |                        ^^^^^^^^^^^^^^^ TCH002
+   |                                     ^^ TCH002
 36 | 
 37 |     x: df = 3
    |
@@ -165,11 +165,11 @@ TCH002.py:35:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 37 40 |     x: df = 3
 38 41 | 
 
-TCH002.py:41:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TCH002.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
 40 | def f():
 41 |     import pandas as pd  # TCH002
-   |            ^^^^^^^^^^^^ TCH002
+   |                      ^^ TCH002
 42 | 
 43 |     x: "pd.DataFrame" = 1
    |
@@ -193,11 +193,11 @@ TCH002.py:41:12: TCH002 [*] Move third-party import `pandas` into a type-checkin
 43 46 |     x: "pd.DataFrame" = 1
 44 47 | 
 
-TCH002.py:47:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
 46 | def f():
 47 |     import pandas as pd  # TCH002
-   |            ^^^^^^^^^^^^ TCH002
+   |                      ^^ TCH002
 48 | 
 49 |     x = dict["pd.DataFrame", "pd.DataFrame"]
    |

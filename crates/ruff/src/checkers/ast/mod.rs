@@ -12,12 +12,13 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
+use ruff_python_ast::identifier::{Identifier, TryIdentifier};
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use ruff_python_ast::{cast, helpers, str, visitor};
+use ruff_python_ast::{cast, helpers, identifier, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
@@ -250,7 +251,7 @@ where
         // Pre-visit.
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
+                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
@@ -271,7 +272,7 @@ where
                 }
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
+                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
@@ -367,7 +368,7 @@ where
                 if self.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
-                            helpers::identifier_range(stmt, self.locator)
+                            stmt.identifier(self.locator)
                         })
                     {
                         self.diagnostics.push(diagnostic);
@@ -692,7 +693,7 @@ where
                 }
                 if self.enabled(Rule::AmbiguousClassName) {
                     if let Some(diagnostic) = pycodestyle::rules::ambiguous_class_name(name, || {
-                        helpers::identifier_range(stmt, self.locator)
+                        stmt.identifier(self.locator)
                     }) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -808,7 +809,7 @@ where
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
-                            alias.range(),
+                            alias.identifier(self.locator),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
                         );
@@ -828,7 +829,7 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            alias.range(),
+                            alias.identifier(self.locator),
                             BindingKind::SubmoduleImportation(SubmoduleImportation {
                                 qualified_name,
                             }),
@@ -839,7 +840,7 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            alias.range(),
+                            alias.identifier(self.locator),
                             BindingKind::Importation(Importation { qualified_name }),
                             if alias
                                 .asname
@@ -1084,7 +1085,7 @@ where
 
                         self.add_binding(
                             name,
-                            alias.range(),
+                            alias.identifier(self.locator),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
                         );
@@ -1145,7 +1146,7 @@ where
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
-                            alias.range(),
+                            alias.identifier(self.locator),
                             BindingKind::FromImportation(FromImportation { qualified_name }),
                             if alias
                                 .asname
@@ -1871,7 +1872,7 @@ where
 
                 self.add_binding(
                     name,
-                    stmt.range(),
+                    stmt.identifier(self.locator),
                     BindingKind::FunctionDefinition,
                     BindingFlags::empty(),
                 );
@@ -2094,7 +2095,7 @@ where
                 self.semantic.pop_definition();
                 self.add_binding(
                     name,
-                    stmt.range(),
+                    stmt.identifier(self.locator),
                     BindingKind::ClassDefinition,
                     BindingFlags::empty(),
                 );
@@ -3902,8 +3903,7 @@ where
                 }
                 match name {
                     Some(name) => {
-                        let range = helpers::excepthandler_name_range(excepthandler, self.locator)
-                            .expect("Failed to find `name` range");
+                        let range = excepthandler.try_identifier(self.locator).unwrap();
 
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
@@ -4019,7 +4019,7 @@ where
         // upstream.
         self.add_binding(
             &arg.arg,
-            arg.range(),
+            arg.identifier(self.locator),
             BindingKind::Argument,
             BindingFlags::empty(),
         );
@@ -4059,7 +4059,7 @@ where
         {
             self.add_binding(
                 name,
-                pattern.range(),
+                pattern.try_identifier(self.locator).unwrap(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
             );
@@ -4268,16 +4268,14 @@ impl<'a> Checker<'a> {
                     {
                         if self.enabled(Rule::RedefinedWhileUnused) {
                             #[allow(deprecated)]
-                            let line = self.locator.compute_line_index(
-                                shadowed.trimmed_range(&self.semantic, self.locator).start(),
-                            );
+                            let line = self.locator.compute_line_index(shadowed.range.start());
 
                             let mut diagnostic = Diagnostic::new(
                                 pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
                                     line,
                                 },
-                                binding.trimmed_range(&self.semantic, self.locator),
+                                binding.range,
                             );
                             if let Some(range) = binding.parent_range(&self.semantic) {
                                 diagnostic.set_parent(range.start());
@@ -4890,9 +4888,7 @@ impl<'a> Checker<'a> {
                         }
 
                         #[allow(deprecated)]
-                        let line = self.locator.compute_line_index(
-                            shadowed.trimmed_range(&self.semantic, self.locator).start(),
-                        );
+                        let line = self.locator.compute_line_index(shadowed.range.start());
 
                         let binding = self.semantic.binding(binding_id);
                         let mut diagnostic = Diagnostic::new(
@@ -4900,7 +4896,7 @@ impl<'a> Checker<'a> {
                                 name: (*name).to_string(),
                                 line,
                             },
-                            binding.trimmed_range(&self.semantic, self.locator),
+                            binding.range,
                         );
                         if let Some(range) = binding.parent_range(&self.semantic) {
                             diagnostic.set_parent(range.start());
