@@ -1483,7 +1483,7 @@ where
                     );
                 }
                 if self.enabled(Rule::RedefinedLoopName) {
-                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
+                    pylint::rules::redefined_loop_name(self, stmt);
                 }
             }
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
@@ -1524,7 +1524,7 @@ where
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
                 if self.enabled(Rule::RedefinedLoopName) {
-                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
+                    pylint::rules::redefined_loop_name(self, stmt);
                 }
                 if self.enabled(Rule::IterationOverSet) {
                     pylint::rules::iteration_over_set(self, iter);
