@@ -22,7 +22,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
     fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {
         // TODO(konstin): Reactivate when string formatting works, currently a source of unstable
         // formatting, e.g.
-        // ```
+        // ```python
         // coverage_ignore_c_items = {
         // #    'cfunction': [...]
         // }

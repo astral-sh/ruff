@@ -335,7 +335,7 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
             if preceding.is_node_with_body() {
                 // We can't set this as a trailing comment of the function declaration because it
                 // will then move behind the function block instead of sticking with the pass
-                // ```
+                // ```python
                 // if True:
                 //     def f():
                 //         pass  # a

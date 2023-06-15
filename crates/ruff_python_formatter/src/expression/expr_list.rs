@@ -23,7 +23,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 
         // The empty list is special because there can be dangling comments, and they can be in two
         // positions:
-        // ```
+        // ```python
         // a3 = [  # end-of-line
         //     # own line
         // ]
