@@ -5,6 +5,7 @@
 //! Jupyter Notebook v4.5 JSON schema.
 //!
 //! The following changes were made to the generated version:
+//! * Only keep the required structs and enums.
 //! * `Cell::id` is optional because it wasn't required <v4.5
 //! * `#[serde(deny_unknown_fields)]` was added where the schema had
 //!   `"additionalProperties": false`
@@ -12,10 +13,12 @@
 //!   `"additionalProperties": true` as preparation for round-trip support.
 //! * `#[serde(skip_serializing_none)]` was added to all structs where one or
 //!   more fields were optional to avoid serializing `null` values.
-//! * `Output::data` & `Cell::attachments` were changed to `Value` because
-//!    the scheme had `patternProperties`.
+//! * `Cell::execution_count` is a required property only for code cells, but
+//!   we serialize it for all cells. This is because we can't know if a cell is
+//!   a code cell or not without looking at the `cell_type` property, which
+//!   would require a custom serializer.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -27,11 +30,12 @@ use serde_with::skip_serializing_none;
 /// <https://github.com/jupyter/nbformat/blob/16b53251aabf472ad9406ddb1f78b0421c014eeb/nbformat/v4/nbformat.v4.schema.json>
 /// Jupyter Notebook v4.5 JSON schema.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RawNotebook {
     /// Array of cells of the current notebook.
     pub cells: Vec<Cell>,
     /// Notebook root-level metadata.
-    pub metadata: JupyterNotebookMetadata,
+    pub metadata: RawNotebookMetadata,
     /// Notebook format (major number). Incremented between backwards incompatible changes to the
     /// notebook format.
     pub nbformat: i64,
@@ -49,110 +53,31 @@ pub struct RawNotebook {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Cell {
-    pub attachments: Option<HashMap<String, HashMap<String, Value>>>,
+    pub attachments: Option<Value>,
     /// String identifying the type of cell.
     pub cell_type: CellType,
+    /// The code cell's prompt number. Will be null if the cell has not been run.
+    #[serialize_always]
+    pub execution_count: Option<i64>,
     /// Technically, id isn't required (it's not even present) in schema v4.0 through v4.4, but
     /// it's required in v4.5. Main issue is that pycharm creates notebooks without an id
     /// <https://youtrack.jetbrains.com/issue/PY-59438/Jupyter-notebooks-created-with-PyCharm-are-missing-the-id-field-in-cells-in-the-.ipynb-json>
     pub id: Option<String>,
     /// Cell-level metadata.
-    pub metadata: CellMetadata,
-    pub source: SourceValue,
-    /// The code cell's prompt number. Will be null if the cell has not been run.
-    pub execution_count: Option<i64>,
+    pub metadata: Value,
     /// Execution, display, or stream outputs.
-    pub outputs: Option<Vec<Output>>,
-}
-
-/// Cell-level metadata.
-#[skip_serializing_none]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct CellMetadata {
-    /// Raw cell metadata format for nbconvert.
-    pub format: Option<String>,
-    /// Official Jupyter Metadata for Raw Cells
-    ///
-    /// Official Jupyter Metadata for Markdown Cells
-    ///
-    /// Official Jupyter Metadata for Code Cells
-    pub jupyter: Option<HashMap<String, Option<Value>>>,
-    pub name: Option<String>,
-    pub tags: Option<Vec<String>>,
-    /// Whether the cell's output is collapsed/expanded.
-    pub collapsed: Option<bool>,
-    /// Execution time for the code in the cell. This tracks time at which messages are received
-    /// from iopub or shell channels
-    pub execution: Option<Execution>,
-    /// Whether the cell's output is scrolled, unscrolled, or autoscrolled.
-    pub scrolled: Option<ScrolledUnion>,
-    /// Custom added: round-trip support
-    #[serde(flatten)]
-    pub other: BTreeMap<String, Value>,
-}
-
-/// Execution time for the code in the cell. This tracks time at which messages are received
-/// from iopub or shell channels
-#[skip_serializing_none]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct Execution {
-    /// header.date (in ISO 8601 format) of iopub channel's execute_input message. It indicates
-    /// the time at which the kernel broadcasts an execute_input message to connected frontends
-    #[serde(rename = "iopub.execute_input")]
-    pub iopub_execute_input: Option<String>,
-    /// header.date (in ISO 8601 format) of iopub channel's kernel status message when the status
-    /// is 'busy'
-    #[serde(rename = "iopub.status.busy")]
-    pub iopub_status_busy: Option<String>,
-    /// header.date (in ISO 8601 format) of iopub channel's kernel status message when the status
-    /// is 'idle'. It indicates the time at which kernel finished processing the associated
-    /// request
-    #[serde(rename = "iopub.status.idle")]
-    pub iopub_status_idle: Option<String>,
-    /// header.date (in ISO 8601 format) of the shell channel's execute_reply message. It
-    /// indicates the time at which the execute_reply message was created
-    #[serde(rename = "shell.execute_reply")]
-    pub shell_execute_reply: Option<String>,
-}
-
-/// Result of executing a code cell.
-///
-/// Data displayed as a result of code cell execution.
-///
-/// Stream output from a code cell.
-///
-/// Output of an error that occurred during code cell execution.
-#[skip_serializing_none]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct Output {
-    pub data: Option<HashMap<String, Value>>,
-    /// A result's prompt number.
-    pub execution_count: Option<i64>,
-    pub metadata: Option<HashMap<String, Option<Value>>>,
-    /// Type of cell output.
-    pub output_type: OutputType,
-    /// The name of the stream (stdout, stderr).
-    pub name: Option<String>,
-    /// The stream's text output, represented as an array of strings.
-    pub text: Option<TextUnion>,
-    /// The name of the error.
-    pub ename: Option<String>,
-    /// The value, or message, of the error.
-    pub evalue: Option<String>,
-    /// The error's traceback, represented as an array of strings.
-    pub traceback: Option<Vec<String>>,
+    pub outputs: Option<Vec<Value>>,
+    pub source: SourceValue,
 }
 
 /// Notebook root-level metadata.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct JupyterNotebookMetadata {
+pub struct RawNotebookMetadata {
     /// The author(s) of the notebook document
-    pub authors: Option<Vec<Option<Value>>>,
+    pub authors: Option<Value>,
     /// Kernel information.
-    pub kernelspec: Option<Kernelspec>,
+    pub kernelspec: Option<Value>,
     /// Kernel information.
     pub language_info: Option<LanguageInfo>,
     /// Original notebook format (major number) before converting the notebook between versions.
@@ -166,23 +91,11 @@ pub struct JupyterNotebookMetadata {
 }
 
 /// Kernel information.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct Kernelspec {
-    /// Name to display in UI.
-    pub display_name: String,
-    /// Name of the kernel specification.
-    pub name: String,
-    /// Custom added: round-trip support
-    #[serde(flatten)]
-    pub other: BTreeMap<String, Value>,
-}
-
-/// Kernel information.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct LanguageInfo {
     /// The codemirror mode to use for code in this language.
-    pub codemirror_mode: Option<CodemirrorMode>,
+    pub codemirror_mode: Option<Value>,
     /// The file extension for files in this language.
     pub file_extension: Option<String>,
     /// The mimetype corresponding to files in this language.
@@ -209,37 +122,8 @@ pub enum SourceValue {
     StringArray(Vec<String>),
 }
 
-/// Whether the cell's output is scrolled, unscrolled, or autoscrolled.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-pub enum ScrolledUnion {
-    Bool(bool),
-    Enum(ScrolledEnum),
-}
-
-/// mimetype output (e.g. text/plain), represented as either an array of strings or a
-/// string.
-///
-/// Contents of the cell, represented as an array of lines.
-///
-/// The stream's text output, represented as an array of strings.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-pub enum TextUnion {
-    String(String),
-    StringArray(Vec<String>),
-}
-
-/// The codemirror mode to use for code in this language.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-pub enum CodemirrorMode {
-    AnythingMap(HashMap<String, Option<Value>>),
-    String(String),
-}
-
 /// String identifying the type of cell.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 pub enum CellType {
     #[serde(rename = "code")]
     Code,
@@ -247,23 +131,4 @@ pub enum CellType {
     Markdown,
     #[serde(rename = "raw")]
     Raw,
-}
-
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
-pub enum ScrolledEnum {
-    #[serde(rename = "auto")]
-    Auto,
-}
-
-/// Type of cell output.
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
-pub enum OutputType {
-    #[serde(rename = "display_data")]
-    DisplayData,
-    #[serde(rename = "error")]
-    Error,
-    #[serde(rename = "execute_result")]
-    ExecuteResult,
-    #[serde(rename = "stream")]
-    Stream,
 }
