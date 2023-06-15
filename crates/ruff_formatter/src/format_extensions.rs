@@ -57,7 +57,6 @@ pub trait MemoizeFormat<Context> {
     /// # Ok(())
     /// # }
     /// ```
-    ///
     fn memoized(self) -> Memoized<Self, Context>
     where
         Self: Sized + Format<Context>,
@@ -142,7 +141,6 @@ where
     /// assert_eq!("Counter:\n\tCount: 0\nCount: 0\n", formatted.print()?.as_code());
     /// # Ok(())
     /// # }
-    ///
     /// ```
     pub fn inspect(&mut self, f: &mut Formatter<Context>) -> FormatResult<&[FormatElement]> {
         let result = self

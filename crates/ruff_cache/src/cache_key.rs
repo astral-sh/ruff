@@ -24,6 +24,7 @@ impl CacheKeyHasher {
 
 impl Deref for CacheKeyHasher {
     type Target = DefaultHasher;
+
     fn deref(&self) -> &Self::Target {
         &self.inner
     }

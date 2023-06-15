@@ -116,7 +116,6 @@ impl Violation for NoSpaceAfterBlockComment {
 /// ## Example
 /// ```python
 /// ### Block comment
-///
 /// ```
 ///
 /// Use instead:

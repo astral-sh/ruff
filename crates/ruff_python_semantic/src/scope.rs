@@ -250,6 +250,7 @@ impl Default for Scopes<'_> {
 
 impl<'a> Deref for Scopes<'a> {
     type Target = IndexSlice<ScopeId, Scope<'a>>;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }

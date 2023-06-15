@@ -1078,23 +1078,29 @@ class A:
             walk_expr(self, expr);
             self.exit_node();
         }
+
         fn visit_expr(&mut self, expr: &Expr) {
             self.enter_node(expr);
             walk_expr(self, expr);
             self.exit_node();
         }
+
         fn visit_constant(&mut self, constant: &Constant) {
             self.emit(&constant);
         }
+
         fn visit_boolop(&mut self, boolop: &Boolop) {
             self.emit(&boolop);
         }
+
         fn visit_operator(&mut self, operator: &Operator) {
             self.emit(&operator);
         }
+
         fn visit_unaryop(&mut self, unaryop: &Unaryop) {
             self.emit(&unaryop);
         }
+
         fn visit_cmpop(&mut self, cmpop: &Cmpop) {
             self.emit(&cmpop);
         }
@@ -1104,51 +1110,61 @@ class A:
             walk_comprehension(self, comprehension);
             self.exit_node();
         }
+
         fn visit_excepthandler(&mut self, excepthandler: &Excepthandler) {
             self.enter_node(excepthandler);
             walk_excepthandler(self, excepthandler);
             self.exit_node();
         }
+
         fn visit_format_spec(&mut self, format_spec: &Expr) {
             self.enter_node(format_spec);
             walk_expr(self, format_spec);
             self.exit_node();
         }
+
         fn visit_arguments(&mut self, arguments: &Arguments) {
             self.enter_node(arguments);
             walk_arguments(self, arguments);
             self.exit_node();
         }
+
         fn visit_arg(&mut self, arg: &Arg) {
             self.enter_node(arg);
             walk_arg(self, arg);
             self.exit_node();
         }
+
         fn visit_keyword(&mut self, keyword: &Keyword) {
             self.enter_node(keyword);
             walk_keyword(self, keyword);
             self.exit_node();
         }
+
         fn visit_alias(&mut self, alias: &Alias) {
             self.enter_node(alias);
             walk_alias(self, alias);
             self.exit_node();
         }
+
         fn visit_withitem(&mut self, withitem: &Withitem) {
             self.enter_node(withitem);
             walk_withitem(self, withitem);
             self.exit_node();
         }
+
         fn visit_match_case(&mut self, match_case: &MatchCase) {
             self.enter_node(match_case);
             walk_match_case(self, match_case);
             self.exit_node();
         }
+
         fn visit_pattern(&mut self, pattern: &Pattern) {
             self.enter_node(pattern);
             walk_pattern(self, pattern);
             self.exit_node();
         }
+
         fn visit_type_ignore(&mut self, type_ignore: &TypeIgnore) {
             self.enter_node(type_ignore);
             walk_type_ignore(self, type_ignore);

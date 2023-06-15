@@ -257,6 +257,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
 
         self.finish_node(withitem);
     }
+
     fn visit_match_case(&mut self, match_case: &'ast MatchCase) {
         if self.start_node(match_case).is_traverse() {
             walk_match_case(self, match_case);

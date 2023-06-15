@@ -50,7 +50,6 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
 /// ## Example
 /// ```python
 /// class Foo(object):\n    \n    bang = 12
-///
 /// ```
 ///
 /// Use instead:

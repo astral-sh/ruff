@@ -94,6 +94,7 @@ struct MessageWithLocation<'a> {
 
 impl Deref for MessageWithLocation<'_> {
     type Target = Message;
+
     fn deref(&self) -> &Self::Target {
         self.message
     }

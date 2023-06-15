@@ -721,7 +721,6 @@ where
 /// # Ok(())
 /// # }
 /// ```
-///
 #[inline(always)]
 pub fn write<Context>(
     output: &mut dyn Buffer<Context = Context>,

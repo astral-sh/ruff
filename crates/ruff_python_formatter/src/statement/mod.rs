@@ -70,6 +70,7 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Stmt {
     type Format<'a> = FormatRefWithRule<'a, Stmt, FormatStmt, PyFormatContext<'ast>>;
+
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatStmt::default())
     }
@@ -77,6 +78,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Stmt {
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt {
     type Format = FormatOwnedWithRule<Stmt, FormatStmt, PyFormatContext<'ast>>;
+
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatStmt::default())
     }
