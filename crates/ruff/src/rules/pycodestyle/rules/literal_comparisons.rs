@@ -295,8 +295,7 @@ pub(crate) fn literal_comparisons(
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.generator());
         for diagnostic in &mut diagnostics {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 content.to_string(),
                 expr.range(),
             )));

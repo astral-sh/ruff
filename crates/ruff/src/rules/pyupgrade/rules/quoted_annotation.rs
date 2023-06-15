@@ -54,8 +54,7 @@ impl AlwaysAutofixableViolation for QuotedAnnotation {
 pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotation, range);
     if checker.patch(Rule::QuotedAnnotation) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             annotation.to_string(),
             range,
         )));

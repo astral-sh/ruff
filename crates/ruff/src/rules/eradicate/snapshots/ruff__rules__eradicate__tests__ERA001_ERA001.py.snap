@@ -10,7 +10,7 @@ ERA001.py:1:1: ERA001 [*] Found commented-out code
   |
   = help: Remove commented-out code
 
-ℹ Suggested fix
+ℹ Possible fix
 1   |-#import os
 2 1 | # from foo import junk
 3 2 | #a = 3
@@ -26,7 +26,7 @@ ERA001.py:2:1: ERA001 [*] Found commented-out code
   |
   = help: Remove commented-out code
 
-ℹ Suggested fix
+ℹ Possible fix
 1 1 | #import os
 2   |-# from foo import junk
 3 2 | #a = 3
@@ -44,7 +44,7 @@ ERA001.py:3:1: ERA001 [*] Found commented-out code
   |
   = help: Remove commented-out code
 
-ℹ Suggested fix
+ℹ Possible fix
 1 1 | #import os
 2 2 | # from foo import junk
 3   |-#a = 3
@@ -63,7 +63,7 @@ ERA001.py:5:1: ERA001 [*] Found commented-out code
   |
   = help: Remove commented-out code
 
-ℹ Suggested fix
+ℹ Possible fix
 2 2 | # from foo import junk
 3 3 | #a = 3
 4 4 | a = 4
@@ -82,7 +82,7 @@ ERA001.py:13:5: ERA001 [*] Found commented-out code
    |
    = help: Remove commented-out code
 
-ℹ Suggested fix
+ℹ Possible fix
 10 10 | 
 11 11 |     # This is a real comment.
 12 12 |     # # This is a (nested) comment.
@@ -100,7 +100,7 @@ ERA001.py:21:5: ERA001 [*] Found commented-out code
    |
    = help: Remove commented-out code
 
-ℹ Suggested fix
+ℹ Possible fix
 18 18 | 
 19 19 | class A():
 20 20 |     pass

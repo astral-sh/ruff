@@ -48,8 +48,7 @@ pub(crate) fn unnecessary_coding_comment(line: &Line, autofix: bool) -> Option<D
     if CODING_COMMENT_REGEX.is_match(line.as_str()) {
         let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, line.full_range());
         if autofix {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+            diagnostic.set_fix(Fix::automatic(Edit::deletion(
                 line.start(),
                 line.full_end(),
             )));

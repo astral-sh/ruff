@@ -11,7 +11,7 @@ UP024_0.py:6:8: UP024 [*] Replace aliased errors with `OSError`
   |
   = help: Replace `EnvironmentError` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | # These should be fixed
 4 4 | try:
 5 5 |     pass
@@ -31,7 +31,7 @@ UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `IOError` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | 
 9  9  | try:
 10 10 |     pass
@@ -51,7 +51,7 @@ UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `WindowsError` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 13 13 | 
 14 14 | try:
 15 15 |     pass
@@ -71,7 +71,7 @@ UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `mmap.error` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 18 18 | 
 19 19 | try:
 20 20 |     pass
@@ -91,7 +91,7 @@ UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `select.error` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 23 23 | 
 24 24 | try:
 25 25 |     pass
@@ -111,7 +111,7 @@ UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `socket.error` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 28 28 | 
 29 29 | try:
 30 30 |     pass
@@ -131,7 +131,7 @@ UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `error` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 33 33 | 
 34 34 | try:
 35 35 |     pass
@@ -152,7 +152,7 @@ UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 40 40 | 
 41 41 | try:
 42 42 |     pass
@@ -173,7 +173,7 @@ UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 44 44 |     pass
 45 45 | try:
 46 46 |     pass
@@ -193,7 +193,7 @@ UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 48 48 |     pass
 49 49 | try:
 50 50 |     pass
@@ -213,7 +213,7 @@ UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 55 55 | 
 56 56 | try:
 57 57 |     pass
@@ -234,7 +234,7 @@ UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 62 62 | from .mmap import error
 63 63 | try:
 64 64 |     pass
@@ -254,7 +254,7 @@ UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `mmap.error` with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 84 84 |     pass
 85 85 | try:
 86 86 |     pass

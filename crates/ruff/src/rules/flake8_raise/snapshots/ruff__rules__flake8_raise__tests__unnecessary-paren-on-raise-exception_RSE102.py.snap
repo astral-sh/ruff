@@ -12,7 +12,7 @@ RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
   |
   = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 2 2 |     y = 6 + "7"
 3 3 | except TypeError:
 4 4 |     # RSE102
@@ -32,7 +32,7 @@ RSE102.py:13:16: RSE102 [*] Unnecessary parentheses on raised exception
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 10 10 |     raise
 11 11 | 
 12 12 | # RSE102
@@ -52,7 +52,7 @@ RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 13 13 | raise TypeError()
 14 14 | 
 15 15 | # RSE102
@@ -73,7 +73,7 @@ RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 16 16 | raise TypeError ()
 17 17 | 
 18 18 | # RSE102
@@ -97,7 +97,7 @@ RSE102.py:23:16: RSE102 [*] Unnecessary parentheses on raised exception
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 20 20 |     ()
 21 21 | 
 22 22 | # RSE102
@@ -122,7 +122,7 @@ RSE102.py:28:16: RSE102 [*] Unnecessary parentheses on raised exception
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 25 25 | )
 26 26 | 
 27 27 | # RSE102

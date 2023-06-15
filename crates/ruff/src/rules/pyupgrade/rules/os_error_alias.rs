@@ -88,11 +88,12 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         target.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            "OSError".to_string(),
-            target.range(),
-        )));
+        if checker.semantic().is_builtin("OSError") {
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                "OSError".to_string(),
+                target.range(),
+            )));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -101,49 +102,49 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, target.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let Expr::Tuple(ast::ExprTuple { elts, ..}) = target else {
-            panic!("Expected Expr::Tuple");
-        };
-
-        // Filter out any `OSErrors` aliases.
-        let mut remaining: Vec<Expr> = elts
-            .iter()
-            .filter_map(|elt| {
-                if aliases.contains(&elt) {
-                    None
-                } else {
-                    Some(elt.clone())
-                }
-            })
-            .collect();
-
-        // If `OSError` itself isn't already in the tuple, add it.
-        if elts.iter().all(|elt| !is_os_error(elt, checker.semantic())) {
-            let node = ast::ExprName {
-                id: "OSError".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
+        if checker.semantic().is_builtin("OSError") {
+            let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
+                panic!("Expected Expr::Tuple");
             };
-            remaining.insert(0, node.into());
-        }
 
-        if remaining.len() == 1 {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                "OSError".to_string(),
-                target.range(),
-            )));
-        } else {
-            let node = ast::ExprTuple {
-                elts: remaining,
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                format!("({})", checker.generator().expr(&node.into())),
-                target.range(),
-            )));
+            // Filter out any `OSErrors` aliases.
+            let mut remaining: Vec<Expr> = elts
+                .iter()
+                .filter_map(|elt| {
+                    if aliases.contains(&elt) {
+                        None
+                    } else {
+                        Some(elt.clone())
+                    }
+                })
+                .collect();
+
+            // If `OSError` itself isn't already in the tuple, add it.
+            if elts.iter().all(|elt| !is_os_error(elt, checker.semantic())) {
+                let node = ast::ExprName {
+                    id: "OSError".into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                remaining.insert(0, node.into());
+            }
+
+            if remaining.len() == 1 {
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    "OSError".to_string(),
+                    target.range(),
+                )));
+            } else {
+                let node = ast::ExprTuple {
+                    elts: remaining,
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    format!("({})", checker.generator().expr(&node.into())),
+                    target.range(),
+                )));
+            }
         }
     }
     checker.diagnostics.push(diagnostic);

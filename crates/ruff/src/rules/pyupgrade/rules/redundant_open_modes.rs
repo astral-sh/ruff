@@ -138,14 +138,14 @@ fn create_check(
     );
     if patch {
         if let Some(content) = replacement_value {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 content.to_string(),
                 mode_param.range(),
             )));
         } else {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| create_remove_param_fix(locator, expr, mode_param));
+            diagnostic.try_set_fix(|| {
+                create_remove_param_fix(locator, expr, mode_param).map(Fix::automatic)
+            });
         }
     }
     diagnostic

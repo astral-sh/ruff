@@ -83,8 +83,7 @@ pub(crate) fn manual_from_import(
                 level: Some(Int::new(0)),
                 range: TextRange::default(),
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 checker.generator().stmt(&node.into()),
                 stmt.range(),
             )));
