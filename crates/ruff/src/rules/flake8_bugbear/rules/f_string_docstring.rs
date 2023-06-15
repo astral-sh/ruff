@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::ranges;
+use ruff_python_ast::identifier;
 
 use crate::checkers::ast::Checker;
 
@@ -31,6 +31,6 @@ pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     };
     checker.diagnostics.push(Diagnostic::new(
         FStringDocstring,
-        ranges::identifier_range(stmt, checker.locator),
+        identifier::statement(stmt, checker.locator),
     ));
 }

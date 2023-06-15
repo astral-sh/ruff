@@ -477,6 +477,7 @@ impl<'a> Cursor<'a> {
         self.source_length = self.text_len();
     }
 
+    /// Returns `true` if the file is at the end of the file.
     fn is_eof(&self) -> bool {
         self.chars.as_str().is_empty()
     }

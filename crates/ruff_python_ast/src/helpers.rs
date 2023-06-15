@@ -1,9 +1,11 @@
 use std::borrow::Cow;
+use std::ops::Sub;
 use std::path::Path;
 
 use num_traits::Zero;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::Cmpop;
 use rustpython_parser::ast::{
     self, Arguments, Constant, Excepthandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
 };
@@ -1415,15 +1417,118 @@ impl Truthiness {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocatedCmpop {
+    pub range: TextRange,
+    pub op: Cmpop,
+}
+
+impl LocatedCmpop {
+    fn new<T: Into<TextRange>>(range: T, op: Cmpop) -> Self {
+        Self {
+            range: range.into(),
+            op,
+        }
+    }
+}
+
+/// Extract all [`Cmpop`] operators from an expression snippet, with appropriate
+/// ranges.
+///
+/// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
+/// `CPython` doesn't either. This method iterates over the token stream and
+/// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
+pub fn locate_cmpops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpop> {
+    // If `Expr` is a multi-line expression, we need to parenthesize it to
+    // ensure that it's lexed correctly.
+    let contents = locator.slice(expr.range());
+    let parenthesized_contents = format!("({contents})");
+    let mut tok_iter = lexer::lex(&parenthesized_contents, Mode::Expression)
+        .flatten()
+        .skip(1)
+        .map(|(tok, range)| (tok, range.sub(TextSize::from(1))))
+        .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment(_)))
+        .peekable();
+
+    let mut ops: Vec<LocatedCmpop> = vec![];
+    let mut count = 0u32;
+    loop {
+        let Some((tok, range)) = tok_iter.next() else {
+            break;
+        };
+        if matches!(tok, Tok::Lpar) {
+            count = count.saturating_add(1);
+            continue;
+        } else if matches!(tok, Tok::Rpar) {
+            count = count.saturating_sub(1);
+            continue;
+        }
+        if count == 0 {
+            match tok {
+                Tok::Not => {
+                    if let Some((_, next_range)) =
+                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::In))
+                    {
+                        ops.push(LocatedCmpop::new(
+                            TextRange::new(range.start(), next_range.end()),
+                            Cmpop::NotIn,
+                        ));
+                    }
+                }
+                Tok::In => {
+                    ops.push(LocatedCmpop::new(range, Cmpop::In));
+                }
+                Tok::Is => {
+                    let op = if let Some((_, next_range)) =
+                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::Not))
+                    {
+                        LocatedCmpop::new(
+                            TextRange::new(range.start(), next_range.end()),
+                            Cmpop::IsNot,
+                        )
+                    } else {
+                        LocatedCmpop::new(range, Cmpop::Is)
+                    };
+                    ops.push(op);
+                }
+                Tok::NotEqual => {
+                    ops.push(LocatedCmpop::new(range, Cmpop::NotEq));
+                }
+                Tok::EqEqual => {
+                    ops.push(LocatedCmpop::new(range, Cmpop::Eq));
+                }
+                Tok::GreaterEqual => {
+                    ops.push(LocatedCmpop::new(range, Cmpop::GtE));
+                }
+                Tok::Greater => {
+                    ops.push(LocatedCmpop::new(range, Cmpop::Gt));
+                }
+                Tok::LessEqual => {
+                    ops.push(LocatedCmpop::new(range, Cmpop::LtE));
+                }
+                Tok::Less => {
+                    ops.push(LocatedCmpop::new(range, Cmpop::Lt));
+                }
+                _ => {}
+            }
+        }
+    }
+    ops
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
 
     use anyhow::Result;
+    use ruff_text_size::TextSize;
+    use rustpython_ast::{Cmpop, Expr};
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
-    use crate::helpers::{has_trailing_content, resolve_imported_module_path};
+    use crate::helpers::{
+        has_trailing_content, locate_cmpops, resolve_imported_module_path, LocatedCmpop,
+    };
     use crate::source_code::Locator;
 
     #[test]
@@ -1500,5 +1605,87 @@ y = 2
             resolve_imported_module_path(Some(2), Some("foo"), Some(&["bar".to_string()])),
             None
         );
+    }
+
+    #[test]
+    fn extract_cmpop_location() -> Result<()> {
+        let contents = "x == 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            locate_cmpops(&expr, &locator),
+            vec![LocatedCmpop::new(
+                TextSize::from(2)..TextSize::from(4),
+                Cmpop::Eq
+            )]
+        );
+
+        let contents = "x != 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            locate_cmpops(&expr, &locator),
+            vec![LocatedCmpop::new(
+                TextSize::from(2)..TextSize::from(4),
+                Cmpop::NotEq
+            )]
+        );
+
+        let contents = "x is 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            locate_cmpops(&expr, &locator),
+            vec![LocatedCmpop::new(
+                TextSize::from(2)..TextSize::from(4),
+                Cmpop::Is
+            )]
+        );
+
+        let contents = "x is not 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            locate_cmpops(&expr, &locator),
+            vec![LocatedCmpop::new(
+                TextSize::from(2)..TextSize::from(8),
+                Cmpop::IsNot
+            )]
+        );
+
+        let contents = "x in 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            locate_cmpops(&expr, &locator),
+            vec![LocatedCmpop::new(
+                TextSize::from(2)..TextSize::from(4),
+                Cmpop::In
+            )]
+        );
+
+        let contents = "x not in 1";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            locate_cmpops(&expr, &locator),
+            vec![LocatedCmpop::new(
+                TextSize::from(2)..TextSize::from(8),
+                Cmpop::NotIn
+            )]
+        );
+
+        let contents = "x != (1 is not 2)";
+        let expr = Expr::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+        assert_eq!(
+            locate_cmpops(&expr, &locator),
+            vec![LocatedCmpop::new(
+                TextSize::from(2)..TextSize::from(4),
+                Cmpop::NotEq
+            )]
+        );
+
+        Ok(())
     }
 }

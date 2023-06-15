@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Excepthandler, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::ranges::except_range;
+use ruff_python_ast::identifier::except_range;
 use ruff_python_ast::source_code::Locator;
 
 /// ## What it does

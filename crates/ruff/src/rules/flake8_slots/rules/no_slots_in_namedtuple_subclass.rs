@@ -3,8 +3,8 @@ use rustpython_parser::ast::{Expr, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::identifier::statement;
 use ruff_python_ast::prelude::Stmt;
-use ruff_python_ast::ranges::identifier_range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -77,7 +77,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
         if !has_slots(&class.body) {
             checker.diagnostics.push(Diagnostic::new(
                 NoSlotsInNamedtupleSubclass,
-                identifier_range(stmt, checker.locator),
+                statement(stmt, checker.locator),
             ));
         }
     }

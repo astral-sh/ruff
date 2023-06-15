@@ -17,7 +17,7 @@ use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use ruff_python_ast::{cast, helpers, ranges, str, visitor};
+use ruff_python_ast::{cast, helpers, identifier, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
@@ -250,7 +250,7 @@ where
         // Pre-visit.
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = ranges::find_names(stmt, self.locator).collect();
+                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
@@ -271,7 +271,7 @@ where
                 }
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = ranges::find_names(stmt, self.locator).collect();
+                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
@@ -367,7 +367,7 @@ where
                 if self.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
-                            ranges::identifier_range(stmt, self.locator)
+                            identifier::statement(stmt, self.locator)
                         })
                     {
                         self.diagnostics.push(diagnostic);
@@ -692,7 +692,7 @@ where
                 }
                 if self.enabled(Rule::AmbiguousClassName) {
                     if let Some(diagnostic) = pycodestyle::rules::ambiguous_class_name(name, || {
-                        ranges::identifier_range(stmt, self.locator)
+                        identifier::statement(stmt, self.locator)
                     }) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -809,7 +809,7 @@ where
                         self.add_binding(
                             name,
                             // NOTE: Incorrect, needs to be the range of the alias.
-                            alias.range(),
+                            identifier::alias(&alias, self.locator),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
                         );
@@ -830,7 +830,7 @@ where
                         self.add_binding(
                             name,
                             // NOTE: Incorrect, needs to be the range of `name`.
-                            alias.range(),
+                            identifier::alias(&alias, self.locator),
                             BindingKind::SubmoduleImportation(SubmoduleImportation {
                                 qualified_name,
                             }),
@@ -842,7 +842,7 @@ where
                         self.add_binding(
                             name,
                             // NOTE: Incorrect, needs to be the range of `name`.
-                            alias.range(),
+                            identifier::alias(&alias, self.locator),
                             BindingKind::Importation(Importation { qualified_name }),
                             if alias
                                 .asname
@@ -1088,7 +1088,7 @@ where
                         self.add_binding(
                             name,
                             // NOTE: Incorrect, needs to be the range of `name`.
-                            alias.range(),
+                            identifier::alias(&alias, self.locator),
                             BindingKind::FutureImportation,
                             BindingFlags::empty(),
                         );
@@ -1150,7 +1150,7 @@ where
                         self.add_binding(
                             name,
                             // NOTE: Incorrect, needs to be the range of `name`.
-                            alias.range(),
+                            identifier::alias(&alias, self.locator),
                             BindingKind::FromImportation(FromImportation { qualified_name }),
                             if alias
                                 .asname
@@ -1877,7 +1877,7 @@ where
                 self.add_binding(
                     name,
                     // NOTE: Correct!
-                    ranges::identifier_range(stmt, self.locator),
+                    identifier::statement(stmt, self.locator),
                     BindingKind::FunctionDefinition,
                     BindingFlags::empty(),
                 );
@@ -2101,7 +2101,7 @@ where
                 self.add_binding(
                     name,
                     // NOTE: Correct!
-                    ranges::identifier_range(stmt, self.locator),
+                    identifier::statement(stmt, self.locator),
                     BindingKind::ClassDefinition,
                     BindingFlags::empty(),
                 );
@@ -3909,7 +3909,7 @@ where
                 }
                 match name {
                     Some(name) => {
-                        let range = ranges::exception_range(excepthandler, self.locator)
+                        let range = identifier::exception_range(excepthandler, self.locator)
                             .expect("Failed to find `name` range");
 
                         if self.enabled(Rule::AmbiguousVariableName) {
@@ -4028,7 +4028,7 @@ where
         // upstream.
         self.add_binding(
             &arg.arg,
-            ranges::arg_range(arg, self.locator),
+            identifier::arg(arg, self.locator),
             BindingKind::Argument,
             BindingFlags::empty(),
         );
@@ -4068,7 +4068,8 @@ where
         {
             self.add_binding(
                 name,
-                // NOTE: Incorrect, this needs to be the range of the identifier.
+                // TODO(charlie): This needs to use the range of the identifier, not the range of
+                // the pattern.
                 pattern.range(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),

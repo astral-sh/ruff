@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
-use ruff_python_ast::ranges::identifier_range;
+use ruff_python_ast::identifier::statement;
 use ruff_python_semantic::analyze::visibility::is_overload;
 use ruff_python_semantic::{Definition, Member, MemberKind};
 
@@ -32,6 +32,6 @@ pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     }
     checker.diagnostics.push(Diagnostic::new(
         OverloadWithDocstring,
-        identifier_range(stmt, checker.locator),
+        statement(stmt, checker.locator),
     ));
 }
