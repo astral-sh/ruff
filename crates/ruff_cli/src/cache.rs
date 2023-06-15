@@ -50,7 +50,7 @@ impl PackageCache {
 
         let mut buf = itoa::Buffer::new();
         let key = Path::new(buf.format(cache_key(&package_root, settings)));
-        let path = PathBuf::from_iter([cache_dir, Path::new("content"), key]);
+        let path = PathBuf::from_iter([cache_dir, key]);
 
         let file = match File::open(&path) {
             Ok(file) => file,
@@ -241,7 +241,7 @@ fn cache_key(package_root: &Path, settings: &Settings) -> u64 {
 /// Initialize the cache at the specified `Path`.
 pub(crate) fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
-    fs::create_dir_all(path.join("content"))?;
+    fs::create_dir_all(path)?;
 
     // Add the CACHEDIR.TAG.
     if !cachedir::is_tagged(path)? {
