@@ -42,8 +42,8 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#is-not)
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#value-comparisons)
+/// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
+/// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
 #[violation]
 pub struct IsLiteral {

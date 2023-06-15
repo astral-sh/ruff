@@ -42,7 +42,7 @@ use ruff_python_ast::source_code::Locator;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[violation]
 pub struct DefaultExceptNotLast;
 

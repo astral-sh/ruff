@@ -32,7 +32,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/exceptions.html#TypeError)
+/// - [Python documentation: `TypeError`](https://docs.python.org/3/library/exceptions.html#TypeError)
 #[violation]
 pub struct TypeCheckWithoutTypeError;
 

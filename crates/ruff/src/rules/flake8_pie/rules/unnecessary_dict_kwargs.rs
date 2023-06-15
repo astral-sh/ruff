@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
+/// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 #[violation]
 pub struct UnnecessaryDictKwargs;
 

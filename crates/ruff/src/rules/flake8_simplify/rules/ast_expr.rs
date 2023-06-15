@@ -73,7 +73,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#dict.get)
+/// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[violation]
 pub struct DictGetWithNoneDefault {
     expected: String,

@@ -35,7 +35,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
+/// - [Python documentation: Constants added by the `site` module](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
 #[violation]
 pub struct SysExitAlias {
     name: String,

@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/functions.html#property)
+/// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
 #[violation]
 pub struct PropertyWithParameters;
 

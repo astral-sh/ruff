@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#lambda)
+/// - [Python documentation: Lambdas](https://docs.python.org/3/reference/expressions.html#lambda)
 #[violation]
 pub struct UnnecessaryDirectLambdaCall;
 

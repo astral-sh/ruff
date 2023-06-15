@@ -26,7 +26,7 @@ use crate::rules::pylint::helpers::CmpopExt;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#comparisons)
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct ComparisonOfConstant {
     left_constant: String,

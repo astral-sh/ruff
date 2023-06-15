@@ -110,7 +110,7 @@ impl ExpectedParams {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/datamodel.html)
+/// - [Python documentation: Data model](https://docs.python.org/3/reference/datamodel.html)
 #[violation]
 pub struct UnexpectedSpecialMethodSignature {
     method_name: String,
