@@ -277,11 +277,17 @@ impl Notebook {
                 .unwrap_or_else(|| {
                     panic!("Transformed content out of bounds ({start:?}..{end:?}) for cell {pos}");
                 });
-            self.raw.cells[pos as usize].source = SourceValue::StringArray(
-                UniversalNewlineIterator::from(cell_content)
-                    .map(|line| line.as_full_str().to_string())
-                    .collect::<Vec<_>>(),
-            );
+            let mut lines = UniversalNewlineIterator::from(cell_content)
+                .map(|line| line.as_full_str().to_string())
+                .collect::<Vec<_>>();
+            if let Some(last) = lines.last_mut() {
+                // We only need to strip the trailing newline which we added
+                // while concatenating the cell contents.
+                if let Some(last_updated) = last.strip_suffix('\n') {
+                    *last = last_updated.to_string();
+                }
+            }
+            self.raw.cells[pos as usize].source = SourceValue::StringArray(lines);
         }
     }
 
