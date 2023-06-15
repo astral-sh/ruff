@@ -12,7 +12,7 @@ docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quote
   |
   = help: Replace single quotes docstring with double quotes
 
-ℹ Possible fix
+ℹ Fix
 1   |-'''
   1 |+"""
 2 2 | Single quotes multiline module docstring
@@ -36,7 +36,7 @@ docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quot
    |
    = help: Replace single quotes docstring with double quotes
 
-ℹ Possible fix
+ℹ Fix
 11 11 | class Cls(MakeKlass('''
 12 12 |     class params \t not a docstring
 13 13 | ''')):
@@ -63,7 +63,7 @@ docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quot
    |
    = help: Replace single quotes docstring with double quotes
 
-ℹ Possible fix
+ℹ Fix
 23 23 |     def f(self, bar='''
 24 24 |         definitely not a docstring''',
 25 25 |         val=l[Cls():3]):

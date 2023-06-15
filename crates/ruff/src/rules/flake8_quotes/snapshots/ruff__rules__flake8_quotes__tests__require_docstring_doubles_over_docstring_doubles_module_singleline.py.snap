@@ -11,7 +11,7 @@ docstring_doubles_module_singleline.py:2:1: Q001 [*] Double quote multiline foun
   |
   = help: Replace double multiline quotes with single quotes
 
-ℹ Possible fix
+ℹ Fix
 1 1 | """ Double quotes singleline module docstring """
 2   |-""" this is not a docstring """
   2 |+''' this is not a docstring '''
@@ -28,7 +28,7 @@ docstring_doubles_module_singleline.py:6:1: Q001 [*] Double quote multiline foun
   |
   = help: Replace double multiline quotes with single quotes
 
-ℹ Possible fix
+ℹ Fix
 3 3 | 
 4 4 | def foo():
 5 5 |     pass

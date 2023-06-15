@@ -11,7 +11,7 @@ singles_implicit.py:2:5: Q000 [*] Single quotes found but double quotes preferre
   |
   = help: Replace single quotes with double quotes
 
-ℹ Possible fix
+ℹ Fix
 1 1 | x = (
 2   |-    'This'
   2 |+    "This"
@@ -30,7 +30,7 @@ singles_implicit.py:3:5: Q000 [*] Single quotes found but double quotes preferre
   |
   = help: Replace single quotes with double quotes
 
-ℹ Possible fix
+ℹ Fix
 1 1 | x = (
 2 2 |     'This'
 3   |-    'is'
@@ -49,7 +49,7 @@ singles_implicit.py:4:5: Q000 [*] Single quotes found but double quotes preferre
   |
   = help: Replace single quotes with double quotes
 
-ℹ Possible fix
+ℹ Fix
 1 1 | x = (
 2 2 |     'This'
 3 3 |     'is'
@@ -69,7 +69,7 @@ singles_implicit.py:8:5: Q000 [*] Single quotes found but double quotes preferre
    |
    = help: Replace single quotes with double quotes
 
-ℹ Possible fix
+ℹ Fix
 5 5 | )
 6 6 | 
 7 7 | x = (
@@ -90,7 +90,7 @@ singles_implicit.py:9:5: Q000 [*] Single quotes found but double quotes preferre
    |
    = help: Replace single quotes with double quotes
 
-ℹ Possible fix
+ℹ Fix
 6  6  | 
 7  7  | x = (
 8  8  |     'This' \
@@ -110,7 +110,7 @@ singles_implicit.py:10:5: Q000 [*] Single quotes found but double quotes preferr
    |
    = help: Replace single quotes with double quotes
 
-ℹ Possible fix
+ℹ Fix
 7  7  | x = (
 8  8  |     'This' \
 9  9  |     'is' \
@@ -129,7 +129,7 @@ singles_implicit.py:27:1: Q000 [*] Single quotes found but double quotes preferr
    |
    = help: Replace single quotes with double quotes
 
-ℹ Possible fix
+ℹ Fix
 24 24 | 
 25 25 | if True:
 26 26 |     'This can use "single" quotes'

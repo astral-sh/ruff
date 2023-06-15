@@ -12,7 +12,7 @@ docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quote
   |
   = help: Replace double quotes docstring with single quotes
 
-ℹ Possible fix
+ℹ Fix
 1   |-"""
   1 |+'''
 2 2 | Double quotes multiline module docstring
@@ -35,7 +35,7 @@ docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quot
    |
    = help: Replace double quotes docstring with single quotes
 
-ℹ Possible fix
+ℹ Fix
 9  9  | l = []
 10 10 | 
 11 11 | class Cls:
@@ -62,7 +62,7 @@ docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quot
    |
    = help: Replace double quotes docstring with single quotes
 
-ℹ Possible fix
+ℹ Fix
 21 21 |     def f(self, bar="""
 22 22 |         definitely not a docstring""",
 23 23 |         val=l[Cls():3]):

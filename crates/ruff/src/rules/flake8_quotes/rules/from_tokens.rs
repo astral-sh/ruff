@@ -284,7 +284,10 @@ fn docstring(locator: &Locator, range: TextRange, settings: &Settings) -> Option
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        diagnostic.set_fix(Fix::manual(Edit::range_replacement(fixed_contents, range)));
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            fixed_contents,
+            range,
+        )));
     }
     Some(diagnostic)
 }
@@ -354,7 +357,10 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                diagnostic.set_fix(Fix::manual(Edit::range_replacement(fixed_contents, *range)));
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    fixed_contents,
+                    *range,
+                )));
             }
             diagnostics.push(diagnostic);
         } else {
@@ -417,8 +423,10 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
 
                         fixed_contents.push(quote);
 
-                        diagnostic
-                            .set_fix(Fix::manual(Edit::range_replacement(fixed_contents, *range)));
+                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                            fixed_contents,
+                            *range,
+                        )));
                     }
                     diagnostics.push(diagnostic);
                 }
@@ -441,8 +449,10 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
-                    diagnostic
-                        .set_fix(Fix::manual(Edit::range_replacement(fixed_contents, *range)));
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                        fixed_contents,
+                        *range,
+                    )));
                 }
                 diagnostics.push(diagnostic);
             }
