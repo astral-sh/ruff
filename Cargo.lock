@@ -1879,6 +1879,7 @@ dependencies = [
 name = "ruff_cache"
 version = "0.0.0"
 dependencies = [
+ "dirs 5.0.1",
  "filetime",
  "glob",
  "globset",

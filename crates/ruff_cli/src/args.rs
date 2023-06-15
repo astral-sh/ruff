@@ -55,7 +55,11 @@ pub enum Command {
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
-    Clean,
+    Clean {
+        /// Path to the cache directory.
+        #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
+        cache_dir: Option<PathBuf>,
+    },
     /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },

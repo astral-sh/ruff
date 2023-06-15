@@ -49,11 +49,11 @@ pub struct Options {
     )]
     /// A path to the cache directory.
     ///
-    /// By default, Ruff stores cache results in a `.ruff_cache` directory in
-    /// the current project root.
+    /// By default, Ruff stores cache results in the global OS cache, falling
+    /// back to a `.ruff_cache` directory in the current project root.
     ///
     /// However, Ruff will also respect the `RUFF_CACHE_DIR` environment
-    /// variable, which takes precedence over that default.
+    /// variable, which takes precedence over those defaults.
     ///
     /// This setting will override even the `RUFF_CACHE_DIR` environment
     /// variable, if set.

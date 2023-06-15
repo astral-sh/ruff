@@ -115,7 +115,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
         Command::Rule { rule, format } => commands::rule::rule(rule, format)?,
         Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
         Command::Linter { format } => commands::linter::linter(format)?,
-        Command::Clean => commands::clean::clean(log_level)?,
+        Command::Clean { cache_dir } => commands::clean::clean(cache_dir, log_level)?,
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());
         }

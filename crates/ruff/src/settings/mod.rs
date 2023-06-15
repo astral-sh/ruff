@@ -50,10 +50,7 @@ impl AllSettings {
     pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
             cli: CliSettings {
-                cache_dir: config
-                    .cache_dir
-                    .clone()
-                    .unwrap_or_else(|| cache_dir(project_root)),
+                cache_dir: cache_dir(config.cache_dir.clone(), project_root),
                 fix: config.fix.unwrap_or(false),
                 fix_only: config.fix_only.unwrap_or(false),
                 format: config.format.unwrap_or_default(),

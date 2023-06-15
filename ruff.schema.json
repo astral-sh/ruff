@@ -26,7 +26,7 @@
       }
     },
     "cache-dir": {
-      "description": "A path to the cache directory.\n\nBy default, Ruff stores cache results in a `.ruff_cache` directory in the current project root.\n\nHowever, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes precedence over that default.\n\nThis setting will override even the `RUFF_CACHE_DIR` environment variable, if set.",
+      "description": "A path to the cache directory.\n\nBy default, Ruff stores cache results in the global OS cache, falling back to a `.ruff_cache` directory in the current project root.\n\nHowever, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes precedence over those defaults.\n\nThis setting will override even the `RUFF_CACHE_DIR` environment variable, if set.",
       "type": [
         "string",
         "null"
