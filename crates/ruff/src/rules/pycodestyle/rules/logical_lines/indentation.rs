@@ -9,7 +9,7 @@ use super::LogicalLine;
 /// Checks for indentation with a non-multiple of 4 spaces.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, 4 spaces per indentation level should be preferred.
+/// According to [PEP 8], 4 spaces per indentation level should be preferred.
 ///
 /// ## Example
 /// ```python
@@ -23,8 +23,7 @@ use super::LogicalLine;
 ///     a = 1
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+/// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct IndentationWithInvalidMultiple {
     indent_size: usize,
@@ -42,7 +41,7 @@ impl Violation for IndentationWithInvalidMultiple {
 /// Checks for indentation of comments with a non-multiple of 4 spaces.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, 4 spaces per indentation level should be preferred.
+/// According to [PEP 8], 4 spaces per indentation level should be preferred.
 ///
 /// ## Example
 /// ```python
@@ -56,8 +55,7 @@ impl Violation for IndentationWithInvalidMultiple {
 ///     # a = 1
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+/// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct IndentationWithInvalidMultipleComment {
     indent_size: usize,
@@ -90,8 +88,7 @@ impl Violation for IndentationWithInvalidMultipleComment {
 ///     pass
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+/// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct NoIndentedBlock;
 
@@ -123,8 +120,7 @@ impl Violation for NoIndentedBlock {
 ///     pass
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+/// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct NoIndentedBlockComment;
 
@@ -153,8 +149,7 @@ impl Violation for NoIndentedBlockComment {
 /// b = 2
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+/// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct UnexpectedIndentation;
 
@@ -183,8 +178,7 @@ impl Violation for UnexpectedIndentation {
 /// # b = 2
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+/// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct UnexpectedIndentationComment;
 
@@ -199,7 +193,7 @@ impl Violation for UnexpectedIndentationComment {
 /// Checks for over-indented code.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, 4 spaces per indentation level should be preferred. Increased
+/// According to [PEP 8], 4 spaces per indentation level should be preferred. Increased
 /// indentation can lead to inconsistent formatting, which can hurt
 /// readability.
 ///
@@ -215,8 +209,7 @@ impl Violation for UnexpectedIndentationComment {
 ///     pass
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+/// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[violation]
 pub struct OverIndented {
     is_comment: bool,

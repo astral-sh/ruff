@@ -42,8 +42,7 @@ use ruff_python_ast::source_code::Locator;
 /// ```
 ///
 /// ## References
-/// - [PEP 8](https://www.python.org/dev/peps/pep-0008/#programming-recommendations)
-/// - [Python: "Exception hierarchy"](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
+/// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 /// - [Google Python Style Guide: "Exceptions"](https://google.github.io/styleguide/pyguide.html#24-exceptions)
 #[violation]
 pub struct BareExcept;

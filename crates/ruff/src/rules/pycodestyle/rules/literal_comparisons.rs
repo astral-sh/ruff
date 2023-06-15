@@ -30,7 +30,7 @@ impl EqCmpop {
 /// Checks for comparisons to `None` which are not using the `is` operator.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "Comparisons to singletons like None should always be done with
+/// According to [PEP 8], "Comparisons to singletons like None should always be done with
 /// is or is not, never the equality operators."
 ///
 /// ## Example
@@ -47,8 +47,7 @@ impl EqCmpop {
 ///     pass
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[violation]
 pub struct NoneComparison(EqCmpop);
 
@@ -75,7 +74,7 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// Checks for comparisons to booleans which are not using the `is` operator.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "Comparisons to singletons like None should always be done with
+/// According to [PEP 8], "Comparisons to singletons like None should always be done with
 /// is or is not, never the equality operators."
 ///
 /// ## Example
@@ -94,8 +93,7 @@ impl AlwaysAutofixableViolation for NoneComparison {
 ///     pass
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[violation]
 pub struct TrueFalseComparison(bool, EqCmpop);
 

@@ -40,7 +40,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
+/// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct DuplicateIsinstanceCall {
     name: Option<String>,
