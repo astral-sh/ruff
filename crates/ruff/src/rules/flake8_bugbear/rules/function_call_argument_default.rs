@@ -7,11 +7,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPath};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_semantic::analyze::typing::is_immutable_func;
+use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_func};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.

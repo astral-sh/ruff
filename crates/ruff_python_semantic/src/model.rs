@@ -10,7 +10,7 @@ use smallvec::smallvec;
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_stdlib::path::is_python_stub_file;
-use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
+use ruff_python_stdlib::typing::is_typing_extension;
 
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImportation,
@@ -175,7 +175,7 @@ impl<'a> SemanticModel<'a> {
             return true;
         }
 
-        if TYPING_EXTENSIONS.contains(target) {
+        if is_typing_extension(target) {
             if call_path.as_slice() == ["typing_extensions", target] {
                 return true;
             }

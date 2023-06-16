@@ -1,27 +1,12 @@
-use ruff_python_ast::helpers::map_callable;
 use rustpython_parser::ast::{self, Expr};
 
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::SemanticModel;
 
-pub(super) fn is_mutable_expr(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::List(_)
-            | Expr::Dict(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::DictComp(_)
-            | Expr::SetComp(_)
-    )
-}
-
-const ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS: &[&[&str]] = &[&["dataclasses", "field"]];
-
-pub(super) fn is_allowed_dataclass_function(func: &Expr, semantic: &SemanticModel) -> bool {
+/// Returns `true` if the given [`Expr`] is a `dataclasses.field` call.
+pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
-        ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
+        matches!(call_path.as_slice(), ["dataclasses", "field"])
     })
 }
 
