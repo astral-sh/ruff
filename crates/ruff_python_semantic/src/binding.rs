@@ -57,6 +57,19 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::ALIAS)
     }
 
+    /// Return `true` if this [`Binding`] represents a `nonlocal`. A [`Binding`] is a `nonlocal`
+    /// if it's declared by a `nonlocal` statement, or shadows a [`Binding`] declared by a
+    /// `nonlocal` statement.
+    pub const fn is_nonlocal(&self) -> bool {
+        self.flags.contains(BindingFlags::NONLOCAL)
+    }
+
+    /// Return `true` if this [`Binding`] represents a `global`. A [`Binding`] is a `global` if it's
+    /// declared by a `global` statement, or shadows a [`Binding`] declared by a `global` statement.
+    pub const fn is_global(&self) -> bool {
+        self.flags.contains(BindingFlags::GLOBAL)
+    }
+
     /// Return `true` if this [`Binding`] represents an unbound variable
     /// (e.g., `x` in `x = 1; del x`).
     pub const fn is_unbound(&self) -> bool {
@@ -193,6 +206,28 @@ bitflags! {
         /// from fastapi import FastAPI as app
         /// ```
         const ALIAS = 1 << 2;
+
+        /// The binding is `nonlocal` to the declaring scope. This could be a binding created by
+        /// a `nonlocal` statement, or a binding that shadows such a binding.
+        ///
+        /// For example, both of the bindings in the following function are `nonlocal`:
+        /// ```python
+        /// def f():
+        ///     nonlocal x
+        ///     x = 1
+        /// ```
+        const NONLOCAL = 1 << 3;
+
+        /// The binding is `global`. This could be a binding created by a `global` statement, or a
+        /// binding that shadows such a binding.
+        ///
+        /// For example, both of the bindings in the following function are `global`:
+        /// ```python
+        /// def f():
+        ///     global x
+        ///     x = 1
+        /// ```
+        const GLOBAL = 1 << 4;
     }
 }
 

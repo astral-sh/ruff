@@ -295,6 +295,8 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
         .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
         .filter_map(|(name, binding)| {
             if (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
+                && !binding.is_nonlocal()
+                && !binding.is_global()
                 && !binding.is_used()
                 && !checker.settings.dummy_variable_rgx.is_match(name)
                 && name != "__tracebackhide__"

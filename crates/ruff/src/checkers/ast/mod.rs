@@ -264,7 +264,7 @@ where
                         let binding_id = self.semantic.push_binding(
                             *range,
                             BindingKind::Global,
-                            BindingFlags::empty(),
+                            BindingFlags::GLOBAL,
                         );
                         let scope = self.semantic.scope_mut();
                         scope.add(name, binding_id);
@@ -299,7 +299,7 @@ where
                             let binding_id = self.semantic.push_binding(
                                 *range,
                                 BindingKind::Nonlocal(scope_id),
-                                BindingFlags::empty(),
+                                BindingFlags::NONLOCAL,
                             );
                             let scope = self.semantic.scope_mut();
                             scope.add(name, binding_id);
@@ -4279,22 +4279,27 @@ impl<'a> Checker<'a> {
                 return binding_id;
             }
 
+            // Avoid shadowing builtins.
             let shadowed = &self.semantic.bindings[shadowed_id];
-            match &shadowed.kind {
-                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException => {
-                    // Avoid overriding builtins.
+            if !matches!(
+                shadowed.kind,
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException,
+            ) {
+                let references = shadowed.references.clone();
+                let is_global = shadowed.is_global();
+                let is_nonlocal = shadowed.is_nonlocal();
+
+                // If the shadowed binding was global, then this one is too.
+                if is_global {
+                    self.semantic.bindings[binding_id].flags |= BindingFlags::GLOBAL;
                 }
-                kind @ (BindingKind::Global | BindingKind::Nonlocal(_)) => {
-                    // If the original binding was a global or nonlocal, then the new binding is
-                    // too.
-                    let references = shadowed.references.clone();
-                    self.semantic.bindings[binding_id].kind = kind.clone();
-                    self.semantic.bindings[binding_id].references = references;
+
+                // If the shadowed binding was non-local, then this one is too.
+                if is_nonlocal {
+                    self.semantic.bindings[binding_id].flags |= BindingFlags::NONLOCAL;
                 }
-                _ => {
-                    let references = shadowed.references.clone();
-                    self.semantic.bindings[binding_id].references = references;
-                }
+
+                self.semantic.bindings[binding_id].references = references;
             }
         }
 
@@ -4389,7 +4394,7 @@ impl<'a> Checker<'a> {
             if self.semantic.scope().kind.is_any_function() {
                 // Ignore globals.
                 if !self.semantic.scope().get(id).map_or(false, |binding_id| {
-                    self.semantic.binding(binding_id).kind.is_global()
+                    self.semantic.binding(binding_id).is_global()
                 }) {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4839,17 +4844,12 @@ impl<'a> Checker<'a> {
                 for (name, binding_id) in scope.bindings() {
                     let binding = self.semantic.binding(binding_id);
                     if binding.kind.is_global() {
-                        if let Some(source) = binding.source {
-                            let stmt = &self.semantic.stmts[source];
-                            if stmt.is_global_stmt() {
-                                diagnostics.push(Diagnostic::new(
-                                    pylint::rules::GlobalVariableNotAssigned {
-                                        name: (*name).to_string(),
-                                    },
-                                    binding.range,
-                                ));
-                            }
-                        }
+                        diagnostics.push(Diagnostic::new(
+                            pylint::rules::GlobalVariableNotAssigned {
+                                name: (*name).to_string(),
+                            },
+                            binding.range,
+                        ));
                     }
                 }
             }
