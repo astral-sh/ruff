@@ -80,8 +80,8 @@ pub(crate) fn run(
     // Create a cache per package, if enabled.
     let package_caches = if cache.into() {
         let mut caches = HashMap::new();
-        // TODO: try to merge this with the detection of package roots above or
-        // with the parallel iteration below.
+        // TODO(thomas): try to merge this with the detection of package roots
+        // above or with the parallel iteration below.
         for entry in &paths {
             let Ok(entry) = entry else { continue };
             let path = entry.path();

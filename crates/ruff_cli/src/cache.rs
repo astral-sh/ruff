@@ -39,11 +39,15 @@ pub(crate) struct PackageCache {
 
 impl PackageCache {
     /// Open or create a new package cache.
+    ///
+    /// `package_root` must be canonicalized.
     pub(crate) fn open(
         cache_dir: &Path,
         package_root: PathBuf,
         settings: &Settings,
     ) -> Result<PackageCache> {
+        debug_assert!(package_root.is_absolute()); // Our "canonicalized" check.
+
         let mut buf = itoa::Buffer::new();
         let key = Path::new(buf.format(cache_key(&package_root, settings)));
         let path = PathBuf::from_iter([cache_dir, Path::new("content"), key]);
@@ -111,14 +115,15 @@ impl PackageCache {
         path: &RelativePath,
         file_last_modified: SystemTime,
     ) -> Option<FileCache> {
-        let file = self.files.lock().unwrap().get(path)?.clone();
+        let files = self.files.lock().unwrap();
+        let file = files.get(path)?;
 
         // Make sure the file hasn't changed since the cached run.
         if file.last_modified != file_last_modified {
             return None;
         }
 
-        Some(file)
+        Some(file.clone())
     }
 
     /// Add or update a file cache at `path` relative to the package root.
