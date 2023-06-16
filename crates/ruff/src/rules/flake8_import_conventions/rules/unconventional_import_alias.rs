@@ -1,8 +1,10 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Scope;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for imports that are typically imported using a common convention,
@@ -40,22 +42,34 @@ impl Violation for UnconventionalImportAlias {
 }
 
 /// ICN001
-pub(crate) fn conventional_import_alias(
-    stmt: &Stmt,
-    name: &str,
-    asname: Option<&str>,
+pub(crate) fn unconventional_import_alias(
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
     conventions: &FxHashMap<String, String>,
 ) -> Option<Diagnostic> {
-    if let Some(expected_alias) = conventions.get(name) {
-        if asname != Some(expected_alias) {
-            return Some(Diagnostic::new(
-                UnconventionalImportAlias {
-                    name: name.to_string(),
-                    asname: expected_alias.to_string(),
-                },
-                stmt.range(),
-            ));
+    for (name, binding_id) in scope.all_bindings() {
+        let binding = checker.semantic().binding(binding_id);
+
+        let Some(qualified_name) = binding.qualified_name() else {
+            continue;
+        };
+
+        let Some(expected_alias) = conventions.get(qualified_name) else {
+            continue;
+        };
+
+        if binding.is_alias() && name == expected_alias {
+            continue;
         }
+
+        diagnostics.push(Diagnostic::new(
+            UnconventionalImportAlias {
+                name: qualified_name.to_string(),
+                asname: expected_alias.to_string(),
+            },
+            binding.range,
+        ));
     }
     None
 }
