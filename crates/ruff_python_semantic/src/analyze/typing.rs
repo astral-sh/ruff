@@ -6,7 +6,8 @@ use rustpython_parser::ast::{self, Constant, Expr, Operator};
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_stdlib::typing::{
-    IMMUTABLE_GENERIC_TYPES, IMMUTABLE_TYPES, PEP_585_GENERICS, PEP_593_SUBSCRIPTS, SUBSCRIPTS,
+    is_generic_member, is_generic_type, is_immutable_generic, is_immutable_type,
+    is_pep_593_generic_member, is_pep_593_generic_type, PEP_585_GENERICS,
 };
 
 use crate::model::SemanticModel;
@@ -34,12 +35,8 @@ pub fn match_annotated_subscript<'a>(
     typing_modules: impl Iterator<Item = &'a str>,
     extend_generics: &[String],
 ) -> Option<SubscriptKind> {
-    if !matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
-        return None;
-    }
-
     semantic.resolve_call_path(expr).and_then(|call_path| {
-        if SUBSCRIPTS.contains(&call_path.as_slice())
+        if is_generic_type(call_path.as_slice())
             || extend_generics
                 .iter()
                 .map(|target| from_qualified_name(target))
@@ -47,20 +44,19 @@ pub fn match_annotated_subscript<'a>(
         {
             return Some(SubscriptKind::AnnotatedSubscript);
         }
-        if PEP_593_SUBSCRIPTS.contains(&call_path.as_slice()) {
+
+        if is_pep_593_generic_type(call_path.as_slice()) {
             return Some(SubscriptKind::PEP593AnnotatedSubscript);
         }
 
         for module in typing_modules {
             let module_call_path: CallPath = from_unqualified_name(module);
             if call_path.starts_with(&module_call_path) {
-                for subscript in SUBSCRIPTS.iter() {
-                    if call_path.last() == subscript.last() {
+                if let Some(member) = call_path.last() {
+                    if is_generic_member(member) {
                         return Some(SubscriptKind::AnnotatedSubscript);
                     }
-                }
-                for subscript in PEP_593_SUBSCRIPTS.iter() {
-                    if call_path.last() == subscript.last() {
+                    if is_pep_593_generic_member(member) {
                         return Some(SubscriptKind::PEP593AnnotatedSubscript);
                     }
                 }
@@ -178,19 +174,14 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
             semantic.resolve_call_path(expr).map_or(false, |call_path| {
-                IMMUTABLE_TYPES
-                    .iter()
-                    .chain(IMMUTABLE_GENERIC_TYPES)
-                    .any(|target| call_path.as_slice() == *target)
+                is_immutable_type(call_path.as_slice())
+                    || is_immutable_generic(call_path.as_slice())
             })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
             .resolve_call_path(value)
             .map_or(false, |call_path| {
-                if IMMUTABLE_GENERIC_TYPES
-                    .iter()
-                    .any(|target| call_path.as_slice() == *target)
-                {
+                if is_immutable_generic(call_path.as_slice()) {
                     true
                 } else if matches!(call_path.as_slice(), ["typing", "Union"]) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
@@ -226,26 +217,22 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
-const IMMUTABLE_FUNCS: &[&[&str]] = &[
-    &["", "bool"],
-    &["", "complex"],
-    &["", "float"],
-    &["", "frozenset"],
-    &["", "int"],
-    &["", "str"],
-    &["", "tuple"],
-    &["datetime", "date"],
-    &["datetime", "datetime"],
-    &["datetime", "timedelta"],
-    &["decimal", "Decimal"],
-    &["fractions", "Fraction"],
-    &["operator", "attrgetter"],
-    &["operator", "itemgetter"],
-    &["operator", "methodcaller"],
-    &["pathlib", "Path"],
-    &["types", "MappingProxyType"],
-    &["re", "compile"],
-];
+pub fn is_immutable_builtin_func(call_path: &[&str]) -> bool {
+    matches!(
+        call_path,
+        ["datetime", "date" | "datetime" | "timedelta"]
+            | ["decimal", "Decimal"]
+            | ["fractions", "Fraction"]
+            | ["operator", "attrgetter" | "itemgetter" | "methodcaller"]
+            | ["pathlib", "Path"]
+            | ["types", "MappingProxyType"]
+            | ["re", "compile"]
+            | [
+                "",
+                "bool" | "complex" | "float" | "frozenset" | "int" | "str" | "tuple"
+            ]
+    )
+}
 
 /// Return `true` if `func` is a function that returns an immutable object.
 pub fn is_immutable_func(
@@ -254,9 +241,7 @@ pub fn is_immutable_func(
     extend_immutable_calls: &[CallPath],
 ) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
-        IMMUTABLE_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
+        is_immutable_builtin_func(call_path.as_slice())
             || extend_immutable_calls
                 .iter()
                 .any(|target| call_path == *target)

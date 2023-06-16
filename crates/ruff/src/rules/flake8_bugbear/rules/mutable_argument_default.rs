@@ -16,36 +16,6 @@ impl Violation for MutableArgumentDefault {
         format!("Do not use mutable data structures for argument defaults")
     }
 }
-const MUTABLE_FUNCS: &[&[&str]] = &[
-    &["", "dict"],
-    &["", "list"],
-    &["", "set"],
-    &["collections", "Counter"],
-    &["collections", "OrderedDict"],
-    &["collections", "defaultdict"],
-    &["collections", "deque"],
-];
-
-pub(crate) fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        MUTABLE_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-    })
-}
-
-fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::List(_)
-        | Expr::Dict(_)
-        | Expr::Set(_)
-        | Expr::ListComp(_)
-        | Expr::DictComp(_)
-        | Expr::SetComp(_) => true,
-        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(func, semantic),
-        _ => false,
-    }
-}
 
 /// B006
 pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
@@ -73,5 +43,33 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Argume
                 .diagnostics
                 .push(Diagnostic::new(MutableArgumentDefault, default.range()));
         }
+    }
+}
+
+pub(crate) fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["", "dict"]
+                | ["", "list"]
+                | ["", "set"]
+                | ["collections", "Counter"]
+                | ["collections", "OrderedDict"]
+                | ["collections", "defaultdict"]
+                | ["collections", "deque"]
+        )
+    })
+}
+
+fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::List(_)
+        | Expr::Dict(_)
+        | Expr::Set(_)
+        | Expr::ListComp(_)
+        | Expr::DictComp(_)
+        | Expr::SetComp(_) => true,
+        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(func, semantic),
+        _ => false,
     }
 }

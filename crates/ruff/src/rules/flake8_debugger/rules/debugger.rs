@@ -23,41 +23,22 @@ impl Violation for Debugger {
     }
 }
 
-const DEBUGGERS: &[&[&str]] = &[
-    &["pdb", "set_trace"],
-    &["pudb", "set_trace"],
-    &["ipdb", "set_trace"],
-    &["ipdb", "sset_trace"],
-    &["IPython", "terminal", "embed", "InteractiveShellEmbed"],
-    &[
-        "IPython",
-        "frontend",
-        "terminal",
-        "embed",
-        "InteractiveShellEmbed",
-    ],
-    &["celery", "contrib", "rdb", "set_trace"],
-    &["builtins", "breakpoint"],
-    &["", "breakpoint"],
-];
-
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(target) = checker
+    if let Some(using_type) = checker
         .semantic()
         .resolve_call_path(func)
         .and_then(|call_path| {
-            DEBUGGERS
-                .iter()
-                .find(|target| call_path.as_slice() == **target)
+            if is_debugger_call(&call_path) {
+                Some(DebuggerUsingType::Call(format_call_path(&call_path)))
+            } else {
+                None
+            }
         })
     {
-        checker.diagnostics.push(Diagnostic::new(
-            Debugger {
-                using_type: DebuggerUsingType::Call(format_call_path(target)),
-            },
-            expr.range(),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(Debugger { using_type }, expr.range()));
     }
 }
 
@@ -72,10 +53,8 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
     if let Some(module) = module {
         let mut call_path: CallPath = from_unqualified_name(module);
         call_path.push(name);
-        if DEBUGGERS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-        {
+
+        if is_debugger_call(&call_path) {
             return Some(Diagnostic::new(
                 Debugger {
                     using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
@@ -84,11 +63,10 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
             ));
         }
     } else {
-        let parts: CallPath = from_unqualified_name(name);
-        if DEBUGGERS
-            .iter()
-            .any(|call_path| &call_path[..call_path.len() - 1] == parts.as_slice())
-        {
+        let mut call_path: CallPath = from_unqualified_name(name);
+        call_path.pop();
+
+        if is_debugger_call(&call_path) {
             return Some(Diagnostic::new(
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
@@ -98,4 +76,25 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
         }
     }
     None
+}
+
+fn is_debugger_call(call_path: &CallPath) -> bool {
+    matches!(
+        call_path.as_slice(),
+        ["pdb", "set_trace"]
+            | ["pudb", "set_trace"]
+            | ["ipdb", "set_trace"]
+            | ["ipdb", "sset_trace"]
+            | ["IPython", "terminal", "embed", "InteractiveShellEmbed"]
+            | [
+                "IPython",
+                "frontend",
+                "terminal",
+                "embed",
+                "InteractiveShellEmbed",
+            ]
+            | ["celery", "contrib", "rdb", "set_trace"]
+            | ["builtins", "breakpoint"]
+            | ["", "breakpoint"]
+    )
 }

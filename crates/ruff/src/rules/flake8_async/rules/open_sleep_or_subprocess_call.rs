@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
 
@@ -39,36 +40,15 @@ impl Violation for OpenSleepOrSubprocessInAsyncFunction {
     }
 }
 
-const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
-    &["", "open"],
-    &["time", "sleep"],
-    &["subprocess", "run"],
-    &["subprocess", "Popen"],
-    // Deprecated subprocess calls:
-    &["subprocess", "call"],
-    &["subprocess", "check_call"],
-    &["subprocess", "check_output"],
-    &["subprocess", "getoutput"],
-    &["subprocess", "getstatusoutput"],
-    &["os", "wait"],
-    &["os", "wait3"],
-    &["os", "wait4"],
-    &["os", "waitid"],
-    &["os", "waitpid"],
-];
-
 /// ASYNC101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
     if checker.semantic().in_async_context() {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            let is_open_sleep_or_subprocess_call = checker
+            if checker
                 .semantic()
                 .resolve_call_path(func)
-                .map_or(false, |path| {
-                    OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&path.as_slice())
-                });
-
-            if is_open_sleep_or_subprocess_call {
+                .map_or(false, is_open_sleep_or_subprocess_call)
+            {
                 checker.diagnostics.push(Diagnostic::new(
                     OpenSleepOrSubprocessInAsyncFunction,
                     func.range(),
@@ -76,4 +56,24 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) 
             }
         }
     }
+}
+
+fn is_open_sleep_or_subprocess_call(call_path: CallPath) -> bool {
+    matches!(
+        call_path.as_slice(),
+        ["", "open"]
+            | ["time", "sleep"]
+            | ["subprocess", "run"]
+            | ["subprocess", "Popen"]
+            | ["subprocess", "call"]
+            | ["subprocess", "check_call"]
+            | ["subprocess", "check_output"]
+            | ["subprocess", "getoutput"]
+            | ["subprocess", "getstatusoutput"]
+            | ["os", "wait"]
+            | ["os", "wait3"]
+            | ["os", "wait4"]
+            | ["os", "waitid"]
+            | ["os", "waitpid"]
+    )
 }

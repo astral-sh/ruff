@@ -370,34 +370,30 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
-const NORETURN_FUNCS: &[&[&str]] = &[
-    // builtins
-    &["", "exit"],
-    &["", "quit"],
-    // stdlib
-    &["builtins", "exit"],
-    &["builtins", "quit"],
-    &["os", "_exit"],
-    &["os", "abort"],
-    &["posix", "_exit"],
-    &["posix", "abort"],
-    &["sys", "exit"],
-    &["_thread", "exit"],
-    &["_winapi", "ExitProcess"],
-    // third-party modules
-    &["pytest", "exit"],
-    &["pytest", "fail"],
-    &["pytest", "skip"],
-    &["pytest", "xfail"],
-];
-
 /// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
-        NORETURN_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-            || semantic.match_typing_call_path(&call_path, "assert_never")
+        matches!(
+            call_path.as_slice(),
+            // builtins
+            ["", "exit"] |
+                ["", "quit"] |
+                // stdlib
+                ["builtins", "exit"] |
+                ["builtins", "quit"] |
+                ["os", "_exit"] |
+                ["os", "abort"] |
+                ["posix", "_exit"] |
+                ["posix", "abort"] |
+                ["sys", "exit"] |
+                ["_thread", "exit"] |
+                ["_winapi", "ExitProcess"] |
+                // third-party modules
+                ["pytest", "exit"] |
+                ["pytest", "fail"] |
+                ["pytest", "skip"] |
+                ["pytest", "xfail"]
+        ) || semantic.match_typing_call_path(&call_path, "assert_never")
     })
 }
 

@@ -683,8 +683,7 @@ pub(crate) fn definition(
                     },
                     stmt.identifier(checker.locator),
                 );
-                let return_type = SIMPLE_MAGIC_RETURN_TYPES.get(name);
-                if let Some(return_type) = return_type {
+                if let Some(return_type) = SIMPLE_MAGIC_RETURN_TYPES.get(name) {
                     if checker.patch(diagnostic.kind.rule()) {
                         #[allow(deprecated)]
                         diagnostic.try_set_fix_from_edit(|| {
