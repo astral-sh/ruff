@@ -7,6 +7,28 @@ use ruff_python_ast::helpers::match_parens;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary parentheses on raised exceptions.
+///
+/// ## Why is this bad?
+/// If no arguments are passed to exception, parentheses are not required. This
+/// is because the `raise` statement accepts either an exception instance or an
+/// exception class (which is then implicitly instantiated).
+///
+/// Removing unnecessary parentheses makes code more readable and idiomatic.
+///
+/// ## Example
+/// ```python
+/// raise TypeError()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// raise TypeError
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[violation]
 pub struct UnnecessaryParenOnRaiseException;
 
