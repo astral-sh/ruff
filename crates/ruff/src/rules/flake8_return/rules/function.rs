@@ -1,13 +1,13 @@
 use std::ops::Add;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::helpers::{elif_else_range, is_const_false, is_const_true};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
@@ -339,13 +339,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
         };
-        if !matches!(
-            expr,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            })
-        ) {
+        if !is_const_none(expr) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range);
@@ -433,22 +427,8 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        Stmt::Assert(ast::StmtAssert { test, .. })
-            if matches!(
-                test.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(false),
-                    ..
-                })
-            ) => {}
-        Stmt::While(ast::StmtWhile { test, .. })
-            if matches!(
-                test.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(true),
-                    ..
-                })
-            ) => {}
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
         Stmt::For(ast::StmtFor { orelse, .. })
         | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
         | Stmt::While(ast::StmtWhile { orelse, .. }) => {

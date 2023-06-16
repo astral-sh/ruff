@@ -1,8 +1,9 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -44,12 +45,9 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
 
 /// B011
 pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(false),
-        ..
-    } )= &test else {
+    if !is_const_false(test) {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
     if checker.patch(diagnostic.kind.rule()) {
