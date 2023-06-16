@@ -2714,47 +2714,47 @@ impl ToPyObject for ExprContextDel {
 
 #[pyclass(module="rustpython_ast.ranged", name="_boolop", extends=super::Ast, frozen, subclass)]
 #[derive(Clone, Debug)]
-pub struct Boolop;
+pub struct BoolOp;
 
-impl From<&'static ast::Boolop> for Boolop {
-    fn from(_node: &'static ast::Boolop) -> Self {
-        Boolop
+impl From<&'static ast::BoolOp> for BoolOp {
+    fn from(_node: &'static ast::BoolOp) -> Self {
+        BoolOp
     }
 }
 
 #[pymethods]
-impl Boolop {
+impl BoolOp {
     #[new]
     fn new() -> PyClassInitializer<Self> {
         PyClassInitializer::from(Ast).add_subclass(Self)
     }
 }
-impl ToPyObject for Boolop {
+impl ToPyObject for BoolOp {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = Self::new();
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_And", extends=Boolop)]
-pub struct BoolopAnd;
+#[pyclass(module="rustpython_ast.ranged", name="_And", extends=BoolOp)]
+pub struct BoolOpAnd;
 
-impl ToPyObject for BoolopAnd {
+impl ToPyObject for BoolOpAnd {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Boolop)
+            .add_subclass(BoolOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_Or", extends=Boolop)]
-pub struct BoolopOr;
+#[pyclass(module="rustpython_ast.ranged", name="_Or", extends=BoolOp)]
+pub struct BoolOpOr;
 
-impl ToPyObject for BoolopOr {
+impl ToPyObject for BoolOpOr {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Boolop)
+            .add_subclass(BoolOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
@@ -2942,71 +2942,71 @@ impl ToPyObject for OperatorFloorDiv {
 
 #[pyclass(module="rustpython_ast.ranged", name="_unaryop", extends=super::Ast, frozen, subclass)]
 #[derive(Clone, Debug)]
-pub struct Unaryop;
+pub struct UnaryOp;
 
-impl From<&'static ast::Unaryop> for Unaryop {
-    fn from(_node: &'static ast::Unaryop) -> Self {
-        Unaryop
+impl From<&'static ast::UnaryOp> for UnaryOp {
+    fn from(_node: &'static ast::UnaryOp) -> Self {
+        UnaryOp
     }
 }
 
 #[pymethods]
-impl Unaryop {
+impl UnaryOp {
     #[new]
     fn new() -> PyClassInitializer<Self> {
         PyClassInitializer::from(Ast).add_subclass(Self)
     }
 }
-impl ToPyObject for Unaryop {
+impl ToPyObject for UnaryOp {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = Self::new();
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_Invert", extends=Unaryop)]
-pub struct UnaryopInvert;
+#[pyclass(module="rustpython_ast.ranged", name="_Invert", extends=UnaryOp)]
+pub struct UnaryOpInvert;
 
-impl ToPyObject for UnaryopInvert {
+impl ToPyObject for UnaryOpInvert {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Unaryop)
+            .add_subclass(UnaryOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_Not", extends=Unaryop)]
-pub struct UnaryopNot;
+#[pyclass(module="rustpython_ast.ranged", name="_Not", extends=UnaryOp)]
+pub struct UnaryOpNot;
 
-impl ToPyObject for UnaryopNot {
+impl ToPyObject for UnaryOpNot {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Unaryop)
+            .add_subclass(UnaryOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_UAdd", extends=Unaryop)]
-pub struct UnaryopUAdd;
+#[pyclass(module="rustpython_ast.ranged", name="_UAdd", extends=UnaryOp)]
+pub struct UnaryOpUAdd;
 
-impl ToPyObject for UnaryopUAdd {
+impl ToPyObject for UnaryOpUAdd {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Unaryop)
+            .add_subclass(UnaryOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_USub", extends=Unaryop)]
-pub struct UnaryopUSub;
+#[pyclass(module="rustpython_ast.ranged", name="_USub", extends=UnaryOp)]
+pub struct UnaryOpUSub;
 
-impl ToPyObject for UnaryopUSub {
+impl ToPyObject for UnaryOpUSub {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Unaryop)
+            .add_subclass(UnaryOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
@@ -3014,143 +3014,143 @@ impl ToPyObject for UnaryopUSub {
 
 #[pyclass(module="rustpython_ast.ranged", name="_cmpop", extends=super::Ast, frozen, subclass)]
 #[derive(Clone, Debug)]
-pub struct Cmpop;
+pub struct CmpOp;
 
-impl From<&'static ast::Cmpop> for Cmpop {
-    fn from(_node: &'static ast::Cmpop) -> Self {
-        Cmpop
+impl From<&'static ast::CmpOp> for CmpOp {
+    fn from(_node: &'static ast::CmpOp) -> Self {
+        CmpOp
     }
 }
 
 #[pymethods]
-impl Cmpop {
+impl CmpOp {
     #[new]
     fn new() -> PyClassInitializer<Self> {
         PyClassInitializer::from(Ast).add_subclass(Self)
     }
 }
-impl ToPyObject for Cmpop {
+impl ToPyObject for CmpOp {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = Self::new();
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_Eq", extends=Cmpop)]
-pub struct CmpopEq;
+#[pyclass(module="rustpython_ast.ranged", name="_Eq", extends=CmpOp)]
+pub struct CmpOpEq;
 
-impl ToPyObject for CmpopEq {
+impl ToPyObject for CmpOpEq {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_NotEq", extends=Cmpop)]
-pub struct CmpopNotEq;
+#[pyclass(module="rustpython_ast.ranged", name="_NotEq", extends=CmpOp)]
+pub struct CmpOpNotEq;
 
-impl ToPyObject for CmpopNotEq {
+impl ToPyObject for CmpOpNotEq {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_Lt", extends=Cmpop)]
-pub struct CmpopLt;
+#[pyclass(module="rustpython_ast.ranged", name="_Lt", extends=CmpOp)]
+pub struct CmpOpLt;
 
-impl ToPyObject for CmpopLt {
+impl ToPyObject for CmpOpLt {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_LtE", extends=Cmpop)]
-pub struct CmpopLtE;
+#[pyclass(module="rustpython_ast.ranged", name="_LtE", extends=CmpOp)]
+pub struct CmpOpLtE;
 
-impl ToPyObject for CmpopLtE {
+impl ToPyObject for CmpOpLtE {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_Gt", extends=Cmpop)]
-pub struct CmpopGt;
+#[pyclass(module="rustpython_ast.ranged", name="_Gt", extends=CmpOp)]
+pub struct CmpOpGt;
 
-impl ToPyObject for CmpopGt {
+impl ToPyObject for CmpOpGt {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_GtE", extends=Cmpop)]
-pub struct CmpopGtE;
+#[pyclass(module="rustpython_ast.ranged", name="_GtE", extends=CmpOp)]
+pub struct CmpOpGtE;
 
-impl ToPyObject for CmpopGtE {
+impl ToPyObject for CmpOpGtE {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_Is", extends=Cmpop)]
-pub struct CmpopIs;
+#[pyclass(module="rustpython_ast.ranged", name="_Is", extends=CmpOp)]
+pub struct CmpOpIs;
 
-impl ToPyObject for CmpopIs {
+impl ToPyObject for CmpOpIs {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_IsNot", extends=Cmpop)]
-pub struct CmpopIsNot;
+#[pyclass(module="rustpython_ast.ranged", name="_IsNot", extends=CmpOp)]
+pub struct CmpOpIsNot;
 
-impl ToPyObject for CmpopIsNot {
+impl ToPyObject for CmpOpIsNot {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_In", extends=Cmpop)]
-pub struct CmpopIn;
+#[pyclass(module="rustpython_ast.ranged", name="_In", extends=CmpOp)]
+pub struct CmpOpIn;
 
-impl ToPyObject for CmpopIn {
+impl ToPyObject for CmpOpIn {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_NotIn", extends=Cmpop)]
-pub struct CmpopNotIn;
+#[pyclass(module="rustpython_ast.ranged", name="_NotIn", extends=CmpOp)]
+pub struct CmpOpNotIn;
 
-impl ToPyObject for CmpopNotIn {
+impl ToPyObject for CmpOpNotIn {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Cmpop)
+            .add_subclass(CmpOp)
             .add_subclass(Self);
         Py::new(py, initializer).unwrap().into_py(py)
     }
@@ -3209,29 +3209,29 @@ impl Comprehension {
 
 #[pyclass(module="rustpython_ast.ranged", name="_excepthandler", extends=super::Ast, frozen, subclass)]
 #[derive(Clone, Debug)]
-pub struct Excepthandler;
+pub struct ExceptHandler;
 
-impl From<&'static ast::Excepthandler<TextRange>> for Excepthandler {
-    fn from(_node: &'static ast::Excepthandler<TextRange>) -> Self {
-        Excepthandler
+impl From<&'static ast::ExceptHandler<TextRange>> for ExceptHandler {
+    fn from(_node: &'static ast::ExceptHandler<TextRange>) -> Self {
+        ExceptHandler
     }
 }
 
 #[pymethods]
-impl Excepthandler {
+impl ExceptHandler {
     #[new]
     fn new() -> PyClassInitializer<Self> {
         PyClassInitializer::from(Ast).add_subclass(Self)
     }
 }
-impl ToPyObject for Excepthandler {
+impl ToPyObject for ExceptHandler {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = Self::new();
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-impl ToPyWrapper for ast::Excepthandler<TextRange> {
+impl ToPyWrapper for ast::ExceptHandler<TextRange> {
     #[inline]
     fn to_py_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {
         match &self {
@@ -3240,34 +3240,34 @@ impl ToPyWrapper for ast::Excepthandler<TextRange> {
     }
 }
 
-#[pyclass(module="rustpython_ast.ranged", name="_ExceptHandler", extends=Excepthandler, frozen)]
+#[pyclass(module="rustpython_ast.ranged", name="_ExceptHandler", extends=ExceptHandler, frozen)]
 #[derive(Clone, Debug)]
-pub struct ExcepthandlerExceptHandler(pub &'static ast::ExcepthandlerExceptHandler<TextRange>);
+pub struct ExceptHandlerExceptHandler(pub &'static ast::ExceptHandlerExceptHandler<TextRange>);
 
-impl From<&'static ast::ExcepthandlerExceptHandler<TextRange>> for ExcepthandlerExceptHandler {
-    fn from(node: &'static ast::ExcepthandlerExceptHandler<TextRange>) -> Self {
-        ExcepthandlerExceptHandler(node)
+impl From<&'static ast::ExceptHandlerExceptHandler<TextRange>> for ExceptHandlerExceptHandler {
+    fn from(node: &'static ast::ExceptHandlerExceptHandler<TextRange>) -> Self {
+        ExceptHandlerExceptHandler(node)
     }
 }
 
-impl ToPyObject for ExcepthandlerExceptHandler {
+impl ToPyObject for ExceptHandlerExceptHandler {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast)
-            .add_subclass(Excepthandler)
+            .add_subclass(ExceptHandler)
             .add_subclass(self.clone());
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-impl ToPyWrapper for ast::ExcepthandlerExceptHandler<TextRange> {
+impl ToPyWrapper for ast::ExceptHandlerExceptHandler<TextRange> {
     #[inline]
     fn to_py_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {
-        Ok(ExcepthandlerExceptHandler(self).to_object(py))
+        Ok(ExceptHandlerExceptHandler(self).to_object(py))
     }
 }
 
 #[pymethods]
-impl ExcepthandlerExceptHandler {
+impl ExceptHandlerExceptHandler {
     #[getter]
     #[inline]
     fn get_type(&self, py: Python) -> PyResult<PyObject> {
@@ -3481,30 +3481,30 @@ impl Alias {
 
 #[pyclass(module="rustpython_ast.ranged", name="_withitem", extends=super::Ast, frozen)]
 #[derive(Clone, Debug)]
-pub struct Withitem(pub &'static ast::Withitem<TextRange>);
+pub struct WithItem(pub &'static ast::WithItem<TextRange>);
 
-impl From<&'static ast::Withitem<TextRange>> for Withitem {
-    fn from(node: &'static ast::Withitem<TextRange>) -> Self {
-        Withitem(node)
+impl From<&'static ast::WithItem<TextRange>> for WithItem {
+    fn from(node: &'static ast::WithItem<TextRange>) -> Self {
+        WithItem(node)
     }
 }
 
-impl ToPyObject for Withitem {
+impl ToPyObject for WithItem {
     fn to_object(&self, py: Python) -> PyObject {
         let initializer = PyClassInitializer::from(Ast).add_subclass(self.clone());
         Py::new(py, initializer).unwrap().into_py(py)
     }
 }
 
-impl ToPyWrapper for ast::Withitem<TextRange> {
+impl ToPyWrapper for ast::WithItem<TextRange> {
     #[inline]
     fn to_py_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {
-        Ok(Withitem(self).to_object(py))
+        Ok(WithItem(self).to_object(py))
     }
 }
 
 #[pymethods]
-impl Withitem {
+impl WithItem {
     #[getter]
     #[inline]
     fn get_context_expr(&self, py: Python) -> PyResult<PyObject> {
@@ -4060,9 +4060,9 @@ pub fn add_to_module(py: Python, m: &PyModule) -> PyResult<()> {
     super::init_type::<ExprContextLoad, ast::ExprContextLoad>(py, m)?;
     super::init_type::<ExprContextStore, ast::ExprContextStore>(py, m)?;
     super::init_type::<ExprContextDel, ast::ExprContextDel>(py, m)?;
-    super::init_type::<Boolop, ast::Boolop>(py, m)?;
-    super::init_type::<BoolopAnd, ast::BoolopAnd>(py, m)?;
-    super::init_type::<BoolopOr, ast::BoolopOr>(py, m)?;
+    super::init_type::<BoolOp, ast::BoolOp>(py, m)?;
+    super::init_type::<BoolOpAnd, ast::BoolOpAnd>(py, m)?;
+    super::init_type::<BoolOpOr, ast::BoolOpOr>(py, m)?;
     super::init_type::<Operator, ast::Operator>(py, m)?;
     super::init_type::<OperatorAdd, ast::OperatorAdd>(py, m)?;
     super::init_type::<OperatorSub, ast::OperatorSub>(py, m)?;
@@ -4077,30 +4077,30 @@ pub fn add_to_module(py: Python, m: &PyModule) -> PyResult<()> {
     super::init_type::<OperatorBitXor, ast::OperatorBitXor>(py, m)?;
     super::init_type::<OperatorBitAnd, ast::OperatorBitAnd>(py, m)?;
     super::init_type::<OperatorFloorDiv, ast::OperatorFloorDiv>(py, m)?;
-    super::init_type::<Unaryop, ast::Unaryop>(py, m)?;
-    super::init_type::<UnaryopInvert, ast::UnaryopInvert>(py, m)?;
-    super::init_type::<UnaryopNot, ast::UnaryopNot>(py, m)?;
-    super::init_type::<UnaryopUAdd, ast::UnaryopUAdd>(py, m)?;
-    super::init_type::<UnaryopUSub, ast::UnaryopUSub>(py, m)?;
-    super::init_type::<Cmpop, ast::Cmpop>(py, m)?;
-    super::init_type::<CmpopEq, ast::CmpopEq>(py, m)?;
-    super::init_type::<CmpopNotEq, ast::CmpopNotEq>(py, m)?;
-    super::init_type::<CmpopLt, ast::CmpopLt>(py, m)?;
-    super::init_type::<CmpopLtE, ast::CmpopLtE>(py, m)?;
-    super::init_type::<CmpopGt, ast::CmpopGt>(py, m)?;
-    super::init_type::<CmpopGtE, ast::CmpopGtE>(py, m)?;
-    super::init_type::<CmpopIs, ast::CmpopIs>(py, m)?;
-    super::init_type::<CmpopIsNot, ast::CmpopIsNot>(py, m)?;
-    super::init_type::<CmpopIn, ast::CmpopIn>(py, m)?;
-    super::init_type::<CmpopNotIn, ast::CmpopNotIn>(py, m)?;
+    super::init_type::<UnaryOp, ast::UnaryOp>(py, m)?;
+    super::init_type::<UnaryOpInvert, ast::UnaryOpInvert>(py, m)?;
+    super::init_type::<UnaryOpNot, ast::UnaryOpNot>(py, m)?;
+    super::init_type::<UnaryOpUAdd, ast::UnaryOpUAdd>(py, m)?;
+    super::init_type::<UnaryOpUSub, ast::UnaryOpUSub>(py, m)?;
+    super::init_type::<CmpOp, ast::CmpOp>(py, m)?;
+    super::init_type::<CmpOpEq, ast::CmpOpEq>(py, m)?;
+    super::init_type::<CmpOpNotEq, ast::CmpOpNotEq>(py, m)?;
+    super::init_type::<CmpOpLt, ast::CmpOpLt>(py, m)?;
+    super::init_type::<CmpOpLtE, ast::CmpOpLtE>(py, m)?;
+    super::init_type::<CmpOpGt, ast::CmpOpGt>(py, m)?;
+    super::init_type::<CmpOpGtE, ast::CmpOpGtE>(py, m)?;
+    super::init_type::<CmpOpIs, ast::CmpOpIs>(py, m)?;
+    super::init_type::<CmpOpIsNot, ast::CmpOpIsNot>(py, m)?;
+    super::init_type::<CmpOpIn, ast::CmpOpIn>(py, m)?;
+    super::init_type::<CmpOpNotIn, ast::CmpOpNotIn>(py, m)?;
     super::init_type::<Comprehension, ast::Comprehension>(py, m)?;
-    super::init_type::<Excepthandler, ast::Excepthandler>(py, m)?;
-    super::init_type::<ExcepthandlerExceptHandler, ast::ExcepthandlerExceptHandler>(py, m)?;
+    super::init_type::<ExceptHandler, ast::ExceptHandler>(py, m)?;
+    super::init_type::<ExceptHandlerExceptHandler, ast::ExceptHandlerExceptHandler>(py, m)?;
     super::init_type::<Arguments, ast::PythonArguments>(py, m)?;
     super::init_type::<Arg, ast::Arg>(py, m)?;
     super::init_type::<Keyword, ast::Keyword>(py, m)?;
     super::init_type::<Alias, ast::Alias>(py, m)?;
-    super::init_type::<Withitem, ast::Withitem>(py, m)?;
+    super::init_type::<WithItem, ast::WithItem>(py, m)?;
     super::init_type::<MatchCase, ast::MatchCase>(py, m)?;
     super::init_type::<Pattern, ast::Pattern>(py, m)?;
     super::init_type::<PatternMatchValue, ast::PatternMatchValue>(py, m)?;

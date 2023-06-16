@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: b94dbacf01253c4fc4605d489e98f5929504a78e0baa83381e126895ec61cb59
+// sha3: c39f9711066c6f94aaf93d62d86b41efb4242ddcdcbe5b9d35e5a77a14ff22d6
 use crate::{
     ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
@@ -57,8 +57,8 @@ mod __parse__Top {
         Variant15(ast::Expr),
         Variant16(core::option::Option<ast::Expr>),
         Variant17(alloc::vec::Vec<ast::Expr>),
-        Variant18(ast::Withitem),
-        Variant19(alloc::vec::Vec<ast::Withitem>),
+        Variant18(ast::WithItem),
+        Variant19(alloc::vec::Vec<ast::WithItem>),
         Variant20((token::Tok, ast::Identifier)),
         Variant21(alloc::vec::Vec<(token::Tok, ast::Identifier)>),
         Variant22(alloc::vec::Vec<token::Tok>),
@@ -77,12 +77,12 @@ mod __parse__Top {
         Variant35(ast::Stmt),
         Variant36(alloc::vec::Vec<ast::Stmt>),
         Variant37((ast::Expr, ast::Identifier)),
-        Variant38(Vec<ast::Withitem>),
-        Variant39(core::option::Option<Vec<ast::Withitem>>),
+        Variant38(Vec<ast::WithItem>),
+        Variant39(core::option::Option<Vec<ast::WithItem>>),
         Variant40((TextSize, (String, StringKind, bool), TextSize)),
         Variant41(alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>),
-        Variant42((ast::Cmpop, ast::Expr)),
-        Variant43(alloc::vec::Vec<(ast::Cmpop, ast::Expr)>),
+        Variant42((ast::CmpOp, ast::Expr)),
+        Variant43(alloc::vec::Vec<(ast::CmpOp, ast::Expr)>),
         Variant44(ast::Arguments),
         Variant45(core::option::Option<ast::Arguments>),
         Variant46(TextSize),
@@ -92,7 +92,7 @@ mod __parse__Top {
         Variant50(Vec<ast::Pattern>),
         Variant51(Vec<ast::Comprehension>),
         Variant52(core::option::Option<Vec<ast::Comprehension>>),
-        Variant53(ast::Cmpop),
+        Variant53(ast::CmpOp),
         Variant54(ast::Constant),
         Variant55((Option<Box<ast::Expr>>, ast::Expr)),
         Variant56((ast::Expr, ast::Expr)),
@@ -100,8 +100,8 @@ mod __parse__Top {
         Variant58(core::option::Option<Vec<(Option<Box<ast::Expr>>, ast::Expr)>>),
         Variant59(ast::Arg),
         Variant60(core::option::Option<ast::Arg>),
-        Variant61(ast::Excepthandler),
-        Variant62(alloc::vec::Vec<ast::Excepthandler>),
+        Variant61(ast::ExceptHandler),
+        Variant62(alloc::vec::Vec<ast::ExceptHandler>),
         Variant63(core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
         Variant64(ast::Alias),
         Variant65(Vec<ast::Alias>),
@@ -124,7 +124,7 @@ mod __parse__Top {
         Variant82(core::option::Option<Option<ast::Expr>>),
         Variant83(Vec<ast::Stmt>),
         Variant84(ast::Mod),
-        Variant85(ast::Unaryop),
+        Variant85(ast::UnaryOp),
     }
     const __ACTION: &[i16] = &[
         // State 0
@@ -17004,7 +17004,7 @@ mod __parse__Top {
     fn __pop_Variant42<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (ast::Cmpop, ast::Expr), TextSize)
+    ) -> (TextSize, (ast::CmpOp, ast::Expr), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant42(__v), __r)) => (__l, __v, __r),
@@ -17254,7 +17254,7 @@ mod __parse__Top {
     fn __pop_Variant38<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Vec<ast::Withitem>, TextSize)
+    ) -> (TextSize, Vec<ast::WithItem>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant38(__v), __r)) => (__l, __v, __r),
@@ -17294,7 +17294,7 @@ mod __parse__Top {
     fn __pop_Variant43<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize)
+    ) -> (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant43(__v), __r)) => (__l, __v, __r),
@@ -17334,7 +17334,7 @@ mod __parse__Top {
     fn __pop_Variant62<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize)
+    ) -> (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant62(__v), __r)) => (__l, __v, __r),
@@ -17394,7 +17394,7 @@ mod __parse__Top {
     fn __pop_Variant19<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize)
+    ) -> (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant19(__v), __r)) => (__l, __v, __r),
@@ -17454,7 +17454,7 @@ mod __parse__Top {
     fn __pop_Variant53<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::Cmpop, TextSize)
+    ) -> (TextSize, ast::CmpOp, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant53(__v), __r)) => (__l, __v, __r),
@@ -17484,7 +17484,7 @@ mod __parse__Top {
     fn __pop_Variant61<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::Excepthandler, TextSize)
+    ) -> (TextSize, ast::ExceptHandler, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant61(__v), __r)) => (__l, __v, __r),
@@ -17584,7 +17584,7 @@ mod __parse__Top {
     fn __pop_Variant85<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::Unaryop, TextSize)
+    ) -> (TextSize, ast::UnaryOp, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant85(__v), __r)) => (__l, __v, __r),
@@ -17594,7 +17594,7 @@ mod __parse__Top {
     fn __pop_Variant18<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::Withitem, TextSize)
+    ) -> (TextSize, ast::WithItem, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant18(__v), __r)) => (__l, __v, __r),
@@ -17684,7 +17684,7 @@ mod __parse__Top {
     fn __pop_Variant39<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize)
+    ) -> (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant39(__v), __r)) => (__l, __v, __r),
@@ -30090,7 +30090,7 @@ fn __action107<
 {
     ast::Expr::UnaryOp(
         ast::ExprUnaryOp {
-            op: ast::Unaryop::USub,
+            op: ast::UnaryOp::USub,
             operand: Box::new(operand),
             range: (location..end_location).into()
         }
@@ -30784,7 +30784,7 @@ fn __action144<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
-    (_, handlers, _): (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    (_, handlers, _): (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     (_, orelse, _): (TextSize, core::option::Option<ast::Suite>, TextSize),
     (_, finalbody, _): (TextSize, core::option::Option<ast::Suite>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
@@ -30818,7 +30818,7 @@ fn __action145<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
-    (_, handlers, _): (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    (_, handlers, _): (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     (_, orelse, _): (TextSize, core::option::Option<ast::Suite>, TextSize),
     (_, finalbody, _): (TextSize, core::option::Option<ast::Suite>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
@@ -30880,12 +30880,12 @@ fn __action147<
     (_, typ, _): (TextSize, ast::Expr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: Some(Box::new(typ)),
                 name: None,
                 body,
@@ -30904,12 +30904,12 @@ fn __action148<
     (_, x, _): (TextSize, (ast::Expr, ast::Identifier), TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: Some(Box::new(x.0)),
                 name: Some(x.1),
                 body,
@@ -30927,12 +30927,12 @@ fn __action149<
     (_, typ, _): (TextSize, core::option::Option<ast::Expr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: typ.map(Box::new),
                 name: None,
                 body,
@@ -30950,12 +30950,12 @@ fn __action150<
     (_, x, _): (TextSize, (ast::Expr, ast::Identifier), TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: Some(Box::new(x.0)),
                 name: Some(x.1),
                 body,
@@ -30971,7 +30971,7 @@ fn __action151<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, is_async, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, items, _): (TextSize, Vec<ast::Withitem>, TextSize),
+    (_, items, _): (TextSize, Vec<ast::WithItem>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -30991,10 +30991,10 @@ fn __action151<
 fn __action152<
 >(
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, Vec<ast::Withitem>, TextSize),
+    (_, __0, _): (TextSize, Vec<ast::WithItem>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     __0
 }
@@ -31003,12 +31003,12 @@ fn __action152<
 fn __action153<
 >(
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, left, _): (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize),
-    (_, mid, _): (TextSize, ast::Withitem, TextSize),
-    (_, right, _): (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    (_, left, _): (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
+    (_, mid, _): (TextSize, ast::WithItem, TextSize),
+    (_, right, _): (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     {
         left.into_iter().flatten().chain([mid]).chain(right).collect()
@@ -31018,8 +31018,8 @@ fn __action153<
 #[allow(clippy::too_many_arguments)]
 fn __action154<
 >(
-    (_, __0, _): (TextSize, ast::Withitem, TextSize),
-) -> Vec<ast::Withitem>
+    (_, __0, _): (TextSize, ast::WithItem, TextSize),
+) -> Vec<ast::WithItem>
 {
     vec![__0]
 }
@@ -31027,9 +31027,9 @@ fn __action154<
 #[allow(clippy::too_many_arguments)]
 fn __action155<
 >(
-    (_, item, _): (TextSize, ast::Withitem, TextSize),
-    (_, items, _): (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
-) -> Vec<ast::Withitem>
+    (_, item, _): (TextSize, ast::WithItem, TextSize),
+    (_, items, _): (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+) -> Vec<ast::WithItem>
 {
     {
         [item].into_iter().chain(items).collect()
@@ -31042,10 +31042,10 @@ fn __action156<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, all, _): (TextSize, Vec<ast::Expr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     {
-        all.into_iter().map(|context_expr| ast::Withitem { context_expr, optional_vars: None, range: optional_range(location, end_location) }).collect()
+        all.into_iter().map(|context_expr| ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }).collect()
     }
 }
 
@@ -31311,63 +31311,63 @@ fn __action171<
 fn __action172<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::Eq
+    ast::CmpOp::Eq
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action173<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::NotEq
+    ast::CmpOp::NotEq
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action174<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::Lt
+    ast::CmpOp::Lt
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action175<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::LtE
+    ast::CmpOp::LtE
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action176<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::Gt
+    ast::CmpOp::Gt
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action177<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::GtE
+    ast::CmpOp::GtE
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action178<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::In
+    ast::CmpOp::In
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -31375,18 +31375,18 @@ fn __action179<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
     (_, __1, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::NotIn
+    ast::CmpOp::NotIn
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action180<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::Is
+    ast::CmpOp::Is
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -31394,9 +31394,9 @@ fn __action181<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
     (_, __1, _): (TextSize, token::Tok, TextSize),
-) -> ast::Cmpop
+) -> ast::CmpOp
 {
-    ast::Cmpop::IsNot
+    ast::CmpOp::IsNot
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -31484,27 +31484,27 @@ fn __action190<
 fn __action191<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Unaryop
+) -> ast::UnaryOp
 {
-    ast::Unaryop::UAdd
+    ast::UnaryOp::UAdd
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action192<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Unaryop
+) -> ast::UnaryOp
 {
-    ast::Unaryop::USub
+    ast::UnaryOp::USub
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action193<
 >(
     (_, __0, _): (TextSize, token::Tok, TextSize),
-) -> ast::Unaryop
+) -> ast::UnaryOp
 {
-    ast::Unaryop::Invert
+    ast::UnaryOp::Invert
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -31945,7 +31945,7 @@ fn __action230<
     {
         values.push(last);
         ast::Expr::BoolOp(
-            ast::ExprBoolOp { op: ast::Boolop::Or, values, range: (location..end_location).into() }
+            ast::ExprBoolOp { op: ast::BoolOp::Or, values, range: (location..end_location).into() }
         )
     }
 }
@@ -32566,8 +32566,8 @@ fn __action276<
 #[allow(clippy::too_many_arguments)]
 fn __action277<
 >(
-    (_, __0, _): (TextSize, ast::Withitem, TextSize),
-) -> alloc::vec::Vec<ast::Withitem>
+    (_, __0, _): (TextSize, ast::WithItem, TextSize),
+) -> alloc::vec::Vec<ast::WithItem>
 {
     alloc::vec![__0]
 }
@@ -32575,9 +32575,9 @@ fn __action277<
 #[allow(clippy::too_many_arguments)]
 fn __action278<
 >(
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
-    (_, e, _): (TextSize, ast::Withitem, TextSize),
-) -> alloc::vec::Vec<ast::Withitem>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+    (_, e, _): (TextSize, ast::WithItem, TextSize),
+) -> alloc::vec::Vec<ast::WithItem>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -32588,9 +32588,9 @@ fn __action279<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, context_expr, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
-    ast::Withitem { context_expr, optional_vars: None, range: optional_range(location, end_location) }
+    ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -32601,11 +32601,11 @@ fn __action280<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, vars, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::Withitem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
     }
 }
 
@@ -32614,7 +32614,7 @@ fn __action281<
 >(
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::Withitem>
+) -> alloc::vec::Vec<ast::WithItem>
 {
     alloc::vec![]
 }
@@ -32622,8 +32622,8 @@ fn __action281<
 #[allow(clippy::too_many_arguments)]
 fn __action282<
 >(
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
-) -> alloc::vec::Vec<ast::Withitem>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+) -> alloc::vec::Vec<ast::WithItem>
 {
     v
 }
@@ -32632,8 +32632,8 @@ fn __action282<
 fn __action283<
 >(
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::Withitem, TextSize),
-) -> ast::Withitem
+    (_, __0, _): (TextSize, ast::WithItem, TextSize),
+) -> ast::WithItem
 {
     __0
 }
@@ -32644,9 +32644,9 @@ fn __action284<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, context_expr, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
-    ast::Withitem { context_expr, optional_vars: None, range: optional_range(location, end_location) }
+    ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -32657,11 +32657,11 @@ fn __action285<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, vars, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::Withitem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
     }
 }
 
@@ -32673,19 +32673,19 @@ fn __action286<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, vars, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::Withitem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn __action287<
 >(
-    (_, __0, _): (TextSize, Vec<ast::Withitem>, TextSize),
-) -> core::option::Option<Vec<ast::Withitem>>
+    (_, __0, _): (TextSize, Vec<ast::WithItem>, TextSize),
+) -> core::option::Option<Vec<ast::WithItem>>
 {
     Some(__0)
 }
@@ -32695,7 +32695,7 @@ fn __action288<
 >(
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Vec<ast::Withitem>>
+) -> core::option::Option<Vec<ast::WithItem>>
 {
     None
 }
@@ -32703,9 +32703,9 @@ fn __action288<
 #[allow(clippy::too_many_arguments)]
 fn __action289<
 >(
-    (_, __0, _): (TextSize, Vec<ast::Withitem>, TextSize),
+    (_, __0, _): (TextSize, Vec<ast::WithItem>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     __0
 }
@@ -32743,8 +32743,8 @@ fn __action292<
 #[allow(clippy::too_many_arguments)]
 fn __action293<
 >(
-    (_, __0, _): (TextSize, ast::Excepthandler, TextSize),
-) -> alloc::vec::Vec<ast::Excepthandler>
+    (_, __0, _): (TextSize, ast::ExceptHandler, TextSize),
+) -> alloc::vec::Vec<ast::ExceptHandler>
 {
     alloc::vec![__0]
 }
@@ -32752,9 +32752,9 @@ fn __action293<
 #[allow(clippy::too_many_arguments)]
 fn __action294<
 >(
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
-    (_, e, _): (TextSize, ast::Excepthandler, TextSize),
-) -> alloc::vec::Vec<ast::Excepthandler>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    (_, e, _): (TextSize, ast::ExceptHandler, TextSize),
+) -> alloc::vec::Vec<ast::ExceptHandler>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -32792,8 +32792,8 @@ fn __action297<
 #[allow(clippy::too_many_arguments)]
 fn __action298<
 >(
-    (_, __0, _): (TextSize, ast::Excepthandler, TextSize),
-) -> alloc::vec::Vec<ast::Excepthandler>
+    (_, __0, _): (TextSize, ast::ExceptHandler, TextSize),
+) -> alloc::vec::Vec<ast::ExceptHandler>
 {
     alloc::vec![__0]
 }
@@ -32801,9 +32801,9 @@ fn __action298<
 #[allow(clippy::too_many_arguments)]
 fn __action299<
 >(
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
-    (_, e, _): (TextSize, ast::Excepthandler, TextSize),
-) -> alloc::vec::Vec<ast::Excepthandler>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    (_, e, _): (TextSize, ast::ExceptHandler, TextSize),
+) -> alloc::vec::Vec<ast::ExceptHandler>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -34074,7 +34074,7 @@ fn __action417<
     {
         values.push(last);
         ast::Expr::BoolOp(
-            ast::ExprBoolOp { op: ast::Boolop::And, values, range: (location..end_location).into() }
+            ast::ExprBoolOp { op: ast::BoolOp::And, values, range: (location..end_location).into() }
         )
     }
 }
@@ -34213,7 +34213,7 @@ fn __action431<
 ) -> ast::Expr
 {
     ast::Expr::UnaryOp(
-        ast::ExprUnaryOp { operand: Box::new(e), op: ast::Unaryop::Not, range: (location..end_location).into() }
+        ast::ExprUnaryOp { operand: Box::new(e), op: ast::UnaryOp::Not, range: (location..end_location).into() }
     )
 }
 
@@ -34507,7 +34507,7 @@ fn __action459<
     {
         values.push(last);
         ast::Expr::BoolOp(
-            ast::ExprBoolOp { op: ast::Boolop::Or, values, range: (location..end_location).into() }
+            ast::ExprBoolOp { op: ast::BoolOp::Or, values, range: (location..end_location).into() }
         )
     }
 }
@@ -34533,7 +34533,7 @@ fn __action461<
     {
         values.push(last);
         ast::Expr::BoolOp(
-            ast::ExprBoolOp { op: ast::Boolop::And, values, range: (location..end_location).into() }
+            ast::ExprBoolOp { op: ast::BoolOp::And, values, range: (location..end_location).into() }
         )
     }
 }
@@ -34614,7 +34614,7 @@ fn __action469<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, left, _): (TextSize, ast::Expr, TextSize),
-    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
+    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
@@ -34638,8 +34638,8 @@ fn __action470<
 #[allow(clippy::too_many_arguments)]
 fn __action471<
 >(
-    (_, __0, _): (TextSize, (ast::Cmpop, ast::Expr), TextSize),
-) -> alloc::vec::Vec<(ast::Cmpop, ast::Expr)>
+    (_, __0, _): (TextSize, (ast::CmpOp, ast::Expr), TextSize),
+) -> alloc::vec::Vec<(ast::CmpOp, ast::Expr)>
 {
     alloc::vec![__0]
 }
@@ -34647,9 +34647,9 @@ fn __action471<
 #[allow(clippy::too_many_arguments)]
 fn __action472<
 >(
-    (_, v, _): (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
-    (_, e, _): (TextSize, (ast::Cmpop, ast::Expr), TextSize),
-) -> alloc::vec::Vec<(ast::Cmpop, ast::Expr)>
+    (_, v, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
+    (_, e, _): (TextSize, (ast::CmpOp, ast::Expr), TextSize),
+) -> alloc::vec::Vec<(ast::CmpOp, ast::Expr)>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -34657,9 +34657,9 @@ fn __action472<
 #[allow(clippy::too_many_arguments)]
 fn __action473<
 >(
-    (_, __0, _): (TextSize, ast::Cmpop, TextSize),
+    (_, __0, _): (TextSize, ast::CmpOp, TextSize),
     (_, __1, _): (TextSize, ast::Expr, TextSize),
-) -> (ast::Cmpop, ast::Expr)
+) -> (ast::CmpOp, ast::Expr)
 {
     (__0, __1)
 }
@@ -34698,7 +34698,7 @@ fn __action476<
 ) -> ast::Expr
 {
     ast::Expr::UnaryOp(
-        ast::ExprUnaryOp { operand: Box::new(e), op: ast::Unaryop::Not, range: (location..end_location).into() }
+        ast::ExprUnaryOp { operand: Box::new(e), op: ast::UnaryOp::Not, range: (location..end_location).into() }
     )
 }
 
@@ -34716,7 +34716,7 @@ fn __action478<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, left, _): (TextSize, ast::Expr, TextSize),
-    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
+    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
@@ -34765,7 +34765,7 @@ fn __action481<
 fn __action482<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, op, _): (TextSize, ast::Unaryop, TextSize),
+    (_, op, _): (TextSize, ast::UnaryOp, TextSize),
     (_, e, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
@@ -35463,7 +35463,7 @@ fn __action534<
 fn __action535<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, op, _): (TextSize, ast::Unaryop, TextSize),
+    (_, op, _): (TextSize, ast::UnaryOp, TextSize),
     (_, e, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
@@ -37498,10 +37498,10 @@ fn __action624<
 fn __action625<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, Vec<ast::WithItem>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -37521,9 +37521,9 @@ fn __action625<
 fn __action626<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, Vec<ast::WithItem>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -37544,12 +37544,12 @@ fn __action626<
 fn __action627<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize),
-    __2: (TextSize, ast::Withitem, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
+    __2: (TextSize, ast::WithItem, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __4.0;
     let __end0 = __4.2;
@@ -37571,11 +37571,11 @@ fn __action627<
 fn __action628<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize),
-    __2: (TextSize, ast::Withitem, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
+    __2: (TextSize, ast::WithItem, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __3.2;
     let __end0 = __4.0;
@@ -37986,7 +37986,7 @@ fn __action643<
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Vec<ast::Withitem>, TextSize),
+    __3: (TextSize, Vec<ast::WithItem>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -38012,7 +38012,7 @@ fn __action644<
 >(
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Vec<ast::Withitem>, TextSize),
+    __2: (TextSize, Vec<ast::WithItem>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -40813,7 +40813,7 @@ fn __action755<
 fn __action756<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
@@ -40836,7 +40836,7 @@ fn __action756<
 fn __action757<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
@@ -40975,7 +40975,7 @@ fn __action763<
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -41000,7 +41000,7 @@ fn __action764<
     __1: (TextSize, (ast::Expr, ast::Identifier), TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -41026,7 +41026,7 @@ fn __action765<
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -41053,7 +41053,7 @@ fn __action766<
     __2: (TextSize, (ast::Expr, ast::Identifier), TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -41200,7 +41200,7 @@ fn __action771<
 #[allow(clippy::too_many_arguments)]
 fn __action772<
 >(
-    __0: (TextSize, ast::Unaryop, TextSize),
+    __0: (TextSize, ast::UnaryOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Expr
@@ -41223,7 +41223,7 @@ fn __action772<
 #[allow(clippy::too_many_arguments)]
 fn __action773<
 >(
-    __0: (TextSize, ast::Unaryop, TextSize),
+    __0: (TextSize, ast::UnaryOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Expr
@@ -44240,7 +44240,7 @@ fn __action897<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
     __5: (TextSize, core::option::Option<ast::Suite>, TextSize),
     __6: (TextSize, TextSize, TextSize),
@@ -44271,7 +44271,7 @@ fn __action898<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
     __5: (TextSize, core::option::Option<ast::Suite>, TextSize),
     __6: (TextSize, TextSize, TextSize),
@@ -44418,7 +44418,7 @@ fn __action904<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -44441,7 +44441,7 @@ fn __action905<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -44466,7 +44466,7 @@ fn __action906<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -44489,7 +44489,7 @@ fn __action907<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -44512,7 +44512,7 @@ fn __action908<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -44535,7 +44535,7 @@ fn __action909<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -44556,7 +44556,7 @@ fn __action910<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Vec<ast::Withitem>, TextSize),
+    __2: (TextSize, Vec<ast::WithItem>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -44582,7 +44582,7 @@ fn __action910<
 fn __action911<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, Vec<ast::WithItem>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -47738,8 +47738,8 @@ fn __action1038<
 fn __action1039<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Withitem, TextSize),
-) -> alloc::vec::Vec<ast::Withitem>
+    __1: (TextSize, ast::WithItem, TextSize),
+) -> alloc::vec::Vec<ast::WithItem>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -47756,10 +47756,10 @@ fn __action1039<
 #[allow(clippy::too_many_arguments)]
 fn __action1040<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Withitem, TextSize),
-) -> alloc::vec::Vec<ast::Withitem>
+    __2: (TextSize, ast::WithItem, TextSize),
+) -> alloc::vec::Vec<ast::WithItem>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -47778,11 +47778,11 @@ fn __action1040<
 fn __action1041<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize),
-    __2: (TextSize, ast::Withitem, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
+    __2: (TextSize, ast::WithItem, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -47805,12 +47805,12 @@ fn __action1041<
 fn __action1042<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize),
-    __2: (TextSize, ast::Withitem, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
+    __2: (TextSize, ast::WithItem, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -47832,10 +47832,10 @@ fn __action1042<
 fn __action1043<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize),
-    __2: (TextSize, ast::Withitem, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
+    __2: (TextSize, ast::WithItem, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -47857,11 +47857,11 @@ fn __action1043<
 fn __action1044<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Withitem>>, TextSize),
-    __2: (TextSize, ast::Withitem, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
+    __2: (TextSize, ast::WithItem, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -48633,7 +48633,7 @@ fn __action1076<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -48666,7 +48666,7 @@ fn __action1077<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
@@ -48695,7 +48695,7 @@ fn __action1078<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -48728,7 +48728,7 @@ fn __action1079<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
@@ -48859,7 +48859,7 @@ fn __action1084<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -48896,7 +48896,7 @@ fn __action1085<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -48929,7 +48929,7 @@ fn __action1086<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -48960,7 +48960,7 @@ fn __action1087<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -48987,7 +48987,7 @@ fn __action1088<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -49024,7 +49024,7 @@ fn __action1089<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -49057,7 +49057,7 @@ fn __action1090<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -49088,7 +49088,7 @@ fn __action1091<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -50456,7 +50456,7 @@ fn __action1148<
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -50484,7 +50484,7 @@ fn __action1149<
     __4: (TextSize, ast::Identifier, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __2.0;
     let __end0 = __4.2;
@@ -52471,7 +52471,7 @@ fn __action1231<
 fn __action1232<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
 ) -> ast::Expr
 {
     let __start0 = __1.2;
@@ -52492,7 +52492,7 @@ fn __action1232<
 fn __action1233<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
 ) -> ast::Expr
 {
     let __start0 = __1.2;
@@ -52730,7 +52730,7 @@ fn __action1243<
 #[allow(clippy::too_many_arguments)]
 fn __action1244<
 >(
-    __0: (TextSize, ast::Unaryop, TextSize),
+    __0: (TextSize, ast::UnaryOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
 {
@@ -52751,7 +52751,7 @@ fn __action1244<
 #[allow(clippy::too_many_arguments)]
 fn __action1245<
 >(
-    __0: (TextSize, ast::Unaryop, TextSize),
+    __0: (TextSize, ast::UnaryOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
 {
@@ -56619,7 +56619,7 @@ fn __action1410<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -56656,7 +56656,7 @@ fn __action1411<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -56687,7 +56687,7 @@ fn __action1412<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -56718,7 +56718,7 @@ fn __action1413<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __3.2;
@@ -56743,7 +56743,7 @@ fn __action1414<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -56780,7 +56780,7 @@ fn __action1415<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -56811,7 +56811,7 @@ fn __action1416<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -56842,7 +56842,7 @@ fn __action1417<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Excepthandler>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __3.2;
@@ -56945,7 +56945,7 @@ fn __action1421<
 fn __action1422<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -56966,7 +56966,7 @@ fn __action1423<
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -56989,7 +56989,7 @@ fn __action1424<
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -57010,7 +57010,7 @@ fn __action1424<
 fn __action1425<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -57031,7 +57031,7 @@ fn __action1426<
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Withitem
+) -> ast::WithItem
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -57052,7 +57052,7 @@ fn __action1426<
 fn __action1427<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -57162,7 +57162,7 @@ fn __action1432<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -57183,7 +57183,7 @@ fn __action1433<
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -57205,7 +57205,7 @@ fn __action1434<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -57225,7 +57225,7 @@ fn __action1435<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> core::option::Option<Vec<ast::Withitem>>
+) -> core::option::Option<Vec<ast::WithItem>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -57245,10 +57245,10 @@ fn __action1436<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Withitem, TextSize),
+    __3: (TextSize, ast::WithItem, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -57270,10 +57270,10 @@ fn __action1436<
 fn __action1437<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Withitem, TextSize),
+    __1: (TextSize, ast::WithItem, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -57297,11 +57297,11 @@ fn __action1438<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Withitem, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __3: (TextSize, ast::WithItem, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -57324,11 +57324,11 @@ fn __action1438<
 fn __action1439<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Withitem, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, ast::WithItem, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -57353,9 +57353,9 @@ fn __action1440<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Withitem, TextSize),
+    __3: (TextSize, ast::WithItem, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -57376,9 +57376,9 @@ fn __action1440<
 fn __action1441<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Withitem, TextSize),
+    __1: (TextSize, ast::WithItem, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -57401,10 +57401,10 @@ fn __action1442<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Withitem, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __3: (TextSize, ast::WithItem, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -57426,10 +57426,10 @@ fn __action1442<
 fn __action1443<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Withitem, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::Withitem>, TextSize),
+    __1: (TextSize, ast::WithItem, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Withitem>
+) -> Vec<ast::WithItem>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -57486,9 +57486,9 @@ fn __action1445<
 #[allow(clippy::too_many_arguments)]
 fn __action1446<
 >(
-    __0: (TextSize, ast::Cmpop, TextSize),
+    __0: (TextSize, ast::CmpOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
-) -> alloc::vec::Vec<(ast::Cmpop, ast::Expr)>
+) -> alloc::vec::Vec<(ast::CmpOp, ast::Expr)>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -57505,10 +57505,10 @@ fn __action1446<
 #[allow(clippy::too_many_arguments)]
 fn __action1447<
 >(
-    __0: (TextSize, alloc::vec::Vec<(ast::Cmpop, ast::Expr)>, TextSize),
-    __1: (TextSize, ast::Cmpop, TextSize),
+    __0: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
+    __1: (TextSize, ast::CmpOp, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> alloc::vec::Vec<(ast::Cmpop, ast::Expr)>
+) -> alloc::vec::Vec<(ast::CmpOp, ast::Expr)>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -62420,7 +62420,7 @@ fn __action1636<
     __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -62442,7 +62442,7 @@ fn __action1637<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
-) -> ast::Excepthandler
+) -> ast::ExceptHandler
 {
     let __start0 = __0.2;
     let __end0 = __1.0;

@@ -509,7 +509,7 @@ ConstantExpr: ast::Expr = {
     ConstantAtom,
     <location:@L> "-" <operand:ConstantAtom> <end_location:@R> => ast::Expr::UnaryOp(
         ast::ExprUnaryOp {
-            op: ast::Unaryop::USub,
+            op: ast::UnaryOp::USub,
             operand: Box::new(operand),
             range: (location..end_location).into()
         }
@@ -875,11 +875,11 @@ TryStatement: ast::Stmt = {
     },
 };
 
-ExceptStarClause: ast::Excepthandler = {
+ExceptStarClause: ast::ExceptHandler = {
     <location:@L> "except" "*" <typ:Test<"all">> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: Some(Box::new(typ)),
                 name: None,
                 body,
@@ -889,8 +889,8 @@ ExceptStarClause: ast::Excepthandler = {
     },
     <location:@L> "except" "*" <x:(<Test<"all">> "as" <Identifier>)> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: Some(Box::new(x.0)),
                 name: Some(x.1),
                 body,
@@ -901,11 +901,11 @@ ExceptStarClause: ast::Excepthandler = {
 };
 
 
-ExceptClause: ast::Excepthandler = {
+ExceptClause: ast::ExceptHandler = {
     <location:@L> "except" <typ:Test<"all">?> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: typ.map(Box::new),
                 name: None,
                 body,
@@ -915,8 +915,8 @@ ExceptClause: ast::Excepthandler = {
     },
     <location:@L> "except" <x:(<Test<"all">> "as" <Identifier>)> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
-        ast::Excepthandler::ExceptHandler(
-            ast::ExcepthandlerExceptHandler {
+        ast::ExceptHandler::ExceptHandler(
+            ast::ExceptHandlerExceptHandler {
                 type_: Some(Box::new(x.0)),
                 name: Some(x.1),
                 body,
@@ -938,7 +938,7 @@ WithStatement: ast::Stmt = {
     },
 };
 
-WithItems: Vec<ast::Withitem> = {
+WithItems: Vec<ast::WithItem> = {
     "(" <WithItemsNoAs> ","? ")",
     "(" <left:(<WithItemsNoAs> ",")?> <mid:WithItem<"as">> <right:("," <WithItem<"all">>)*> ","? ")" => {
         left.into_iter().flatten().chain([mid]).chain(right).collect()
@@ -950,17 +950,17 @@ WithItems: Vec<ast::Withitem> = {
 };
 
 #[inline]
-WithItemsNoAs: Vec<ast::Withitem> = {
+WithItemsNoAs: Vec<ast::WithItem> = {
     <location:@L> <all:OneOrMore<Test<"all">>> <end_location:@R> => {
-        all.into_iter().map(|context_expr| ast::Withitem { context_expr, optional_vars: None, range: optional_range(location, end_location) }).collect()
+        all.into_iter().map(|context_expr| ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }).collect()
     },
 }
 
-WithItem<Goal>: ast::Withitem = {
-    <location:@L> <context_expr: Test<Goal>> <end_location:@R> if Goal != "as" => ast::Withitem { context_expr, optional_vars: None, range: optional_range(location, end_location) },
+WithItem<Goal>: ast::WithItem = {
+    <location:@L> <context_expr: Test<Goal>> <end_location:@R> if Goal != "as" => ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) },
     <location:@L> <context_expr:Test<"all">> "as" <vars:Expression<"all">> <end_location:@R> => {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::Withitem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
     },
 };
 
@@ -1212,7 +1212,7 @@ OrTest<Goal>: ast::Expr = {
     <location:@L> <mut values:(<AndTest<"all">> "or")+> <last: AndTest<"all">> <end_location:@R> => {
         values.push(last);
         ast::Expr::BoolOp(
-            ast::ExprBoolOp { op: ast::Boolop::Or, values, range: (location..end_location).into() }
+            ast::ExprBoolOp { op: ast::BoolOp::Or, values, range: (location..end_location).into() }
         )
     },
     AndTest<Goal>,
@@ -1222,7 +1222,7 @@ AndTest<Goal>: ast::Expr = {
     <location:@L> <mut values:(<NotTest<"all">> "and")+> <last:NotTest<"all">> <end_location:@R> => {
         values.push(last);
         ast::Expr::BoolOp(
-            ast::ExprBoolOp { op: ast::Boolop::And, values, range: (location..end_location).into() }
+            ast::ExprBoolOp { op: ast::BoolOp::And, values, range: (location..end_location).into() }
         )
     },
     NotTest<Goal>,
@@ -1230,7 +1230,7 @@ AndTest<Goal>: ast::Expr = {
 
 NotTest<Goal>: ast::Expr = {
     <location:@L> "not" <e:NotTest<"all">> <end_location:@R> => ast::Expr::UnaryOp(
-        ast::ExprUnaryOp { operand: Box::new(e), op: ast::Unaryop::Not, range: (location..end_location).into() }
+        ast::ExprUnaryOp { operand: Box::new(e), op: ast::UnaryOp::Not, range: (location..end_location).into() }
     ),
     Comparison<Goal>,
 };
@@ -1245,17 +1245,17 @@ Comparison<Goal>: ast::Expr = {
     Expression<Goal>,
 };
 
-CompOp: ast::Cmpop = {
-    "==" => ast::Cmpop::Eq,
-    "!=" => ast::Cmpop::NotEq,
-    "<" => ast::Cmpop::Lt,
-    "<=" => ast::Cmpop::LtE,
-    ">" => ast::Cmpop::Gt,
-    ">=" => ast::Cmpop::GtE,
-    "in" => ast::Cmpop::In,
-    "not" "in" => ast::Cmpop::NotIn,
-    "is" => ast::Cmpop::Is,
-    "is" "not" => ast::Cmpop::IsNot,
+CompOp: ast::CmpOp = {
+    "==" => ast::CmpOp::Eq,
+    "!=" => ast::CmpOp::NotEq,
+    "<" => ast::CmpOp::Lt,
+    "<=" => ast::CmpOp::LtE,
+    ">" => ast::CmpOp::Gt,
+    ">=" => ast::CmpOp::GtE,
+    "in" => ast::CmpOp::In,
+    "not" "in" => ast::CmpOp::NotIn,
+    "is" => ast::CmpOp::Is,
+    "is" "not" => ast::CmpOp::IsNot,
 };
 
 Expression<Goal>: ast::Expr = {
@@ -1325,10 +1325,10 @@ Factor<Goal>: ast::Expr = {
     Power<Goal>,
 };
 
-UnaryOp: ast::Unaryop = {
-    "+" => ast::Unaryop::UAdd,
-    "-" => ast::Unaryop::USub,
-    "~" => ast::Unaryop::Invert,
+UnaryOp: ast::UnaryOp = {
+    "+" => ast::UnaryOp::UAdd,
+    "-" => ast::UnaryOp::USub,
+    "~" => ast::UnaryOp::Invert,
 };
 
 Power<Goal>: ast::Expr = {

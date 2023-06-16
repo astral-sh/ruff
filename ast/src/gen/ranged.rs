@@ -380,12 +380,12 @@ impl Ranged for crate::generic::Comprehension<TextRange> {
         self.range
     }
 }
-impl Ranged for crate::generic::ExcepthandlerExceptHandler<TextRange> {
+impl Ranged for crate::generic::ExceptHandlerExceptHandler<TextRange> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::Excepthandler {
+impl Ranged for crate::ExceptHandler {
     fn range(&self) -> TextRange {
         match self {
             Self::ExceptHandler(node) => node.range(),
@@ -415,7 +415,7 @@ impl Ranged for crate::generic::Alias<TextRange> {
     }
 }
 #[cfg(feature = "all-nodes-with-ranges")]
-impl Ranged for crate::generic::Withitem<TextRange> {
+impl Ranged for crate::generic::WithItem<TextRange> {
     fn range(&self) -> TextRange {
         self.range
     }

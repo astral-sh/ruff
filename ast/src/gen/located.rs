@@ -989,11 +989,11 @@ pub type ExprContextStore = crate::generic::ExprContextStore;
 
 pub type ExprContextDel = crate::generic::ExprContextDel;
 
-pub type Boolop = crate::generic::Boolop;
+pub type BoolOp = crate::generic::BoolOp;
 
-pub type BoolopAnd = crate::generic::BoolopAnd;
+pub type BoolOpAnd = crate::generic::BoolOpAnd;
 
-pub type BoolopOr = crate::generic::BoolopOr;
+pub type BoolOpOr = crate::generic::BoolOpOr;
 
 pub type Operator = crate::generic::Operator;
 
@@ -1023,37 +1023,37 @@ pub type OperatorBitAnd = crate::generic::OperatorBitAnd;
 
 pub type OperatorFloorDiv = crate::generic::OperatorFloorDiv;
 
-pub type Unaryop = crate::generic::Unaryop;
+pub type UnaryOp = crate::generic::UnaryOp;
 
-pub type UnaryopInvert = crate::generic::UnaryopInvert;
+pub type UnaryOpInvert = crate::generic::UnaryOpInvert;
 
-pub type UnaryopNot = crate::generic::UnaryopNot;
+pub type UnaryOpNot = crate::generic::UnaryOpNot;
 
-pub type UnaryopUAdd = crate::generic::UnaryopUAdd;
+pub type UnaryOpUAdd = crate::generic::UnaryOpUAdd;
 
-pub type UnaryopUSub = crate::generic::UnaryopUSub;
+pub type UnaryOpUSub = crate::generic::UnaryOpUSub;
 
-pub type Cmpop = crate::generic::Cmpop;
+pub type CmpOp = crate::generic::CmpOp;
 
-pub type CmpopEq = crate::generic::CmpopEq;
+pub type CmpOpEq = crate::generic::CmpOpEq;
 
-pub type CmpopNotEq = crate::generic::CmpopNotEq;
+pub type CmpOpNotEq = crate::generic::CmpOpNotEq;
 
-pub type CmpopLt = crate::generic::CmpopLt;
+pub type CmpOpLt = crate::generic::CmpOpLt;
 
-pub type CmpopLtE = crate::generic::CmpopLtE;
+pub type CmpOpLtE = crate::generic::CmpOpLtE;
 
-pub type CmpopGt = crate::generic::CmpopGt;
+pub type CmpOpGt = crate::generic::CmpOpGt;
 
-pub type CmpopGtE = crate::generic::CmpopGtE;
+pub type CmpOpGtE = crate::generic::CmpOpGtE;
 
-pub type CmpopIs = crate::generic::CmpopIs;
+pub type CmpOpIs = crate::generic::CmpOpIs;
 
-pub type CmpopIsNot = crate::generic::CmpopIsNot;
+pub type CmpOpIsNot = crate::generic::CmpOpIsNot;
 
-pub type CmpopIn = crate::generic::CmpopIn;
+pub type CmpOpIn = crate::generic::CmpOpIn;
 
-pub type CmpopNotIn = crate::generic::CmpopNotIn;
+pub type CmpOpNotIn = crate::generic::CmpOpNotIn;
 
 pub type Comprehension = crate::generic::Comprehension<SourceRange>;
 
@@ -1070,23 +1070,23 @@ impl LocatedMut for Comprehension {
     }
 }
 
-pub type Excepthandler = crate::generic::Excepthandler<SourceRange>;
+pub type ExceptHandler = crate::generic::ExceptHandler<SourceRange>;
 
-pub type ExcepthandlerExceptHandler = crate::generic::ExcepthandlerExceptHandler<SourceRange>;
+pub type ExceptHandlerExceptHandler = crate::generic::ExceptHandlerExceptHandler<SourceRange>;
 
-impl Located for ExcepthandlerExceptHandler {
+impl Located for ExceptHandlerExceptHandler {
     fn range(&self) -> SourceRange {
         self.range
     }
 }
 
-impl LocatedMut for ExcepthandlerExceptHandler {
+impl LocatedMut for ExceptHandlerExceptHandler {
     fn range_mut(&mut self) -> &mut SourceRange {
         &mut self.range
     }
 }
 
-impl Located for Excepthandler {
+impl Located for ExceptHandler {
     fn range(&self) -> SourceRange {
         match self {
             Self::ExceptHandler(node) => node.range(),
@@ -1094,7 +1094,7 @@ impl Located for Excepthandler {
     }
 }
 
-impl LocatedMut for Excepthandler {
+impl LocatedMut for ExceptHandler {
     fn range_mut(&mut self) -> &mut SourceRange {
         match self {
             Self::ExceptHandler(node) => node.range_mut(),
@@ -1159,16 +1159,16 @@ impl LocatedMut for Alias {
     }
 }
 
-pub type Withitem = crate::generic::Withitem<SourceRange>;
+pub type WithItem = crate::generic::WithItem<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-impl Located for Withitem {
+impl Located for WithItem {
     fn range(&self) -> SourceRange {
         self.range
     }
 }
 #[cfg(feature = "all-nodes-with-ranges")]
-impl LocatedMut for Withitem {
+impl LocatedMut for WithItem {
     fn range_mut(&mut self) -> &mut SourceRange {
         &mut self.range
     }

@@ -520,7 +520,7 @@ impl PyNode for ast::ExprContextDel {
     }
 }
 
-impl PyNode for ast::Boolop {
+impl PyNode for ast::BoolOp {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -528,7 +528,7 @@ impl PyNode for ast::Boolop {
     }
 }
 
-impl PyNode for ast::BoolopAnd {
+impl PyNode for ast::BoolOpAnd {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -536,7 +536,7 @@ impl PyNode for ast::BoolopAnd {
     }
 }
 
-impl PyNode for ast::BoolopOr {
+impl PyNode for ast::BoolOpOr {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -656,7 +656,7 @@ impl PyNode for ast::OperatorFloorDiv {
     }
 }
 
-impl PyNode for ast::Unaryop {
+impl PyNode for ast::UnaryOp {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -664,7 +664,7 @@ impl PyNode for ast::Unaryop {
     }
 }
 
-impl PyNode for ast::UnaryopInvert {
+impl PyNode for ast::UnaryOpInvert {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -672,7 +672,7 @@ impl PyNode for ast::UnaryopInvert {
     }
 }
 
-impl PyNode for ast::UnaryopNot {
+impl PyNode for ast::UnaryOpNot {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -680,7 +680,7 @@ impl PyNode for ast::UnaryopNot {
     }
 }
 
-impl PyNode for ast::UnaryopUAdd {
+impl PyNode for ast::UnaryOpUAdd {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -688,7 +688,7 @@ impl PyNode for ast::UnaryopUAdd {
     }
 }
 
-impl PyNode for ast::UnaryopUSub {
+impl PyNode for ast::UnaryOpUSub {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -696,7 +696,7 @@ impl PyNode for ast::UnaryopUSub {
     }
 }
 
-impl PyNode for ast::Cmpop {
+impl PyNode for ast::CmpOp {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -704,7 +704,7 @@ impl PyNode for ast::Cmpop {
     }
 }
 
-impl PyNode for ast::CmpopEq {
+impl PyNode for ast::CmpOpEq {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -712,7 +712,7 @@ impl PyNode for ast::CmpopEq {
     }
 }
 
-impl PyNode for ast::CmpopNotEq {
+impl PyNode for ast::CmpOpNotEq {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -720,7 +720,7 @@ impl PyNode for ast::CmpopNotEq {
     }
 }
 
-impl PyNode for ast::CmpopLt {
+impl PyNode for ast::CmpOpLt {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -728,7 +728,7 @@ impl PyNode for ast::CmpopLt {
     }
 }
 
-impl PyNode for ast::CmpopLtE {
+impl PyNode for ast::CmpOpLtE {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -736,7 +736,7 @@ impl PyNode for ast::CmpopLtE {
     }
 }
 
-impl PyNode for ast::CmpopGt {
+impl PyNode for ast::CmpOpGt {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -744,7 +744,7 @@ impl PyNode for ast::CmpopGt {
     }
 }
 
-impl PyNode for ast::CmpopGtE {
+impl PyNode for ast::CmpOpGtE {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -752,7 +752,7 @@ impl PyNode for ast::CmpopGtE {
     }
 }
 
-impl PyNode for ast::CmpopIs {
+impl PyNode for ast::CmpOpIs {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -760,7 +760,7 @@ impl PyNode for ast::CmpopIs {
     }
 }
 
-impl PyNode for ast::CmpopIsNot {
+impl PyNode for ast::CmpOpIsNot {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -768,7 +768,7 @@ impl PyNode for ast::CmpopIsNot {
     }
 }
 
-impl PyNode for ast::CmpopIn {
+impl PyNode for ast::CmpOpIn {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -776,7 +776,7 @@ impl PyNode for ast::CmpopIn {
     }
 }
 
-impl PyNode for ast::CmpopNotIn {
+impl PyNode for ast::CmpOpNotIn {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -792,7 +792,7 @@ impl<R> PyNode for ast::Comprehension<R> {
     }
 }
 
-impl<R> PyNode for ast::Excepthandler<R> {
+impl<R> PyNode for ast::ExceptHandler<R> {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -800,7 +800,7 @@ impl<R> PyNode for ast::Excepthandler<R> {
     }
 }
 
-impl<R> PyNode for ast::ExcepthandlerExceptHandler<R> {
+impl<R> PyNode for ast::ExceptHandlerExceptHandler<R> {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -840,7 +840,7 @@ impl<R> PyNode for ast::Alias<R> {
     }
 }
 
-impl<R> PyNode for ast::Withitem<R> {
+impl<R> PyNode for ast::WithItem<R> {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -956,12 +956,12 @@ impl ToPyAst for ast::ExprContext {
     }
 }
 
-impl ToPyAst for ast::Boolop {
+impl ToPyAst for ast::BoolOp {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
-            ast::Boolop::And => ast::BoolopAnd::py_type_cache(),
-            ast::Boolop::Or => ast::BoolopOr::py_type_cache(),
+            ast::BoolOp::And => ast::BoolOpAnd::py_type_cache(),
+            ast::BoolOp::Or => ast::BoolOpOr::py_type_cache(),
         };
         Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
@@ -989,33 +989,33 @@ impl ToPyAst for ast::Operator {
     }
 }
 
-impl ToPyAst for ast::Unaryop {
+impl ToPyAst for ast::UnaryOp {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
-            ast::Unaryop::Invert => ast::UnaryopInvert::py_type_cache(),
-            ast::Unaryop::Not => ast::UnaryopNot::py_type_cache(),
-            ast::Unaryop::UAdd => ast::UnaryopUAdd::py_type_cache(),
-            ast::Unaryop::USub => ast::UnaryopUSub::py_type_cache(),
+            ast::UnaryOp::Invert => ast::UnaryOpInvert::py_type_cache(),
+            ast::UnaryOp::Not => ast::UnaryOpNot::py_type_cache(),
+            ast::UnaryOp::UAdd => ast::UnaryOpUAdd::py_type_cache(),
+            ast::UnaryOp::USub => ast::UnaryOpUSub::py_type_cache(),
         };
         Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
 }
 
-impl ToPyAst for ast::Cmpop {
+impl ToPyAst for ast::CmpOp {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
-            ast::Cmpop::Eq => ast::CmpopEq::py_type_cache(),
-            ast::Cmpop::NotEq => ast::CmpopNotEq::py_type_cache(),
-            ast::Cmpop::Lt => ast::CmpopLt::py_type_cache(),
-            ast::Cmpop::LtE => ast::CmpopLtE::py_type_cache(),
-            ast::Cmpop::Gt => ast::CmpopGt::py_type_cache(),
-            ast::Cmpop::GtE => ast::CmpopGtE::py_type_cache(),
-            ast::Cmpop::Is => ast::CmpopIs::py_type_cache(),
-            ast::Cmpop::IsNot => ast::CmpopIsNot::py_type_cache(),
-            ast::Cmpop::In => ast::CmpopIn::py_type_cache(),
-            ast::Cmpop::NotIn => ast::CmpopNotIn::py_type_cache(),
+            ast::CmpOp::Eq => ast::CmpOpEq::py_type_cache(),
+            ast::CmpOp::NotEq => ast::CmpOpNotEq::py_type_cache(),
+            ast::CmpOp::Lt => ast::CmpOpLt::py_type_cache(),
+            ast::CmpOp::LtE => ast::CmpOpLtE::py_type_cache(),
+            ast::CmpOp::Gt => ast::CmpOpGt::py_type_cache(),
+            ast::CmpOp::GtE => ast::CmpOpGtE::py_type_cache(),
+            ast::CmpOp::Is => ast::CmpOpIs::py_type_cache(),
+            ast::CmpOp::IsNot => ast::CmpOpIsNot::py_type_cache(),
+            ast::CmpOp::In => ast::CmpOpIn::py_type_cache(),
+            ast::CmpOp::NotIn => ast::CmpOpNotIn::py_type_cache(),
         };
         Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
@@ -2256,17 +2256,17 @@ impl ToPyAst for ast::Comprehension<TextRange> {
     }
 }
 
-impl ToPyAst for ast::Excepthandler<TextRange> {
+impl ToPyAst for ast::ExceptHandler<TextRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
-            ast::Excepthandler::ExceptHandler(cons) => cons.to_py_ast(py)?,
+            ast::ExceptHandler::ExceptHandler(cons) => cons.to_py_ast(py)?,
         };
         Ok(instance)
     }
 }
 
-impl ToPyAst for ast::ExcepthandlerExceptHandler<TextRange> {
+impl ToPyAst for ast::ExceptHandlerExceptHandler<TextRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
@@ -2376,7 +2376,7 @@ impl ToPyAst for ast::Alias<TextRange> {
     }
 }
 
-impl ToPyAst for ast::Withitem<TextRange> {
+impl ToPyAst for ast::WithItem<TextRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
@@ -4272,17 +4272,17 @@ impl ToPyAst for ast::Comprehension<SourceRange> {
     }
 }
 
-impl ToPyAst for ast::Excepthandler<SourceRange> {
+impl ToPyAst for ast::ExceptHandler<SourceRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
-            ast::Excepthandler::ExceptHandler(cons) => cons.to_py_ast(py)?,
+            ast::ExceptHandler::ExceptHandler(cons) => cons.to_py_ast(py)?,
         };
         Ok(instance)
     }
 }
 
-impl ToPyAst for ast::ExcepthandlerExceptHandler<SourceRange> {
+impl ToPyAst for ast::ExceptHandlerExceptHandler<SourceRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
@@ -4424,7 +4424,7 @@ impl ToPyAst for ast::Alias<SourceRange> {
     }
 }
 
-impl ToPyAst for ast::Withitem<SourceRange> {
+impl ToPyAst for ast::WithItem<SourceRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
@@ -4784,9 +4784,9 @@ fn init_types(py: Python) -> PyResult<()> {
     cache_py_type::<ast::ExprContextLoad>(ast_module)?;
     cache_py_type::<ast::ExprContextStore>(ast_module)?;
     cache_py_type::<ast::ExprContextDel>(ast_module)?;
-    cache_py_type::<ast::Boolop>(ast_module)?;
-    cache_py_type::<ast::BoolopAnd>(ast_module)?;
-    cache_py_type::<ast::BoolopOr>(ast_module)?;
+    cache_py_type::<ast::BoolOp>(ast_module)?;
+    cache_py_type::<ast::BoolOpAnd>(ast_module)?;
+    cache_py_type::<ast::BoolOpOr>(ast_module)?;
     cache_py_type::<ast::Operator>(ast_module)?;
     cache_py_type::<ast::OperatorAdd>(ast_module)?;
     cache_py_type::<ast::OperatorSub>(ast_module)?;
@@ -4801,30 +4801,30 @@ fn init_types(py: Python) -> PyResult<()> {
     cache_py_type::<ast::OperatorBitXor>(ast_module)?;
     cache_py_type::<ast::OperatorBitAnd>(ast_module)?;
     cache_py_type::<ast::OperatorFloorDiv>(ast_module)?;
-    cache_py_type::<ast::Unaryop>(ast_module)?;
-    cache_py_type::<ast::UnaryopInvert>(ast_module)?;
-    cache_py_type::<ast::UnaryopNot>(ast_module)?;
-    cache_py_type::<ast::UnaryopUAdd>(ast_module)?;
-    cache_py_type::<ast::UnaryopUSub>(ast_module)?;
-    cache_py_type::<ast::Cmpop>(ast_module)?;
-    cache_py_type::<ast::CmpopEq>(ast_module)?;
-    cache_py_type::<ast::CmpopNotEq>(ast_module)?;
-    cache_py_type::<ast::CmpopLt>(ast_module)?;
-    cache_py_type::<ast::CmpopLtE>(ast_module)?;
-    cache_py_type::<ast::CmpopGt>(ast_module)?;
-    cache_py_type::<ast::CmpopGtE>(ast_module)?;
-    cache_py_type::<ast::CmpopIs>(ast_module)?;
-    cache_py_type::<ast::CmpopIsNot>(ast_module)?;
-    cache_py_type::<ast::CmpopIn>(ast_module)?;
-    cache_py_type::<ast::CmpopNotIn>(ast_module)?;
+    cache_py_type::<ast::UnaryOp>(ast_module)?;
+    cache_py_type::<ast::UnaryOpInvert>(ast_module)?;
+    cache_py_type::<ast::UnaryOpNot>(ast_module)?;
+    cache_py_type::<ast::UnaryOpUAdd>(ast_module)?;
+    cache_py_type::<ast::UnaryOpUSub>(ast_module)?;
+    cache_py_type::<ast::CmpOp>(ast_module)?;
+    cache_py_type::<ast::CmpOpEq>(ast_module)?;
+    cache_py_type::<ast::CmpOpNotEq>(ast_module)?;
+    cache_py_type::<ast::CmpOpLt>(ast_module)?;
+    cache_py_type::<ast::CmpOpLtE>(ast_module)?;
+    cache_py_type::<ast::CmpOpGt>(ast_module)?;
+    cache_py_type::<ast::CmpOpGtE>(ast_module)?;
+    cache_py_type::<ast::CmpOpIs>(ast_module)?;
+    cache_py_type::<ast::CmpOpIsNot>(ast_module)?;
+    cache_py_type::<ast::CmpOpIn>(ast_module)?;
+    cache_py_type::<ast::CmpOpNotIn>(ast_module)?;
     cache_py_type::<ast::Comprehension>(ast_module)?;
-    cache_py_type::<ast::Excepthandler>(ast_module)?;
-    cache_py_type::<ast::ExcepthandlerExceptHandler>(ast_module)?;
+    cache_py_type::<ast::ExceptHandler>(ast_module)?;
+    cache_py_type::<ast::ExceptHandlerExceptHandler>(ast_module)?;
     cache_py_type::<ast::PythonArguments>(ast_module)?;
     cache_py_type::<ast::Arg>(ast_module)?;
     cache_py_type::<ast::Keyword>(ast_module)?;
     cache_py_type::<ast::Alias>(ast_module)?;
-    cache_py_type::<ast::Withitem>(ast_module)?;
+    cache_py_type::<ast::WithItem>(ast_module)?;
     cache_py_type::<ast::MatchCase>(ast_module)?;
     cache_py_type::<ast::Pattern>(ast_module)?;
     cache_py_type::<ast::PatternMatchValue>(ast_module)?;

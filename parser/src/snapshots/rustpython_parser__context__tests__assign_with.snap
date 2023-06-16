@@ -7,7 +7,7 @@ expression: parse_ast
         StmtWith {
             range: 0..17,
             items: [
-                Withitem {
+                WithItem {
                     range: 5..11,
                     context_expr: Constant(
                         ExprConstant {

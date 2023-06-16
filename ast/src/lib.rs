@@ -6,6 +6,14 @@
 //!
 //! [PythonArguments] is replaced by [Arguments]. The new [Arguments] type representation uses a new type
 //! [ArgWithDefault] to represent arguments with default values. See each type documentation for more details.
+//!
+//! A few top-level sum types are renamed to human friendly names.
+//! [CmpOp] refers `cmpop`
+//! [UnaryOp] refers `unaryop`
+//! [BoolOp] refers `boolop`
+//! [WithItem] refers `withitem`
+//! [ExceptHandler] refers `excepthandler`
+//!
 
 mod builtin;
 mod generic;

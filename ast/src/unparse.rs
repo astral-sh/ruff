@@ -1,5 +1,5 @@
 use crate::{
-    Arg, ArgWithDefault, Arguments, Boolop, Comprehension, Constant, ConversionFlag, Expr,
+    Arg, ArgWithDefault, Arguments, BoolOp, Comprehension, Constant, ConversionFlag, Expr,
     Identifier, Operator, PythonArguments,
 };
 use std::fmt;
@@ -79,7 +79,7 @@ impl<'a> Unparser<'a> {
                 values,
                 range: _range,
             }) => {
-                let (op, prec) = op_prec!(bin, op, Boolop, And("and", AND), Or("or", OR));
+                let (op, prec) = op_prec!(bin, op, BoolOp, And("and", AND), Or("or", OR));
                 group_if!(prec, {
                     let mut first = true;
                     for val in values {
@@ -138,7 +138,7 @@ impl<'a> Unparser<'a> {
                 let (op, prec) = op_prec!(
                     un,
                     op,
-                    crate::Unaryop,
+                    crate::UnaryOp,
                     Invert("~", FACTOR),
                     Not("not ", NOT),
                     UAdd("+", FACTOR),

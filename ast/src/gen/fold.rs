@@ -390,16 +390,16 @@ pub trait Fold<U> {
     fn fold_expr_context(&mut self, node: ExprContext) -> Result<ExprContext, Self::Error> {
         fold_expr_context(self, node)
     }
-    fn fold_boolop(&mut self, node: Boolop) -> Result<Boolop, Self::Error> {
+    fn fold_boolop(&mut self, node: BoolOp) -> Result<BoolOp, Self::Error> {
         fold_boolop(self, node)
     }
     fn fold_operator(&mut self, node: Operator) -> Result<Operator, Self::Error> {
         fold_operator(self, node)
     }
-    fn fold_unaryop(&mut self, node: Unaryop) -> Result<Unaryop, Self::Error> {
+    fn fold_unaryop(&mut self, node: UnaryOp) -> Result<UnaryOp, Self::Error> {
         fold_unaryop(self, node)
     }
-    fn fold_cmpop(&mut self, node: Cmpop) -> Result<Cmpop, Self::Error> {
+    fn fold_cmpop(&mut self, node: CmpOp) -> Result<CmpOp, Self::Error> {
         fold_cmpop(self, node)
     }
     fn fold_comprehension(
@@ -410,14 +410,14 @@ pub trait Fold<U> {
     }
     fn fold_excepthandler(
         &mut self,
-        node: Excepthandler<U>,
-    ) -> Result<Excepthandler<Self::TargetU>, Self::Error> {
+        node: ExceptHandler<U>,
+    ) -> Result<ExceptHandler<Self::TargetU>, Self::Error> {
         fold_excepthandler(self, node)
     }
     fn fold_excepthandler_except_handler(
         &mut self,
-        node: ExcepthandlerExceptHandler<U>,
-    ) -> Result<ExcepthandlerExceptHandler<Self::TargetU>, Self::Error> {
+        node: ExceptHandlerExceptHandler<U>,
+    ) -> Result<ExceptHandlerExceptHandler<Self::TargetU>, Self::Error> {
         fold_excepthandler_except_handler(self, node)
     }
     fn fold_arguments(
@@ -435,7 +435,7 @@ pub trait Fold<U> {
     fn fold_alias(&mut self, node: Alias<U>) -> Result<Alias<Self::TargetU>, Self::Error> {
         fold_alias(self, node)
     }
-    fn fold_withitem(&mut self, node: Withitem<U>) -> Result<Withitem<Self::TargetU>, Self::Error> {
+    fn fold_withitem(&mut self, node: WithItem<U>) -> Result<WithItem<Self::TargetU>, Self::Error> {
         fold_withitem(self, node)
     }
     fn fold_match_case(
@@ -2210,8 +2210,8 @@ pub fn fold_expr_context<U, F: Fold<U> + ?Sized>(
 ) -> Result<ExprContext, F::Error> {
     Ok(node)
 }
-impl<T, U> Foldable<T, U> for Boolop {
-    type Mapped = Boolop;
+impl<T, U> Foldable<T, U> for BoolOp {
+    type Mapped = BoolOp;
     fn fold<F: Fold<T, TargetU = U> + ?Sized>(
         self,
         folder: &mut F,
@@ -2221,8 +2221,8 @@ impl<T, U> Foldable<T, U> for Boolop {
 }
 pub fn fold_boolop<U, F: Fold<U> + ?Sized>(
     #[allow(unused)] folder: &mut F,
-    node: Boolop,
-) -> Result<Boolop, F::Error> {
+    node: BoolOp,
+) -> Result<BoolOp, F::Error> {
     Ok(node)
 }
 impl<T, U> Foldable<T, U> for Operator {
@@ -2240,8 +2240,8 @@ pub fn fold_operator<U, F: Fold<U> + ?Sized>(
 ) -> Result<Operator, F::Error> {
     Ok(node)
 }
-impl<T, U> Foldable<T, U> for Unaryop {
-    type Mapped = Unaryop;
+impl<T, U> Foldable<T, U> for UnaryOp {
+    type Mapped = UnaryOp;
     fn fold<F: Fold<T, TargetU = U> + ?Sized>(
         self,
         folder: &mut F,
@@ -2251,12 +2251,12 @@ impl<T, U> Foldable<T, U> for Unaryop {
 }
 pub fn fold_unaryop<U, F: Fold<U> + ?Sized>(
     #[allow(unused)] folder: &mut F,
-    node: Unaryop,
-) -> Result<Unaryop, F::Error> {
+    node: UnaryOp,
+) -> Result<UnaryOp, F::Error> {
     Ok(node)
 }
-impl<T, U> Foldable<T, U> for Cmpop {
-    type Mapped = Cmpop;
+impl<T, U> Foldable<T, U> for CmpOp {
+    type Mapped = CmpOp;
     fn fold<F: Fold<T, TargetU = U> + ?Sized>(
         self,
         folder: &mut F,
@@ -2266,8 +2266,8 @@ impl<T, U> Foldable<T, U> for Cmpop {
 }
 pub fn fold_cmpop<U, F: Fold<U> + ?Sized>(
     #[allow(unused)] folder: &mut F,
-    node: Cmpop,
-) -> Result<Cmpop, F::Error> {
+    node: CmpOp,
+) -> Result<CmpOp, F::Error> {
     Ok(node)
 }
 impl<T, U> Foldable<T, U> for Comprehension<T> {
@@ -2304,8 +2304,8 @@ pub fn fold_comprehension<U, F: Fold<U> + ?Sized>(
         range,
     })
 }
-impl<T, U> Foldable<T, U> for Excepthandler<T> {
-    type Mapped = Excepthandler<U>;
+impl<T, U> Foldable<T, U> for ExceptHandler<T> {
+    type Mapped = ExceptHandler<U>;
     fn fold<F: Fold<T, TargetU = U> + ?Sized>(
         self,
         folder: &mut F,
@@ -2315,17 +2315,17 @@ impl<T, U> Foldable<T, U> for Excepthandler<T> {
 }
 pub fn fold_excepthandler<U, F: Fold<U> + ?Sized>(
     #[allow(unused)] folder: &mut F,
-    node: Excepthandler<U>,
-) -> Result<Excepthandler<F::TargetU>, F::Error> {
+    node: ExceptHandler<U>,
+) -> Result<ExceptHandler<F::TargetU>, F::Error> {
     let folded = match node {
-        Excepthandler::ExceptHandler(cons) => {
-            Excepthandler::ExceptHandler(Foldable::fold(cons, folder)?)
+        ExceptHandler::ExceptHandler(cons) => {
+            ExceptHandler::ExceptHandler(Foldable::fold(cons, folder)?)
         }
     };
     Ok(folded)
 }
-impl<T, U> Foldable<T, U> for ExcepthandlerExceptHandler<T> {
-    type Mapped = ExcepthandlerExceptHandler<U>;
+impl<T, U> Foldable<T, U> for ExceptHandlerExceptHandler<T> {
+    type Mapped = ExceptHandlerExceptHandler<U>;
     fn fold<F: Fold<T, TargetU = U> + ?Sized>(
         self,
         folder: &mut F,
@@ -2335,9 +2335,9 @@ impl<T, U> Foldable<T, U> for ExcepthandlerExceptHandler<T> {
 }
 pub fn fold_excepthandler_except_handler<U, F: Fold<U> + ?Sized>(
     #[allow(unused)] folder: &mut F,
-    node: ExcepthandlerExceptHandler<U>,
-) -> Result<ExcepthandlerExceptHandler<F::TargetU>, F::Error> {
-    let ExcepthandlerExceptHandler {
+    node: ExceptHandlerExceptHandler<U>,
+) -> Result<ExceptHandlerExceptHandler<F::TargetU>, F::Error> {
+    let ExceptHandlerExceptHandler {
         type_,
         name,
         body,
@@ -2349,7 +2349,7 @@ pub fn fold_excepthandler_except_handler<U, F: Fold<U> + ?Sized>(
     let name = Foldable::fold(name, folder)?;
     let body = Foldable::fold(body, folder)?;
     let range = folder.map_user(range, context)?;
-    Ok(ExcepthandlerExceptHandler {
+    Ok(ExceptHandlerExceptHandler {
         type_,
         name,
         body,
@@ -2472,8 +2472,8 @@ pub fn fold_alias<U, F: Fold<U> + ?Sized>(
         range,
     })
 }
-impl<T, U> Foldable<T, U> for Withitem<T> {
-    type Mapped = Withitem<U>;
+impl<T, U> Foldable<T, U> for WithItem<T> {
+    type Mapped = WithItem<U>;
     fn fold<F: Fold<T, TargetU = U> + ?Sized>(
         self,
         folder: &mut F,
@@ -2483,9 +2483,9 @@ impl<T, U> Foldable<T, U> for Withitem<T> {
 }
 pub fn fold_withitem<U, F: Fold<U> + ?Sized>(
     #[allow(unused)] folder: &mut F,
-    node: Withitem<U>,
-) -> Result<Withitem<F::TargetU>, F::Error> {
-    let Withitem {
+    node: WithItem<U>,
+) -> Result<WithItem<F::TargetU>, F::Error> {
+    let WithItem {
         context_expr,
         optional_vars,
         range,
@@ -2494,7 +2494,7 @@ pub fn fold_withitem<U, F: Fold<U> + ?Sized>(
     let context_expr = Foldable::fold(context_expr, folder)?;
     let optional_vars = Foldable::fold(optional_vars, folder)?;
     let range = folder.map_user_cfg(range, context)?;
-    Ok(Withitem {
+    Ok(WithItem {
         context_expr,
         optional_vars,
         range,

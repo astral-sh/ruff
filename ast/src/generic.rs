@@ -54,19 +54,19 @@ impl<R> Default for EmptyRange<R> {
     }
 }
 
-impl Cmpop {
+impl CmpOp {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Cmpop::Eq => "==",
-            Cmpop::NotEq => "!=",
-            Cmpop::Lt => "<",
-            Cmpop::LtE => "<=",
-            Cmpop::Gt => ">",
-            Cmpop::GtE => ">=",
-            Cmpop::Is => "is",
-            Cmpop::IsNot => "is not",
-            Cmpop::In => "in",
-            Cmpop::NotIn => "not in",
+            CmpOp::Eq => "==",
+            CmpOp::NotEq => "!=",
+            CmpOp::Lt => "<",
+            CmpOp::LtE => "<=",
+            CmpOp::Gt => ">",
+            CmpOp::GtE => ">=",
+            CmpOp::Is => "is",
+            CmpOp::IsNot => "is not",
+            CmpOp::In => "in",
+            CmpOp::NotIn => "not in",
         }
     }
 }

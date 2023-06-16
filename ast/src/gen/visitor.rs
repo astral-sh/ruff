@@ -665,38 +665,38 @@ pub trait Visitor<R = crate::text_size::TextRange> {
         self.generic_visit_expr_context(node)
     }
     fn generic_visit_expr_context(&mut self, node: ExprContext) {}
-    fn visit_boolop(&mut self, node: Boolop) {
+    fn visit_boolop(&mut self, node: BoolOp) {
         self.generic_visit_boolop(node)
     }
-    fn generic_visit_boolop(&mut self, node: Boolop) {}
+    fn generic_visit_boolop(&mut self, node: BoolOp) {}
     fn visit_operator(&mut self, node: Operator) {
         self.generic_visit_operator(node)
     }
     fn generic_visit_operator(&mut self, node: Operator) {}
-    fn visit_unaryop(&mut self, node: Unaryop) {
+    fn visit_unaryop(&mut self, node: UnaryOp) {
         self.generic_visit_unaryop(node)
     }
-    fn generic_visit_unaryop(&mut self, node: Unaryop) {}
-    fn visit_cmpop(&mut self, node: Cmpop) {
+    fn generic_visit_unaryop(&mut self, node: UnaryOp) {}
+    fn visit_cmpop(&mut self, node: CmpOp) {
         self.generic_visit_cmpop(node)
     }
-    fn generic_visit_cmpop(&mut self, node: Cmpop) {}
+    fn generic_visit_cmpop(&mut self, node: CmpOp) {}
     fn visit_comprehension(&mut self, node: Comprehension<R>) {
         self.generic_visit_comprehension(node)
     }
     fn generic_visit_comprehension(&mut self, node: Comprehension<R>) {}
-    fn visit_excepthandler(&mut self, node: Excepthandler<R>) {
+    fn visit_excepthandler(&mut self, node: ExceptHandler<R>) {
         self.generic_visit_excepthandler(node)
     }
-    fn generic_visit_excepthandler(&mut self, node: Excepthandler<R>) {
+    fn generic_visit_excepthandler(&mut self, node: ExceptHandler<R>) {
         match node {
-            Excepthandler::ExceptHandler(data) => self.visit_excepthandler_except_handler(data),
+            ExceptHandler::ExceptHandler(data) => self.visit_excepthandler_except_handler(data),
         }
     }
-    fn visit_excepthandler_except_handler(&mut self, node: ExcepthandlerExceptHandler<R>) {
+    fn visit_excepthandler_except_handler(&mut self, node: ExceptHandlerExceptHandler<R>) {
         self.generic_visit_excepthandler_except_handler(node)
     }
-    fn generic_visit_excepthandler_except_handler(&mut self, node: ExcepthandlerExceptHandler<R>) {
+    fn generic_visit_excepthandler_except_handler(&mut self, node: ExceptHandlerExceptHandler<R>) {
         if let Some(value) = node.type_ {
             self.visit_expr(*value);
         }
@@ -720,10 +720,10 @@ pub trait Visitor<R = crate::text_size::TextRange> {
         self.generic_visit_alias(node)
     }
     fn generic_visit_alias(&mut self, node: Alias<R>) {}
-    fn visit_withitem(&mut self, node: Withitem<R>) {
+    fn visit_withitem(&mut self, node: WithItem<R>) {
         self.generic_visit_withitem(node)
     }
-    fn generic_visit_withitem(&mut self, node: Withitem<R>) {}
+    fn generic_visit_withitem(&mut self, node: WithItem<R>) {}
     fn visit_match_case(&mut self, node: MatchCase<R>) {
         self.generic_visit_match_case(node)
     }

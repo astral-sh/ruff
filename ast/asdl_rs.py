@@ -31,6 +31,14 @@ BUILTIN_INT_NAMES = {
     "conversion": "ConversionFlag",
 }
 
+RENAME_MAP = {
+    "cmpop": "cmp_op",
+    "unaryop": "unary_op",
+    "boolop": "bool_op",
+    "excepthandler": "except_handler",
+    "withitem": "with_item",
+}
+
 RUST_KEYWORDS = {
     "if",
     "while",
@@ -124,6 +132,7 @@ def rust_type_name(name):
 
     This function special cases the default types provided by asdl.
     """
+    name = RENAME_MAP.get(name, name)
     if name in asdl.builtin_types:
         builtin = BUILTIN_TYPE_NAMES[name]
         return builtin
@@ -444,7 +453,9 @@ class StructVisitor(EmitVisitor):
     def visitType(self, type, depth=0):
         if hasattr(type, "doc"):
             doc = "/// " + type.doc.replace("\n", "\n/// ") + "\n"
-            self.emit(doc, depth)
+        else:
+            doc = f"/// See also [{type.name}](https://docs.python.org/3/library/ast.html#ast.{type.name})"
+        self.emit(doc, depth)
         self.visit(type.value, type, depth)
 
     def visitSum(self, sum, type, depth):
@@ -525,11 +536,6 @@ class StructVisitor(EmitVisitor):
     def sum_with_constructors(self, sum, type, depth):
         type_info = self.type_info[type.name]
         rust_name = rust_type_name(type.name)
-        # all the attributes right now are for location, so if it has attrs we
-        # can just wrap it in Attributed<>
-
-        for t in sum.types:
-            self.sum_subtype_struct(type_info, t, rust_name, depth)
 
         self.emit_attrs(depth)
         self.emit("#[derive(is_macro::Is)]", depth)
@@ -545,7 +551,12 @@ class StructVisitor(EmitVisitor):
         self.emit("}", depth)
         self.emit("", depth)
 
+        for t in sum.types:
+            self.sum_subtype_struct(type_info, t, rust_name, depth)
+
+
     def sum_subtype_struct(self, sum_type_info, t, rust_name, depth):
+        self.emit(f"""/// See also [{t.name}](https://docs.python.org/3/library/ast.html#ast.{t.name})""", depth)
         self.emit_attrs(depth)
         payload_name = f"{rust_name}{t.name}"
         self.emit(f"pub struct {payload_name}<R = TextRange> {{", depth)
