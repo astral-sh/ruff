@@ -671,15 +671,17 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.enabled(Rule::DjangoModelWithoutDunderStr) {
-                    if let Some(diagnostic) =
-                        flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
-                }
                 if self.enabled(Rule::DjangoUnorderedBodyContentInModel) {
                     flake8_django::rules::unordered_body_content_in_model(self, bases, body);
+                }
+                if !self.is_stub {
+                    if self.enabled(Rule::DjangoModelWithoutDunderStr) {
+                        if let Some(diagnostic) =
+                            flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
                 }
                 if self.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
