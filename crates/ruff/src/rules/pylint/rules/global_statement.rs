@@ -58,19 +58,18 @@ pub(crate) fn global_statement(checker: &mut Checker, name: &str) {
     let scope = checker.semantic().scope();
     if let Some(binding_id) = scope.get(name) {
         let binding = checker.semantic().binding(binding_id);
-        if binding.kind.is_global() {
-            let source = checker.semantic().stmts[binding
-                .source
-                .expect("`global` bindings should always have a `source`")];
-            let diagnostic = Diagnostic::new(
-                GlobalStatement {
-                    name: name.to_string(),
-                },
-                // Match Pylint's behavior by reporting on the `global` statement`, rather
-                // than the variable usage.
-                source.range(),
-            );
-            checker.diagnostics.push(diagnostic);
+        if binding.is_global() {
+            if let Some(source) = binding.source {
+                let source = checker.semantic().stmts[source];
+                checker.diagnostics.push(Diagnostic::new(
+                    GlobalStatement {
+                        name: name.to_string(),
+                    },
+                    // Match Pylint's behavior by reporting on the `global` statement`, rather
+                    // than the variable usage.
+                    source.range(),
+                ));
+            }
         }
     }
 }
