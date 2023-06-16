@@ -186,11 +186,17 @@ pub(crate) fn run(
 
     // Store the package caches.
     if let Some(package_caches) = package_caches {
-        for package_cache in package_caches.into_inner().unwrap().values() {
-            if let Some(package_cache) = package_cache.get() {
-                package_cache.store()?;
-            }
-        }
+        package_caches
+            .into_inner()
+            .unwrap()
+            .par_iter()
+            .try_for_each(|(_, package_cache)| {
+                if let Some(package_cache) = package_cache.get() {
+                    package_cache.store()
+                } else {
+                    Ok(())
+                }
+            })?;
     }
 
     let duration = start.elapsed();
