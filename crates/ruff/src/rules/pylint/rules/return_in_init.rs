@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_init;
@@ -46,13 +47,7 @@ impl Violation for ReturnInInit {
 pub(crate) fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
     if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
         if let Some(expr) = value {
-            if matches!(
-                expr.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::None,
-                    ..
-                })
-            ) {
+            if is_const_none(expr) {
                 // Explicit `return None`.
                 return;
             }

@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_true;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -112,9 +113,9 @@ fn is_model_abstract(body: &[Stmt]) -> bool {
                 if id != "abstract" {
                     continue;
                 }
-                let Expr::Constant(ast::ExprConstant{value: Constant::Bool(true), ..}) = value.as_ref() else {
+                if !is_const_true(value) {
                     continue;
-                };
+                }
                 return true;
             }
         }

@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -208,15 +209,9 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Some(default) = args.get(1) else {
         return;
     };
-    if !matches!(
-        default,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        })
-    ) {
+    if !is_const_none(default) {
         return;
-    };
+    }
 
     let expected = format!(
         "{}({})",

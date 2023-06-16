@@ -1,9 +1,10 @@
 //! Analysis rules for the `typing` module.
 
+use num_traits::identities::Zero;
 use rustpython_parser::ast::{self, Constant, Expr, Operator};
 
-use num_traits::identities::Zero;
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
+use ruff_python_ast::helpers::is_const_false;
 use ruff_python_stdlib::typing::{
     IMMUTABLE_GENERIC_TYPES, IMMUTABLE_TYPES, PEP_585_GENERICS, PEP_593_SUBSCRIPTS, SUBSCRIPTS,
 };
@@ -267,13 +268,7 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     let ast::StmtIf { test, .. } = stmt;
 
     // Ex) `if False:`
-    if matches!(
-        test.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(false),
-            ..
-        })
-    ) {
+    if is_const_false(test) {
         return true;
     }
 

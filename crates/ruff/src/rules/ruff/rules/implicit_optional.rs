@@ -5,6 +5,7 @@ use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::TextRange;
 
@@ -320,13 +321,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
                 .zip(arguments.defaults.iter().rev()),
         );
     for (arg, default) in arguments_with_defaults {
-        if !matches!(
-            default,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            }),
-        ) {
+        if !is_const_none(default) {
             continue;
         }
         let Some(annotation) = &arg.annotation else {

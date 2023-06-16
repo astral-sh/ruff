@@ -5,6 +5,7 @@ use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -153,16 +154,7 @@ pub(crate) fn literal_comparisons(
 
     if !helpers::is_constant_non_singleton(next) {
         if let Some(op) = EqCmpop::try_from(*op) {
-            if check_none_comparisons
-                && matches!(
-                    comparator,
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::None,
-                        kind: None,
-                        range: _
-                    })
-                )
-            {
+            if check_none_comparisons && is_const_none(comparator) {
                 match op {
                     EqCmpop::Eq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
@@ -223,16 +215,7 @@ pub(crate) fn literal_comparisons(
         }
 
         if let Some(op) = EqCmpop::try_from(*op) {
-            if check_none_comparisons
-                && matches!(
-                    next,
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::None,
-                        kind: None,
-                        range: _
-                    })
-                )
-            {
+            if check_none_comparisons && is_const_none(next) {
                 match op {
                     EqCmpop::Eq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
