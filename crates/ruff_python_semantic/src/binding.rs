@@ -10,6 +10,7 @@ use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::node::NodeId;
 use crate::reference::ReferenceId;
+use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
@@ -336,7 +337,7 @@ pub enum BindingKind<'a> {
     /// def foo():
     ///     nonlocal x
     /// ```
-    Nonlocal,
+    Nonlocal(ScopeId),
 
     /// A binding for a builtin, like `print` or `bool`.
     Builtin,

@@ -38,7 +38,7 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                         | BindingKind::UnpackedAssignment
                         | BindingKind::LoopVar
                         | BindingKind::Global
-                        | BindingKind::Nonlocal => Resolution::RelevantLocal,
+                        | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
                         BindingKind::Importation(Importation {
                             qualified_name: module,
                         }) if module == "pandas" => Resolution::PandasModule,
