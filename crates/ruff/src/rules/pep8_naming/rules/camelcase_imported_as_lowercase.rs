@@ -58,7 +58,7 @@ pub(crate) fn camelcase_imported_as_lowercase(
         return None;
     }
 
-    if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_lower(asname) {
+    if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_cased_lowercase(asname) {
         let mut diagnostic = Diagnostic::new(
             CamelcaseImportedAsLowercase {
                 name: name.to_string(),

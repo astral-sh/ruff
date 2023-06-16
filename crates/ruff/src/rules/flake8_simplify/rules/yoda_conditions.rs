@@ -71,10 +71,10 @@ impl Violation for YodaConditions {
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
     match expr {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_upper(attr),
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_cased_uppercase(attr),
         Expr::Constant(_) => true,
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
-        Expr::Name(ast::ExprName { id, .. }) => str::is_upper(id),
+        Expr::Name(ast::ExprName { id, .. }) => str::is_cased_uppercase(id),
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
             operand,
