@@ -95,35 +95,31 @@ impl Violation for UnassignedSpecialVariableInStub {
     }
 }
 
-fn is_allowed_negated_math_attribute(call_path: CallPath) -> bool {
-    matches!(
-        call_path.as_slice(),
-        ["math", "inf"] | ["math", "e"] | ["math", "pi"] | ["math", "tau"]
-    )
+fn is_allowed_negated_math_attribute(call_path: &CallPath) -> bool {
+    matches!(call_path.as_slice(), ["math", "inf" | "e" | "pi" | "tau"])
 }
 
-fn is_allowed_math_attribute(call_path: CallPath) -> bool {
+fn is_allowed_math_attribute(call_path: &CallPath) -> bool {
     matches!(
         call_path.as_slice(),
-        ["math", "inf"]
-            | ["math", "nan"]
-            | ["math", "e"]
-            | ["math", "pi"]
-            | ["math", "tau"]
-            | ["sys", "stdin"]
-            | ["sys", "stdout"]
-            | ["sys", "stderr"]
-            | ["sys", "version"]
-            | ["sys", "version_info"]
-            | ["sys", "platform"]
-            | ["sys", "executable"]
-            | ["sys", "prefix"]
-            | ["sys", "exec_prefix"]
-            | ["sys", "base_prefix"]
-            | ["sys", "byteorder"]
-            | ["sys", "maxsize"]
-            | ["sys", "hexversion"]
-            | ["sys", "winver"]
+        ["math", "inf" | "nan" | "e" | "pi" | "tau"]
+            | [
+                "sys",
+                "stdin"
+                    | "stdout"
+                    | "stderr"
+                    | "version"
+                    | "version_info"
+                    | "platform"
+                    | "executable"
+                    | "prefix"
+                    | "exec_prefix"
+                    | "base_prefix"
+                    | "byteorder"
+                    | "maxsize"
+                    | "hexversion"
+                    | "winver"
+            ]
     )
 }
 
@@ -174,6 +170,7 @@ fn is_valid_default_value_with_annotation(
                 Expr::Attribute(_) => {
                     if semantic
                         .resolve_call_path(operand)
+                        .as_ref()
                         .map_or(false, is_allowed_negated_math_attribute)
                     {
                         return true;
@@ -222,6 +219,7 @@ fn is_valid_default_value_with_annotation(
         Expr::Attribute(_) => {
             if semantic
                 .resolve_call_path(default)
+                .as_ref()
                 .map_or(false, is_allowed_math_attribute)
             {
                 return true;

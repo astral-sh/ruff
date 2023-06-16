@@ -1,10 +1,9 @@
-use once_cell::sync::Lazy;
-use rustc_hash::FxHashMap;
-
-/// See: https://pypi.org/project/typing-extensions/
-pub fn is_typing_extension(name: &str) -> bool {
+/// Returns `true` if a name is a member of Python's `typing_extensions` module.
+///
+/// See: <https://pypi.org/project/typing-extensions/>
+pub fn is_typing_extension(member: &str) -> bool {
     matches!(
-        name,
+        member,
         "Annotated"
             | "Any"
             | "AsyncContextManager"
@@ -59,269 +58,218 @@ pub fn is_typing_extension(name: &str) -> bool {
     )
 }
 
-/// See: https://docs.python.org/3/library/typing.html
-pub fn is_generic_type(call_path: &[&str]) -> bool {
+/// Returns `true` if a call path is a generic from the Python standard library (e.g. `list`, which
+/// can be used as `list[int]`).
+///
+/// See: <https://docs.python.org/3/library/typing.html>
+pub fn is_standard_library_generic(call_path: &[&str]) -> bool {
     matches!(
         call_path,
-        // builtins
-        ["", "dict"] |
-    ["", "frozenset"] |
-    ["", "list"] |
-    ["", "set"] |
-    ["", "tuple"] |
-    ["", "type"] |
-    // `collections`
-    ["collections", "ChainMap"] |
-    ["collections", "Counter"] |
-    ["collections", "OrderedDict"] |
-    ["collections", "defaultdict"] |
-    ["collections", "deque"] |
-    // `collections.abc`
-    ["collections", "abc", "AsyncGenerator"] |
-    ["collections", "abc", "AsyncIterable"] |
-    ["collections", "abc", "AsyncIterator"] |
-    ["collections", "abc", "Awaitable"] |
-    ["collections", "abc", "ByteString"] |
-    ["collections", "abc", "Callable"] |
-    ["collections", "abc", "Collection"] |
-    ["collections", "abc", "Container"] |
-    ["collections", "abc", "Coroutine"] |
-    ["collections", "abc", "Generator"] |
-    ["collections", "abc", "ItemsView"] |
-    ["collections", "abc", "Iterable"] |
-    ["collections", "abc", "Iterator"] |
-    ["collections", "abc", "KeysView"] |
-    ["collections", "abc", "Mapping"] |
-    ["collections", "abc", "MappingView"] |
-    ["collections", "abc", "MutableMapping"] |
-    ["collections", "abc", "MutableSequence"] |
-    ["collections", "abc", "MutableSet"] |
-    ["collections", "abc", "Reversible"] |
-    ["collections", "abc", "Sequence"] |
-    ["collections", "abc", "Set"] |
-    ["collections", "abc", "ValuesView"] |
-    // `contextlib`
-    ["contextlib", "AbstractAsyncContextManager"] |
-    ["contextlib", "AbstractContextManager"] |
-    // `re`
-    ["re", "Match"] |
-    ["re", "Pattern"] |
-    // `typing`
-    ["typing", "AbstractSet"] |
-    ["typing", "AsyncContextManager"] |
-    ["typing", "AsyncGenerator"] |
-    ["typing", "AsyncIterator"] |
-    ["typing", "Awaitable"] |
-    ["typing", "BinaryIO"] |
-    ["typing", "ByteString"] |
-    ["typing", "Callable"] |
-    ["typing", "ChainMap"] |
-    ["typing", "ClassVar"] |
-    ["typing", "Collection"] |
-    ["typing", "Concatenate"] |
-    ["typing", "Container"] |
-    ["typing", "ContextManager"] |
-    ["typing", "Coroutine"] |
-    ["typing", "Counter"] |
-    ["typing", "DefaultDict"] |
-    ["typing", "Deque"] |
-    ["typing", "Dict"] |
-    ["typing", "Final"] |
-    ["typing", "FrozenSet"] |
-    ["typing", "Generator"] |
-    ["typing", "Generic"] |
-    ["typing", "IO"] |
-    ["typing", "ItemsView"] |
-    ["typing", "Iterable"] |
-    ["typing", "Iterator"] |
-    ["typing", "KeysView"] |
-    ["typing", "List"] |
-    ["typing", "Mapping"] |
-    ["typing", "Match"] |
-    ["typing", "MutableMapping"] |
-    ["typing", "MutableSequence"] |
-    ["typing", "MutableSet"] |
-    ["typing", "Optional"] |
-    ["typing", "OrderedDict"] |
-    ["typing", "Pattern"] |
-    ["typing", "Reversible"] |
-    ["typing", "Sequence"] |
-    ["typing", "Set"] |
-    ["typing", "TextIO"] |
-    ["typing", "Tuple"] |
-    ["typing", "Type"] |
-    ["typing", "TypeGuard"] |
-    ["typing", "Union"] |
-    ["typing", "Unpack"] |
-    ["typing", "ValuesView"] |
-    // `typing.io`
-    ["typing", "io", "BinaryIO"] |
-    ["typing", "io", "IO"] |
-    ["typing", "io", "TextIO"] |
-    // `typing.re`
-    ["typing", "re", "Match"] |
-    ["typing", "re", "Pattern"] |
-    // `typing_extensions`
-    ["typing_extensions", "AsyncContextManager"] |
-    ["typing_extensions", "AsyncGenerator"] |
-    ["typing_extensions", "AsyncIterable"] |
-    ["typing_extensions", "AsyncIterator"] |
-    ["typing_extensions", "Awaitable"] |
-    ["typing_extensions", "ChainMap"] |
-    ["typing_extensions", "ClassVar"] |
-    ["typing_extensions", "Concatenate"] |
-    ["typing_extensions", "ContextManager"] |
-    ["typing_extensions", "Coroutine"] |
-    ["typing_extensions", "Counter"] |
-    ["typing_extensions", "DefaultDict"] |
-    ["typing_extensions", "Deque"] |
-    ["typing_extensions", "Type"] |
-    // `weakref`
-    ["weakref", "WeakKeyDictionary"] |
-    ["weakref", "WeakSet"] |
-    ["weakref", "WeakValueDictionary"]
+        ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
+            | [
+                "collections" | "typing" | "typing_extensions",
+                "ChainMap" | "Counter"
+            ]
+            | ["collections" | "typing", "OrderedDict"]
+            | ["collections", "defaultdict" | "deque"]
+            | [
+                "collections",
+                "abc",
+                "AsyncGenerator"
+                    | "AsyncIterable"
+                    | "AsyncIterator"
+                    | "Awaitable"
+                    | "ByteString"
+                    | "Callable"
+                    | "Collection"
+                    | "Container"
+                    | "Coroutine"
+                    | "Generator"
+                    | "ItemsView"
+                    | "Iterable"
+                    | "Iterator"
+                    | "KeysView"
+                    | "Mapping"
+                    | "MappingView"
+                    | "MutableMapping"
+                    | "MutableSequence"
+                    | "MutableSet"
+                    | "Reversible"
+                    | "Sequence"
+                    | "Set"
+                    | "ValuesView"
+            ]
+            | [
+                "contextlib",
+                "AbstractAsyncContextManager" | "AbstractContextManager"
+            ]
+            | ["re" | "typing", "Match" | "Pattern"]
+            | [
+                "typing",
+                "AbstractSet"
+                    | "AsyncContextManager"
+                    | "AsyncGenerator"
+                    | "AsyncIterator"
+                    | "Awaitable"
+                    | "BinaryIO"
+                    | "ByteString"
+                    | "Callable"
+                    | "ClassVar"
+                    | "Collection"
+                    | "Concatenate"
+                    | "Container"
+                    | "ContextManager"
+                    | "Coroutine"
+                    | "DefaultDict"
+                    | "Deque"
+                    | "Dict"
+                    | "Final"
+                    | "FrozenSet"
+                    | "Generator"
+                    | "Generic"
+                    | "IO"
+                    | "ItemsView"
+                    | "Iterable"
+                    | "Iterator"
+                    | "KeysView"
+                    | "List"
+                    | "Mapping"
+                    | "MutableMapping"
+                    | "MutableSequence"
+                    | "MutableSet"
+                    | "Optional"
+                    | "Reversible"
+                    | "Sequence"
+                    | "Set"
+                    | "TextIO"
+                    | "Tuple"
+                    | "Type"
+                    | "TypeGuard"
+                    | "Union"
+                    | "Unpack"
+                    | "ValuesView"
+            ]
+            | ["typing", "io", "BinaryIO" | "IO" | "TextIO"]
+            | ["typing", "re", "Match" | "Pattern"]
+            | [
+                "typing_extensions",
+                "AsyncContextManager"
+                    | "AsyncGenerator"
+                    | "AsyncIterable"
+                    | "AsyncIterator"
+                    | "Awaitable"
+                    | "ClassVar"
+                    | "Concatenate"
+                    | "ContextManager"
+                    | "Coroutine"
+                    | "DefaultDict"
+                    | "Deque"
+                    | "Type"
+            ]
+            | [
+                "weakref",
+                "WeakKeyDictionary" | "WeakSet" | "WeakValueDictionary"
+            ]
     )
 }
 
-/// See: https://docs.python.org/3/library/typing.html
+/// Returns `true` if a call path is a [PEP 593] generic (e.g. `Annotated`).
+///
+/// See: <https://docs.python.org/3/library/typing.html>
+///
+/// [PEP 593]: https://peps.python.org/pep-0593/
 pub fn is_pep_593_generic_type(call_path: &[&str]) -> bool {
-    matches!(
-        call_path,
-        // `typing`
-        ["typing", "Annotated"] |
-        // `typing_extensions`
-        ["typing_extensions", "Annotated"]
-    )
+    matches!(call_path, ["typing" | "typing_extensions", "Annotated"])
 }
 
-pub fn is_generic_member(member: &str) -> bool {
+/// Returns `true` if a name matches that of a generic from the Python standard library (e.g.
+/// `list` or `Set`).
+///
+/// See: <https://docs.python.org/3/library/typing.html>
+pub fn is_standard_library_generic_member(member: &str) -> bool {
+    // Constructed by taking every pattern from `is_standard_library_generic`, removing all but
+    // the last element in each pattern, and de-duplicating the values.
     matches!(
         member,
-        // builtins
-        "dict" |
-        "frozenset" |
-        "list" |
-        "set" |
-        "tuple" |
-        "type" |
-        // `collections`
-        "ChainMap" |
-        "Counter" |
-        "OrderedDict" |
-        "defaultdict" |
-        "deque" |
-        // `collections.abc`
-        "AsyncGenerator" |
-        "AsyncIterable" |
-        "AsyncIterator" |
-        "Awaitable" |
-        "ByteString" |
-        "Callable" |
-        "Collection" |
-        "Container" |
-        "Coroutine" |
-        "Generator" |
-        "ItemsView" |
-        "Iterable" |
-        "Iterator" |
-        "KeysView" |
-        "Mapping" |
-        "MappingView" |
-        "MutableMapping" |
-        "MutableSequence" |
-        "MutableSet" |
-        "Reversible" |
-        "Sequence" |
-        "Set" |
-        "ValuesView" |
-        // `contextlib`
-        "AbstractAsyncContextManager" |
-        "AbstractContextManager" |
-        // `re`
-        "Match" |
-        "Pattern" |
-        // `typing`
-        "AbstractSet" |
-        "AsyncContextManager" |
-        "AsyncGenerator" |
-        "AsyncIterator" |
-        "Awaitable" |
-        "BinaryIO" |
-        "ByteString" |
-        "Callable" |
-        "ChainMap" |
-        "ClassVar" |
-        "Collection" |
-        "Concatenate" |
-        "Container" |
-        "ContextManager" |
-        "Coroutine" |
-        "Counter" |
-        "DefaultDict" |
-        "Deque" |
-        "Dict" |
-        "Final" |
-        "FrozenSet" |
-        "Generator" |
-        "Generic" |
-        "IO" |
-        "ItemsView" |
-        "Iterable" |
-        "Iterator" |
-        "KeysView" |
-        "List" |
-        "Mapping" |
-        "Match" |
-        "MutableMapping" |
-        "MutableSequence" |
-        "MutableSet" |
-        "Optional" |
-        "OrderedDict" |
-        "Pattern" |
-        "Reversible" |
-        "Sequence" |
-        "Set" |
-        "TextIO" |
-        "Tuple" |
-        "Type" |
-        "TypeGuard" |
-        "Union" |
-        "Unpack" |
-        "ValuesView" |
-        // `typing.io`
-        "BinaryIO" |
-        "IO" |
-        "TextIO" |
-        // `typing.re`
-        "Match" |
-        "Pattern" |
-        // `typing_extensions`
-        "AsyncContextManager" |
-        "AsyncGenerator" |
-        "AsyncIterable" |
-        "AsyncIterator" |
-        "Awaitable" |
-        "ChainMap" |
-        "ClassVar" |
-        "Concatenate" |
-        "ContextManager" |
-        "Coroutine" |
-        "Counter" |
-        "DefaultDict" |
-        "Deque" |
-        "Type" |
-        // `weakref`
-        "WeakKeyDictionary" |
-        "WeakSet" |
-        "WeakValueDictionary"
+        "dict"
+            | "AbstractAsyncContextManager"
+            | "AbstractContextManager"
+            | "AbstractSet"
+            | "AsyncContextManager"
+            | "AsyncGenerator"
+            | "AsyncIterable"
+            | "AsyncIterator"
+            | "Awaitable"
+            | "BinaryIO"
+            | "ByteString"
+            | "Callable"
+            | "ChainMap"
+            | "ClassVar"
+            | "Collection"
+            | "Concatenate"
+            | "Container"
+            | "ContextManager"
+            | "Coroutine"
+            | "Counter"
+            | "DefaultDict"
+            | "Deque"
+            | "Dict"
+            | "Final"
+            | "FrozenSet"
+            | "Generator"
+            | "Generic"
+            | "IO"
+            | "ItemsView"
+            | "Iterable"
+            | "Iterator"
+            | "KeysView"
+            | "List"
+            | "Mapping"
+            | "MappingView"
+            | "Match"
+            | "MutableMapping"
+            | "MutableSequence"
+            | "MutableSet"
+            | "Optional"
+            | "OrderedDict"
+            | "Pattern"
+            | "Reversible"
+            | "Sequence"
+            | "Set"
+            | "TextIO"
+            | "Tuple"
+            | "Type"
+            | "TypeGuard"
+            | "Union"
+            | "Unpack"
+            | "ValuesView"
+            | "WeakKeyDictionary"
+            | "WeakSet"
+            | "WeakValueDictionary"
+            | "defaultdict"
+            | "deque"
+            | "frozenset"
+            | "list"
+            | "set"
+            | "tuple"
+            | "type"
     )
 }
 
+/// Returns `true` if a name matches that of a generic from [PEP 593] (e.g. `Annotated`).
+///
+/// See: <https://docs.python.org/3/library/typing.html>
+///
+/// [PEP 593]: https://peps.python.org/pep-0593/
 pub fn is_pep_593_generic_member(member: &str) -> bool {
+    // Constructed by taking every pattern from `is_pep_593_generic`, removing all but
+    // the last element in each pattern, and de-duplicating the values.
     matches!(member, "Annotated")
 }
 
-pub fn is_immutable_type(call_path: &[&str]) -> bool {
+/// Returns `true` if a call path represents that of an immutable, non-generic type from the Python
+/// standard library (e.g. `int` or `str`).
+pub fn is_immutable_non_generic_type(call_path: &[&str]) -> bool {
     matches!(
         call_path,
         ["collections", "abc", "Sized"]
@@ -341,7 +289,9 @@ pub fn is_immutable_type(call_path: &[&str]) -> bool {
     )
 }
 
-pub fn is_immutable_generic(call_path: &[&str]) -> bool {
+/// Returns `true` if a call path represents that of an immutable, generic type from the Python
+/// standard library (e.g. `tuple`).
+pub fn is_immutable_generic_type(call_path: &[&str]) -> bool {
     matches!(
         call_path,
         ["", "tuple"]
@@ -377,52 +327,88 @@ pub fn is_immutable_generic(call_path: &[&str]) -> bool {
     )
 }
 
+/// Returns `true` if a call path represents a function from the Python standard library that
+/// returns a mutable value (e.g., `dict`).
+pub fn is_mutable_return_type(call_path: &[&str]) -> bool {
+    matches!(
+        call_path,
+        ["", "dict" | "list" | "set"]
+            | [
+                "collections",
+                "Counter" | "OrderedDict" | "defaultdict" | "deque"
+            ]
+    )
+}
+
+/// Returns `true` if a call path represents a function from the Python standard library that
+/// returns a immutable value (e.g., `bool`).
+pub fn is_immutable_return_type(call_path: &[&str]) -> bool {
+    matches!(
+        call_path,
+        ["datetime", "date" | "datetime" | "timedelta"]
+            | ["decimal", "Decimal"]
+            | ["fractions", "Fraction"]
+            | ["operator", "attrgetter" | "itemgetter" | "methodcaller"]
+            | ["pathlib", "Path"]
+            | ["types", "MappingProxyType"]
+            | ["re", "compile"]
+            | [
+                "",
+                "bool" | "complex" | "float" | "frozenset" | "int" | "str" | "tuple"
+            ]
+    )
+}
+
 type ModuleMember = (&'static str, &'static str);
 
-type SymbolReplacement = (ModuleMember, ModuleMember);
+/// Given a typing member, returns the module and member name for a generic from the Python standard
+/// library (e.g., `list` for `typing.List`), if such a generic was introduced by [PEP 585].
+///
+/// [PEP 585]: https://peps.python.org/pep-0585/
+pub fn as_pep_585_generic(module: &str, member: &str) -> Option<ModuleMember> {
+    match (module, member) {
+        ("typing", "Dict") => Some(("", "dict")),
+        ("typing", "FrozenSet") => Some(("", "frozenset")),
+        ("typing", "List") => Some(("", "list")),
+        ("typing", "Set") => Some(("", "set")),
+        ("typing", "Tuple") => Some(("", "tuple")),
+        ("typing", "Type") => Some(("", "type")),
+        ("typing_extensions", "Type") => Some(("", "type")),
+        ("typing", "Deque") => Some(("collections", "deque")),
+        ("typing_extensions", "Deque") => Some(("collections", "deque")),
+        ("typing", "DefaultDict") => Some(("collections", "defaultdict")),
+        ("typing_extensions", "DefaultDict") => Some(("collections", "defaultdict")),
+        _ => None,
+    }
+}
 
-// See: https://peps.python.org/pep-0585/
-pub const PEP_585_GENERICS: &[SymbolReplacement] = &[
-    (("typing", "Dict"), ("", "dict")),
-    (("typing", "FrozenSet"), ("", "frozenset")),
-    (("typing", "List"), ("", "list")),
-    (("typing", "Set"), ("", "set")),
-    (("typing", "Tuple"), ("", "tuple")),
-    (("typing", "Type"), ("", "type")),
-    (("typing_extensions", "Type"), ("", "type")),
-    (("typing", "Deque"), ("collections", "deque")),
-    (("typing_extensions", "Deque"), ("collections", "deque")),
-    (("typing", "DefaultDict"), ("collections", "defaultdict")),
-    (
-        ("typing_extensions", "DefaultDict"),
-        ("collections", "defaultdict"),
-    ),
-];
+/// Given a typing member, returns `true` if a generic equivalent exists in the Python standard
+/// library (e.g., `list` for `typing.List`), as introduced by [PEP 585].
+///
+/// [PEP 585]: https://peps.python.org/pep-0585/
+pub fn has_pep_585_generic(module: &str, member: &str) -> bool {
+    // Constructed by taking every pattern from `as_pep_585_generic`, removing all but
+    // the last element in each pattern, and de-duplicating the values.
+    matches!(
+        (module, member),
+        ("", "dict" | "frozenset" | "list" | "set" | "tuple" | "type")
+            | ("collections", "deque" | "defaultdict")
+    )
+}
 
-// See: https://github.com/JelleZijlstra/autotyping/blob/0adba5ba0eee33c1de4ad9d0c79acfd737321dd9/autotyping/autotyping.py#L69-L91
-pub static SIMPLE_MAGIC_RETURN_TYPES: Lazy<FxHashMap<&'static str, &'static str>> =
-    Lazy::new(|| {
-        FxHashMap::from_iter([
-            ("__str__", "str"),
-            ("__repr__", "str"),
-            ("__len__", "int"),
-            ("__length_hint__", "int"),
-            ("__init__", "None"),
-            ("__del__", "None"),
-            ("__bool__", "bool"),
-            ("__bytes__", "bytes"),
-            ("__format__", "str"),
-            ("__contains__", "bool"),
-            ("__complex__", "complex"),
-            ("__int__", "int"),
-            ("__float__", "float"),
-            ("__index__", "int"),
-            ("__setattr__", "None"),
-            ("__delattr__", "None"),
-            ("__setitem__", "None"),
-            ("__delitem__", "None"),
-            ("__set__", "None"),
-            ("__instancecheck__", "bool"),
-            ("__subclasscheck__", "bool"),
-        ])
-    });
+/// Returns the expected return type for a magic method.
+///
+/// See: <https://github.com/JelleZijlstra/autotyping/blob/0adba5ba0eee33c1de4ad9d0c79acfd737321dd9/autotyping/autotyping.py#L69-L91>
+pub fn simple_magic_return_type(method: &str) -> Option<&'static str> {
+    match method {
+        "__str__" | "__repr__" | "__format__" => Some("str"),
+        "__bytes__" => Some("bytes"),
+        "__len__" | "__length_hint__" | "__int__" | "__index__" => Some("int"),
+        "__float__" => Some("float"),
+        "__complex__" => Some("complex"),
+        "__bool__" | "__contains__" | "__instancecheck__" | "__subclasscheck__" => Some("bool"),
+        "__init__" | "__del__" | "__setattr__" | "__delattr__" | "__setitem__" | "__delitem__"
+        | "__set__" => Some("None"),
+        _ => None,
+    }
+}

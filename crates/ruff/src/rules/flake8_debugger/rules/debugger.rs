@@ -44,12 +44,6 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
 
 /// Checks for the presence of a debugger import.
 pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
-    // Special-case: allow `import builtins`, which is far more general than (e.g.)
-    // `import celery.contrib.rdb`).
-    if module.is_none() && name == "builtins" {
-        return None;
-    }
-
     if let Some(module) = module {
         let mut call_path: CallPath = from_unqualified_name(module);
         call_path.push(name);
@@ -63,10 +57,9 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
             ));
         }
     } else {
-        let mut call_path: CallPath = from_unqualified_name(name);
-        call_path.pop();
+        let call_path: CallPath = from_unqualified_name(name);
 
-        if is_debugger_call(&call_path) {
+        if is_debugger_import(&call_path) {
             return Some(Diagnostic::new(
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
@@ -81,9 +74,7 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
 fn is_debugger_call(call_path: &CallPath) -> bool {
     matches!(
         call_path.as_slice(),
-        ["pdb", "set_trace"]
-            | ["pudb", "set_trace"]
-            | ["ipdb", "set_trace"]
+        ["pdb" | "pudb" | "ipdb", "set_trace"]
             | ["ipdb", "sset_trace"]
             | ["IPython", "terminal", "embed", "InteractiveShellEmbed"]
             | [
@@ -91,10 +82,23 @@ fn is_debugger_call(call_path: &CallPath) -> bool {
                 "frontend",
                 "terminal",
                 "embed",
-                "InteractiveShellEmbed",
+                "InteractiveShellEmbed"
             ]
             | ["celery", "contrib", "rdb", "set_trace"]
-            | ["builtins", "breakpoint"]
-            | ["", "breakpoint"]
+            | ["builtins" | "", "breakpoint"]
+    )
+}
+
+fn is_debugger_import(call_path: &CallPath) -> bool {
+    // Constructed by taking every pattern in `is_debugger_call`, removing the last element in
+    // each pattern, and de-duplicating the values.
+    // As a special-case, we omit `builtins` to allow `import builtins`, which is far more general
+    // than (e.g.) `import celery.contrib.rdb`.
+    matches!(
+        call_path.as_slice(),
+        ["pdb" | "pudb" | "ipdb"]
+            | ["IPython", "terminal", "embed"]
+            | ["IPython", "frontend", "terminal", "embed",]
+            | ["celery", "contrib", "rdb"]
     )
 }

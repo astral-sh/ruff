@@ -3,19 +3,6 @@ use rustpython_parser::ast::{self, Expr};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::SemanticModel;
 
-/// Returns `true` if the given [`Expr`] resolves to an inherently mutable value, like a list.
-pub(super) fn is_mutable_expr(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::List(_)
-            | Expr::Dict(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::DictComp(_)
-            | Expr::SetComp(_)
-    )
-}
-
 /// Returns `true` if the given [`Expr`] is a `dataclasses.field` call.
 pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {

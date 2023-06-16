@@ -47,6 +47,7 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) 
             if checker
                 .semantic()
                 .resolve_call_path(func)
+                .as_ref()
                 .map_or(false, is_open_sleep_or_subprocess_call)
             {
                 checker.diagnostics.push(Diagnostic::new(
@@ -58,22 +59,21 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) 
     }
 }
 
-fn is_open_sleep_or_subprocess_call(call_path: CallPath) -> bool {
+fn is_open_sleep_or_subprocess_call(call_path: &CallPath) -> bool {
     matches!(
         call_path.as_slice(),
         ["", "open"]
             | ["time", "sleep"]
-            | ["subprocess", "run"]
-            | ["subprocess", "Popen"]
-            | ["subprocess", "call"]
-            | ["subprocess", "check_call"]
-            | ["subprocess", "check_output"]
-            | ["subprocess", "getoutput"]
-            | ["subprocess", "getstatusoutput"]
-            | ["os", "wait"]
-            | ["os", "wait3"]
-            | ["os", "wait4"]
-            | ["os", "waitid"]
-            | ["os", "waitpid"]
+            | [
+                "subprocess",
+                "run"
+                    | "Popen"
+                    | "call"
+                    | "check_call"
+                    | "check_output"
+                    | "getoutput"
+                    | "getstatusoutput"
+            ]
+            | ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"]
     )
 }

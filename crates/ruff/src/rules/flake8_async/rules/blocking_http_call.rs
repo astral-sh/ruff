@@ -41,28 +41,22 @@ impl Violation for BlockingHttpCallInAsyncFunction {
     }
 }
 
-fn is_blocking_http_call(call_path: CallPath) -> bool {
+fn is_blocking_http_call(call_path: &CallPath) -> bool {
     matches!(
         call_path.as_slice(),
         ["urllib", "request", "urlopen"]
-            | ["httpx", "get"]
-            | ["httpx", "post"]
-            | ["httpx", "delete"]
-            | ["httpx", "patch"]
-            | ["httpx", "put"]
-            | ["httpx", "head"]
-            | ["httpx", "connect"]
-            | ["httpx", "options"]
-            | ["httpx", "trace"]
-            | ["requests", "get"]
-            | ["requests", "post"]
-            | ["requests", "delete"]
-            | ["requests", "patch"]
-            | ["requests", "put"]
-            | ["requests", "head"]
-            | ["requests", "connect"]
-            | ["requests", "options"]
-            | ["requests", "trace"]
+            | [
+                "httpx" | "requests",
+                "get"
+                    | "post"
+                    | "delete"
+                    | "patch"
+                    | "put"
+                    | "head"
+                    | "connect"
+                    | "options"
+                    | "trace"
+            ]
     )
 }
 
@@ -73,6 +67,7 @@ pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
             if checker
                 .semantic()
                 .resolve_call_path(func)
+                .as_ref()
                 .map_or(false, is_blocking_http_call)
             {
                 checker.diagnostics.push(Diagnostic::new(

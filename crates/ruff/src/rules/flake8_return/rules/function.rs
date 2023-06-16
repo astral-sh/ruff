@@ -375,24 +375,11 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
         matches!(
             call_path.as_slice(),
-            // builtins
-            ["", "exit"] |
-                ["", "quit"] |
-                // stdlib
-                ["builtins", "exit"] |
-                ["builtins", "quit"] |
-                ["os", "_exit"] |
-                ["os", "abort"] |
-                ["posix", "_exit"] |
-                ["posix", "abort"] |
-                ["sys", "exit"] |
-                ["_thread", "exit"] |
-                ["_winapi", "ExitProcess"] |
-                // third-party modules
-                ["pytest", "exit"] |
-                ["pytest", "fail"] |
-                ["pytest", "skip"] |
-                ["pytest", "xfail"]
+            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
+                | ["" | "builtins", "quit"]
+                | ["os" | "posix", "_exit" | "abort"]
+                | ["_winapi", "ExitProcess"]
+                | ["pytest", "fail" | "skip" | "xfail"]
         ) || semantic.match_typing_call_path(&call_path, "assert_never")
     })
 }

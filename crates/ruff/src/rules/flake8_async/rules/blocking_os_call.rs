@@ -47,6 +47,7 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
             if checker
                 .semantic()
                 .resolve_call_path(func)
+                .as_ref()
                 .map_or(false, is_unsafe_os_method)
             {
                 checker
@@ -57,20 +58,23 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-fn is_unsafe_os_method(call_path: CallPath) -> bool {
+fn is_unsafe_os_method(call_path: &CallPath) -> bool {
     matches!(
         call_path.as_slice(),
-        ["os", "popen"]
-            | ["os", "posix_spawn"]
-            | ["os", "posix_spawnp"]
-            | ["os", "spawnl"]
-            | ["os", "spawnle"]
-            | ["os", "spawnlp"]
-            | ["os", "spawnlpe"]
-            | ["os", "spawnv"]
-            | ["os", "spawnve"]
-            | ["os", "spawnvp"]
-            | ["os", "spawnvpe"]
-            | ["os", "system"]
+        [
+            "os",
+            "popen"
+                | "posix_spawn"
+                | "posix_spawnp"
+                | "spawnl"
+                | "spawnle"
+                | "spawnlp"
+                | "spawnlpe"
+                | "spawnv"
+                | "spawnve"
+                | "spawnvp"
+                | "spawnvpe"
+                | "system"
+        ]
     )
 }

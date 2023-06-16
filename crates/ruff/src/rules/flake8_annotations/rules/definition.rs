@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
@@ -8,7 +8,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
-use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
+use ruff_python_stdlib::typing::simple_magic_return_type;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -667,9 +667,9 @@ pub(crate) fn definition(
                         stmt.identifier(checker.locator),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             fixes::add_return_annotation(checker.locator, stmt, "None")
+                                .map(Fix::suggested)
                         });
                     }
                     diagnostics.push(diagnostic);
@@ -683,11 +683,11 @@ pub(crate) fn definition(
                     },
                     stmt.identifier(checker.locator),
                 );
-                if let Some(return_type) = SIMPLE_MAGIC_RETURN_TYPES.get(name) {
-                    if checker.patch(diagnostic.kind.rule()) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                if checker.patch(diagnostic.kind.rule()) {
+                    if let Some(return_type) = simple_magic_return_type(name) {
+                        diagnostic.try_set_fix(|| {
                             fixes::add_return_annotation(checker.locator, stmt, return_type)
+                                .map(Fix::suggested)
                         });
                     }
                 }
