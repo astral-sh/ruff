@@ -138,11 +138,6 @@ impl<'a> LogicalLine<'a> {
         self.flags() == TokenFlags::COMMENT
     }
 
-    /// Returns `true` if this is a comment only line
-    pub(crate) fn is_empty(&self) -> bool {
-        self.tokens().iter().all(|token| token.kind.is_newline())
-    }
-
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
     pub(crate) fn text(&self) -> &'a str {
         let tokens = self.tokens();
@@ -430,6 +425,10 @@ struct LogicalLinesBuilder {
     tokens: Vec<LogicalLineToken>,
     lines: Vec<Line>,
     current_line: CurrentLine,
+    /// Number of consecutive blank lines.
+    current_blank_lines: u32,
+    /// Number of blank characters in the blank lines (\n vs \r\n for example).
+    current_blank_characters: u32,
 }
 
 impl LogicalLinesBuilder {
@@ -490,11 +489,23 @@ impl LogicalLinesBuilder {
     fn finish_line(&mut self) {
         let end = self.tokens.len() as u32;
         if self.current_line.tokens_start < end {
-            self.lines.push(Line {
-                flags: self.current_line.flags,
-                tokens_start: self.current_line.tokens_start,
-                tokens_end: end,
-            });
+            let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
+                .iter()
+                .all(|token| token.kind.is_newline());
+            if is_empty {
+                self.current_blank_lines += 1;
+                self.current_blank_characters += end - self.current_line.tokens_start;
+            } else {
+                self.lines.push(Line {
+                    flags: self.current_line.flags,
+                    preceding_blank_lines: self.current_blank_lines,
+                    preceding_blank_characters: self.current_blank_characters,
+                    tokens_start: self.current_line.tokens_start,
+                    tokens_end: end,
+                });
+                self.current_blank_lines = 0;
+                self.current_blank_characters = 0;
+            }
 
             self.current_line = CurrentLine {
                 flags: TokenFlags::default(),
@@ -517,6 +528,8 @@ impl LogicalLinesBuilder {
 #[derive(Debug, Clone)]
 struct Line {
     flags: TokenFlags,
+    preceding_blank_lines: u32,
+    preceding_blank_characters: u32,
     tokens_start: u32,
     tokens_end: u32,
 }
@@ -604,7 +617,7 @@ if False:
     print()
 "#
             .trim(),
-            &["if False:", "", "print()", ""],
+            &["if False:", "print()", ""],
         );
     }
 

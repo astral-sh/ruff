@@ -108,18 +108,16 @@ pub(crate) fn check_logical_lines(
 
         let indent_size = 4;
 
-        if !line.is_empty() {
-            for kind in indentation(
-                &line,
-                prev_line.as_ref(),
-                indent_char,
-                indent_level,
-                prev_indent_level,
-                indent_size,
-            ) {
-                if settings.rules.enabled(kind.rule()) {
-                    context.push(kind, range);
-                }
+        for kind in indentation(
+            &line,
+            prev_line.as_ref(),
+            indent_char,
+            indent_level,
+            prev_indent_level,
+            indent_size,
+        ) {
+            if settings.rules.enabled(kind.rule()) {
+                context.push(kind, range);
             }
         }
 
@@ -133,7 +131,7 @@ pub(crate) fn check_logical_lines(
             &mut context,
         );
 
-        if !line.is_comment_only() && !line.is_empty() {
+        if !line.is_comment_only() {
             prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
