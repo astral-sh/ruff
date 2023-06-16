@@ -10,6 +10,7 @@ remove_default.py:3:8: ICN001 `altair` should be imported as `alt`
 4 | import matplotlib.pyplot  # unconventional
 5 | import numpy  # not checked
   |
+  = help: Alias `altair` to `alt`
 
 remove_default.py:4:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
   |
@@ -19,6 +20,7 @@ remove_default.py:4:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
 5 | import numpy  # not checked
 6 | import pandas  # unconventional
   |
+  = help: Alias `matplotlib.pyplot` to `plt`
 
 remove_default.py:6:8: ICN001 `pandas` should be imported as `pd`
   |
@@ -28,6 +30,7 @@ remove_default.py:6:8: ICN001 `pandas` should be imported as `pd`
   |        ^^^^^^ ICN001
 7 | import seaborn  # unconventional
   |
+  = help: Alias `pandas` to `pd`
 
 remove_default.py:7:8: ICN001 `seaborn` should be imported as `sns`
   |
@@ -38,6 +41,7 @@ remove_default.py:7:8: ICN001 `seaborn` should be imported as `sns`
 8 | 
 9 | import altair as altr  # unconventional
   |
+  = help: Alias `seaborn` to `sns`
 
 remove_default.py:9:18: ICN001 `altair` should be imported as `alt`
    |
@@ -48,6 +52,7 @@ remove_default.py:9:18: ICN001 `altair` should be imported as `alt`
 10 | import matplotlib.pyplot as plot  # unconventional
 11 | import numpy as nmp  # not checked
    |
+   = help: Alias `altair` to `alt`
 
 remove_default.py:10:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
@@ -57,6 +62,7 @@ remove_default.py:10:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
 11 | import numpy as nmp  # not checked
 12 | import pandas as pdas  # unconventional
    |
+   = help: Alias `matplotlib.pyplot` to `plt`
 
 remove_default.py:12:18: ICN001 `pandas` should be imported as `pd`
    |
@@ -66,6 +72,7 @@ remove_default.py:12:18: ICN001 `pandas` should be imported as `pd`
    |                  ^^^^ ICN001
 13 | import seaborn as sbrn  # unconventional
    |
+   = help: Alias `pandas` to `pd`
 
 remove_default.py:13:19: ICN001 `seaborn` should be imported as `sns`
    |
@@ -76,5 +83,6 @@ remove_default.py:13:19: ICN001 `seaborn` should be imported as `sns`
 14 | 
 15 | import altair as alt  # conventional
    |
+   = help: Alias `seaborn` to `sns`
 
 
