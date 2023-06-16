@@ -1,21 +1,41 @@
 //! Code modification struct to support symbol renaming within a scope.
 
 use anyhow::{anyhow, Result};
+use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
-use ruff_python_semantic::{Binding, BindingKind, Scope, SemanticModel};
+use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
 
 pub(crate) struct Renamer;
 
 impl Renamer {
-    /// Rename a symbol (from `name` to `target`) within a [`Scope`].
+    /// Rename a symbol (from `name` to `target`).
     ///
     /// ## How it works
     ///
     /// The renaming algorithm is as follows:
     ///
-    /// 1. Start with the first [`Binding`] in the scope, for the given name. For example, in the
-    ///    following snippet, we'd start by examining the `x = 1` binding:
+    /// 1. Determine the scope in which the rename should occur. This is typically the scope passed
+    ///    in by the caller. However, if a symbol is `nonlocal` or `global`, then the rename needs
+    ///    to occur in the scope in which the symbol is declared. For example, attempting to rename
+    ///    `x` in `foo` below should trigger a rename in the module scope:
+    ///
+    /// ```python
+    /// x = 1
+    ///
+    /// def foo():
+    ///     global x
+    ///     x = 2
+    /// ```
+    ///
+    /// 1. Determine whether the symbol is rebound in another scope. This is effectively the inverse
+    ///    of the previous step: when attempting to rename `x` in the module scope, we need to
+    ///    detect that `x` is rebound in the `foo` scope. Determine every scope in which the symbol
+    ///    is rebound, and add it to the set of scopes in which the rename should occur.
+    ///
+    /// 1. Start with the first scope in the stack. Take the first [`Binding`] in the scope, for the
+    ///    given name. For example, in the following snippet, we'd start by examining the `x = 1`
+    ///    binding:
     ///
     /// ```python
     /// if True:
@@ -28,7 +48,7 @@ impl Renamer {
     /// print(x)
     /// ```
     ///
-    /// 2. Rename the [`Binding`]. In most cases, this is a simple replacement. For example,
+    /// 1. Rename the [`Binding`]. In most cases, this is a simple replacement. For example,
     ///    renaming `x` to `y` above would require replacing `x = 1` with `y = 1`. After the
     ///    first replacement in the snippet above, we'd have:
     ///
@@ -47,7 +67,7 @@ impl Renamer {
     ///    example, to rename `pandas` to `pd`, we may need to rewrite `import pandas` to
     ///    `import pandas as pd`, rather than `import pd`.
     ///
-    /// 3. Rename every reference to the [`Binding`]. For example, renaming the references to the
+    /// 1. Rename every reference to the [`Binding`]. For example, renaming the references to the
     ///    `x = 1` binding above would give us:
     ///
     /// ```python
@@ -61,9 +81,9 @@ impl Renamer {
     /// print(x)
     /// ```
     ///
-    /// 4. Rename every delayed annotation. (See [`SemanticModel::delayed_annotations`].)
+    /// 1. Rename every delayed annotation. (See [`SemanticModel::delayed_annotations`].)
     ///
-    /// 5. Repeat the above process for every [`Binding`] in the scope with the given name.
+    /// 1. Repeat the above process for every [`Binding`] in the scope with the given name.
     ///    After renaming the `x = 2` binding, we'd have:
     ///
     /// ```python
@@ -77,23 +97,89 @@ impl Renamer {
     /// print(y)
     /// ```
     ///
-    /// ## Limitations
-    ///
-    /// `global` and `nonlocal` declarations are not yet supported.
-    ///
-    /// `global` and `nonlocal` declarations add some additional complexity. If we're renaming a
-    /// name that's declared as `global` or `nonlocal` in a child scope, we need to rename the name
-    /// in that scope too, repeating the above process.
-    ///
-    /// If we're renaming a name that's declared as `global` or `nonlocal` in the current scope,
-    /// then we need to identify the scope in which the name is declared, and perform the rename
-    /// in that scope instead (which will in turn trigger the above process on the current scope).
+    /// 1. Repeat the above process for every scope in the stack.
     pub(crate) fn rename(
         name: &str,
         target: &str,
         scope: &Scope,
         semantic: &SemanticModel,
     ) -> Result<(Edit, Vec<Edit>)> {
+        let mut edits = vec![];
+
+        // Determine whether the symbol is `nonlocal` or `global`. (A symbol can't be both; Python
+        // raises a `SyntaxError`.) If the symbol is `nonlocal` or `global`, we need to rename it in
+        // the scope in which it's declared, rather than the current scope. For example, given:
+        //
+        // ```python
+        // x = 1
+        //
+        // def foo():
+        //     global x
+        // ```
+        //
+        // When renaming `x` in `foo`, we detect that `x` is a global, and back out to the module
+        // scope.
+        let scope_id = scope.get_all(name).find_map(|binding_id| {
+            let binding = semantic.binding(binding_id);
+            match binding.kind {
+                BindingKind::Global => Some(ScopeId::global()),
+                BindingKind::Nonlocal(symbol_id) => Some(symbol_id),
+                _ => None,
+            }
+        });
+
+        let scope = scope_id.map_or(scope, |scope_id| &semantic.scopes[scope_id]);
+        edits.extend(Renamer::rename_in_scope(name, target, scope, semantic));
+
+        // Find any scopes in which the symbol is referenced as `nonlocal` or `global`. For example,
+        // given:
+        //
+        // ```python
+        // x = 1
+        //
+        // def foo():
+        //     global x
+        //
+        // def bar():
+        //     global x
+        // ```
+        //
+        // When renaming `x` in `foo`, we detect that `x` is a global, and back out to the module
+        // scope. But we need to rename `x` in `bar` too.
+        //
+        // Note that it's impossible for a symbol to be referenced as both `nonlocal` and `global`
+        // in the same program. If a symbol is referenced as `global`, then it must be defined in
+        // the module scope. If a symbol is referenced as `nonlocal`, then it _can't_ be defined in
+        // the module scope (because `nonlocal` can only be used in a nested scope).
+        for scope_id in scope
+            .get_all(name)
+            .filter_map(|binding_id| semantic.rebinding_scopes(binding_id))
+            .flatten()
+            .dedup()
+            .copied()
+        {
+            let scope = &semantic.scopes[scope_id];
+            edits.extend(Renamer::rename_in_scope(name, target, scope, semantic));
+        }
+
+        // Deduplicate any edits.
+        edits.sort();
+        edits.dedup();
+
+        let edit = edits
+            .pop()
+            .ok_or(anyhow!("Unable to rename any references to `{name}`"))?;
+
+        Ok((edit, edits))
+    }
+
+    /// Rename a symbol in a single [`Scope`].
+    fn rename_in_scope(
+        name: &str,
+        target: &str,
+        scope: &Scope,
+        semantic: &SemanticModel,
+    ) -> Vec<Edit> {
         let mut edits = vec![];
 
         // Iterate over every binding to the name in the scope.
@@ -125,10 +211,7 @@ impl Renamer {
         edits.sort();
         edits.dedup();
 
-        let edit = edits
-            .pop()
-            .ok_or(anyhow!("Unable to rename any references to `{name}`"))?;
-        Ok((edit, edits))
+        edits
     }
 
     /// Rename a [`Binding`] reference.
@@ -164,7 +247,7 @@ impl Renamer {
             | BindingKind::Assignment
             | BindingKind::LoopVar
             | BindingKind::Global
-            | BindingKind::Nonlocal
+            | BindingKind::Nonlocal(_)
             | BindingKind::ClassDefinition
             | BindingKind::FunctionDefinition
             | BindingKind::Deletion

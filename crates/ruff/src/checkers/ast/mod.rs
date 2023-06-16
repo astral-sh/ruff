@@ -254,6 +254,12 @@ where
                 let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
+                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                            // Mark the binding in the global scope as "rebound" in the current scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+                        }
+
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
                             *range,
@@ -264,6 +270,7 @@ where
                         scope.add(name, binding_id);
                     }
                 }
+
                 if self.enabled(Rule::AmbiguousVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
@@ -275,33 +282,27 @@ where
                 let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        // Add a binding to the current scope.
-                        let binding_id = self.semantic.push_binding(
-                            *range,
-                            BindingKind::Nonlocal,
-                            BindingFlags::empty(),
-                        );
-                        let scope = self.semantic.scope_mut();
-                        scope.add(name, binding_id);
-                    }
-
-                    // Mark the binding in the defining scopes as used too. (Skip the global scope
-                    // and the current scope, and, per standard resolution rules, any class scopes.)
-                    for (name, range) in names.iter().zip(ranges.iter()) {
-                        let binding_id = self
-                            .semantic
-                            .scopes
-                            .ancestors(self.semantic.scope_id)
-                            .skip(1)
-                            .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
-                            .find_map(|scope| scope.get(name.as_str()));
-
-                        if let Some(binding_id) = binding_id {
+                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
+                            // Mark the binding as "used".
                             self.semantic.add_local_reference(
                                 binding_id,
-                                stmt.range(),
+                                *range,
                                 ExecutionContext::Runtime,
                             );
+
+                            // Mark the binding in the enclosing scope as "rebound" in the current
+                            // scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+
+                            // Add a binding to the current scope.
+                            let binding_id = self.semantic.push_binding(
+                                *range,
+                                BindingKind::Nonlocal(scope_id),
+                                BindingFlags::empty(),
+                            );
+                            let scope = self.semantic.scope_mut();
+                            scope.add(name, binding_id);
                         } else {
                             if self.enabled(Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
@@ -4283,7 +4284,7 @@ impl<'a> Checker<'a> {
                 BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException => {
                     // Avoid overriding builtins.
                 }
-                kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
+                kind @ (BindingKind::Global | BindingKind::Nonlocal(_)) => {
                     // If the original binding was a global or nonlocal, then the new binding is
                     // too.
                     let references = shadowed.references.clone();

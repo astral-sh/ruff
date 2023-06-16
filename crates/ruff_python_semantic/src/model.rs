@@ -73,7 +73,7 @@ pub struct SemanticModel<'a> {
 
     /// Map from binding index to indexes of bindings that annotate it (in the same scope).
     ///
-    /// For example:
+    /// For example, given:
     /// ```python
     /// x = 1
     /// x: int
@@ -93,6 +93,21 @@ pub struct SemanticModel<'a> {
     /// as a delayed annotation. Annotations are thus treated as bindings only when they are the
     /// first binding in a scope; any annotations that follow are treated as "delayed" annotations.
     delayed_annotations: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
+
+    /// Map from binding ID to the IDs of all scopes in which it is declared a `global` or
+    /// `nonlocal`.
+    ///
+    /// For example, given:
+    /// ```python
+    /// x = 1
+    ///
+    /// def f():
+    ///    global x
+    /// ```
+    ///
+    /// In this case, the binding created by `x = 1` is rebound within the scope created by `f`
+    /// by way of the `global x` statement.
+    rebinding_scopes: HashMap<BindingId, Vec<ScopeId>, BuildNoHashHasher<BindingId>>,
 
     /// Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
@@ -123,6 +138,7 @@ impl<'a> SemanticModel<'a> {
             globals: GlobalsArena::default(),
             shadowed_bindings: IntMap::default(),
             delayed_annotations: IntMap::default(),
+            rebinding_scopes: IntMap::default(),
             body: &[],
             body_index: 0,
             flags: SemanticModelFlags::new(path),
@@ -699,6 +715,26 @@ impl<'a> SemanticModel<'a> {
         self.globals[global_id].get(name).copied()
     }
 
+    /// Given a `name` that has been declared `nonlocal`, return the [`ScopeId`] and [`BindingId`]
+    /// to which it refers.
+    ///
+    /// Unlike `global` declarations, for which the scope is unambiguous, Python requires that
+    /// `nonlocal` declarations refer to the closest enclosing scope that contains a binding for
+    /// the given name.
+    pub fn nonlocal(&self, name: &str) -> Option<(ScopeId, BindingId)> {
+        self.scopes
+            .ancestor_ids(self.scope_id)
+            .skip(1)
+            .find_map(|scope_id| {
+                let scope = &self.scopes[scope_id];
+                if scope.kind.is_module() || scope.kind.is_class() {
+                    None
+                } else {
+                    scope.get(name).map(|binding_id| (scope_id, binding_id))
+                }
+            })
+    }
+
     /// Return `true` if the given [`ScopeId`] matches that of the current scope.
     pub fn is_current_scope(&self, scope_id: ScopeId) -> bool {
         self.scope_id == scope_id
@@ -764,6 +800,21 @@ impl<'a> SemanticModel<'a> {
     /// Return the list of delayed annotations for the given [`BindingId`].
     pub fn delayed_annotations(&self, binding_id: BindingId) -> Option<&[BindingId]> {
         self.delayed_annotations.get(&binding_id).map(Vec::as_slice)
+    }
+
+    /// Mark the given [`BindingId`] as rebound in the given [`ScopeId`] (i.e., declared as
+    /// `global` or `nonlocal`).
+    pub fn add_rebinding_scope(&mut self, binding_id: BindingId, scope_id: ScopeId) {
+        self.rebinding_scopes
+            .entry(binding_id)
+            .or_insert_with(Vec::new)
+            .push(scope_id);
+    }
+
+    /// Return the list of [`ScopeId`]s in which the given [`BindingId`] is rebound (i.e., declared
+    /// as `global` or `nonlocal`).
+    pub fn rebinding_scopes(&self, binding_id: BindingId) -> Option<&[ScopeId]> {
+        self.rebinding_scopes.get(&binding_id).map(Vec::as_slice)
     }
 
     /// Return the [`ExecutionContext`] of the current scope.
