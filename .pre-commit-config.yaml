@@ -39,11 +39,6 @@ repos:
         entry: cargo fmt --
         language: system
         types: [rust]
-      - id: clippy
-        name: clippy
-        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
-        language: system
-        pass_filenames: false
       - id: ruff
         name: ruff
         entry: cargo run -p ruff_cli -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
@@ -69,4 +64,4 @@ repos:
       - id: black
 
 ci:
-  skip: [cargo-fmt, clippy, dev-generate-all]
+  skip: [cargo-fmt, dev-generate-all]
