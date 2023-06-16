@@ -4,6 +4,8 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use ruff::logging::{set_up_logging, LogLevel};
+use ruff_cli::check;
 
 mod generate_all;
 mod generate_cli_help;
@@ -48,6 +50,16 @@ enum Command {
     PrintTokens(print_tokens::Args),
     /// Run round-trip source code generation on a given Python file.
     RoundTrip(round_trip::Args),
+    /// Run a ruff command n times for profiling/benchmarking
+    Repeat {
+        #[clap(flatten)]
+        args: ruff_cli::args::CheckArgs,
+        #[clap(flatten)]
+        log_level_args: ruff_cli::args::LogLevelArgs,
+        /// Run this many times
+        #[clap(long, short = 'n')]
+        repeat: usize,
+    },
 }
 
 fn main() -> Result<()> {
@@ -64,6 +76,17 @@ fn main() -> Result<()> {
         Command::PrintCST(args) => print_cst::main(args)?,
         Command::PrintTokens(args) => print_tokens::main(args)?,
         Command::RoundTrip(args) => round_trip::main(args)?,
+        Command::Repeat {
+            args,
+            repeat,
+            log_level_args,
+        } => {
+            let log_level = LogLevel::from(log_level_args);
+            set_up_logging(&log_level)?;
+            for _ in 0..*repeat {
+                check(args.clone(), log_level)?;
+            }
+        }
     }
     Ok(())
 }

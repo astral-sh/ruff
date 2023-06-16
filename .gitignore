@@ -6,6 +6,11 @@ github_search*.jsonl
 schemastore
 .venv*
 scratch.py
+perf.data
+perf.data.old
+flamegraph.svg
+# Additional target directories that don't invalidate the main compile cache when changing linker settings
+/target*
 
 ###
 # Rust.gitignore
