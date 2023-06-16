@@ -29,6 +29,7 @@ struct Args {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Command {
     /// Run all code and documentation generation steps.
     GenerateAll(generate_all::Args),
