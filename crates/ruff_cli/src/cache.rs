@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
@@ -28,6 +29,13 @@ pub(crate) struct PackageCache {
     /// Not stored on disk, just used as a storage location.
     #[serde(skip)]
     path: PathBuf,
+    /// Boolean indicating the cache has been changed, used by
+    /// [`PackageCache::store`] to determine if we need to write the change back
+    /// to disk or not.
+    ///
+    /// Not stored on disk.
+    #[serde(skip)]
+    changed: AtomicBool,
     /// Path to the root of the package.
     ///
     /// Usually this is a directory, but it can also be a single file in case of
@@ -90,13 +98,24 @@ impl PackageCache {
     pub(crate) fn empty(path: PathBuf, package_root: PathBuf) -> PackageCache {
         PackageCache {
             path,
+            changed: AtomicBool::new(false),
             package_root,
             files: Mutex::new(HashMap::new()),
         }
     }
 
     /// Store the cache to disk.
+    ///
+    /// # Notes
+    ///
+    /// This does not write the cache back to disk if it has not been changed.
     pub(crate) fn store(&self) -> Result<()> {
+        if !self.changed.load(Ordering::Acquire) {
+            // No changes made, no need to write the same cache file back to
+            // disk.
+            return Ok(());
+        }
+
         let file = File::create(&self.path)
             .with_context(|| format!("Failed to create cache file '{}'", self.path.display()))?;
         let writer = BufWriter::new(file);
@@ -139,12 +158,21 @@ impl PackageCache {
 
     /// Add or update a file cache at `path` relative to the package root.
     pub(crate) fn update(&self, path: RelativePathBuf, file: FileCache) {
+        self.set_changed();
         self.files.lock().unwrap().insert(path, file);
     }
 
     /// Remove a file cache at `path` relative to the package root.
     pub(crate) fn remove(&self, path: &RelativePath) {
+        self.set_changed();
         self.files.lock().unwrap().remove(path);
+    }
+
+    /// Mark the cache as changed, indicting we need to write it to disk again.
+    fn set_changed(&self) {
+        if !self.changed.load(Ordering::Relaxed) {
+            self.changed.store(true, Ordering::Release);
+        }
     }
 }
 
