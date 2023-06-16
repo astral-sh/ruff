@@ -2,6 +2,7 @@ use rustpython_parser::ast::{Arg, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::str;
 
 use crate::settings::types::IdentifierPattern;
 
@@ -58,7 +59,7 @@ pub(crate) fn invalid_argument_name(
     {
         return None;
     }
-    if name.to_lowercase() != name {
+    if !str::is_lowercase(name) {
         return Some(Diagnostic::new(
             InvalidArgumentName {
                 name: name.to_string(),

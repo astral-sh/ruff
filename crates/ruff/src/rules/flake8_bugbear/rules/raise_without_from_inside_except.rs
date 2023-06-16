@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_stdlib::str::is_lower;
+use ruff_python_stdlib::str::is_cased_lowercase;
 
 use crate::checkers::ast::Checker;
 
@@ -33,7 +33,7 @@ pub(crate) fn raise_without_from_inside_except(checker: &mut Checker, body: &[St
         if cause.is_none() {
             if let Some(exc) = exc {
                 match exc {
-                    Expr::Name(ast::ExprName { id, .. }) if is_lower(id) => {}
+                    Expr::Name(ast::ExprName { id, .. }) if is_cased_lowercase(id) => {}
                     _ => {
                         checker
                             .diagnostics
