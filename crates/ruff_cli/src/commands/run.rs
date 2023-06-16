@@ -23,7 +23,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::SourceFileBuilder;
 
 use crate::args::Overrides;
-use crate::cache::{self, PackageCache};
+use crate::cache::{self, Cache};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
@@ -78,8 +78,8 @@ pub(crate) fn run(
         pyproject_config,
     );
 
-    // The package caches are created lazily below.
-    let package_caches = bool::from(cache).then(|| Mutex::new(HashMap::new()));
+    // The caches are read/created lazily below.
+    let caches = bool::from(cache).then(|| Mutex::new(HashMap::new()));
 
     let start = Instant::now();
     let mut diagnostics: Diagnostics = paths
@@ -109,17 +109,17 @@ pub(crate) fn run(
                     // while block only the thread interested in the same
                     // package cache.
                     let package_root = package.unwrap_or(path);
-                    let package_cache_init = package_caches.as_ref().map(|package_caches| {
-                        package_caches
+                    let cache_init = caches.as_ref().map(|caches| {
+                        caches
                             .lock()
                             .unwrap()
                             .entry(package_root)
                             .or_insert_with(|| Arc::new(OnceLock::new()))
                             .clone()
                     });
-                    let package_cache = package_cache_init.as_ref().map(|package_cache| {
-                        package_cache.get_or_init(|| {
-                            PackageCache::open(
+                    let cache = cache_init.as_ref().map(|cache| {
+                        cache.get_or_init(|| {
+                            Cache::open(
                                 &settings.cli.cache_dir,
                                 package_root.to_owned(),
                                 &settings.lib,
@@ -127,7 +127,7 @@ pub(crate) fn run(
                         })
                     });
 
-                    lint_path(path, package, settings, package_cache, noqa, autofix).map_err(|e| {
+                    lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
@@ -184,15 +184,15 @@ pub(crate) fn run(
 
     diagnostics.messages.sort();
 
-    // Store the package caches.
-    if let Some(package_caches) = package_caches {
-        package_caches
+    // Store the caches.
+    if let Some(caches) = caches {
+        caches
             .into_inner()
             .unwrap()
-            .par_iter()
-            .try_for_each(|(_, package_cache)| {
-                if let Some(package_cache) = package_cache.get() {
-                    package_cache.store()
+            .par_iter_mut()
+            .try_for_each(|(_, cache)| {
+                if let Some(cache) = Arc::get_mut(cache).and_then(|c| c.take()) {
+                    cache.store()
                 } else {
                     Ok(())
                 }
@@ -211,12 +211,12 @@ fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
-    package_cache: Option<&PackageCache>,
+    cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, package_cache, noqa, autofix)
+        crate::diagnostics::lint_path(path, package, settings, cache, noqa, autofix)
     });
 
     match result {

@@ -3,7 +3,6 @@ use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
@@ -21,40 +20,44 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::diagnostics::Diagnostics;
 
-/// On disk representation of a cache of a package.
-#[derive(Deserialize, Debug, Serialize)]
-pub(crate) struct PackageCache {
+/// [`Path`] that is relative to the package root in [`PackageCache`].
+pub(crate) type RelativePath = Path;
+/// [`PathBuf`] that is relative to the package root in [`PackageCache`].
+pub(crate) type RelativePathBuf = PathBuf;
+
+/// Cache.
+///
+/// `Cache` holds everything required to display the diagnostics for a single
+/// package. The on-disk representation is represented in `PackageCache` (and
+/// related) types.
+///
+/// This type manages the cache file, reading it from disk and writing it back
+/// to disk (if required).
+pub(crate) struct Cache {
     /// Location of the cache.
-    ///
-    /// Not stored on disk, just used as a storage location.
-    #[serde(skip)]
     path: PathBuf,
-    /// Boolean indicating the cache has been changed, used by
-    /// [`PackageCache::store`] to determine if we need to write the change back
-    /// to disk or not.
+    /// Package cache read from disk.
+    package: PackageCache,
+    /// Changes made compared to the (old) `package`.
     ///
-    /// Not stored on disk.
-    #[serde(skip)]
-    changed: AtomicBool,
-    /// Path to the root of the package.
-    ///
-    /// Usually this is a directory, but it can also be a single file in case of
-    /// single file "packages", e.g. scripts.
-    package_root: PathBuf,
-    /// Mapping of source file path to it's cached data.
-    // TODO: look into concurrent hashmap or similar instead of a mutex.
-    files: Mutex<HashMap<RelativePathBuf, FileCache>>,
+    /// Recreated [`PackageCache::files`] which only contains the cache for
+    /// source file that still exist.
+    new_files: Mutex<HashMap<RelativePathBuf, FileCache>>,
 }
 
-impl PackageCache {
-    /// Open or create a new package cache.
+impl Cache {
+    /// Open or create a new cache.
     ///
-    /// `package_root` must be canonicalized.
-    pub(crate) fn open(
-        cache_dir: &Path,
-        package_root: PathBuf,
-        settings: &Settings,
-    ) -> PackageCache {
+    /// `cache_dir` is considered the root directory of the cache, which can be
+    /// local the project, global or otherwise set by the user.
+    ///
+    /// `package_root` is the path to root of the package that is contained
+    /// within this cache must be canonicalized (to avoid considering `./` and
+    /// `../project` being different).
+    ///
+    /// Finally `settings` is used to ensure we don't open a cache for different
+    /// settings.
+    pub(crate) fn open(cache_dir: &Path, package_root: PathBuf, settings: &Settings) -> Cache {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let mut buf = itoa::Buffer::new();
@@ -65,61 +68,66 @@ impl PackageCache {
             Ok(file) => file,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // No cache exist yet, return an empty cache.
-                return PackageCache::empty(path, package_root);
+                return Cache::empty(path, package_root);
             }
             Err(err) => {
                 warn_user!("Failed to open cache file '{}': {err}", path.display());
-                return PackageCache::empty(path, package_root);
+                return Cache::empty(path, package_root);
             }
         };
 
-        let mut cache: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
-            Ok(cache) => cache,
+        let mut package: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
+            Ok(package) => package,
             Err(err) => {
                 warn_user!("Failed parse cache file '{}': {err}", path.display());
-                return PackageCache::empty(path, package_root);
+                return Cache::empty(path, package_root);
             }
         };
 
         // Sanity check.
-        if cache.package_root != package_root {
+        if package.package_root != package_root {
             warn_user!(
                 "Different package root in cache: expected '{}', got '{}'",
                 package_root.display(),
-                cache.package_root.display(),
+                package.package_root.display(),
             );
-            cache.files.lock().unwrap().clear();
+            package.files.clear();
         }
-
-        cache.path = path;
-        cache
-    }
-
-    pub(crate) fn empty(path: PathBuf, package_root: PathBuf) -> PackageCache {
-        PackageCache {
+        Cache {
             path,
-            changed: AtomicBool::new(false),
-            package_root,
-            files: Mutex::new(HashMap::new()),
+            package,
+            new_files: Mutex::new(HashMap::new()),
         }
     }
 
-    /// Store the cache to disk.
-    ///
-    /// # Notes
-    ///
-    /// This does not write the cache back to disk if it has not been changed.
-    pub(crate) fn store(&self) -> Result<()> {
-        if !self.changed.load(Ordering::Acquire) {
+    /// Create an empty `Cache`.
+    fn empty(path: PathBuf, package_root: PathBuf) -> Cache {
+        Cache {
+            path,
+            package: PackageCache {
+                package_root,
+                files: HashMap::new(),
+            },
+            new_files: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Store the cache to disk, if it has been changed.
+    pub(crate) fn store(mut self) -> Result<()> {
+        let new_files = self.new_files.into_inner().unwrap();
+        if new_files.is_empty() {
             // No changes made, no need to write the same cache file back to
             // disk.
             return Ok(());
         }
 
+        // Add/overwrite the changes made.
+        self.package.files.extend(new_files);
+
         let file = File::create(&self.path)
             .with_context(|| format!("Failed to create cache file '{}'", self.path.display()))?;
         let writer = BufWriter::new(file);
-        bincode::serialize_into(writer, &self).with_context(|| {
+        bincode::serialize_into(writer, &self.package).with_context(|| {
             format!(
                 "Failed to serialise cache to file '{}'",
                 self.path.display()
@@ -131,7 +139,7 @@ impl PackageCache {
     ///
     /// Returns `None` if `path` is not within the package.
     pub(crate) fn relative_path<'a>(&self, path: &'a Path) -> Option<&'a RelativePath> {
-        path.strip_prefix(&self.package_root).ok()
+        path.strip_prefix(&self.package.package_root).ok()
     }
 
     /// Get the cached results for a single file at relative `path`. This uses
@@ -144,42 +152,34 @@ impl PackageCache {
         &self,
         path: &RelativePath,
         file_last_modified: SystemTime,
-    ) -> Option<FileCache> {
-        let files = self.files.lock().unwrap();
-        let file = files.get(path)?;
+    ) -> Option<&FileCache> {
+        let file = self.package.files.get(path)?;
 
         // Make sure the file hasn't changed since the cached run.
         if file.last_modified != file_last_modified {
             return None;
         }
 
-        Some(file.clone())
+        Some(file)
     }
 
     /// Add or update a file cache at `path` relative to the package root.
     pub(crate) fn update(&self, path: RelativePathBuf, file: FileCache) {
-        self.set_changed();
-        self.files.lock().unwrap().insert(path, file);
-    }
-
-    /// Remove a file cache at `path` relative to the package root.
-    pub(crate) fn remove(&self, path: &RelativePath) {
-        self.set_changed();
-        self.files.lock().unwrap().remove(path);
-    }
-
-    /// Mark the cache as changed, indicting we need to write it to disk again.
-    fn set_changed(&self) {
-        if !self.changed.load(Ordering::Relaxed) {
-            self.changed.store(true, Ordering::Release);
-        }
+        self.new_files.lock().unwrap().insert(path, file);
     }
 }
 
-/// [`Path`] that is relative to the package root in [`PackageCache`].
-pub(crate) type RelativePath = Path;
-/// [`PathBuf`] that is relative to the package root in [`PackageCache`].
-pub(crate) type RelativePathBuf = PathBuf;
+/// On disk representation of a cache of a package.
+#[derive(Deserialize, Debug, Serialize)]
+struct PackageCache {
+    /// Path to the root of the package.
+    ///
+    /// Usually this is a directory, but it can also be a single file in case of
+    /// single file "packages", e.g. scripts.
+    package_root: PathBuf,
+    /// Mapping of source file path to it's cached data.
+    files: HashMap<RelativePathBuf, FileCache>,
+}
 
 /// On disk representation of the cache per source file.
 #[derive(Clone, Deserialize, Debug, Serialize)]
@@ -237,23 +237,23 @@ impl FileCache {
     }
 
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
-    pub(crate) fn into_diagnostics(self, path: &Path) -> Diagnostics {
+    pub(crate) fn into_diagnostics(&self, path: &Path) -> Diagnostics {
         let messages = if self.messages.is_empty() {
             Vec::new()
         } else {
-            let file = SourceFileBuilder::new(path.to_string_lossy(), self.source).finish();
+            let file = SourceFileBuilder::new(path.to_string_lossy(), &*self.source).finish();
             self.messages
-                .into_iter()
+                .iter()
                 .map(|msg| Message {
-                    kind: msg.kind,
+                    kind: msg.kind.clone(),
                     range: msg.range,
-                    fix: msg.fix,
+                    fix: msg.fix.clone(),
                     file: file.clone(),
                     noqa_offset: msg.noqa_offset,
                 })
                 .collect()
         };
-        Diagnostics::new(messages, self.imports)
+        Diagnostics::new(messages, self.imports.clone())
     }
 }
 
