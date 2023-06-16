@@ -1,22 +1,81 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI025.pyi:4:29: PYI025 Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
-  |
-4 | from collections.abc import Set  # PYI025
-  |                             ^^^ PYI025
-  |
-  = help: Alias `Set` to `AbstractSet`
-
-PYI025.pyi:10:5: PYI025 Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025.pyi:8:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
    |
- 8 |     Container,
- 9 |     Sized,
-10 |     Set,  # PYI025
-   |     ^^^ PYI025
-11 |     ValuesView
-12 | )
+ 7 | def f():
+ 8 |     from collections.abc import Set  # PYI025
+   |                                 ^^^ PYI025
+ 9 | 
+10 | def f():
    |
    = help: Alias `Set` to `AbstractSet`
+
+ℹ Suggested fix
+5 5 |     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
+6 6 | 
+7 7 | def f():
+8   |-    from collections.abc import Set  # PYI025
+  8 |+    from collections.abc import Set as AbstractSet  # PYI025
+9 9 | 
+10 10 | def f():
+11 11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
+
+PYI025.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+   |
+10 | def f():
+11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
+   |                                                   ^^^ PYI025
+12 | 
+13 | def f():
+   |
+   = help: Alias `Set` to `AbstractSet`
+
+ℹ Suggested fix
+8  8  |     from collections.abc import Set  # PYI025
+9  9  | 
+10 10 | def f():
+11    |-    from collections.abc import Container, Sized, Set, ValuesView  # PYI025
+   11 |+    from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
+12 12 | 
+13 13 | def f():
+14 14 |     if True:
+
+PYI025.pyi:15:37: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+   |
+13 | def f():
+14 |     if True:
+15 |         from collections.abc import Set
+   |                                     ^^^ PYI025
+16 |     else:
+17 |         Set = 1
+   |
+   = help: Alias `Set` to `AbstractSet`
+
+ℹ Suggested fix
+12 12 | 
+13 13 | def f():
+14 14 |     if True:
+15    |-        from collections.abc import Set
+   15 |+        from collections.abc import Set as AbstractSet
+16 16 |     else:
+17    |-        Set = 1
+   17 |+        AbstractSet = 1
+18 18 | 
+19    |-    x: Set = set()
+   19 |+    x: AbstractSet = set()
+20 20 | 
+21    |-    x: Set
+   21 |+    x: AbstractSet
+22 22 | 
+23    |-    del Set
+   23 |+    del AbstractSet
+24 24 | 
+25 25 |     def f():
+26    |-        print(Set)
+   26 |+        print(AbstractSet)
+27 27 | 
+28 28 |         def Set():
+29 29 |             pass
 
 
