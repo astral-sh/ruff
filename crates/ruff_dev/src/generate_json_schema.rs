@@ -32,15 +32,20 @@ pub(crate) fn main(args: &Args) -> Result<()> {
         Mode::Check => {
             let current = fs::read_to_string(schema_path)?;
             if current == schema_string {
-                println!("up-to-date: {filename}");
+                println!("Up-to-date: {filename}");
             } else {
                 let comparison = StrComparison::new(&current, &schema_string);
                 bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
             }
         }
         Mode::Write => {
-            let file = schema_path;
-            fs::write(file, schema_string.as_bytes())?;
+            let current = fs::read_to_string(&schema_path)?;
+            if current == schema_string {
+                println!("Up-to-date: {filename}");
+            } else {
+                println!("Updating: {filename}");
+                fs::write(schema_path, schema_string.as_bytes())?;
+            }
         }
     }
 
@@ -50,6 +55,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 #[cfg(test)]
 mod test {
     use anyhow::Result;
+    use std::env;
 
     use crate::generate_all::Mode;
 
@@ -57,6 +63,11 @@ mod test {
 
     #[test]
     fn test_generate_json_schema() -> Result<()> {
-        main(&Args { mode: Mode::Check })
+        let mode = if env::var("RUFF_UPDATE_SCHEMA") == Ok("1".to_string()) {
+            Mode::Write
+        } else {
+            Mode::Check
+        };
+        main(&Args { mode })
     }
 }

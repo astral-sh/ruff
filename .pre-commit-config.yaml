@@ -38,24 +38,19 @@ repos:
         name: cargo fmt
         entry: cargo fmt --
         language: system
-        types: [rust]
+        types: [ rust ]
+        pass_filenames: false # This makes it a lot faster
       - id: ruff
         name: ruff
-        entry: cargo run -p ruff_cli -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
+        entry: cargo run --bin ruff -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
         language: system
-        types_or: [python, pyi]
+        types_or: [ python, pyi ]
         require_serial: true
         exclude: |
           (?x)^(
             crates/ruff/resources/.*|
             crates/ruff_python_formatter/resources/.*
           )$
-      - id: dev-generate-all
-        name: dev-generate-all
-        entry: cargo dev generate-all
-        language: system
-        pass_filenames: false
-        exclude: target
 
   # Black
   - repo: https://github.com/psf/black
@@ -64,4 +59,4 @@ repos:
       - id: black
 
 ci:
-  skip: [cargo-fmt, dev-generate-all]
+  skip: [ cargo-fmt, dev-generate-all ]
