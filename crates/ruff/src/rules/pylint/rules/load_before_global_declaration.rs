@@ -52,6 +52,7 @@ impl Violation for LoadBeforeGlobalDeclaration {
         format!("Name `{name}` is used prior to global declaration on line {line}")
     }
 }
+
 /// PLE0118
 pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
     if let Some(stmt) = checker.semantic().global(name) {
