@@ -1,4 +1,5 @@
 use num_complex::Complex64;
+use num_traits::cast::ToPrimitive;
 use once_cell::sync::OnceCell;
 use pyo3::{
     prelude::*,
@@ -97,7 +98,10 @@ fn constant_to_object(constant: &ast::Constant, py: Python) -> PyObject {
         ast::Constant::Bool(bool) => cache.bool(py, *bool).into(),
         ast::Constant::Str(string) => string.to_object(py),
         ast::Constant::Bytes(bytes) => PyBytes::new(py, bytes).into(),
-        ast::Constant::Int(int) => int.to_object(py),
+        ast::Constant::Int(int) => match int.to_i64() {
+            Some(small_int) => small_int.to_object(py),
+            None => int.to_object(py),
+        },
         ast::Constant::Tuple(elts) => {
             let elts: Vec<_> = elts.iter().map(|c| constant_to_object(c, py)).collect();
             PyTuple::new(py, elts).into()

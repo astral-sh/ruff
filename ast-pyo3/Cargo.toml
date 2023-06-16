@@ -1,9 +1,10 @@
 [package]
 name = "rustpython-ast-pyo3"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 
 [features]
+# abi3 = ["pyo3/abi3-py37"]  # will be supported from next pyo3 version
 # This feature is experimental
 # It reimplements AST types, but currently both slower than python AST types and limited to use in other API
 wrapper = []
@@ -16,6 +17,7 @@ crate-type = ["cdylib"]
 rustpython-ast = { workspace = true, features = ["location"] }
 rustpython-parser = { workspace = true, features = ["num-bigint"] }
 num-complex = { workspace = true }
+num-traits = { workspace = true }
 once_cell = { workspace = true }
 
 pyo3 = { workspace = true, features = ["num-bigint", "num-complex"] }

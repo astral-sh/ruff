@@ -10,6 +10,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 
-
 [tool.maturin]
+# module-name = "_rustpython_ast"
 features = ["pyo3/extension-module"]
