@@ -634,6 +634,18 @@ pub const fn is_const_true(expr: &Expr) -> bool {
     )
 }
 
+/// Return `true` if an [`Expr`] is `False`.
+pub const fn is_const_false(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Bool(false),
+            kind: None,
+            ..
+        }),
+    )
+}
+
 /// Return `true` if a keyword argument is present with a non-`None` value.
 pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
     find_keyword(keywords, keyword).map_or(false, |keyword| {
