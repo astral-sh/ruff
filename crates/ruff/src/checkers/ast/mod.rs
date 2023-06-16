@@ -364,7 +364,6 @@ where
                             |expr| self.semantic.resolve_call_path(expr),
                         ));
                 }
-
                 if self.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
@@ -891,7 +890,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::LowercaseImportedAsNonLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
@@ -905,7 +903,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::CamelcaseImportedAsLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
@@ -919,7 +916,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::CamelcaseImportedAsConstant) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
@@ -933,7 +929,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::CamelcaseImportedAsAcronym) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
@@ -1076,7 +1071,6 @@ where
                         if self.enabled(Rule::FutureFeatureNotDefined) {
                             pyflakes::rules::future_feature_not_defined(self, alias);
                         }
-
                         if self.enabled(Rule::LateFutureImport) {
                             if self.semantic.seen_futures_boundary() {
                                 self.diagnostics.push(Diagnostic::new(
@@ -1101,7 +1095,6 @@ where
                                 ));
                             }
                         }
-
                         if self.enabled(Rule::UndefinedLocalWithImportStar) {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithImportStar {
@@ -1206,7 +1199,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::LowercaseImportedAsNonLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
@@ -1220,7 +1212,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::CamelcaseImportedAsLowercase) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
@@ -1234,7 +1225,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::CamelcaseImportedAsConstant) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
@@ -1248,7 +1238,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::CamelcaseImportedAsAcronym) {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
@@ -2475,7 +2464,6 @@ where
                         }
                     }
                 }
-
                 if self.enabled(Rule::TypeOfPrimitive) {
                     pyupgrade::rules::type_of_primitive(self, expr, func, args);
                 }
@@ -3895,7 +3883,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if self.enabled(Rule::BuiltinVariableShadowing) {
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 self,
