@@ -117,7 +117,7 @@ pub(crate) fn lint_path(
                 .expect("wrong package cache for file");
             let last_modified = path.metadata()?.modified()?;
             if let Some(cache) = cache.get(relative_path, last_modified) {
-                return Ok(cache.into_diagnostics(path));
+                return Ok(cache.as_diagnostics(path));
             }
 
             Some((cache, relative_path, last_modified))

@@ -191,7 +191,7 @@ pub(crate) fn run(
             .unwrap()
             .par_iter_mut()
             .try_for_each(|(_, cache)| {
-                if let Some(cache) = Arc::get_mut(cache).and_then(|c| c.take()) {
+                if let Some(cache) = Arc::get_mut(cache).and_then(OnceLock::take) {
                     cache.store()
                 } else {
                     Ok(())

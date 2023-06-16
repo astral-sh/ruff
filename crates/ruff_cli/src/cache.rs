@@ -237,7 +237,7 @@ impl FileCache {
     }
 
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
-    pub(crate) fn into_diagnostics(&self, path: &Path) -> Diagnostics {
+    pub(crate) fn as_diagnostics(&self, path: &Path) -> Diagnostics {
         let messages = if self.messages.is_empty() {
             Vec::new()
         } else {
