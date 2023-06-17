@@ -10,7 +10,7 @@ docstring.py:1:1: I002 [*] Missing required import: `import os`
   |
   = help: Insert required import: `import os`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """Hello, world!"""
   2 |+import os
 2 3 | 

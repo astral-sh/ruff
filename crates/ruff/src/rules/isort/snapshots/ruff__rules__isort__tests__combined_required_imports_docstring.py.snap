@@ -10,7 +10,7 @@ docstring.py:1:1: I002 [*] Missing required import: `from __future__ import anno
   |
   = help: Insert required import: `from future import annotations`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """Hello, world!"""
   2 |+from __future__ import annotations
 2 3 | 
@@ -25,7 +25,7 @@ docstring.py:1:1: I002 [*] Missing required import: `from __future__ import gene
   |
   = help: Insert required import: `from future import generator_stop`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """Hello, world!"""
   2 |+from __future__ import generator_stop
 2 3 | 
