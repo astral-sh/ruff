@@ -126,7 +126,7 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -14,135 +13,87 @@
+@@ -14,135 +13,90 @@
      b
      c
      if True:
@@ -185,7 +185,7 @@ def __await__(): return (yield)
 +    i="NOT_YET_IMPLEMENTED_STRING",
 +):
 +    offset = NOT_IMPLEMENTED_call()
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
  
  
  def spaces_types(
@@ -210,7 +210,10 @@ def __await__(): return (yield)
 -def spaces2(result=_core.Value(None)):
 -    assert fut is self._read_fut, (fut, self._read_fut)
 +def spaces2(result=NOT_IMPLEMENTED_call()):
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right, (
++        fut,
++        self.NOT_IMPLEMENTED_attr,
++    )
  
  
  def example(session):
@@ -358,7 +361,7 @@ def spaces(
     i="NOT_YET_IMPLEMENTED_STRING",
 ):
     offset = NOT_IMPLEMENTED_call()
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 
 
 def spaces_types(
@@ -376,7 +379,10 @@ def spaces_types(
 
 
 def spaces2(result=NOT_IMPLEMENTED_call()):
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right, (
+        fut,
+        self.NOT_IMPLEMENTED_attr,
+    )
 
 
 def example(session):

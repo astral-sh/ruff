@@ -105,7 +105,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,89 +1,70 @@
+@@ -1,89 +1,74 @@
 -"""Docstring."""
 +"NOT_YET_IMPLEMENTED_STRING"
  
@@ -134,7 +134,9 @@ def g():
          return DOUBLESPACE
  
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right, (
++        NOT_YET_IMPLEMENTED_ExprJoinedStr
++    )
  
 -    prev = leaf.prev_sibling
 -    if not prev:
@@ -202,7 +204,9 @@ def g():
  
      # Another comment because more comments
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right, (
++        NOT_YET_IMPLEMENTED_ExprJoinedStr
++    )
  
 -    prev = leaf.prev_sibling
 -    if not prev:
@@ -251,7 +255,9 @@ def f():
     if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:  # another trailing comment
         return DOUBLESPACE
 
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right, (
+        NOT_YET_IMPLEMENTED_ExprJoinedStr
+    )
 
     prev = leaf.NOT_IMPLEMENTED_attr
     if NOT_YET_IMPLEMENTED_ExprUnaryOp:
@@ -289,7 +295,9 @@ def g():
         return DOUBLESPACE
 
     # Another comment because more comments
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right, (
+        NOT_YET_IMPLEMENTED_ExprJoinedStr
+    )
 
     prev = leaf.NOT_IMPLEMENTED_attr
     if NOT_YET_IMPLEMENTED_ExprUnaryOp:

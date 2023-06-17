@@ -292,7 +292,7 @@ d={'a':1,
 +    i="NOT_YET_IMPLEMENTED_STRING",
 +):
 +    offset = NOT_IMPLEMENTED_call()
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
  
  
  def spaces_types(
@@ -571,7 +571,7 @@ def spaces(
     i="NOT_YET_IMPLEMENTED_STRING",
 ):
     offset = NOT_IMPLEMENTED_call()
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 
 
 def spaces_types(
