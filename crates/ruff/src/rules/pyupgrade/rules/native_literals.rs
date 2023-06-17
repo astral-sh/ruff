@@ -100,8 +100,7 @@ pub(crate) fn native_literals(
                     Constant::Str(String::new())
                 };
                 let content = checker.generator().constant(&constant);
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     content,
                     expr.range(),
                 )));
@@ -153,8 +152,7 @@ pub(crate) fn native_literals(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 arg_code.to_string(),
                 expr.range(),
             )));

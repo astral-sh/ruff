@@ -11,7 +11,7 @@ UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |
   = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 1 1 | # UP035
 2   |-from collections import Mapping
   2 |+from collections.abc import Mapping
@@ -30,7 +30,7 @@ UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |
   = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 1 1 | # UP035
 2 2 | from collections import Mapping
 3 3 | 
@@ -51,7 +51,7 @@ UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Seque
   |
   = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 3 3 | 
 4 4 | from collections import Mapping as MAP
 5 5 | 
@@ -72,7 +72,7 @@ UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 5  5  | 
 6  6  | from collections import Mapping, Sequence
 7  7  | 
@@ -94,7 +94,7 @@ UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 7  7  | 
 8  8  | from collections import Counter, Mapping
 9  9  | 
@@ -117,7 +117,7 @@ UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 9  9  | 
 10 10 | from collections import (Counter, Mapping)
 11 11 | 
@@ -141,7 +141,7 @@ UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 12 12 | from collections import (Counter,
 13 13 |                          Mapping)
 14 14 | 
@@ -164,7 +164,7 @@ UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequ
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 15 15 | from collections import Counter, \
 16 16 |                          Mapping
 17 17 | 
@@ -186,7 +186,7 @@ UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 17 17 | 
 18 18 | from collections import Counter, Mapping, Sequence
 19 19 | 
@@ -207,7 +207,7 @@ UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 20 20 | from collections import Mapping as mapping, Counter
 21 21 | 
 22 22 | if True:
@@ -229,7 +229,7 @@ UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 25 25 | if True:
 26 26 |     if True:
 27 27 |         pass
@@ -251,7 +251,7 @@ UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 27 27 |         pass
 28 28 |     from collections import Mapping, Counter
 29 29 | 
@@ -270,7 +270,7 @@ UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 30 30 | if True: from collections import Mapping
 31 31 | 
 32 32 | import os
@@ -297,7 +297,7 @@ UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Call
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 35 35 | 
 36 36 | if True:
 37 37 |     from collections import (
@@ -322,7 +322,7 @@ UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
    |
    = help: Import from `collections.abc`
 
-ℹ Suggested fix
+ℹ Possible fix
 41 41 |         Good,
 42 42 |     )
 43 43 | 
@@ -344,7 +344,7 @@ UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
    |
    = help: Import from `collections`
 
-ℹ Suggested fix
+ℹ Possible fix
 41 41 |         Good,
 42 42 |     )
 43 43 | 
@@ -366,7 +366,7 @@ UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
    |
    = help: Import from `re`
 
-ℹ Suggested fix
+ℹ Possible fix
 41 41 |         Good,
 42 42 |     )
 43 43 | 
