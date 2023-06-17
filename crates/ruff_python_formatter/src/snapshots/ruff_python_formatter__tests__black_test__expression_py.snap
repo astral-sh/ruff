@@ -276,7 +276,7 @@ last_call()
  Name
  None
  True
-@@ -7,294 +8,236 @@
+@@ -7,294 +8,268 @@
  1
  1.0
  1j
@@ -339,9 +339,6 @@ last_call()
 -)
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
--{**a, **b, **c}
--{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
--({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
@@ -363,9 +360,22 @@ last_call()
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 +(NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++{
++    "NOT_YET_IMPLEMENTED_STRING": dead,
++    "NOT_YET_IMPLEMENTED_STRING": (
++        NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++    ),
++}
++{
++    "NOT_YET_IMPLEMENTED_STRING": dead,
++    "NOT_YET_IMPLEMENTED_STRING": (
++        NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++    ),
++    **{"NOT_YET_IMPLEMENTED_STRING": verygood},
++}
+ {**a, **b, **c}
+-{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
+-({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 +{
 +    "NOT_YET_IMPLEMENTED_STRING",
 +    "NOT_YET_IMPLEMENTED_STRING",
@@ -392,6 +402,11 @@ last_call()
 -    *a,
      4,
      5,
+-]
+-[
+-    4,
+-    *a,
+-    5,
 +    6,
 +    7,
 +    8,
@@ -400,11 +415,6 @@ last_call()
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
  ]
--[
--    4,
--    *a,
--    5,
--]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
@@ -495,16 +505,11 @@ last_call()
 +NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  {
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++    "NOT_YET_IMPLEMENTED_STRING": dead,
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
  }
 -Python3 > Python2 > COBOL
 -Life is Life
@@ -541,6 +546,14 @@ last_call()
 -]
 -very_long_variable_name_filters: t.List[
 -    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
++{
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++}
 +[
 +    1,
 +    2,
@@ -602,21 +615,27 @@ last_call()
 -((i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c")))
 -(((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3))
 -(*starred,)
--{
++(i for i in [])
++(i for i in [])
++(i for i in [])
++(i for i in [])
++(NOT_YET_IMPLEMENTED_ExprStarred,)
+ {
 -    "id": "1",
 -    "type": "type",
 -    "started_at": now(),
 -    "ended_at": now() + timedelta(days=10),
 -    "priority": 1,
 -    "import_session_id": 1,
--    **kwargs,
--}
-+(i for i in [])
-+(i for i in [])
-+(i for i in [])
-+(i for i in [])
-+(NOT_YET_IMPLEMENTED_ExprStarred,)
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
++    + NOT_IMPLEMENTED_call(),
++    "NOT_YET_IMPLEMENTED_STRING": 1,
++    "NOT_YET_IMPLEMENTED_STRING": 1,
+     **kwargs,
+ }
  a = (1,)
  b = (1,)
  c = 1
@@ -659,17 +678,24 @@ last_call()
  )
 -Ø = set()
 -authors.łukasz.say_thanks()
--mapping = {
--    A: 0.25 * (10.0 / 12),
--    B: 0.1 * (10.0 / 12),
--    C: 0.1 * (10.0 / 12),
--    D: 0.1 * (10.0 / 12),
--}
 +result = NOT_IMPLEMENTED_call()
 +result = NOT_IMPLEMENTED_call()
 +Ø = NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
-+mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+ mapping = {
+-    A: 0.25 * (10.0 / 12),
+-    B: 0.1 * (10.0 / 12),
+-    C: 0.1 * (10.0 / 12),
+-    D: 0.1 * (10.0 / 12),
++    A: 0.25
++    * (10.0 / 12),
++    B: 0.1
++    * (10.0 / 12),
++    C: 0.1
++    * (10.0 / 12),
++    D: 0.1
++    * (10.0 / 12),
+ }
  
  
  def gen():
@@ -758,7 +784,7 @@ last_call()
      return True
  if (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-@@ -327,24 +270,44 @@
+@@ -327,24 +302,44 @@
  ):
      return True
  if (
@@ -815,7 +841,7 @@ last_call()
  ):
      return True
  (
-@@ -363,8 +326,9 @@
+@@ -363,8 +358,9 @@
  bbbb >> bbbb * bbbb
  (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -880,9 +906,20 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    "NOT_YET_IMPLEMENTED_STRING": dead,
+    "NOT_YET_IMPLEMENTED_STRING": (
+        NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+    ),
+}
+{
+    "NOT_YET_IMPLEMENTED_STRING": dead,
+    "NOT_YET_IMPLEMENTED_STRING": (
+        NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+    ),
+    **{"NOT_YET_IMPLEMENTED_STRING": verygood},
+}
+{**a, **b, **c}
 {
     "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING",
@@ -988,7 +1025,10 @@ NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    "NOT_YET_IMPLEMENTED_STRING": dead,
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
+}
 {
     "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING",
@@ -1019,7 +1059,16 @@ SomeName
 (i for i in [])
 (i for i in [])
 (NOT_YET_IMPLEMENTED_ExprStarred,)
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
+    + NOT_IMPLEMENTED_call(),
+    "NOT_YET_IMPLEMENTED_STRING": 1,
+    "NOT_YET_IMPLEMENTED_STRING": 1,
+    **kwargs,
+}
 a = (1,)
 b = (1,)
 c = 1
@@ -1039,7 +1088,16 @@ result = NOT_IMPLEMENTED_call()
 result = NOT_IMPLEMENTED_call()
 Ø = NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
-mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+mapping = {
+    A: 0.25
+    * (10.0 / 12),
+    B: 0.1
+    * (10.0 / 12),
+    C: 0.1
+    * (10.0 / 12),
+    D: 0.1
+    * (10.0 / 12),
+}
 
 
 def gen():

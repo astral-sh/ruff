@@ -92,7 +92,12 @@ aaaaaaaaaaaaaa + (
     dddddddddddddddd,
     eeeeeee,
 )
-aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+aaaaaaaaaaaaaa + {
+    key1: bbbbbbbbbbbbbbbbbbbbbb,
+    key2: ccccccccccccccccccccc,
+    key3: dddddddddddddddd,
+    key4: eeeeeee,
+}
 aaaaaaaaaaaaaa + {
     bbbbbbbbbbbbbbbbbbbbbb,
     ccccccccccccccccccccc,

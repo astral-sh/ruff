@@ -126,7 +126,7 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -14,135 +13,87 @@
+@@ -14,39 +13,46 @@
      b
      c
      if True:
@@ -177,7 +177,7 @@ def __await__(): return (yield)
 +    a=1,
 +    b=(),
 +    c=[],
-+    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
++    d={},
 +    e=True,
 +    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
@@ -189,11 +189,9 @@ def __await__(): return (yield)
  
  
  def spaces_types(
-     a: int = 1,
-     b: tuple = (),
+@@ -55,79 +61,39 @@
      c: list = [],
--    d: dict = {},
-+    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+     d: dict = {},
      e: bool = True,
 -    f: int = -1,
 -    g: int = 1 if False else 2,
@@ -273,16 +271,23 @@ def __await__(): return (yield)
  
  
  def trailing_comma():
--    mapping = {
+     mapping = {
 -        A: 0.25 * (10.0 / 12),
 -        B: 0.1 * (10.0 / 12),
 -        C: 0.1 * (10.0 / 12),
 -        D: 0.1 * (10.0 / 12),
--    }
-+    mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++        A: 0.25
++        * (10.0 / 12),
++        B: 0.1
++        * (10.0 / 12),
++        C: 0.1
++        * (10.0 / 12),
++        D: 0.1
++        * (10.0 / 12),
+     }
  
  
- def f(
+@@ -135,14 +101,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -350,7 +355,7 @@ def spaces(
     a=1,
     b=(),
     c=[],
-    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    d={},
     e=True,
     f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
@@ -365,7 +370,7 @@ def spaces_types(
     a: int = 1,
     b: tuple = (),
     c: list = [],
-    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    d: dict = {},
     e: bool = True,
     f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
@@ -391,7 +396,16 @@ def long_lines():
 
 
 def trailing_comma():
-    mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    mapping = {
+        A: 0.25
+        * (10.0 / 12),
+        B: 0.1
+        * (10.0 / 12),
+        C: 0.1
+        * (10.0 / 12),
+        D: 0.1
+        * (10.0 / 12),
+    }
 
 
 def f(
