@@ -222,7 +222,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,30 +16,51 @@
+@@ -18,30 +16,53 @@
  
  # fmt: off
  def func_no_args():
@@ -241,7 +241,9 @@ d={'a':1,
 +        NOT_YET_IMPLEMENTED_StmtRaise
 +    if False:
 +        ...
-+    NOT_YET_IMPLEMENTED_StmtFor
++    for i in NOT_IMPLEMENTED_call():
++        NOT_IMPLEMENTED_call()
++        continue
 +    NOT_IMPLEMENTED_call()
 +    return None
 +
@@ -296,7 +298,7 @@ d={'a':1,
  
  
  def spaces_types(
-@@ -51,76 +70,71 @@
+@@ -51,76 +72,71 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -397,7 +399,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
-@@ -130,13 +144,15 @@
+@@ -130,13 +146,15 @@
  
  
  def on_and_off_broken():
@@ -418,7 +420,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,80 +161,21 @@
+@@ -145,80 +163,21 @@
  
  def long_lines():
      if True:
@@ -430,11 +432,13 @@ d={'a':1,
 -                implicit_default=True,
 -            )
 -        )
--        # fmt: off
++        NOT_IMPLEMENTED_call()
+         # fmt: off
 -        a = (
 -            unnecessary_bracket()
 -        )
--        # fmt: on
++        a = NOT_IMPLEMENTED_call()
+         # fmt: on
 -    _type_comment_re = re.compile(
 -        r"""
 -        ^
@@ -455,11 +459,9 @@ d={'a':1,
 -        )
 -        $
 -        """,
-+        NOT_IMPLEMENTED_call()
-         # fmt: off
+-        # fmt: off
 -        re.MULTILINE|re.VERBOSE
-+        a = NOT_IMPLEMENTED_call()
-         # fmt: on
+-        # fmt: on
 -    )
 +    _type_comment_re = NOT_IMPLEMENTED_call()
  
@@ -537,7 +539,9 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    NOT_YET_IMPLEMENTED_StmtFor
+    for i in NOT_IMPLEMENTED_call():
+        NOT_IMPLEMENTED_call()
+        continue
     NOT_IMPLEMENTED_call()
     return None
 

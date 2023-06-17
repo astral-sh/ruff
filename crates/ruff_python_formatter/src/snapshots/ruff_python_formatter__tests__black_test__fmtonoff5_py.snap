@@ -134,7 +134,7 @@ elif   unformatted:
          return True
      # yapf: enable
      elif b:
-@@ -39,49 +21,27 @@
+@@ -39,49 +21,29 @@
  # Regression test for https://github.com/psf/black/issues/2567.
  if True:
      # fmt: off
@@ -142,7 +142,9 @@ elif   unformatted:
 -    # fmt: on
 -        print ( "This won't be formatted" )
 -    print ( "This won't be formatted either" )
-+    NOT_YET_IMPLEMENTED_StmtFor
++    for _ in NOT_IMPLEMENTED_call():
++        # fmt: on
++        NOT_IMPLEMENTED_call()
 +    NOT_IMPLEMENTED_call()
  else:
 -    print("This will be formatted")
@@ -220,7 +222,9 @@ def test_func():
 # Regression test for https://github.com/psf/black/issues/2567.
 if True:
     # fmt: off
-    NOT_YET_IMPLEMENTED_StmtFor
+    for _ in NOT_IMPLEMENTED_call():
+        # fmt: on
+        NOT_IMPLEMENTED_call()
     NOT_IMPLEMENTED_call()
 else:
     NOT_IMPLEMENTED_call()

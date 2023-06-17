@@ -61,7 +61,7 @@ def func():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,46 +3,15 @@
+@@ -3,46 +3,17 @@
  
  # %%
  def func():
@@ -97,7 +97,9 @@ def func():
 -                    )
 -                    # This should be left alone (after)
 -                )
-+        NOT_YET_IMPLEMENTED_StmtFor
++        for exc in exc_value.NOT_IMPLEMENTED_attr:
++            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++                NOT_IMPLEMENTED_call()
  
      # everything is fine if the expression isn't nested
 -    traceback.TracebackException.from_exception(
@@ -128,7 +130,9 @@ def func():
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
     if NOT_IMPLEMENTED_call():
         embedded = []
-        NOT_YET_IMPLEMENTED_StmtFor
+        for exc in exc_value.NOT_IMPLEMENTED_attr:
+            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+                NOT_IMPLEMENTED_call()
 
     # everything is fine if the expression isn't nested
     NOT_IMPLEMENTED_call()
