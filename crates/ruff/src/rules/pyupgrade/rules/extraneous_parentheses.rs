@@ -157,8 +157,7 @@ pub(crate) fn extraneous_parentheses(
                 if settings.rules.should_fix(Rule::ExtraneousParentheses) {
                     let contents =
                         locator.slice(TextRange::new(start_range.start(), end_range.end()));
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         start_range.start(),
                         end_range.end(),

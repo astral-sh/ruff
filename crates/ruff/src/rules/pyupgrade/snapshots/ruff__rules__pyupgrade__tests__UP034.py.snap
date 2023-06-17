@@ -11,7 +11,7 @@ UP034.py:2:7: UP034 [*] Avoid extraneous parentheses
   |
   = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # UP034
 2   |-print(("foo"))
   2 |+print("foo")
@@ -29,7 +29,7 @@ UP034.py:5:7: UP034 [*] Avoid extraneous parentheses
   |
   = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | print(("foo"))
 3 3 | 
 4 4 | # UP034
@@ -49,7 +49,7 @@ UP034.py:8:7: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 5 5 | print(("hell((goodybe))o"))
 6 6 | 
 7 7 | # UP034
@@ -69,7 +69,7 @@ UP034.py:11:7: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | print((("foo")))
 9  9  | 
 10 10 | # UP034
@@ -89,7 +89,7 @@ UP034.py:14:7: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 11 11 | print((((1))))
 12 12 | 
 13 13 | # UP034
@@ -109,7 +109,7 @@ UP034.py:18:5: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 15 15 | 
 16 16 | # UP034
 17 17 | print(
@@ -132,7 +132,7 @@ UP034.py:23:5: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 20 20 | 
 21 21 | # UP034
 22 22 | print(
@@ -156,7 +156,7 @@ UP034.py:30:13: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 27 27 | 
 28 28 | # UP034
 29 29 | def f():
@@ -176,7 +176,7 @@ UP034.py:35:9: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 32 32 | # UP034
 33 33 | if True:
 34 34 |     print(
@@ -196,7 +196,7 @@ UP034.py:39:7: UP034 [*] Avoid extraneous parentheses
    |
    = help: Remove extraneous parentheses
 
-ℹ Suggested fix
+ℹ Fix
 36 36 |     )
 37 37 | 
 38 38 | # UP034
