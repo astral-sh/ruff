@@ -8,14 +8,15 @@ use ruff_python_semantic::analyze::logging;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for blind `except` clauses.
+/// Checks for `except` clauses that catch all exceptions.
 ///
 /// ## Why is this bad?
-/// Blind exception handling can hide bugs and make debugging difficult. It can
-/// also lead to unexpected behavior, such as catching `KeyboardInterrupt` or
-/// `SystemExit` exceptions that prevent the user from exiting the program.
+/// Overly broad `except` clauses can lead to unexpected behavior, such as
+/// catching `KeyboardInterrupt` or `SystemExit` exceptions that prevent the
+/// user from exiting the program.
 ///
-/// Instead of catching all exceptions, catch only the exceptions you expect.
+/// Instead of catching all exceptions, catch only those that are expected to
+/// be raised in the `try` block.
 ///
 /// ## Example
 /// ```python

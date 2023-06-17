@@ -11,11 +11,11 @@ use crate::registry::AsRule;
 /// Checks for unnecessary parentheses on raised exceptions.
 ///
 /// ## Why is this bad?
-/// If no arguments are passed to an exception, parentheses are not required.
-/// This is because the `raise` statement accepts either an exception instance
+/// If an exception is raised without any arguments, parentheses are not
+/// required, as the `raise` statement accepts either an exception instance
 /// or an exception class (which is then implicitly instantiated).
 ///
-/// Removing unnecessary parentheses makes code more readable and idiomatic.
+/// Removing the parentheses makes the code more concise.
 ///
 /// ## Example
 /// ```python
