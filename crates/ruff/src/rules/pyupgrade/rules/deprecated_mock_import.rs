@@ -260,7 +260,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 value.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::manual(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     "mock".to_string(),
                     value.range(),
                 )));
@@ -306,7 +306,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             name.range(),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic.set_fix(Fix::manual(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 content.clone(),
                                 stmt.range(),
                             )));
