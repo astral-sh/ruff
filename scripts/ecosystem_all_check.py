@@ -56,7 +56,7 @@ def main() -> None:
             errors += 1
             continue
 
-        try:
+        try:  # noqa: PERF203
             output = subprocess.run(
                 [ruff, *ruff_args, "."],
                 cwd=project_dir,
