@@ -7,6 +7,35 @@ use ruff_python_semantic::analyze::logging;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for blind `except` clauses.
+///
+/// ## Why is this bad?
+/// Blind exception handling can hide bugs and make debugging difficult. It can
+/// also lead to unexpected behavior, such as catching `KeyboardInterrupt` or
+/// `SystemExit` exceptions that prevent the user from exiting the program.
+///
+/// Instead of catching all exceptions, catch only the exceptions you expect.
+///
+/// ## Example
+/// ```python
+/// try:
+///     foo()
+/// except BaseException:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     foo()
+/// except FileNotFoundError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
+/// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[violation]
 pub struct BlindExcept {
     name: String,
