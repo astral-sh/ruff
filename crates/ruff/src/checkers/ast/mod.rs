@@ -950,18 +950,6 @@ where
                             }
                         }
                     }
-                    if self.enabled(Rule::UnconventionalImportAlias) {
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::conventional_import_alias(
-                                stmt,
-                                &alias.name,
-                                alias.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
                             if let Some(diagnostic) =
@@ -1162,20 +1150,6 @@ where
                             self.diagnostics.push(diagnostic);
                         }
                     }
-                    if self.enabled(Rule::UnconventionalImportAlias) {
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::conventional_import_alias(
-                                stmt,
-                                &qualified_name,
-                                alias.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
                             let qualified_name =
@@ -1192,7 +1166,6 @@ where
                             }
                         }
                     }
-
                     if let Some(asname) = &alias.asname {
                         if self.enabled(Rule::ConstantImportedAsNonConstant) {
                             if let Some(diagnostic) =
@@ -1259,8 +1232,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
-                        // pylint
                         if !self.is_stub {
                             if self.enabled(Rule::UselessImportAlias) {
                                 pylint::rules::useless_import_alias(self, alias);
@@ -4733,6 +4704,7 @@ impl<'a> Checker<'a> {
             Rule::TypingOnlyStandardLibraryImport,
             Rule::UndefinedExport,
             Rule::UnaliasedCollectionsAbcSetImport,
+            Rule::UnconventionalImportAlias,
         ]) {
             return;
         }
@@ -4918,7 +4890,14 @@ impl<'a> Checker<'a> {
             if self.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(self, scope, &mut diagnostics);
             }
-
+            if self.enabled(Rule::UnconventionalImportAlias) {
+                flake8_import_conventions::rules::unconventional_import_alias(
+                    self,
+                    scope,
+                    &mut diagnostics,
+                    &self.settings.flake8_import_conventions.aliases,
+                );
+            }
             if self.is_stub {
                 if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
                     flake8_pyi::rules::unaliased_collections_abc_set_import(
