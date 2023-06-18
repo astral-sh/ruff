@@ -45,6 +45,12 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
+and pre-commit to run some validation checks:
+
+```shell
+pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
+```
+
 ### Development
 
 After cloning the repository, run Ruff locally with:
@@ -57,9 +63,9 @@ Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo fmt  # Auto-formatting...
-cargo test  # Testing...
-cargo clippy --workspace --all-targets --all-features -- -D warnings  # Linting...
+cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
+RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
+pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -70,13 +76,6 @@ after running `cargo test` like so:
 
 ```shell
 cargo insta review
-```
-
-If you have `pre-commit` [installed](https://pre-commit.com/#installation) then you can use it to
-assist with formatting and linting. The following command will run the `pre-commit` hooks:
-
-```shell
-pre-commit run --all-files
 ```
 
 Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
