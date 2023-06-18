@@ -7,15 +7,23 @@ del x  # Trailing comment
 # Dangling comment
 
 # Some comment
-del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Trailing comment
-# Dangling comment
-
-# Some comment
 del (
     x,
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     b,
     c,
+    d,
+)  # Trailing comment
+# Dangling comment
+
+# Some comment
+del (
+    x,
+    # Slapping one here
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    b,
+    c,
     d
-) # Trailing comment
+    # Another one
+)  # Trailing comment
 # Dangling comment
