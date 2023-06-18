@@ -65,7 +65,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Linting...
 RUFF_UPDATE_SCHEMA=1 cargo test  # Testing and updating ruff.schema.json
-pre-commit run --all-files  # rust and python formatting, markdown and python linting, etc.
+pre-commit run --all-files --show-diff-on-failure  # rust and python formatting, markdown and python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
