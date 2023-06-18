@@ -2038,10 +2038,12 @@ where
         // Post-visit.
         match stmt {
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
             }
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
                 self.add_binding(
@@ -3785,6 +3787,7 @@ where
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
             }
             _ => {}
@@ -4692,7 +4695,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_dead_scopes(&mut self) {
+    fn check_deferred_scopes(&mut self) {
         if !self.any_enabled(&[
             Rule::UnusedImport,
             Rule::GlobalVariableNotAssigned,
@@ -4771,7 +4774,7 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope_id in self.semantic.dead_scopes.iter().rev() {
+        for scope_id in self.deferred.scopes.iter().rev() {
             let scope = &self.semantic.scopes[*scope_id];
 
             if scope.kind.is_module() {
@@ -5256,8 +5259,8 @@ pub(crate) fn check_ast(
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
-    checker.semantic.dead_scopes.push(ScopeId::global());
-    checker.check_dead_scopes();
+    checker.deferred.scopes.push(ScopeId::global());
+    checker.check_deferred_scopes();
 
     checker.diagnostics
 }
