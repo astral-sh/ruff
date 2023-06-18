@@ -1,0 +1,67 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+---
+## Input
+```py
+x = 1
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
+b, c, d = (2, 3, 4)
+
+# Some comment
+del x  # Trailing comment
+# Dangling comment
+
+# Some comment
+del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Trailing comment
+# Dangling comment
+
+# Some comment
+del (
+    x,
+    # Slapping one here
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    b,
+    c,
+    d
+    # Another one
+) # Trailing comment
+# Dangling comment
+```
+
+
+
+## Output
+```py
+x = 1
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
+b, c, d = (2, 3, 4)
+
+# Some comment
+del x  # Trailing comment
+# Dangling comment
+
+# Some comment
+del (
+    x,
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    b,
+    c,
+    d,
+)  # Trailing comment
+# Dangling comment
+
+# Some comment
+del (
+    x,
+    # Slapping one here
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    b,
+    c,
+    d
+    # Another one
+)  # Trailing comment
+# Dangling comment
+```
+
+
