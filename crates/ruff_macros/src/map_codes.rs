@@ -178,8 +178,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let rule_to_code = generate_rule_to_code(&linter_to_rules);
     output.extend(rule_to_code);
 
-    let iter = generate_iter_impl(&linter_to_rules, &all_codes);
-    output.extend(iter);
+    output.extend(generate_iter_impl(&linter_to_rules, &linter_idents));
 
     Ok(output)
 }
@@ -326,7 +325,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 /// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
 fn generate_iter_impl(
     linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
-    all_codes: &[TokenStream],
+    linter_idents: &[&Ident],
 ) -> TokenStream {
     let mut linter_into_iter_match_arms = quote!();
     for (linter, map) in linter_to_rules {
@@ -352,8 +351,11 @@ fn generate_iter_impl(
         }
 
         impl RuleCodePrefix {
-            pub fn iter() -> ::std::vec::IntoIter<RuleCodePrefix> {
-                vec![ #(#all_codes,)* ].into_iter()
+            pub fn iter() -> impl Iterator<Item = RuleCodePrefix> {
+                use strum::IntoEnumIterator;
+
+                std::iter::empty()
+                    #(.chain(#linter_idents::iter().map(|x| Self::#linter_idents(x))))*
             }
         }
     }
