@@ -104,19 +104,20 @@ print("hello world")  # Trailing comment (end-of-line)
 # Trailing comment (own line)
 ```
 
-Comment are automatically attached as `Leading` or `Trailing` to a node close to them categorization
-is automatic except when overridden in `place_comment` in `placement.rs`, which this section is
-about. A `Dangling` comment happens when there is node that the comment would be leading or trailing
-to.
+Comment are automatically attached as `Leading` or `Trailing` to a node close to them, or `Dangling`
+if there are only tokens and no nodes surrounding it. Categorization is automatic but sometimes
+needs to be overridden in `place_comment` in `placement.rs`, which this section is about.
 
 ```Python
 [
-    # here we use an empty list
+    # This needs to be handled as a dangling comment
 ]
 ```
 
-Here, you have to call `dangling_comments` manually and stubbing out `fmt_dangling_comments` default
-from `FormatNodeRule` in `FormatExprList`.
+Here, the comment is dangling because it is preceded by `[`, which is a non-trivia token but not a
+node, and  followed by `]`, which is also a non-trivia token but not a node. In the `FormatExprList`
+implementation, we have to call `dangling_comments` manually and stub out the
+`fmt_dangling_comments` default from `FormatNodeRule`.
 
 ```rust
 impl FormatNodeRule<ExprList> for FormatExprList {
@@ -141,9 +142,9 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 }
 ```
 
-A common challenge is that we want to attach comments to tokens (think keywords and syntactically
-meaningful characters such as `:`) that have no node on their own. A slightly simplified version of
-the `while` node in our AST looks like the following:
+A related common challenge is that we want to attach comments to tokens (think keywords and
+syntactically meaningful characters such as `:`) that have no node on their own. A slightly
+simplified version of the `while` node in our AST looks like the following:
 
 ```rust
 pub struct StmtWhile {
@@ -168,23 +169,29 @@ else:
 
 the `else` has no node, we're just getting the statements in its body.
 
-By default, the comment would get misattributed and moved to the `break` (the first node before the
-comment) or the `print` call (the first node after it). We avoid this by finding comments between
+The preceding token of the leading else comment is the `break`, which has a node, the following
+token is the `else`, which lacks a node, so by default the comment would be marked as trailing
+the `break` and wrongly formatted as such. We avoid this by finding comments between
 two bodies that have the same indentation level as the keyword in
 `handle_in_between_bodies_own_line_comment` and marking them as dangling. Similarly, we find and
-mark comment after the colon(s). In `FormatStmtWhile`, we take the list of all dangling comments and
-split it into after-colon-comments, before-else-comments, etc. and manually insert them in the right
-position.
+mark comment after the colon(s). In `FormatStmtWhile`, we take the list of all dangling comments,
+split them into after-colon-comments, before-else-comments, etc. by some element separating them
+(e.g. all comments trailing the colon come before the first statement in the body) and manually
+insert them in the right position.
 
-A simplified implementation with only those two kinds comments:
+A simplified implementation with only those two kinds of comments:
 
 ```rust
 fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
 
     // ...
 
+    // See FormatStmtWhile for the real, more complex implementation
+    let first_while_body_stmt = item.body.first().unwrap().end();
+    let trailing_condition_comments_end =
+        dangling_comments.partition_point(|comment| comment.slice().end() < first_while_body_stmt);
     let (trailing_condition_comments, or_else_comments) =
-        dangling_comments.split_at(or_else_comments_start);
+        dangling_comments.split_at(trailing_condition_comments_end);
 
     write!(
         f,
