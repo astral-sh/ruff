@@ -40,7 +40,6 @@ pub struct SemanticModel<'a> {
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
-    pub dead_scopes: Vec<ScopeId>,
 
     /// Stack of all definitions created in any scope, at any point in execution.
     pub definitions: Definitions<'a>,
@@ -130,7 +129,6 @@ impl<'a> SemanticModel<'a> {
             exprs: Vec::default(),
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
-            dead_scopes: Vec::default(),
             definitions: Definitions::for_module(module),
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
@@ -596,7 +594,6 @@ impl<'a> SemanticModel<'a> {
 
     /// Pop the current [`Scope`] off the stack.
     pub fn pop_scope(&mut self) {
-        self.dead_scopes.push(self.scope_id);
         self.scope_id = self.scopes[self.scope_id]
             .parent
             .expect("Attempted to pop without scope");
