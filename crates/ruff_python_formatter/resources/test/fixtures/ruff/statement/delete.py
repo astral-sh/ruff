@@ -2,22 +2,60 @@ x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
 b, c, d = (2, 3, 4)
 
-# Some comment
-del x  # Trailing comment
-# Dangling comment
+del (
+    # Dangling comment
+)
 
-# Some comment
-del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Trailing comment
-# Dangling comment
+# Delete something
+del x  # Deleted something
+# Done deleting
 
-# Some comment
+# Delete something
+del (
+    # Deleting something
+    x  # Deleted something
+    # Finishing deletes
+) # Completed
+# Done deleting
+
+# Delete something
+del (
+    # Deleting something
+    x  # Deleted something
+    # Finishing deletes
+) # Completed
+# Done deleting
+
+# Delete something
+del (
+    # Deleting something
+    x,  # Deleted something
+    # Finishing deletes
+) # Completed
+# Done deleting
+
+# Delete something
+del (
+    # Deleting something
+    x  # Deleted something
+    # Finishing deletes
+
+    # Dangling comment
+) # Completed
+# Done deleting
+
+# Delete something
+del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Delete these
+# Ready to delete
+
+# Delete something
 del (
     x,
-    # Slapping one here
+    # Deleting this
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     b,
     c,
     d
-    # Another one
-) # Trailing comment
-# Dangling comment
+    # Deleted
+) # Completed
+# Done
