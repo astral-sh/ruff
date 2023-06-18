@@ -24,9 +24,17 @@ struct KeyValuePair<'a> {
 impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         if let Some(key) = self.key {
-            write!(f, [key.format(), text(":"), space(), self.value.format()])
+            write!(
+                f,
+                [group(&format_args![
+                    key.format(),
+                    text(":"),
+                    space(),
+                    self.value.format()
+                ])]
+            )
         } else {
-            write!(f, [text("**"), self.value.format()])
+            write!(f, [group(&format_args![text("**"), self.value.format()])])
         }
     }
 }

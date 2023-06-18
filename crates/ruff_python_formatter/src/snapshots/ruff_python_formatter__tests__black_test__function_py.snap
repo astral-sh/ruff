@@ -112,14 +112,14 @@ def __await__(): return (yield)
  #!/usr/bin/env python3
 -import asyncio
 -import sys
--
--from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImport
 +NOT_YET_IMPLEMENTED_StmtImport
  
--from library import some_connection, some_decorator
+-from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
+-from library import some_connection, some_decorator
+-
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
@@ -189,7 +189,7 @@ def __await__(): return (yield)
  
  
  def spaces_types(
-@@ -55,79 +61,39 @@
+@@ -55,71 +61,27 @@
      c: list = [],
      d: dict = {},
      e: bool = True,
@@ -271,23 +271,7 @@ def __await__(): return (yield)
  
  
  def trailing_comma():
-     mapping = {
--        A: 0.25 * (10.0 / 12),
--        B: 0.1 * (10.0 / 12),
--        C: 0.1 * (10.0 / 12),
--        D: 0.1 * (10.0 / 12),
-+        A: 0.25
-+        * (10.0 / 12),
-+        B: 0.1
-+        * (10.0 / 12),
-+        C: 0.1
-+        * (10.0 / 12),
-+        D: 0.1
-+        * (10.0 / 12),
-     }
- 
- 
-@@ -135,14 +101,8 @@
+@@ -135,14 +97,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -397,14 +381,10 @@ def long_lines():
 
 def trailing_comma():
     mapping = {
-        A: 0.25
-        * (10.0 / 12),
-        B: 0.1
-        * (10.0 / 12),
-        C: 0.1
-        * (10.0 / 12),
-        D: 0.1
-        * (10.0 / 12),
+        A: 0.25 * (10.0 / 12),
+        B: 0.1 * (10.0 / 12),
+        C: 0.1 * (10.0 / 12),
+        D: 0.1 * (10.0 / 12),
     }
 
 

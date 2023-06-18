@@ -276,7 +276,7 @@ last_call()
  Name
  None
  True
-@@ -7,294 +8,268 @@
+@@ -7,226 +8,225 @@
  1
  1.0
  1j
@@ -630,8 +630,7 @@ last_call()
 +    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
 +    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
 +    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
-+    + NOT_IMPLEMENTED_call(),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call() + NOT_IMPLEMENTED_call(),
 +    "NOT_YET_IMPLEMENTED_STRING": 1,
 +    "NOT_YET_IMPLEMENTED_STRING": 1,
      **kwargs,
@@ -683,19 +682,9 @@ last_call()
 +Ø = NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
  mapping = {
--    A: 0.25 * (10.0 / 12),
--    B: 0.1 * (10.0 / 12),
--    C: 0.1 * (10.0 / 12),
--    D: 0.1 * (10.0 / 12),
-+    A: 0.25
-+    * (10.0 / 12),
-+    B: 0.1
-+    * (10.0 / 12),
-+    C: 0.1
-+    * (10.0 / 12),
-+    D: 0.1
-+    * (10.0 / 12),
- }
+     A: 0.25 * (10.0 / 12),
+     B: 0.1 * (10.0 / 12),
+@@ -236,65 +236,35 @@
  
  
  def gen():
@@ -725,14 +714,6 @@ last_call()
 -for (x,) in (1,), (2,), (3,):
 -    ...
 -for y in ():
--    ...
--for z in (i for i in (1, 2, 3)):
--    ...
--for i in call():
--    ...
--for j in 1 + (2 + 3):
--    ...
--while this and that:
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
@@ -746,6 +727,14 @@ last_call()
 +NOT_YET_IMPLEMENTED_StmtFor
 +while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
      ...
+-for z in (i for i in (1, 2, 3)):
+-    ...
+-for i in call():
+-    ...
+-for j in 1 + (2 + 3):
+-    ...
+-while this and that:
+-    ...
 -for (
 -    addr_family,
 -    addr_type,
@@ -784,7 +773,7 @@ last_call()
      return True
  if (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-@@ -327,24 +302,44 @@
+@@ -327,24 +297,44 @@
  ):
      return True
  if (
@@ -841,7 +830,7 @@ last_call()
  ):
      return True
  (
-@@ -363,8 +358,9 @@
+@@ -363,8 +353,9 @@
  bbbb >> bbbb * bbbb
  (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -1063,8 +1052,7 @@ SomeName
     "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
-    + NOT_IMPLEMENTED_call(),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call() + NOT_IMPLEMENTED_call(),
     "NOT_YET_IMPLEMENTED_STRING": 1,
     "NOT_YET_IMPLEMENTED_STRING": 1,
     **kwargs,
@@ -1089,14 +1077,10 @@ result = NOT_IMPLEMENTED_call()
 Ø = NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
 mapping = {
-    A: 0.25
-    * (10.0 / 12),
-    B: 0.1
-    * (10.0 / 12),
-    C: 0.1
-    * (10.0 / 12),
-    D: 0.1
-    * (10.0 / 12),
+    A: 0.25 * (10.0 / 12),
+    B: 0.1 * (10.0 / 12),
+    C: 0.1 * (10.0 / 12),
+    D: 0.1 * (10.0 / 12),
 }
 
 
