@@ -94,9 +94,20 @@ write!(f, [if_group_breaks(&text(","))])
 If you need avoid second mutable borrows with a builder, you can use `format_with(|f| { ... })` as
 a formattable element similar to `text()` or `group()`.
 
-The generic comment formatting in `FormatNodeRule` handles comments correctly for most nodes, e.g.
-preceding and end-of-line comments depending on the node range. Sometimes however, you may have
-dangling comments that are not before or after a node but inside of it, e.g.
+## Comments
+
+Comments can either be own line or end-of-line and can be marked as `Leading`, `Trailing` and `Dangling`.
+
+```python
+# Leading comment (always own line)
+print("hello world")  # Trailing comment (end-of-line)
+# Trailing comment (own line)
+```
+
+Comment are automatically attached as `Leading` or `Trailing` to a node close to them categorization
+is automatic except when overridden in `place_comment` in `placement.rs`, which this section is
+about. A `Dangling` comment happens when there is node that the comment would be leading or trailing
+to.
 
 ```Python
 [
@@ -104,8 +115,8 @@ dangling comments that are not before or after a node but inside of it, e.g.
 ]
 ```
 
-Here, you have to call `dangling_comments` manually and stubbing out `fmt_dangling_comments` in list
-formatting.
+Here, you have to call `dangling_comments` manually and stubbing out `fmt_dangling_comments` default
+from `FormatNodeRule` in `FormatExprList`.
 
 ```rust
 impl FormatNodeRule<ExprList> for FormatExprList {
@@ -116,7 +127,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             f,
             [group(&format_args![
                 text("["),
-                dangling_comments(dangling),
+                dangling_comments(dangling), // Gets all the comments marked as dangling for the node
                 soft_block_indent(&items),
                 text("]")
             ])]
@@ -130,8 +141,67 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 }
 ```
 
-Comments are categorized into `Leading`, `Trailing` and `Dangling`, you can override this in
-`place_comment`.
+A common challenge is that we want to attach comments to tokens (think keywords and syntactically
+meaningful characters such as `:`) that have no node on their own. A slightly simplified version of
+the `while` node in our AST looks like the following:
+
+```rust
+pub struct StmtWhile {
+    pub range: TextRange,
+    pub test: Box<Expr<TextRange>>,
+    pub body: Vec<Stmt<TextRange>>,
+    pub orelse: Vec<Stmt<TextRange>>,
+}
+```
+
+That means in
+
+```python
+while True:  # Trailing cond comment
+    if f():
+        break
+    # trailing while comment
+# leading else comment
+else:
+    print("while-else")
+```
+
+the `else` has no node, we're just getting the statements in its body.
+
+By default, the comment would get misattributed and moved to the `break` (the first node before the
+comment) or the `print` call (the first node after it). We avoid this by finding comments between
+two bodies that have the same indentation level as the keyword in
+`handle_in_between_bodies_own_line_comment` and marking them as dangling. Similarly, we find and
+mark comment after the colon(s). In `FormatStmtWhile`, we take the list of all dangling comments and
+split it into after-colon-comments, before-else-comments, etc. and manually insert them in the right
+position.
+
+A simplified implementation with only those two kinds comments:
+
+```rust
+fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
+
+    // ...
+
+    let (trailing_condition_comments, or_else_comments) =
+        dangling_comments.split_at(or_else_comments_start);
+
+    write!(
+        f,
+        [
+            text("while"),
+            space(),
+            test.format(),
+            text(":"),
+            trailing_comments(trailing_condition_comments),
+            block_indent(&body.format())
+            leading_comments(or_else_comments),
+            text("else:"),
+            block_indent(&orelse.format())
+        ]
+    )?;
+}
+```
 
 ## Development notes
 
