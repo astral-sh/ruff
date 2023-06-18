@@ -63,7 +63,7 @@ mod test {
 
     #[test]
     fn test_generate_json_schema() -> Result<()> {
-        let mode = if env::var("RUFF_UPDATE_SCHEMA").as_ref() == Ok("1") {
+        let mode = if env::var("RUFF_UPDATE_SCHEMA").as_deref() == Ok("1") {
             Mode::Write
         } else {
             Mode::Check
