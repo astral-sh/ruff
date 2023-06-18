@@ -7,7 +7,7 @@ use rustpython_parser::ast::StmtContinue;
 pub struct FormatStmtContinue;
 
 impl FormatNodeRule<StmtContinue> for FormatStmtContinue {
-    fn fmt_fields(&self, _tem: &StmtContinue, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &StmtContinue, f: &mut PyFormatter) -> FormatResult<()> {
         text("continue").fmt(f)
     }
 }
