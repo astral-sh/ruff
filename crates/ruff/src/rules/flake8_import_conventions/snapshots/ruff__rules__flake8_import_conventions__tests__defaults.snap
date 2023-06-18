@@ -10,6 +10,7 @@ defaults.py:3:8: ICN001 `altair` should be imported as `alt`
 4 | import matplotlib.pyplot  # unconventional
 5 | import numpy  # unconventional
   |
+  = help: Alias `altair` to `alt`
 
 defaults.py:4:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
   |
@@ -19,6 +20,7 @@ defaults.py:4:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
 5 | import numpy  # unconventional
 6 | import pandas  # unconventional
   |
+  = help: Alias `matplotlib.pyplot` to `plt`
 
 defaults.py:5:8: ICN001 `numpy` should be imported as `np`
   |
@@ -29,6 +31,7 @@ defaults.py:5:8: ICN001 `numpy` should be imported as `np`
 6 | import pandas  # unconventional
 7 | import seaborn  # unconventional
   |
+  = help: Alias `numpy` to `np`
 
 defaults.py:6:8: ICN001 `pandas` should be imported as `pd`
   |
@@ -38,6 +41,7 @@ defaults.py:6:8: ICN001 `pandas` should be imported as `pd`
   |        ^^^^^^ ICN001
 7 | import seaborn  # unconventional
   |
+  = help: Alias `pandas` to `pd`
 
 defaults.py:7:8: ICN001 `seaborn` should be imported as `sns`
   |
@@ -48,6 +52,7 @@ defaults.py:7:8: ICN001 `seaborn` should be imported as `sns`
 8 | 
 9 | import altair as altr  # unconventional
   |
+  = help: Alias `seaborn` to `sns`
 
 defaults.py:9:18: ICN001 `altair` should be imported as `alt`
    |
@@ -58,6 +63,7 @@ defaults.py:9:18: ICN001 `altair` should be imported as `alt`
 10 | import matplotlib.pyplot as plot  # unconventional
 11 | import numpy as nmp  # unconventional
    |
+   = help: Alias `altair` to `alt`
 
 defaults.py:10:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
@@ -67,6 +73,7 @@ defaults.py:10:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
 11 | import numpy as nmp  # unconventional
 12 | import pandas as pdas  # unconventional
    |
+   = help: Alias `matplotlib.pyplot` to `plt`
 
 defaults.py:11:17: ICN001 `numpy` should be imported as `np`
    |
@@ -77,6 +84,7 @@ defaults.py:11:17: ICN001 `numpy` should be imported as `np`
 12 | import pandas as pdas  # unconventional
 13 | import seaborn as sbrn  # unconventional
    |
+   = help: Alias `numpy` to `np`
 
 defaults.py:12:18: ICN001 `pandas` should be imported as `pd`
    |
@@ -86,6 +94,7 @@ defaults.py:12:18: ICN001 `pandas` should be imported as `pd`
    |                  ^^^^ ICN001
 13 | import seaborn as sbrn  # unconventional
    |
+   = help: Alias `pandas` to `pd`
 
 defaults.py:13:19: ICN001 `seaborn` should be imported as `sns`
    |
@@ -96,5 +105,6 @@ defaults.py:13:19: ICN001 `seaborn` should be imported as `sns`
 14 | 
 15 | import altair as alt  # conventional
    |
+   = help: Alias `seaborn` to `sns`
 
 

@@ -1,10 +1,12 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::Scope;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+use crate::renamer::Renamer;
 
 /// ## What it does
 /// Checks for imports that are typically imported using a common convention,
@@ -34,10 +36,17 @@ pub struct UnconventionalImportAlias {
 }
 
 impl Violation for UnconventionalImportAlias {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnconventionalImportAlias { name, asname } = self;
         format!("`{name}` should be imported as `{asname}`")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        let UnconventionalImportAlias { name, asname } = self;
+        Some(format!("Alias `{name}` to `{asname}`"))
     }
 }
 
@@ -63,13 +72,23 @@ pub(crate) fn unconventional_import_alias(
             continue;
         }
 
-        diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             UnconventionalImportAlias {
                 name: qualified_name.to_string(),
                 asname: expected_alias.to_string(),
             },
             binding.range,
-        ));
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            if checker.semantic().is_available(expected_alias) {
+                diagnostic.try_set_fix(|| {
+                    let (edit, rest) =
+                        Renamer::rename(name, expected_alias, scope, checker.semantic())?;
+                    Ok(Fix::suggested_edits(edit, rest))
+                });
+            }
+        }
+        diagnostics.push(diagnostic);
     }
     None
 }
