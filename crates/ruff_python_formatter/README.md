@@ -106,7 +106,7 @@ print("hello world")  # Trailing comment (end-of-line)
 
 Comments are automatically attached as `Leading` or `Trailing` to a node close to them, or `Dangling`
 if there are only tokens and no nodes surrounding it. Categorization is automatic but sometimes
-needs to be overridden in `place_comment` in `placement.rs`, which this section is about.
+needs to be overridden in [`place_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L13) in `placement.rs`, which this section is about.
 
 ```Python
 [
