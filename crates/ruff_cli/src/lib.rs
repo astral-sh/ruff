@@ -15,7 +15,7 @@ use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
 use ruff_python_formatter::format_module;
 
-use crate::args::{Args, CheckArgs, Command};
+use crate::args::{Args, Arguments, CheckArgs, Command};
 use crate::commands::run_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -58,16 +58,13 @@ enum OutputWriter {
     File(BufWriter<File>),
 }
 
-impl<P> TryFrom<Option<P>> for OutputWriter
-where
-    P: AsRef<Path>,
-{
+impl TryFrom<&Arguments> for OutputWriter {
     type Error = anyhow::Error;
 
-    fn try_from(path: Option<P>) -> Result<Self> {
-        Ok(match path {
-            Some(path) => OutputWriter::File(BufWriter::new(File::create(path)?)),
-            None => OutputWriter::Stdout(BufWriter::new(io::stdout())),
+    fn try_from(args: &Arguments) -> Result<Self> {
+        Ok(match args.output_file.as_ref() {
+            Some(path) if !args.watch => OutputWriter::File(BufWriter::new(File::create(path)?)),
+            _ => OutputWriter::Stdout(BufWriter::new(io::stdout())),
         })
     }
 }
@@ -207,11 +204,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         cli.stdin_filename.as_deref(),
     )?;
 
-    let mut writer = if !cli.watch {
-        OutputWriter::try_from(cli.output_file)?
-    } else {
-        OutputWriter::try_from(None)?
-    };
+    let mut writer = OutputWriter::try_from(&cli)?;
     if matches!(writer, OutputWriter::File(_)) {
         colored::control::set_override(false);
     }
