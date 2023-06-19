@@ -1,11 +1,10 @@
 //! Lint rules based on checking physical lines.
-
 use ruff_text_size::TextSize;
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_python_whitespace::{Line, UniversalNewlines};
 
 use crate::registry::Rule;
 use crate::rules::copyright::rules::missing_copyright_notice;
@@ -57,6 +56,8 @@ pub(crate) fn check_physical_lines(
 
     let mut commented_lines_iter = indexer.comment_ranges().iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
+
+    let mut prev_line: Option<Line> = None;
 
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
@@ -146,7 +147,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, settings) {
+            if let Some(diagnostic) = trailing_whitespace(&line, &prev_line, settings) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -156,6 +157,8 @@ pub(crate) fn check_physical_lines(
                 diagnostics.push(diagnostic);
             }
         }
+
+        prev_line = Some(line);
     }
 
     if enforce_no_newline_at_end_of_file {

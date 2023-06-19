@@ -72,7 +72,11 @@ impl AlwaysAutofixableViolation for BlankLineWithWhitespace {
 }
 
 /// W291, W293
-pub(crate) fn trailing_whitespace(line: &Line, settings: &Settings) -> Option<Diagnostic> {
+pub(crate) fn trailing_whitespace(
+    line: &Line,
+    prev_line: &Option<Line>,
+    settings: &Settings,
+) -> Option<Diagnostic> {
     let whitespace_len: TextSize = line
         .chars()
         .rev()
@@ -85,10 +89,30 @@ pub(crate) fn trailing_whitespace(line: &Line, settings: &Settings) -> Option<Di
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
+
                 if settings.rules.should_fix(Rule::BlankLineWithWhitespace) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
+                    // If this line is blank with whitespace, we have to ensure that the previous line
+                    // doesn't end with a backslash. If it did, the file would end with a backslash
+                    // and therefore have an "unexpected EOF" SyntaxError, so we have to remove it.
+                    if let Some(prev) = prev_line {
+                        let trimmed = prev.trim_end();
+                        if trimmed.ends_with('\\') {
+                            let initial_len = prev.text_len();
+                            diagnostic.range = range.sub_start(
+                                // Shift by the amount of whitespace in the previous line, plus the
+                                // newline, plus the slash, plus any remaining whitespace after it.
+                                initial_len - trimmed.text_len()
+                                    + TextSize::from(1)
+                                    + '\\'.text_len()
+                                    + (trimmed.text_len() - trimmed.trim_end().text_len()
+                                        + TextSize::from(1)),
+                            );
+                        }
+                    }
+
+                    diagnostic.set_fix(Fix::suggested(Edit::range_deletion(diagnostic.range)));
                 }
+
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
