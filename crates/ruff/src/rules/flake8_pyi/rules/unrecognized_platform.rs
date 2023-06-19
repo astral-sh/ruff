@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -93,7 +93,7 @@ pub(crate) fn unrecognized_platform(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     let ([op], [right]) = (ops, comparators) else {
@@ -113,7 +113,7 @@ pub(crate) fn unrecognized_platform(
     }
 
     // "in" might also make sense but we don't currently have one.
-    if !matches!(op, Cmpop::Eq | Cmpop::NotEq) && checker.enabled(Rule::UnrecognizedPlatformCheck) {
+    if !matches!(op, CmpOp::Eq | CmpOp::NotEq) && checker.enabled(Rule::UnrecognizedPlatformCheck) {
         checker
             .diagnostics
             .push(diagnostic_unrecognized_platform_check);

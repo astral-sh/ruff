@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Arg, ArgWithDefault, Arguments, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -176,22 +176,28 @@ fn function(
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| Arg {
-                    annotation: arg_types
-                        .get(idx)
-                        .map(|arg_type| Box::new(arg_type.clone())),
-                    ..arg.clone()
+                .map(|(idx, arg_with_default)| ArgWithDefault {
+                    def: Arg {
+                        annotation: arg_types
+                            .get(idx)
+                            .map(|arg_type| Box::new(arg_type.clone())),
+                        ..arg_with_default.def.clone()
+                    },
+                    ..arg_with_default.clone()
                 })
                 .collect::<Vec<_>>();
             let new_args = args
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| Arg {
-                    annotation: arg_types
-                        .get(idx + new_posonlyargs.len())
-                        .map(|arg_type| Box::new(arg_type.clone())),
-                    ..arg.clone()
+                .map(|(idx, arg_with_default)| ArgWithDefault {
+                    def: Arg {
+                        annotation: arg_types
+                            .get(idx + new_posonlyargs.len())
+                            .map(|arg_type| Box::new(arg_type.clone())),
+                        ..arg_with_default.def.clone()
+                    },
+                    ..arg_with_default.clone()
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {

@@ -5,9 +5,9 @@ use std::path::Path;
 use num_traits::Zero;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::Cmpop;
+use rustpython_ast::CmpOp;
 use rustpython_parser::ast::{
-    self, Arguments, Constant, Excepthandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
+    self, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
 };
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
@@ -333,25 +333,19 @@ where
             returns,
             ..
         }) => {
-            args.defaults.iter().any(|expr| any_over_expr(expr, func))
-                || args
-                    .kw_defaults
-                    .iter()
-                    .any(|expr| any_over_expr(expr, func))
-                || args.args.iter().any(|arg| {
-                    arg.annotation
+            args.posonlyargs
+                .iter()
+                .chain(args.args.iter().chain(args.kwonlyargs.iter()))
+                .any(|arg_with_default| {
+                    arg_with_default
+                        .default
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
-                })
-                || args.kwonlyargs.iter().any(|arg| {
-                    arg.annotation
-                        .as_ref()
-                        .map_or(false, |expr| any_over_expr(expr, func))
-                })
-                || args.posonlyargs.iter().any(|arg| {
-                    arg.annotation
-                        .as_ref()
-                        .map_or(false, |expr| any_over_expr(expr, func))
+                        || arg_with_default
+                            .def
+                            .annotation
+                            .as_ref()
+                            .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || args.vararg.as_ref().map_or(false, |arg| {
                     arg.annotation
@@ -448,9 +442,9 @@ where
         }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
         Stmt::With(ast::StmtWith { items, body, .. })
         | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
-            items.iter().any(|withitem| {
-                any_over_expr(&withitem.context_expr, func)
-                    || withitem
+            items.iter().any(|with_item| {
+                any_over_expr(&with_item.context_expr, func)
+                    || with_item
                         .optional_vars
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
@@ -483,7 +477,7 @@ where
         }) => {
             any_over_body(body, func)
                 || handlers.iter().any(|handler| {
-                    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         type_,
                         body,
                         ..
@@ -655,11 +649,11 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
 }
 
 /// Extract the names of all handled exceptions.
-pub fn extract_handled_exceptions(handlers: &[Excepthandler]) -> Vec<&Expr> {
+pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
     let mut handled_exceptions = Vec::new();
     for handler in handlers {
         match handler {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) => {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) => {
                 if let Some(type_) = type_ {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_.as_ref() {
                         for type_ in elts {
@@ -678,17 +672,17 @@ pub fn extract_handled_exceptions(handlers: &[Excepthandler]) -> Vec<&Expr> {
 /// Return the set of all bound argument names.
 pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
     let mut arg_names: FxHashSet<&'a str> = FxHashSet::default();
-    for arg in &arguments.posonlyargs {
-        arg_names.insert(arg.arg.as_str());
+    for arg_with_default in &arguments.posonlyargs {
+        arg_names.insert(arg_with_default.def.arg.as_str());
     }
-    for arg in &arguments.args {
-        arg_names.insert(arg.arg.as_str());
+    for arg_with_default in &arguments.args {
+        arg_names.insert(arg_with_default.def.arg.as_str());
     }
     if let Some(arg) = &arguments.vararg {
         arg_names.insert(arg.arg.as_str());
     }
-    for arg in &arguments.kwonlyargs {
-        arg_names.insert(arg.arg.as_str());
+    for arg_with_default in &arguments.kwonlyargs {
+        arg_names.insert(arg_with_default.def.arg.as_str());
     }
     if let Some(arg) = &arguments.kwarg {
         arg_names.insert(arg.arg.as_str());
@@ -1409,13 +1403,13 @@ impl Truthiness {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LocatedCmpop {
+pub struct LocatedCmpOp {
     pub range: TextRange,
-    pub op: Cmpop,
+    pub op: CmpOp,
 }
 
-impl LocatedCmpop {
-    fn new<T: Into<TextRange>>(range: T, op: Cmpop) -> Self {
+impl LocatedCmpOp {
+    fn new<T: Into<TextRange>>(range: T, op: CmpOp) -> Self {
         Self {
             range: range.into(),
             op,
@@ -1423,13 +1417,13 @@ impl LocatedCmpop {
     }
 }
 
-/// Extract all [`Cmpop`] operators from an expression snippet, with appropriate
+/// Extract all [`CmpOp`] operators from an expression snippet, with appropriate
 /// ranges.
 ///
-/// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
+/// `RustPython` doesn't include line and column information on [`CmpOp`] nodes.
 /// `CPython` doesn't either. This method iterates over the token stream and
-/// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
-pub fn locate_cmpops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpop> {
+/// re-identifies [`CmpOp`] nodes, annotating them with valid ranges.
+pub fn locate_cmp_ops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpOp> {
     // If `Expr` is a multi-line expression, we need to parenthesize it to
     // ensure that it's lexed correctly.
     let contents = locator.slice(expr.range());
@@ -1441,7 +1435,7 @@ pub fn locate_cmpops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpop> {
         .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment(_)))
         .peekable();
 
-    let mut ops: Vec<LocatedCmpop> = vec![];
+    let mut ops: Vec<LocatedCmpOp> = vec![];
     let mut count = 0u32;
     loop {
         let Some((tok, range)) = tok_iter.next() else {
@@ -1460,45 +1454,45 @@ pub fn locate_cmpops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpop> {
                     if let Some((_, next_range)) =
                         tok_iter.next_if(|(tok, _)| matches!(tok, Tok::In))
                     {
-                        ops.push(LocatedCmpop::new(
+                        ops.push(LocatedCmpOp::new(
                             TextRange::new(range.start(), next_range.end()),
-                            Cmpop::NotIn,
+                            CmpOp::NotIn,
                         ));
                     }
                 }
                 Tok::In => {
-                    ops.push(LocatedCmpop::new(range, Cmpop::In));
+                    ops.push(LocatedCmpOp::new(range, CmpOp::In));
                 }
                 Tok::Is => {
                     let op = if let Some((_, next_range)) =
                         tok_iter.next_if(|(tok, _)| matches!(tok, Tok::Not))
                     {
-                        LocatedCmpop::new(
+                        LocatedCmpOp::new(
                             TextRange::new(range.start(), next_range.end()),
-                            Cmpop::IsNot,
+                            CmpOp::IsNot,
                         )
                     } else {
-                        LocatedCmpop::new(range, Cmpop::Is)
+                        LocatedCmpOp::new(range, CmpOp::Is)
                     };
                     ops.push(op);
                 }
                 Tok::NotEqual => {
-                    ops.push(LocatedCmpop::new(range, Cmpop::NotEq));
+                    ops.push(LocatedCmpOp::new(range, CmpOp::NotEq));
                 }
                 Tok::EqEqual => {
-                    ops.push(LocatedCmpop::new(range, Cmpop::Eq));
+                    ops.push(LocatedCmpOp::new(range, CmpOp::Eq));
                 }
                 Tok::GreaterEqual => {
-                    ops.push(LocatedCmpop::new(range, Cmpop::GtE));
+                    ops.push(LocatedCmpOp::new(range, CmpOp::GtE));
                 }
                 Tok::Greater => {
-                    ops.push(LocatedCmpop::new(range, Cmpop::Gt));
+                    ops.push(LocatedCmpOp::new(range, CmpOp::Gt));
                 }
                 Tok::LessEqual => {
-                    ops.push(LocatedCmpop::new(range, Cmpop::LtE));
+                    ops.push(LocatedCmpOp::new(range, CmpOp::LtE));
                 }
                 Tok::Less => {
-                    ops.push(LocatedCmpop::new(range, Cmpop::Lt));
+                    ops.push(LocatedCmpOp::new(range, CmpOp::Lt));
                 }
                 _ => {}
             }
@@ -1513,13 +1507,13 @@ mod tests {
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_ast::{Cmpop, Expr, Stmt};
+    use rustpython_ast::{CmpOp, Expr, Stmt};
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
     use crate::helpers::{
-        elif_else_range, first_colon_range, has_trailing_content, locate_cmpops,
-        resolve_imported_module_path, LocatedCmpop,
+        elif_else_range, first_colon_range, has_trailing_content, locate_cmp_ops,
+        resolve_imported_module_path, LocatedCmpOp,
     };
     use crate::source_code::Locator;
 
@@ -1642,15 +1636,15 @@ else:
     }
 
     #[test]
-    fn extract_cmpop_location() -> Result<()> {
+    fn extract_cmp_op_location() -> Result<()> {
         let contents = "x == 1";
         let expr = Expr::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops(&expr, &locator),
-            vec![LocatedCmpop::new(
+            locate_cmp_ops(&expr, &locator),
+            vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
-                Cmpop::Eq
+                CmpOp::Eq
             )]
         );
 
@@ -1658,10 +1652,10 @@ else:
         let expr = Expr::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops(&expr, &locator),
-            vec![LocatedCmpop::new(
+            locate_cmp_ops(&expr, &locator),
+            vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
-                Cmpop::NotEq
+                CmpOp::NotEq
             )]
         );
 
@@ -1669,10 +1663,10 @@ else:
         let expr = Expr::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops(&expr, &locator),
-            vec![LocatedCmpop::new(
+            locate_cmp_ops(&expr, &locator),
+            vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
-                Cmpop::Is
+                CmpOp::Is
             )]
         );
 
@@ -1680,10 +1674,10 @@ else:
         let expr = Expr::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops(&expr, &locator),
-            vec![LocatedCmpop::new(
+            locate_cmp_ops(&expr, &locator),
+            vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(8),
-                Cmpop::IsNot
+                CmpOp::IsNot
             )]
         );
 
@@ -1691,10 +1685,10 @@ else:
         let expr = Expr::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops(&expr, &locator),
-            vec![LocatedCmpop::new(
+            locate_cmp_ops(&expr, &locator),
+            vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
-                Cmpop::In
+                CmpOp::In
             )]
         );
 
@@ -1702,10 +1696,10 @@ else:
         let expr = Expr::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops(&expr, &locator),
-            vec![LocatedCmpop::new(
+            locate_cmp_ops(&expr, &locator),
+            vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(8),
-                Cmpop::NotIn
+                CmpOp::NotIn
             )]
         );
 
@@ -1713,10 +1707,10 @@ else:
         let expr = Expr::parse(contents, "<filename>")?;
         let locator = Locator::new(contents);
         assert_eq!(
-            locate_cmpops(&expr, &locator),
-            vec![LocatedCmpop::new(
+            locate_cmp_ops(&expr, &locator),
+            vec![LocatedCmpOp::new(
                 TextSize::from(2)..TextSize::from(4),
-                Cmpop::NotEq
+                CmpOp::NotEq
             )]
         );
 

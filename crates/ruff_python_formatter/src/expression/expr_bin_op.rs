@@ -10,7 +10,7 @@ use ruff_formatter::{
 };
 use ruff_python_ast::node::AstNode;
 use rustpython_parser::ast::{
-    Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, Unaryop,
+    Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
 };
 
 #[derive(Default)]
@@ -116,7 +116,7 @@ const fn is_simple_power_expression(expr: &ExprBinOp) -> bool {
 const fn is_simple_power_operand(expr: &Expr) -> bool {
     match expr {
         Expr::UnaryOp(ExprUnaryOp {
-            op: Unaryop::Not, ..
+            op: UnaryOp::Not, ..
         }) => false,
         Expr::Constant(ExprConstant {
             value: Constant::Complex { .. } | Constant::Float(_) | Constant::Int(_),

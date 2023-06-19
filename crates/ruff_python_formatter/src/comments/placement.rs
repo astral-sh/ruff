@@ -14,21 +14,21 @@ pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_comment(comment, locator)
-        .or_else(|comment| handle_match_comment(comment, locator))
-        .or_else(|comment| handle_in_between_bodies_own_line_comment(comment, locator))
-        .or_else(|comment| handle_in_between_bodies_end_of_line_comment(comment, locator))
-        .or_else(|comment| handle_trailing_body_comment(comment, locator))
-        .or_else(handle_trailing_end_of_line_body_comment)
-        .or_else(|comment| handle_trailing_end_of_line_condition_comment(comment, locator))
-        .or_else(|comment| {
-            handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
-        })
-        .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
-        .or_else(|comment| {
-            handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
-        })
-        .or_else(handle_leading_function_with_decorators_comment)
+    handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment(
+        comment, locator,
+    )
+    .or_else(|comment| handle_match_comment(comment, locator))
+    .or_else(|comment| handle_in_between_bodies_own_line_comment(comment, locator))
+    .or_else(|comment| handle_in_between_bodies_end_of_line_comment(comment, locator))
+    .or_else(|comment| handle_trailing_body_comment(comment, locator))
+    .or_else(handle_trailing_end_of_line_body_comment)
+    .or_else(|comment| handle_trailing_end_of_line_condition_comment(comment, locator))
+    .or_else(|comment| {
+        handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
+    })
+    .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
+    .or_else(|comment| handle_trailing_binary_expression_left_or_operator_comment(comment, locator))
+    .or_else(handle_leading_function_with_decorators_comment)
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -138,8 +138,8 @@ fn handle_match_comment<'a>(
     }
 }
 
-/// Handles comments between excepthandlers and between the last except handler and any following `else` or `finally` block.
-fn handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_comment<'a>(
+/// Handles comments between except handlers and between the last except handler and any following `else` or `finally` block.
+fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
@@ -147,7 +147,7 @@ fn handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_commen
         return CommentPlacement::Default(comment);
     }
 
-    if let Some(AnyNodeRef::ExcepthandlerExceptHandler(except_handler)) = comment.preceding_node() {
+    if let Some(AnyNodeRef::ExceptHandlerExceptHandler(except_handler)) = comment.preceding_node() {
         // it now depends on the indentation level of the comment if it is a leading comment for e.g.
         // the following `elif` or indeed a trailing comment of the previous body's last statement.
         let comment_indentation =
@@ -627,11 +627,8 @@ fn handle_positional_only_arguments_separator_comment<'a>(
             // ```python
             // def test(a=10, /, b): pass
             // ```
-            || arguments
-                .defaults
-                .iter()
-                .position(|default| AnyNodeRef::from(default).ptr_eq(last_argument_or_default))
-                == Some(arguments.posonlyargs.len().saturating_sub(1));
+            || are_same_optional(last_argument_or_default, arguments
+                .posonlyargs.last().and_then(|arg| arg.default.as_deref()));
 
     if !is_last_positional_argument {
         return CommentPlacement::Default(comment);
@@ -906,7 +903,7 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         | AnyNodeRef::StmtWith(StmtWith { body, .. })
         | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { body, .. })
         | AnyNodeRef::MatchCase(MatchCase { body, .. })
-        | AnyNodeRef::ExcepthandlerExceptHandler(ExcepthandlerExceptHandler { body, .. }) => body,
+        | AnyNodeRef::ExceptHandlerExceptHandler(ExceptHandlerExceptHandler { body, .. }) => body,
 
         AnyNodeRef::StmtIf(StmtIf { body, orelse, .. })
         | AnyNodeRef::StmtFor(StmtFor { body, orelse, .. })
@@ -988,7 +985,7 @@ fn is_first_statement_in_enclosing_alternate_body(
         }) => {
             are_same_optional(following, handlers.first())
                 // Comments between the handlers and the `else`, or comments between the `handlers` and the `finally`
-                // are already handled by `handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_comment`
+                // are already handled by `handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment`
                 || handlers.is_empty() && are_same_optional(following, orelse.first())
                 || (handlers.is_empty() || !orelse.is_empty())
                 && are_same_optional(following, finalbody.first())

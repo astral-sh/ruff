@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Decorator, Expr, Ranged};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
@@ -93,11 +93,16 @@ pub(crate) fn check_positional_boolean_in_def(
         return;
     }
 
-    for arg in arguments.posonlyargs.iter().chain(arguments.args.iter()) {
-        if arg.annotation.is_none() {
+    for ArgWithDefault {
+        def,
+        default: _,
+        range: _,
+    } in arguments.posonlyargs.iter().chain(&arguments.args)
+    {
+        if def.annotation.is_none() {
             continue;
         }
-        let Some(expr) = &arg.annotation else {
+        let Some(expr) = &def.annotation else {
             continue;
         };
 
@@ -115,7 +120,7 @@ pub(crate) fn check_positional_boolean_in_def(
         }
         checker.diagnostics.push(Diagnostic::new(
             BooleanPositionalArgInFunctionDefinition,
-            arg.range(),
+            def.range(),
         ));
     }
 }

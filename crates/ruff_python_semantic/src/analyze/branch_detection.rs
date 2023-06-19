@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use rustpython_parser::ast::{self, Excepthandler, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
 use crate::node::{NodeId, Nodes};
 
@@ -57,7 +57,7 @@ fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
         }) => vec![body.iter().chain(orelse.iter()).collect()]
             .into_iter()
             .chain(handlers.iter().map(|handler| {
-                let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+                let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
                     handler;
                 body.iter().collect()
             }))

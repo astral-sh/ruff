@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use num_bigint::{BigInt, Sign};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -370,8 +370,8 @@ pub(crate) fn outdated_version_block(
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let version = extract_version(elts);
                 let target = checker.settings.target_version;
-                if op == &Cmpop::Lt || op == &Cmpop::LtE {
-                    if compare_version(&version, target, op == &Cmpop::LtE) {
+                if op == &CmpOp::Lt || op == &CmpOp::LtE {
+                    if compare_version(&version, target, op == &CmpOp::LtE) {
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt, body) {
@@ -382,8 +382,8 @@ pub(crate) fn outdated_version_block(
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
-                    if compare_version(&version, target, op == &Cmpop::GtE) {
+                } else if op == &CmpOp::Gt || op == &CmpOp::GtE {
+                    if compare_version(&version, target, op == &CmpOp::GtE) {
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt, body) {
@@ -402,7 +402,7 @@ pub(crate) fn outdated_version_block(
                 ..
             }) => {
                 let version_number = bigint_to_u32(number);
-                if version_number == 2 && op == &Cmpop::Eq {
+                if version_number == 2 && op == &CmpOp::Eq {
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt, body) {
@@ -412,7 +412,7 @@ pub(crate) fn outdated_version_block(
                         }
                     }
                     checker.diagnostics.push(diagnostic);
-                } else if version_number == 3 && op == &Cmpop::Eq {
+                } else if version_number == 3 && op == &CmpOp::Eq {
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt, body) {

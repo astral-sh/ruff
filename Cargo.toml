@@ -36,11 +36,11 @@ proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db" }
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db", default-features = false, features = ["all-nodes-with-ranges"]}
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db" }
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db" }
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
+ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "8d74eee75031b68d2204219963fae54a3f31a394" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "8d74eee75031b68d2204219963fae54a3f31a394" , default-features = false, features = ["all-nodes-with-ranges", "num-bigint"]}
+rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "8d74eee75031b68d2204219963fae54a3f31a394", default-features = false, features = ["num-bigint"] }
+rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "8d74eee75031b68d2204219963fae54a3f31a394" }
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "8d74eee75031b68d2204219963fae54a3f31a394" , default-features = false, features = ["full-lexer", "all-nodes-with-ranges", "num-bigint"] }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93" }

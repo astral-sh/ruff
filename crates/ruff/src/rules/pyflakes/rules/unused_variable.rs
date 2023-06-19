@@ -253,10 +253,10 @@ fn remove_unused_variable(
         }
     }
 
-    // Third case: withitem (`with foo() as x:`)
+    // Third case: with_item (`with foo() as x:`)
     if let Stmt::With(ast::StmtWith { items, .. }) = stmt {
         // Find the binding that matches the given `Range`.
-        // TODO(charlie): Store the `Withitem` in the `Binding`.
+        // TODO(charlie): Store the `WithItem` in the `Binding`.
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == range {

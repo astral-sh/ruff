@@ -1,5 +1,5 @@
 use rustpython_parser::ast::{self, Ranged};
-use rustpython_parser::ast::{Excepthandler, Expr};
+use rustpython_parser::ast::{ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,8 +17,9 @@ impl Violation for ExceptWithEmptyTuple {
 }
 
 /// B029
-pub(crate) fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Excepthandler) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
+pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &ExceptHandler) {
+    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
+        except_handler;
     let Some(type_) = type_ else {
         return;
     };
@@ -26,8 +27,9 @@ pub(crate) fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Exc
         return;
     };
     if elts.is_empty() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ExceptWithEmptyTuple, excepthandler.range()));
+        checker.diagnostics.push(Diagnostic::new(
+            ExceptWithEmptyTuple,
+            except_handler.range(),
+        ));
     }
 }

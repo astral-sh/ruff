@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -123,7 +123,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 }
                 for handler in handlers {
                     count += 1;
-                    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) = handler;
                     count += num_statements(body);

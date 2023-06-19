@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -74,10 +74,10 @@ where
 }
 
 /// TRY201
-pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
-        if let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+        if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             name: Some(exception_name),
             body,
             ..
