@@ -23,12 +23,12 @@ use std::{fs, io, iter};
 /// Control the verbosity of the output
 #[derive(Copy, Clone, PartialEq, Eq, clap::ValueEnum, Default)]
 pub(crate) enum Format {
-    // Filenames only
+    /// Filenames only
     Minimal,
-    // Filenames and reduced diff
+    /// Filenames and reduced diff
     #[default]
     Default,
-    // Full diff and invalid code
+    /// Full diff and invalid code
     Full,
 }
 
