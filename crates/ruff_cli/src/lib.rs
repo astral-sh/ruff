@@ -53,6 +53,41 @@ enum ChangeKind {
     SourceFile,
 }
 
+enum OutputWriter {
+    Stdout(BufWriter<io::Stdout>),
+    File(BufWriter<File>),
+}
+
+impl<P> TryFrom<Option<P>> for OutputWriter
+where
+    P: AsRef<Path>,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(path: Option<P>) -> Result<Self> {
+        Ok(match path {
+            Some(path) => OutputWriter::File(BufWriter::new(File::create(path)?)),
+            None => OutputWriter::Stdout(BufWriter::new(io::stdout())),
+        })
+    }
+}
+
+impl Write for OutputWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            OutputWriter::Stdout(stdout) => stdout.write(buf),
+            OutputWriter::File(file) => file.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            OutputWriter::Stdout(stdout) => stdout.flush(),
+            OutputWriter::File(file) => file.flush(),
+        }
+    }
+}
+
 /// Return the [`ChangeKind`] based on the list of modified file paths.
 ///
 /// Returns `None` if no relevant changes were detected.
@@ -172,14 +207,14 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         cli.stdin_filename.as_deref(),
     )?;
 
-    let mut writer: Box<dyn Write> = match cli.output_file {
-        Some(path) if !cli.watch => {
-            colored::control::set_override(false);
-            let file = File::create(path)?;
-            Box::new(BufWriter::new(file))
-        }
-        _ => Box::new(BufWriter::new(io::stdout().lock())),
+    let mut writer = if !cli.watch {
+        OutputWriter::try_from(cli.output_file)?
+    } else {
+        OutputWriter::try_from(None)?
     };
+    if matches!(writer, OutputWriter::File(_)) {
+        colored::control::set_override(false);
+    }
 
     if cli.show_settings {
         commands::show_settings::show_settings(
