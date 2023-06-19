@@ -15,6 +15,16 @@ expression: snapshot
 
 {**d}
 
+{**a, #  leading
+** # middle
+b # trailing
+}
+
+{
+** # middle with single item
+b
+}
+
 {}
 
 {1:2,}
@@ -45,6 +55,15 @@ mapping = {
 
 
 {**d}
+
+{
+    **a,  #  leading
+    **b,  # middle  # trailing
+}
+
+{
+    **b,  # middle with single item
+}
 
 {}
 

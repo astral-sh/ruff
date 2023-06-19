@@ -29,6 +29,7 @@ pub(super) fn place_comment<'a>(
     .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
     .or_else(|comment| handle_trailing_binary_expression_left_or_operator_comment(comment, locator))
     .or_else(handle_leading_function_with_decorators_comment)
+    .or_else(|comment| handle_dict_unpacking_comment(comment, locator))
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -883,6 +884,73 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
     } else {
         CommentPlacement::Default(comment)
     }
+}
+
+/// Handles comments between `**` and the variable name in dict unpacking
+/// It attaches these to the appropriate value node
+///
+/// ```python
+/// {
+///     **  # comment between `**` and the variable name
+///     value
+///     ...
+/// }
+/// ```
+fn handle_dict_unpacking_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    match comment.enclosing_node() {
+        // TODO: can maybe also add AnyNodeRef::Arguments here, but tricky to test due to
+        // https://github.com/astral-sh/ruff/issues/5176
+        AnyNodeRef::ExprDict(_) => {}
+        _ => {
+            return CommentPlacement::Default(comment);
+        }
+    };
+    if let Some(following) = comment.following_node() {
+        let preceding_end = match comment.preceding_node() {
+            Some(preceding) => preceding.end(),
+            None => comment.enclosing_node().start(),
+        };
+        let mut tokens_before = SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(preceding_end, comment.slice().start()),
+        )
+        .skip_trivia()
+        .peekable();
+
+        while let Some(it) = tokens_before.next() {
+            if it.kind == TokenKind::Star
+                && tokens_before.peek().map(|t| t.kind) == Some(TokenKind::Star)
+            {
+                return CommentPlacement::trailing(following, comment);
+            }
+        }
+    }
+
+    if let Some(preceding) = comment.preceding_node() {
+        let following_start = match comment.following_node() {
+            Some(following) => following.start(),
+            None => comment.enclosing_node().end(),
+        };
+        let mut tokens_after = SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(comment.slice().end(), following_start),
+        )
+        .skip_trivia()
+        .peekable();
+
+        while let Some(it) = tokens_after.next() {
+            if it.kind == TokenKind::Star
+                && tokens_after.peek().map(|t| t.kind) == Some(TokenKind::Star)
+            {
+                return CommentPlacement::trailing(preceding, comment);
+            }
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.

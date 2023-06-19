@@ -9,6 +9,16 @@
 
 {**d}
 
+{**a, #  leading
+** # middle
+b # trailing
+}
+
+{
+** # middle with single item
+b
+}
+
 {}
 
 {1:2,}
