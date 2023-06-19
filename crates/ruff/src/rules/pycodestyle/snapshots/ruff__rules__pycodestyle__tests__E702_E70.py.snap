@@ -61,4 +61,12 @@ E70.py:56:13: E702 Multiple statements on one line (semicolon)
 58 | match *0, 1, *2:
    |
 
+E70.py:65:4: E702 Multiple statements on one line (semicolon)
+   |
+63 | #: E702:2:4
+64 | while 1:
+65 |   1;...
+   |    ^ E702
+   |
+
 
