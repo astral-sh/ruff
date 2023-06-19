@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Cursor, Write};
+use std::io::{BufReader, BufWriter, Write};
 use std::iter;
 use std::path::Path;
 
@@ -34,9 +34,9 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     })?;
     let code = notebook.content().to_string();
     notebook.update_cell_content(&code);
-    let mut buffer = Cursor::new(Vec::new());
+    let mut buffer = BufWriter::new(Vec::new());
     notebook.write_inner(&mut buffer)?;
-    Ok(String::from_utf8(buffer.into_inner())?)
+    Ok(String::from_utf8(buffer.into_inner()?)?)
 }
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
@@ -426,6 +426,7 @@ impl Notebook {
 
 #[cfg(test)]
 mod test {
+    use std::io::BufWriter;
     use std::path::Path;
 
     use anyhow::Result;
@@ -556,6 +557,23 @@ print("after empty cells")
             &settings::Settings::for_rule(Rule::UnsortedImports),
         )?;
         assert_messages!(diagnostics, path, source_kind);
+        Ok(())
+    }
+
+    #[test]
+    fn test_json_consistency() -> Result<()> {
+        let path = "before_fix.ipynb".to_string();
+        let (_, source_kind) = test_notebook_path(
+            &path,
+            Path::new("after_fix.ipynb"),
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        let mut writer = BufWriter::new(Vec::new());
+        source_kind.expect_jupyter().write_inner(&mut writer)?;
+        let actual = String::from_utf8(writer.into_inner()?)?;
+        let expected =
+            std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;
+        assert_eq!(actual, expected);
         Ok(())
     }
 }
