@@ -22,9 +22,8 @@ use ruff_python_ast::{cast, helpers, identifier, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
-    ExecutionContext, Export, FromImportation, Globals, Importation, Module, ModuleKind,
-    ResolvedRead, Scope, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImportation,
-    SubmoduleImportation,
+    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ResolvedRead, Scope,
+    ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -815,9 +814,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::SubmoduleImportation(SubmoduleImportation {
-                                qualified_name,
-                            }),
+                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -838,7 +835,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::Importation(Importation { qualified_name }),
+                            BindingKind::Import(Import { qualified_name }),
                             flags,
                         );
 
@@ -1056,7 +1053,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::FutureImportation,
+                            BindingKind::FutureImport,
                             BindingFlags::empty(),
                         );
 
@@ -1074,7 +1071,7 @@ where
                     } else if &alias.name == "*" {
                         self.semantic
                             .scope_mut()
-                            .add_star_import(StarImportation { level, module });
+                            .add_star_import(StarImport { level, module });
 
                         if self.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
                             let scope = self.semantic.scope();
@@ -1127,7 +1124,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::FromImportation(FromImportation { qualified_name }),
+                            BindingKind::FromImport(FromImport { qualified_name }),
                             flags,
                         );
                     }
@@ -4190,10 +4187,10 @@ impl<'a> Checker<'a> {
             {
                 let shadows_import = matches!(
                     shadowed.kind,
-                    BindingKind::Importation(..)
-                        | BindingKind::FromImportation(..)
-                        | BindingKind::SubmoduleImportation(..)
-                        | BindingKind::FutureImportation
+                    BindingKind::Import(..)
+                        | BindingKind::FromImport(..)
+                        | BindingKind::SubmoduleImport(..)
+                        | BindingKind::FutureImport
                 );
                 if binding.kind.is_loop_var() && shadows_import {
                     if self.enabled(Rule::ImportShadowedByLoopVar) {
@@ -4314,7 +4311,7 @@ impl<'a> Checker<'a> {
                         .scopes
                         .iter()
                         .flat_map(Scope::star_imports)
-                        .map(|StarImportation { level, module }| {
+                        .map(|StarImport { level, module }| {
                             helpers::format_import_from(*level, *module)
                         })
                         .sorted()
@@ -4792,7 +4789,7 @@ impl<'a> Checker<'a> {
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = scope
                         .star_imports()
-                        .map(|StarImportation { level, module }| {
+                        .map(|StarImport { level, module }| {
                             helpers::format_import_from(*level, *module)
                         })
                         .sorted()
