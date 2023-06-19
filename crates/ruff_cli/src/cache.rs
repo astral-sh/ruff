@@ -46,7 +46,7 @@ impl PackageCache {
         package_root: PathBuf,
         settings: &Settings,
     ) -> Result<PackageCache> {
-        debug_assert!(package_root.is_absolute()); // Our "canonicalized" check.
+        debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let mut buf = itoa::Buffer::new();
         let key = Path::new(buf.format(cache_key(&package_root, settings)));
