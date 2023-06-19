@@ -1104,7 +1104,7 @@ def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
     #[test]
     #[cfg(feature = "all-nodes-with-ranges")]
     fn decorator_ranges() {
-        let parse_ast = parse_program(
+        let parse_ast = ast::Suite::parse(
             r#"
 @my_decorator
 def test():

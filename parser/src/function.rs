@@ -16,7 +16,14 @@ pub(crate) struct ArgumentList {
 
 // Perform validation of function/lambda arguments in a function definition.
 pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), LexicalError> {
-    let mut all_arg_names = FxHashSet::with_hasher(Default::default());
+    let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
+        arguments.posonlyargs.len()
+            + arguments.args.len()
+            + arguments.vararg.is_some() as usize
+            + arguments.kwonlyargs.len()
+            + arguments.kwarg.is_some() as usize,
+        Default::default(),
+    );
 
     let posonlyargs = arguments.posonlyargs.iter();
     let args = arguments.args.iter();
@@ -83,7 +90,7 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
             Some((start, end, name)) => {
                 // Check for duplicate keyword arguments in the call.
                 if let Some(keyword_name) = &name {
-                    if keyword_names.contains(keyword_name) {
+                    if !keyword_names.insert(keyword_name.clone()) {
                         return Err(LexicalError {
                             error: LexicalErrorType::DuplicateKeywordArgumentError(
                                 keyword_name.to_string(),
@@ -91,8 +98,6 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
                             location: start,
                         });
                     }
-
-                    keyword_names.insert(keyword_name.clone());
                 } else {
                     double_starred = true;
                 }
