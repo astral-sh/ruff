@@ -11,9 +11,7 @@ include = ["LICENSE", "Cargo.toml", "src/**/*.rs"]
 [workspace]
 resolver = "2"
 members = [
-    "ast", "core", "format", "literal", "parser",
-    "ast-pyo3",
-    "ruff_text_size", "ruff_source_location",
+    "ast", "core", "format", "literal", "parser", "ruff_text_size",
 ]
 
 [workspace.dependencies]

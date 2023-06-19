@@ -8,12 +8,7 @@ repository = "https://github.com/RustPython/Parser/"
 license = "MIT"
 
 [features]
-default = ["location", "malachite-bigint"]
-constant-optimization = ["fold"]
-location = ["fold", "rustpython-parser-core/location"]
-fold = []
-unparse = ["rustpython-literal"]
-visitor = []
+default = ["malachite-bigint"]
 all-nodes-with-ranges = []
 
 [dependencies]

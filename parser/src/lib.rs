@@ -113,8 +113,6 @@
 #![doc(html_root_url = "https://docs.rs/rustpython-parser/")]
 
 pub use rustpython_ast as ast;
-#[cfg(feature = "location")]
-pub use rustpython_parser_core::source_code;
 pub use rustpython_parser_core::{text_size, Mode};
 
 mod function;

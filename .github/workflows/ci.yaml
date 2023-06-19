@@ -40,7 +40,7 @@ jobs:
       - name: run tests with num-bigint
         run: cargo test --all --no-default-features --features num-bigint
       - name: run tests with malachite-bigint and all features
-        run: cargo test --all --features location,malachite-bigint,constant-optimization,fold,unparse,visitor,all-nodes-with-ranges,full-lexer,serde --exclude rustpython-ast-pyo3
+        run: cargo test --all --features malachite-bigint,all-nodes-with-ranges,full-lexer,serde
 
   lint:
     name: Check Rust code with rustfmt and clippy
@@ -55,7 +55,7 @@ jobs:
       - name: run clippy
         run: cargo clippy --all --no-default-features --features num-bigint
       - name: run clippy
-        run: cargo clippy --all --features location,malachite-bigint,constant-optimization,fold,unparse,visitor,all-nodes-with-ranges,full-lexer,serde --exclude rustpython-ast-pyo3 -- -Dwarnings
+        run: cargo clippy --all --features malachite-bigint,all-nodes-with-ranges,full-lexer,serde -- -Dwarnings
 
       - uses: actions/setup-python@v4
         with:

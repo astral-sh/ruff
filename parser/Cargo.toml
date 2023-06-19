@@ -9,8 +9,7 @@ license = "MIT"
 edition = "2021"
 
 [features]
-default = ["location", "malachite-bigint"]
-location = ["rustpython-ast/location", "rustpython-parser-core/location"]
+default = ["malachite-bigint"]
 serde = ["dep:serde", "rustpython-parser-core/serde"]
 all-nodes-with-ranges = ["rustpython-ast/all-nodes-with-ranges"]
 full-lexer = []
