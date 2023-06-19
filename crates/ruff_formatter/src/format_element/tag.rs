@@ -203,8 +203,8 @@ pub enum DedentMode {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Condition {
-    /// - Flat -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
-    /// - Multiline -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
+    /// - `Flat` -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
+    /// - `Expanded` -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
     pub(crate) mode: PrintMode,
 
     /// The id of the group for which it should check if it breaks or not. The group must appear in the document
@@ -213,7 +213,7 @@ pub struct Condition {
 }
 
 impl Condition {
-    pub fn new(mode: PrintMode) -> Self {
+    pub(crate) fn new(mode: PrintMode) -> Self {
         Self {
             mode,
             group_id: None,
@@ -223,10 +223,6 @@ impl Condition {
     pub fn with_group_id(mut self, id: Option<GroupId>) -> Self {
         self.group_id = id;
         self
-    }
-
-    pub fn mode(&self) -> PrintMode {
-        self.mode
     }
 }
 

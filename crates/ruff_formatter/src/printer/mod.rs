@@ -4,18 +4,10 @@ mod printer_options;
 mod queue;
 mod stack;
 
-pub use printer_options::*;
-
-use crate::format_element::{BestFitting, LineMode, PrintMode};
-use crate::{
-    ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError,
-    PrintResult, Printed, SourceMarker, TextRange,
-};
-
 use crate::format_element::document::Document;
-use crate::format_element::tag::Condition;
+use crate::format_element::tag::{Condition, GroupMode};
+use crate::format_element::{BestFittingMode, BestFittingVariants, LineMode, PrintMode};
 use crate::prelude::tag::{DedentMode, Tag, TagKind, VerbatimKind};
-use crate::prelude::Tag::EndFill;
 use crate::printer::call_stack::{
     CallStack, FitsCallStack, PrintCallStack, PrintElementArgs, StackFrame,
 };
@@ -24,7 +16,12 @@ use crate::printer::queue::{
     AllPredicate, FitsEndPredicate, FitsQueue, PrintQueue, Queue, SingleEntryPredicate,
 };
 use crate::source_code::SourceCode;
+use crate::{
+    ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError,
+    PrintResult, Printed, SourceMarker, TextRange,
+};
 use drop_bomb::DebugDropBomb;
+pub use printer_options::*;
 use ruff_text_size::{TextLen, TextSize};
 use std::num::NonZeroU8;
 use unicode_width::UnicodeWidthChar;
@@ -137,8 +134,8 @@ impl<'a> Printer<'a> {
                 self.flush_line_suffixes(queue, stack, Some(HARD_BREAK));
             }
 
-            FormatElement::BestFitting(best_fitting) => {
-                self.print_best_fitting(best_fitting, queue, stack)?;
+            FormatElement::BestFitting { variants, mode } => {
+                self.print_best_fitting(variants, *mode, queue, stack)?;
             }
 
             FormatElement::Interned(content) => {
@@ -146,30 +143,31 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::Tag(StartGroup(group)) => {
-                let group_mode = if !group.mode().is_flat() {
-                    PrintMode::Expanded
-                } else {
-                    match args.mode() {
-                        PrintMode::Flat if self.state.measured_group_fits => {
-                            // A parent group has already verified that this group fits on a single line
-                            // Thus, just continue in flat mode
-                            PrintMode::Flat
-                        }
-                        // The printer is either in expanded mode or it's necessary to re-measure if the group fits
-                        // because the printer printed a line break
-                        _ => {
-                            self.state.measured_group_fits = true;
-
-                            // Measure to see if the group fits up on a single line. If that's the case,
-                            // print the group in "flat" mode, otherwise continue in expanded mode
-                            stack.push(TagKind::Group, args.with_print_mode(PrintMode::Flat));
-                            let fits = self.fits(queue, stack)?;
-                            stack.pop(TagKind::Group)?;
-
-                            if fits {
+                let group_mode = match group.mode() {
+                    GroupMode::Expand | GroupMode::Propagated => PrintMode::Expanded,
+                    GroupMode::Flat => {
+                        match args.mode() {
+                            PrintMode::Flat if self.state.measured_group_fits => {
+                                // A parent group has already verified that this group fits on a single line
+                                // Thus, just continue in flat mode
                                 PrintMode::Flat
-                            } else {
-                                PrintMode::Expanded
+                            }
+                            // The printer is either in expanded mode or it's necessary to re-measure if the group fits
+                            // because the printer printed a line break
+                            _ => {
+                                self.state.measured_group_fits = true;
+
+                                // Measure to see if the group fits up on a single line. If that's the case,
+                                // print the group in "flat" mode, otherwise continue in expanded mode
+                                stack.push(TagKind::Group, args.with_print_mode(PrintMode::Flat));
+                                let fits = self.fits(queue, stack)?;
+                                stack.pop(TagKind::Group)?;
+
+                                if fits {
+                                    PrintMode::Flat
+                                } else {
+                                    PrintMode::Expanded
+                                }
                             }
                         }
                     }
@@ -211,10 +209,10 @@ impl<'a> Printer<'a> {
                     Some(id) => self.state.group_modes.unwrap_print_mode(*id, element),
                 };
 
-                if group_mode != *mode {
-                    queue.skip_content(TagKind::ConditionalContent);
-                } else {
+                if *mode == group_mode {
                     stack.push(TagKind::ConditionalContent, args);
+                } else {
+                    queue.skip_content(TagKind::ConditionalContent);
                 }
             }
 
@@ -249,6 +247,7 @@ impl<'a> Printer<'a> {
             FormatElement::Tag(tag @ (StartLabelled(_) | StartEntry)) => {
                 stack.push(tag.kind(), args);
             }
+
             FormatElement::Tag(
                 tag @ (EndLabelled
                 | EndEntry
@@ -371,19 +370,19 @@ impl<'a> Printer<'a> {
 
     fn print_best_fitting(
         &mut self,
-        best_fitting: &'a BestFitting,
+        variants: &'a BestFittingVariants,
+        mode: BestFittingMode,
         queue: &mut PrintQueue<'a>,
         stack: &mut PrintCallStack,
     ) -> PrintResult<()> {
         let args = stack.top();
 
         if args.mode().is_flat() && self.state.measured_group_fits {
-            queue.extend_back(best_fitting.most_flat());
+            queue.extend_back(variants.most_flat());
             self.print_entry(queue, stack, args)
         } else {
             self.state.measured_group_fits = true;
-
-            let normal_variants = &best_fitting.variants()[..best_fitting.variants().len() - 1];
+            let normal_variants = &variants[..variants.len() - 1];
 
             for variant in normal_variants.iter() {
                 // Test if this variant fits and if so, use it. Otherwise try the next
@@ -394,11 +393,13 @@ impl<'a> Printer<'a> {
                     return invalid_start_tag(TagKind::Entry, variant.first());
                 }
 
-                let entry_args = args.with_print_mode(PrintMode::Flat);
-
                 // Skip the first element because we want to override the args for the entry and the
                 // args must be popped from the stack as soon as it sees the matching end entry.
                 let content = &variant[1..];
+
+                let entry_args = args
+                    .with_print_mode(PrintMode::Flat)
+                    .with_measure_mode(MeasureMode::from(mode));
 
                 queue.extend_back(content);
                 stack.push(TagKind::Entry, entry_args);
@@ -411,12 +412,12 @@ impl<'a> Printer<'a> {
 
                 if variant_fits {
                     queue.extend_back(variant);
-                    return self.print_entry(queue, stack, entry_args);
+                    return self.print_entry(queue, stack, args.with_print_mode(PrintMode::Flat));
                 }
             }
 
             // No variant fits, take the last (most expanded) as fallback
-            let most_expanded = best_fitting.most_expanded();
+            let most_expanded = variants.most_expanded();
             queue.extend_back(most_expanded);
             self.print_entry(queue, stack, args.with_print_mode(PrintMode::Expanded))
         }
@@ -555,7 +556,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if queue.top() == Some(&FormatElement::Tag(EndFill)) {
+        if queue.top() == Some(&FormatElement::Tag(Tag::EndFill)) {
             Ok(())
         } else {
             invalid_end_tag(TagKind::Fill, stack.top_kind())
@@ -959,8 +960,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             FormatElement::Space => return Ok(self.fits_text(" ")),
 
             FormatElement::Line(line_mode) => {
-                if args.mode().is_flat() {
-                    match line_mode {
+                match args.mode() {
+                    PrintMode::Flat => match line_mode {
                         LineMode::SoftOrSpace => return Ok(self.fits_text(" ")),
                         LineMode::Soft => {}
                         LineMode::Hard | LineMode::Empty => {
@@ -970,13 +971,22 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                 Fits::Yes
                             });
                         }
+                    },
+                    PrintMode::Expanded => {
+                        match args.measure_mode() {
+                            MeasureMode::FirstLine => {
+                                // Reachable if the restQueue contains an element with mode expanded because Expanded
+                                // is what the mode's initialized to by default
+                                // This means, the printer is outside of the current element at this point and any
+                                // line break should be printed as regular line break
+                                return Ok(Fits::Yes);
+                            }
+                            MeasureMode::AllLines => {
+                                // Continue measuring on the next line
+                                self.state.line_width = 0;
+                            }
+                        }
                     }
-                } else {
-                    // Reachable if the restQueue contains an element with mode expanded because Expanded
-                    // is what the mode's initialized to by default
-                    // This means, the printer is outside of the current element at this point and any
-                    // line break should be printed as regular line break -> Fits
-                    return Ok(Fits::Yes);
                 }
             }
 
@@ -1000,17 +1010,21 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::SourcePosition(_) => {}
 
-            FormatElement::BestFitting(best_fitting) => {
-                let slice = match args.mode() {
-                    PrintMode::Flat => best_fitting.most_flat(),
-                    PrintMode::Expanded => best_fitting.most_expanded(),
+            FormatElement::BestFitting { variants, mode } => {
+                let (slice, args) = match args.mode() {
+                    PrintMode::Flat => (
+                        variants.most_flat(),
+                        args.with_measure_mode(MeasureMode::from(*mode)),
+                    ),
+                    PrintMode::Expanded => (variants.most_expanded(), args),
                 };
 
                 if !matches!(slice.first(), Some(FormatElement::Tag(Tag::StartEntry))) {
                     return invalid_start_tag(TagKind::Entry, slice.first());
                 }
 
-                self.queue.extend_back(slice);
+                self.stack.push(TagKind::Entry, args);
+                self.queue.extend_back(&slice[1..]);
             }
 
             FormatElement::Interned(content) => self.queue.extend_back(content),
@@ -1040,22 +1054,23 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     return Ok(Fits::No);
                 }
 
-                let group_mode = if !group.mode().is_flat() {
+                // Continue printing groups in expanded mode if measuring a `fits_expanded` element
+                let print_mode = if !group.mode().is_flat() {
                     PrintMode::Expanded
                 } else {
                     args.mode()
                 };
 
                 self.stack
-                    .push(TagKind::Group, args.with_print_mode(group_mode));
+                    .push(TagKind::Group, args.with_print_mode(print_mode));
 
                 if let Some(id) = group.id() {
-                    self.group_modes_mut().insert_print_mode(id, group_mode);
+                    self.group_modes_mut().insert_print_mode(id, print_mode);
                 }
             }
 
             FormatElement::Tag(StartConditionalContent(condition)) => {
-                let group_mode = match condition.group_id {
+                let print_mode = match condition.group_id {
                     None => args.mode(),
                     Some(group_id) => self
                         .group_modes()
@@ -1063,20 +1078,20 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                         .unwrap_or_else(|| args.mode()),
                 };
 
-                if group_mode != condition.mode {
-                    self.queue.skip_content(TagKind::ConditionalContent);
-                } else {
+                if condition.mode == print_mode {
                     self.stack.push(TagKind::ConditionalContent, args);
+                } else {
+                    self.queue.skip_content(TagKind::ConditionalContent);
                 }
             }
 
             FormatElement::Tag(StartIndentIfGroupBreaks(id)) => {
-                let group_mode = self
+                let print_mode = self
                     .group_modes()
                     .get_print_mode(*id)
                     .unwrap_or_else(|| args.mode());
 
-                match group_mode {
+                match print_mode {
                     PrintMode::Flat => {
                         self.stack.push(TagKind::IndentIfGroupBreaks, args);
                     }
@@ -1103,6 +1118,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             ) => {
                 self.stack.push(tag.kind(), args);
             }
+
             FormatElement::Tag(
                 tag @ (EndFill
                 | EndVerbatim
@@ -1232,6 +1248,27 @@ struct FitsState {
     pending_indent: Indention,
     has_line_suffix: bool,
     line_width: usize,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum MeasureMode {
+    /// The content fits if a hard line break or soft line break in [`PrintMode::Expanded`] is seen
+    /// before exceeding the configured print width.
+    /// Returns
+    FirstLine,
+
+    /// The content only fits if non of the lines exceed the print width. Lines are terminated by either
+    /// a hard line break or a soft line break in [`PrintMode::Expanded`].
+    AllLines,
+}
+
+impl From<BestFittingMode> for MeasureMode {
+    fn from(value: BestFittingMode) -> Self {
+        match value {
+            BestFittingMode::FirstLine => Self::FirstLine,
+            BestFittingMode::AllLines => Self::AllLines,
+        }
+    }
 }
 
 #[cfg(test)]
