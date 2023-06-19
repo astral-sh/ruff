@@ -173,18 +173,22 @@ the `else` has no node, we're just getting the statements in its body.
 
 The preceding token of the leading else comment is the `break`, which has a node, the following
 token is the `else`, which lacks a node, so by default the comment would be marked as trailing
-the `break` and wrongly formatted as such. We avoid this by finding comments between
-two bodies that have the same indentation level as the keyword in
+the `break` and wrongly formatted as such. We can identify these cases by looking for comments
+between two bodies that have the same indentation level as the keyword, e.g. in our case the
+leading else comment is inside the `while` node (which spans the entire snippet) and on the same
+level as the `else`. We identify those case in
 [`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196)
-and marking them as dangling. Similarly, we find and
-mark comment after the colon(s).
+and mark them as dangling for manual formatting later. Similarly, we find and mark comment after
+the colon(s) in
+[`handle_trailing_end_of_line_condition_comment`](https://github.com/astral-sh/ruff/blob/main/crates/ruff_python_formatter/src/comments/placement.rs#L518)
+.
 
 The comments don't carry any extra information such as why we marked the comment as trailing,
-instead they are collect into one list of leading, one list of trailing and one list of dangling
+instead they are sorted into one list of leading, one list of trailing and one list of dangling
 comments per node. In `FormatStmtWhile`, we can have multiple types of dangling comments, so we
-have to split them into after-colon-comments, before-else-comments, etc. by some element
-separating them (e.g. all comments trailing the colon come before the first statement in the body)
-and manually insert them in the right position.
+have to split the dangling list into after-colon-comments, before-else-comments, etc. by some
+element separating them (e.g. all comments trailing the colon come before the first statement in
+the body) and manually insert them in the right position.
 
 A simplified implementation with only those two kinds of comments:
 
