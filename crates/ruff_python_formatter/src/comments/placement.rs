@@ -908,46 +908,34 @@ fn handle_dict_unpacking_comment<'a>(
             return CommentPlacement::Default(comment);
         }
     };
-    if let Some(following) = comment.following_node() {
-        let preceding_end = match comment.preceding_node() {
-            Some(preceding) => preceding.end(),
-            None => comment.enclosing_node().start(),
-        };
-        let mut tokens_before = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(preceding_end, comment.slice().start()),
-        )
-        .skip_trivia()
-        .peekable();
 
-        while let Some(it) = tokens_before.next() {
-            if it.kind == TokenKind::Star
-                && tokens_before.peek().map(|t| t.kind) == Some(TokenKind::Star)
-            {
-                return CommentPlacement::trailing(following, comment);
-            }
-        }
+    let Some(following) = comment.following_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let preceding_end = match comment.preceding_node() {
+        Some(preceding) => preceding.end(),
+        None => comment.enclosing_node().start(),
+    };
+    let range_start = preceding_end + TextSize::new(1);
+    if range_start > comment.slice().start() {
+        return CommentPlacement::Default(comment);
     }
+    let tokens = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(range_start, comment.slice().start()),
+    )
+    .skip_trivia();
 
-    if let Some(preceding) = comment.preceding_node() {
-        let following_start = match comment.following_node() {
-            Some(following) => following.start(),
-            None => comment.enclosing_node().end(),
-        };
-        let mut tokens_after = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(comment.slice().end(), following_start),
-        )
-        .skip_trivia()
-        .peekable();
-
-        while let Some(it) = tokens_after.next() {
-            if it.kind == TokenKind::Star
-                && tokens_after.peek().map(|t| t.kind) == Some(TokenKind::Star)
-            {
-                return CommentPlacement::trailing(preceding, comment);
-            }
+    let mut count = 0;
+    for token in tokens {
+        if token.kind != TokenKind::Star {
+            return CommentPlacement::Default(comment);
         }
+        count += 1;
+    }
+    if count == 2 {
+        return CommentPlacement::trailing(following, comment);
     }
 
     CommentPlacement::Default(comment)
