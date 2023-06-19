@@ -301,6 +301,8 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 mod test {
     use std::env::temp_dir;
     use std::fs;
+    use std::io::{self, Write};
+    use std::path::Path;
 
     use ruff::settings::{flags, AllSettings};
 
@@ -371,5 +373,87 @@ mod test {
         expected_diagnostics.source_kind.clear();
         got_diagnostics.source_kind.clear();
         assert!(expected_diagnostics == got_diagnostics);
+    }
+
+    #[test]
+    fn invalidation() {
+        const SOURCE: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let mut cache_dir = temp_dir();
+        cache_dir.push("ruff_tests/cache_invalidation");
+        let _ = fs::remove_dir_all(&cache_dir);
+        cache::init(&cache_dir).unwrap();
+
+        let settings = AllSettings::default();
+        let package_root = fs::canonicalize(&cache_dir).unwrap();
+        let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
+        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+
+        let path = cache_dir.join("source.py");
+        fs::write(&path, SOURCE).unwrap();
+
+        let mut expected_diagnostics = lint_path(
+            &path,
+            Some(&package_root),
+            &settings,
+            Some(&cache),
+            flags::Noqa::Enabled,
+            flags::FixMode::Generate,
+        )
+        .unwrap();
+        assert!(cache.new_files.lock().unwrap().len() == 1);
+
+        cache.store().unwrap();
+        // On certain tmp filesystems (tmpfs) overwriting the file with the same
+        // content doesn't seem to update it's modified timestamp. Calling fsync
+        // doesn't mark a difference, but this small sleep seems to fix the
+        // issue.
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        let tests = [
+            // File change.
+            (|path| {
+                let mut file = fs::OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(path)?;
+                file.write_all(SOURCE)?;
+                file.sync_data()
+            }) as fn(&Path) -> io::Result<()>,
+            // Regression for issue #3086.
+            #[cfg(unix)]
+            |path| {
+                use std::os::unix::fs::PermissionsExt;
+                let file = fs::OpenOptions::new().write(true).open(path)?;
+                let perms = file.metadata()?.permissions();
+                file.set_permissions(PermissionsExt::from_mode(perms.mode() ^ 0o111))
+            },
+        ];
+
+        for change_file in tests {
+            change_file(&path).unwrap();
+
+            let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
+
+            let mut got_diagnostics = lint_path(
+                &path,
+                Some(&package_root),
+                &settings,
+                Some(&cache),
+                flags::Noqa::Enabled,
+                flags::FixMode::Generate,
+            )
+            .unwrap();
+            assert_eq!(
+                cache.new_files.lock().unwrap().len(),
+                1,
+                "cache must not be used"
+            );
+
+            // Not store in the cache.
+            expected_diagnostics.source_kind.clear();
+            got_diagnostics.source_kind.clear();
+            assert!(expected_diagnostics == got_diagnostics);
+        }
     }
 }
