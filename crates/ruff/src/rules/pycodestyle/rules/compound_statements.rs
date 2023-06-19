@@ -145,6 +145,12 @@ pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec
             Tok::Rbrace => {
                 brace_count = brace_count.saturating_sub(1);
             }
+            Tok::Ellipsis => {
+                if allow_ellipsis {
+                    allow_ellipsis = false;
+                    continue;
+                }
+            }
             _ => {}
         }
 
@@ -195,17 +201,15 @@ pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec
                     || with.is_some()
                 {
                     colon = Some((range.start(), range.end()));
-                    allow_ellipsis = true;
+
+                    // Allow `class C: ...`-style definitions in stubs.
+                    allow_ellipsis = class.is_some();
                 }
             }
             Tok::Semi => {
                 semi = Some((range.start(), range.end()));
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
-            Tok::Ellipsis if allow_ellipsis => {
-                // Allow `class C: ...`-style definitions in stubs.
-                allow_ellipsis = false;
-            }
             _ => {
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
