@@ -564,7 +564,7 @@ print("after empty cells")
     fn test_json_consistency() -> Result<()> {
         let path = "before_fix.ipynb".to_string();
         let (_, source_kind) = test_notebook_path(
-            &path,
+            path,
             Path::new("after_fix.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
