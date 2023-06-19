@@ -43,7 +43,7 @@ rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git
 rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
-serde_json = { version = "1.0.93", features = ["preserve_order"] }
+serde_json = { version = "1.0.93" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1" }
 smallvec = { version = "1.10.0" }
