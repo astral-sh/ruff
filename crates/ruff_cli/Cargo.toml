@@ -47,6 +47,7 @@ filetime = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true }
 itertools = { workspace = true }
+itoa = { version = "1.0.6" }
 log = { workspace = true }
 notify = { version = "5.1.0" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
