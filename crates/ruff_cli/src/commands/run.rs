@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use anyhow::Result;
@@ -78,8 +77,21 @@ pub(crate) fn run(
         pyproject_config,
     );
 
-    // The caches are read/created lazily below.
-    let caches = bool::from(cache).then(|| Mutex::new(HashMap::new()));
+    // Load the caches.
+    let caches = bool::from(cache).then(|| {
+        package_roots
+            .par_iter()
+            .map(|(package_root, _)| {
+                let settings = resolver.resolve_all(package_root, pyproject_config);
+                let cache = Cache::open(
+                    &settings.cli.cache_dir,
+                    package_root.to_path_buf(),
+                    &settings.lib,
+                );
+                (&**package_root, cache)
+            })
+            .collect::<HashMap<&Path, Cache>>()
+    });
 
     let start = Instant::now();
     let mut diagnostics: Diagnostics = paths
@@ -95,37 +107,9 @@ pub(crate) fn run(
 
                     let settings = resolver.resolve_all(path, pyproject_config);
                     let package_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
-
-                    // Lazily create a cache per package, if enabled.
-                    //
-                    // This uses a mutex areound a hash map containing
-                    // `OnceLock`s, which is more complex than it needs to be.
-                    //
-                    // We can't hold the lock around the `package_caches`
-                    // hashmap because that would effectively mean we're only
-                    // running this part sequentially. So, we lock the hashmap
-                    // briefly to insert and/or retrieve a `OnceLock`. We use a
-                    // `OnceLock` to create a lock per package so that we still
-                    // ensure that the cache for a package is only opened once,
-                    // while block only the thread interested in the same
-                    // package cache.
-                    let cache_init = caches.as_ref().map(|caches| {
-                        caches
-                            .lock()
-                            .unwrap()
-                            .entry(package_root)
-                            .or_insert_with(|| Arc::new(OnceLock::new()))
-                            .clone()
-                    });
-                    let cache = cache_init.as_ref().map(|cache| {
-                        cache.get_or_init(|| {
-                            Cache::open(
-                                &settings.cli.cache_dir,
-                                package_root.to_owned(),
-                                &settings.lib,
-                            )
-                        })
-                    });
+                    let cache = caches
+                        .as_ref()
+                        .map(|caches| caches.get(&package_root).unwrap());
 
                     lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
@@ -187,16 +171,8 @@ pub(crate) fn run(
     // Store the caches.
     if let Some(caches) = caches {
         caches
-            .into_inner()
-            .unwrap()
-            .par_iter_mut()
-            .try_for_each(|(_, cache)| {
-                if let Some(cache) = Arc::get_mut(cache).and_then(OnceLock::take) {
-                    cache.store()
-                } else {
-                    Ok(())
-                }
-            })?;
+            .into_par_iter()
+            .try_for_each(|(_, cache)| cache.store())?;
     }
 
     let duration = start.elapsed();
