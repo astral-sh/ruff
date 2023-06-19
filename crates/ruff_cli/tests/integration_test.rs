@@ -118,7 +118,8 @@ fn stdin_json() -> Result<()> {
       "row": 1
     }},
     "message": "`os` imported but unused",
-    "noqa_row": 1
+    "noqa_row": 1,
+    "url": "https://beta.ruff.rs/docs/rules/unused-import"
   }}
 ]"#
         )
