@@ -32,7 +32,8 @@ expression: content
       "row": 1
     },
     "message": "`os` imported but unused",
-    "noqa_row": 1
+    "noqa_row": 1,
+    "url": "https://beta.ruff.rs/docs/rules/unused-import"
   },
   {
     "code": "F841",
@@ -63,7 +64,8 @@ expression: content
       "row": 6
     },
     "message": "Local variable `x` is assigned to but never used",
-    "noqa_row": 6
+    "noqa_row": 6,
+    "url": "https://beta.ruff.rs/docs/rules/unused-variable"
   },
   {
     "code": "F821",
@@ -78,6 +80,7 @@ expression: content
       "row": 1
     },
     "message": "Undefined name `a`",
-    "noqa_row": 1
+    "noqa_row": 1,
+    "url": "https://beta.ruff.rs/docs/rules/undefined-name"
   }
 ]
