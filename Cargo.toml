@@ -45,7 +45,7 @@ schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }
 shellexpand = { version = "3.0.0" }
-similar = { version = "2.2.1" }
+similar = { version = "2.2.1", features = ["inline"] }
 smallvec = { version = "1.10.0" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
