@@ -104,7 +104,7 @@ print("hello world")  # Trailing comment (end-of-line)
 # Trailing comment (own line)
 ```
 
-Comment are automatically attached as `Leading` or `Trailing` to a node close to them, or `Dangling`
+Comments are automatically attached as `Leading` or `Trailing` to a node close to them, or `Dangling`
 if there are only tokens and no nodes surrounding it. Categorization is automatic but sometimes
 needs to be overridden in `place_comment` in `placement.rs`, which this section is about.
 
