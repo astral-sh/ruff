@@ -16,15 +16,15 @@ use crate::checkers::ast::Checker;
 /// difficult to distinguish between exceptions raised by the `raise` statement
 /// and exceptions raised by the `except` clause.
 ///
-/// Instead, use the `from` clause to distinguish between the two (for example,
-/// `raise ... from exc` or `raise ... from None`).
+/// Instead, use the `from` clause to distinguish between the scenarios (for
+/// example, `raise ... from exc` or `raise ... from None`).
 ///
 /// ## Example
 /// ```python
 /// try:
 ///     ...
 /// except FileNotFoundError:
-///     if condition:
+///     if ...:
 ///         raise RuntimeError("...")
 ///     else:
 ///         raise UserWarning("...")
@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// try:
 ///     ...
 /// except FileNotFoundError as exc:
-///     if condition:
+///     if ...:
 ///         raise RuntimeError("...") from None
 ///     else:
 ///         raise UserWarning("...") from exc
