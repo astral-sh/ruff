@@ -319,7 +319,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             noqa.into(),
             autofix,
         )?;
-        printer.write_continuously(&messages)?;
+        printer.write_continuously(&mut writer, &messages)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -351,7 +351,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                         noqa.into(),
                         autofix,
                     )?;
-                    printer.write_continuously(&messages)?;
+                    printer.write_continuously(&mut writer, &messages)?;
                 }
                 Err(err) => return Err(err.into()),
             }

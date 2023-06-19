@@ -1,8 +1,7 @@
 use std::cmp::Reverse;
 use std::fmt::Display;
 use std::hash::Hash;
-use std::io;
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
 use anyhow::Result;
 use bitflags::bitflags;
@@ -98,7 +97,7 @@ impl Printer {
         }
     }
 
-    fn write_summary_text(&self, stdout: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
+    fn write_summary_text(&self, writer: &mut impl Write, diagnostics: &Diagnostics) -> Result<()> {
         if self.log_level >= LogLevel::Default {
             if self.flags.contains(Flags::SHOW_VIOLATIONS) {
                 let fixed = diagnostics
@@ -111,12 +110,12 @@ impl Printer {
                 if fixed > 0 {
                     let s = if total == 1 { "" } else { "s" };
                     writeln!(
-                        stdout,
+                        writer,
                         "Found {total} error{s} ({fixed} fixed, {remaining} remaining)."
                     )?;
                 } else if remaining > 0 {
                     let s = if remaining == 1 { "" } else { "s" };
-                    writeln!(stdout, "Found {remaining} error{s}.")?;
+                    writeln!(writer, "Found {remaining} error{s}.")?;
                 }
 
                 if show_fix_status(self.autofix_level) {
@@ -127,7 +126,7 @@ impl Printer {
                         .count();
                     if num_fixable > 0 {
                         writeln!(
-                            stdout,
+                            writer,
                             "[{}] {num_fixable} potentially fixable with the --fix option.",
                             "*".cyan(),
                         )?;
@@ -142,9 +141,9 @@ impl Printer {
                 if fixed > 0 {
                     let s = if fixed == 1 { "" } else { "s" };
                     if self.autofix_level.is_apply() {
-                        writeln!(stdout, "Fixed {fixed} error{s}.")?;
+                        writeln!(writer, "Fixed {fixed} error{s}.")?;
                     } else {
-                        writeln!(stdout, "Would fix {fixed} error{s}.")?;
+                        writeln!(writer, "Would fix {fixed} error{s}.")?;
                     }
                 }
             }
@@ -339,7 +338,11 @@ impl Printer {
         Ok(())
     }
 
-    pub(crate) fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub(crate) fn write_continuously(
+        &self,
+        writer: &mut impl Write,
+        diagnostics: &Diagnostics,
+    ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -356,19 +359,18 @@ impl Printer {
             );
         }
 
-        let mut stdout = BufWriter::new(io::stdout().lock());
         if !diagnostics.messages.is_empty() {
             if self.log_level >= LogLevel::Default {
-                writeln!(stdout)?;
+                writeln!(writer)?;
             }
 
             let context = EmitterContext::new(&diagnostics.source_kind);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.autofix_level))
                 .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
-                .emit(&mut stdout, &diagnostics.messages, &context)?;
+                .emit(writer, &diagnostics.messages, &context)?;
         }
-        stdout.flush()?;
+        writer.flush()?;
 
         Ok(())
     }
