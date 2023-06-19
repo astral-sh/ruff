@@ -173,7 +173,7 @@ The preceding token of the leading else comment is the `break`, which has a node
 token is the `else`, which lacks a node, so by default the comment would be marked as trailing
 the `break` and wrongly formatted as such. We avoid this by finding comments between
 two bodies that have the same indentation level as the keyword in
-`handle_in_between_bodies_own_line_comment` and marking them as dangling. Similarly, we find and
+[`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196) and marking them as dangling. Similarly, we find and
 mark comment after the colon(s). In `FormatStmtWhile`, we take the list of all dangling comments,
 split them into after-colon-comments, before-else-comments, etc. by some element separating them
 (e.g. all comments trailing the colon come before the first statement in the body) and manually
