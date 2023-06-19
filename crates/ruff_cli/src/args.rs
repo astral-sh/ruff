@@ -68,7 +68,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, clap::Args)]
+#[derive(Clone, Debug, clap::Args)]
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
 pub struct CheckArgs {
     /// List of files or directories to check.
