@@ -6,6 +6,28 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for multi-character strings in `.strip()`, `.lstrip()`, and
+/// `.rstrip()`.
+///
+/// ## Why is this bad?
+/// All characters in the call to `.strip()`, `.lstrip()`, or `.rstrip()` are
+/// removed from the leading and trailing ends of the string. If the string
+/// contains multiple characters, the reader may be misled into thinking that
+/// substring is removed from the leading and trailing ends of the string.
+///
+/// ## Example
+/// ```python
+/// "abcba".strip("ab")  # "c"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "abcba".strip("a").strip("b")  # "c"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
 #[violation]
 pub struct StripWithMultiCharacters;
 

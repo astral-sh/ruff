@@ -6,6 +6,43 @@ use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for mutable data structures used as argument defaults.
+///
+/// ## Why is this bad?
+/// Argument defaults are evaluated only once, when the function is defined.
+/// The same mutable data structure is shared across all calls to the function.
+/// If the function modifies the data structure, the changes will persist
+/// across calls, which can lead to unexpected behavior.
+///
+/// Instead of using mutable data structures as argument defaults, use
+/// immutable data structures or `None` as defaults, and create a new mutable
+/// data structure inside the function body.
+///
+/// ## Example
+/// ```python
+/// def add_to_list(item, some_list=[]):
+///     some_list.append(item)
+///     return some_list
+///
+/// l1 = add_to_list(0)  # [0]
+/// l2 = add_to_list(1)  # [0, 1]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def add_to_list(item, some_list=None):
+///     if some_list is None:
+///         some_list = []
+///     some_list.append(item)
+///     return some_list
+///
+/// l1 = add_to_list(0)  # [0]
+/// l2 = add_to_list(1)  # [1]
+/// ```
+///
+/// ## References
+/// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[violation]
 pub struct MutableArgumentDefault;
 

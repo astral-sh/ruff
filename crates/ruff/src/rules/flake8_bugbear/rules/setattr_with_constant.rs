@@ -9,6 +9,26 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `setattr` with a constant attribute value.
+///
+/// ## Why is this bad?
+/// `setattr` is used to set attributes dynamically. If the attribute is
+/// constant, it is not any safer than normal property access. Instead, use
+/// normal property access to set the attribute.
+///
+/// ## Example
+/// ```python
+/// setattr(obj, "foo", 42)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// obj.foo = 42
+/// ```
+///
+/// ## References
+/// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[violation]
 pub struct SetAttrWithConstant;
 

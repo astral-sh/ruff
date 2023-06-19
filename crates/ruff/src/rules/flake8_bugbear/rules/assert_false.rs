@@ -8,6 +8,27 @@ use ruff_python_ast::helpers::is_const_false;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `assert False`.
+///
+/// ## Why is this bad?
+/// Python removes `assert False` when running with the `-O` flag. This means
+/// `assert False` is an unreliable way to raise an `AssertionError`.
+///
+/// Instead, raise `AssertionError` directly.
+///
+/// ## Example
+/// ```python
+/// assert False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// raise AssertionError
+/// ```
+///
+/// ## References
+/// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
 pub struct AssertFalse;
 

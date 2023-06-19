@@ -5,6 +5,26 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for useless comparisons.
+///
+/// ## Why is this bad?
+/// Useless comparisons are pointless and waste CPU instructions. Remove the
+/// comparison or prepend `assert` to make it raise an exception if the
+/// comparison evaluates to `false`.
+///
+/// ## Example
+/// ```python
+/// foo == bar
+/// ```
+///
+/// Use instead:
+/// ```python
+/// assert foo == bar
+/// ```
+///
+/// ## References
+/// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
 pub struct UselessComparison;
 

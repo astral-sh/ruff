@@ -6,6 +6,31 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `except` clauses with an empty tuple.
+///
+/// ## Why is this bad?
+/// Using `except` with an empty tuple does not catch anything. This is likely
+/// a mistake. Instead, add exceptions to the `except` clause.
+///
+/// ## Example
+/// ```python
+/// try:
+///     1 / 0
+/// except ():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     1 / 0
+/// except ZeroDivisionError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[violation]
 pub struct ExceptWithEmptyTuple;
 

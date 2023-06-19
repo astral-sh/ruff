@@ -8,6 +8,37 @@ use ruff_python_stdlib::str::is_cased_lowercase;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `raise` statements without a `from` clause inside an `except` clause.
+///
+/// ## Why is this bad?
+/// Raising exceptions without a `from` clause inside an `except` clause makes it
+/// difficult to distinguish between exceptions raised by the `raise` statement
+/// and exceptions raised by the `except` clause.
+///
+/// Instead, use the `from` clause to distinguish between the two (for example,
+/// `raise ... from exc` or `raise ... from None`).
+///
+/// ## Example
+/// ```python
+/// except FileNotFoundError:
+///     if ...:
+///         raise RuntimeError("...")
+///     else:
+///         raise UserWarning("...")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// except FileNotFoundError as exc:
+///     if ...:
+///         raise RuntimeError("...") from None
+///     else:
+///         raise UserWarning("...") from exc
+/// ```
+///
+/// ## References
+/// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[violation]
 pub struct RaiseWithoutFromInsideExcept;
 

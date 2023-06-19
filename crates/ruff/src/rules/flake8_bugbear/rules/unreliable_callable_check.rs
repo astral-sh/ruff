@@ -5,6 +5,31 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `hasattr(obj, '__call__')` to test if `obj` is callable.
+///
+/// ## Why is this bad?
+/// Using `hasattr(obj, '__call__')` to test if `obj` is callable is
+/// unreliable. If `obj` implements `__getattr__` or if its `__call__` method
+/// is not callable, `hasattr(obj, '__call__')` may return incorrect results.
+///
+/// Instead, use `callable(obj)` to test if `obj` is callable.
+///
+/// ## Example
+/// ```python
+/// hasattr(obj, '__call__')
+/// ```
+///
+/// Use instead:
+/// ```python
+/// callable(obj)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `callable`](https://docs.python.org/3/library/functions.html#callable)
+/// - [Python documentation: `hasattr`](https://docs.python.org/3/library/functions.html#hasattr)
+/// - [Python documentation: `__getattr__`](https://docs.python.org/3/reference/datamodel.html#object.__getattr__)
+/// - [Python documentation: `__call__`](https://docs.python.org/3/reference/datamodel.html#object.__call__)
 #[violation]
 pub struct UnreliableCallableCheck;
 

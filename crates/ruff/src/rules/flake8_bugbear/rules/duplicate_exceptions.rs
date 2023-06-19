@@ -12,6 +12,33 @@ use ruff_python_ast::call_path::CallPath;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for `try-except` blocks with duplicate exception handlers.
+///
+/// ## Why is this bad?
+/// Duplicate exception handlers are redundant, as the first handler will catch
+/// the exception. Instead, remove the duplicate handler.
+///
+/// ## Example
+/// ```python
+/// try:
+///     ...
+/// except ValueError:
+///     ...
+/// except ValueError:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     ...
+/// except ValueError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[violation]
 pub struct DuplicateTryBlockException {
     name: String,
@@ -24,6 +51,27 @@ impl Violation for DuplicateTryBlockException {
         format!("try-except block with duplicate exception `{name}`")
     }
 }
+/// ## What it does
+/// Checks for `try-except` blocks with duplicate exception handlers.
+///
+/// ## Why is this bad?
+/// Duplicate exception handlers are redundant.
+///
+/// ## Example
+/// ```python
+/// except (Exception, ValueError):  # ValueError exceptions are caught by Exception.
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// except Exception:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
+/// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[violation]
 pub struct DuplicateHandlerException {
     pub names: Vec<String>,

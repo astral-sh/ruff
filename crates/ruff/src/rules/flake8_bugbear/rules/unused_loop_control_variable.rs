@@ -1,23 +1,3 @@
-//! Checks for unused loop variables.
-//!
-//! ## Why is this bad?
-//!
-//! Unused variables may signal a mistake or unfinished code.
-//!
-//! ## Example
-//!
-//! ```python
-//! for x in range(10):
-//!     method()
-//! ```
-//!
-//! Prefix the variable with an underscore:
-//!
-//! ```python
-//! for _x in range(10):
-//!     method()
-//! ```
-
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
@@ -35,6 +15,27 @@ enum Certainty {
     Uncertain,
 }
 
+/// ## What it does
+/// Checks for unused loop variables.
+///
+/// ## Why is this bad?
+/// Unused loop variables are indicative of a bug or unfinished code. If the
+/// variable is intended to be unused, it should be prefixed with an underscore.
+/// Otherwise, it should be removed.
+///
+/// ## Example
+/// ```python
+/// for i, j in foo:
+///     bar(i)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for i, _j in foo:
+///     bar(i)
+/// ```
+/// ## References
+/// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[violation]
 pub struct UnusedLoopControlVariable {
     /// The name of the loop control variable.

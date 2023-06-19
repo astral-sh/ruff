@@ -8,6 +8,26 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `getattr` with a constant attribute value.
+///
+/// ## Why is this bad?
+/// `getattr` is used to access attributes dynamically. If the attribute is
+/// constant, it is not any safer than normal property access, as it will raise
+/// an `AttributeError` if the attribute does not exist.
+///
+/// ## Example
+/// ```python
+/// getattr(obj, "foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// obj.foo
+/// ```
+///
+/// ## References
+/// - [Python documentation: `getattr`](https://docs.python.org/3/library/functions.html#getattr)
 #[violation]
 pub struct GetAttrWithConstant;
 

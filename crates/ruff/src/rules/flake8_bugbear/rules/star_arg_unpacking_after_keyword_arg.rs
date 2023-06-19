@@ -1,12 +1,3 @@
-//! Checks for `f(x=0, *(1, 2))`.
-//!
-//! ## Why is this bad?
-//!
-//! Star-arg unpacking after a keyword argument is strongly discouraged. It only
-//! works when the keyword parameter is declared after all parameters supplied
-//! by the unpacked sequence, and this change of ordering can surprise and
-//! mislead readers.
-
 use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -14,6 +5,42 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for star-arg unpacking after a keyword argument.
+///
+/// ## Why is this bad?
+/// Star-arg unpacking works only when the keyword parameter is declared after
+/// all parameters supplied by the star-arg unpacking. This behavior is
+/// confusing and unlikely to be intended, and is legal only for backwards
+/// compatibility.
+///
+/// ## Example
+/// ```python
+/// def foo(x, y, z):
+///     return x, y, z
+///
+///
+/// foo(1, 2, 3)  # (1, 2, 3)
+/// foo(1, *[2, 3])  # (1, 2, 3)
+/// # foo(x=1, *[2, 3])  # TypeError
+/// # foo(y=2, *[1, 3])  # TypeError
+/// foo(z=3, *[1, 2])  # (1, 2, 3) # This is OK, but confusing!
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x, y, z):
+///     return x, y, z
+///
+/// foo(1, 2, 3)  # (1, 2, 3)
+/// foo(x=1, y=2, z=3)  # (1, 2, 3)
+/// foo(*[1, 2, 3])  # (1, 2, 3)
+/// foo(*[1, 2], 3)  # (1, 2, 3)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [Disallow iterable argument unpacking after a keyword argument?](https://github.com/python/cpython/issues/82741)
 #[violation]
 pub struct StarArgUnpackingAfterKeywordArg;
 

@@ -10,6 +10,41 @@ use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for function definitions that use a loop variable.
+///
+/// ## Why is this bad?
+/// The loop variable is not bound in the function definition, so it will always
+/// have the value it had in the last iteration when the function is called. At
+/// that point, the loop has finished and the loop variable will have the last
+/// value it was assigned.
+///
+/// Instead, consider using a default argument to bind the loop variable at
+/// function definition time. Or, use `functools.partial`.
+///
+/// ## Example
+/// ```python
+/// adders = [lambda x: x + i for i in range(3)]
+/// values = [adder(1) for adder in adders]  # [3, 3, 3]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// adders = [lambda x, i=i: x + i for i in range(3)]
+/// values = [adder(1) for adder in adders]  # [1, 2, 3]
+/// ```
+///
+/// Or:
+/// ```python
+/// from functools import partial
+///
+/// adders = [partial(lambda x, i: x + i, i) for i in range(3)]
+/// values = [adder(1) for adder in adders]  # [1, 2, 3]
+/// ```
+///
+/// ## References
+/// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
+/// - [Python documentation: functools.partial](https://docs.python.org/3/library/functools.html#functools.partial)
 #[violation]
 pub struct FunctionUsesLoopVariable {
     name: String,

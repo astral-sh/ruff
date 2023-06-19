@@ -5,6 +5,41 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `break`, `continue`, and `return` statements inside `finally`
+/// blocks.
+///
+/// ## Why is this bad?
+/// `break`, `continue`, and `return` statements inside `finally` blocks cause
+/// exceptions from the `try` and `except` blocks to be silenced. This can lead
+/// to unexpected behavior.
+///
+/// Instead, refactor the code to not use `break`, `continue`, and `return`
+/// statements inside `finally` blocks. If the exception is intended to be
+/// silenced, silence it in the `except` block explicitly.
+///
+/// ## Example
+/// ```python
+/// def speed(distance, time):
+///     try:
+///         return distance / time
+///     except ZeroDivisionError:
+///         raise ValueError("Time cannot be zero")
+///     finally:
+///         return 299792458  # prevents the exception from being re-raised
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def speed(distance, time):
+///     try:
+///         return distance / time
+///     except ZeroDivisionError:
+///         raise ValueError("Time cannot be zero")
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 #[violation]
 pub struct JumpStatementInFinally {
     name: String,

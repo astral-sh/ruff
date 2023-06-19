@@ -6,6 +6,44 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for using `functools.lru_cache` or `functools.cache` on methods.
+///
+/// ## Why is this bad?
+/// Using `functools.lru_cache` or `functools.cache` on methods can create memory
+/// leaks. This is because the global cache will keep a reference to the
+/// instance of the class, which will prevent it from being garbage collected.
+///
+/// Instead, refactor the method to depend only on its arguments and not on the
+/// instance of the class.
+///
+/// ## Example
+/// ```python
+/// from functools import lru_cache
+///
+///
+/// class Foo:
+///     @lru_cache
+///     def bar(self):
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from functools import lru_cache
+///
+///
+/// class Foo:
+///     @staticmethod
+///     @lru_cache
+///     def bar():  # No longer depends on `self`.
+///         ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
+/// - [Python documentation: `functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
+/// - [don't lru_cache methods!](https://www.youtube.com/watch?v=sVjtp6tGo0g)
 #[violation]
 pub struct CachedInstanceMethod;
 

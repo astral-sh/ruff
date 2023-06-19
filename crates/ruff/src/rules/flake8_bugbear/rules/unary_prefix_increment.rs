@@ -1,22 +1,3 @@
-//! Checks for `++n`.
-//!
-//! ## Why is this bad?
-//!
-//! Python does not support the unary prefix increment. Writing `++n` is
-//! equivalent to `+(+(n))`, which equals `n`.
-//!
-//! ## Example
-//!
-//! ```python
-//! ++n;
-//! ```
-//!
-//! Use instead:
-//!
-//! ```python
-//! n += 1
-//! ```
-
 use rustpython_parser::ast::{self, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -24,6 +5,26 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `++n`.
+///
+/// ## Why is this bad?
+/// Python does not support the unary prefix increment. Writing `++n` is
+/// equivalent to `+(+(n))`, which equals `n`.
+///
+/// ## Example
+/// ```python
+/// ++n
+/// ```
+///
+/// Use instead:
+/// ```python
+/// n += 1
+/// ```
+///
+/// ## References
+/// - [Python documentation: Unary arithmetic and bitwise operations](https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations)
+/// - [Python documentation: Augmented assignment statements](https://docs.python.org/3/reference/simple_stmts.html#augmented-assignment-statements)
 #[violation]
 pub struct UnaryPrefixIncrement;
 

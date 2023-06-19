@@ -5,6 +5,28 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `contextlib.suppress` without arguments.
+///
+/// ## Why is this bad?
+/// No exceptions will be suppressed and therefore this context manager is
+/// redundant. Instead, remove the context manager to improve readability.
+///
+/// ## Example
+/// ```python
+/// import contextlib
+///
+/// with contextlib.suppress():
+///     foo()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo()
+/// ```
+///
+/// ## References
+/// - [Python documentation: contextlib.suppress](https://docs.python.org/3/library/contextlib.html#contextlib.suppress)
 #[violation]
 pub struct UselessContextlibSuppress;
 

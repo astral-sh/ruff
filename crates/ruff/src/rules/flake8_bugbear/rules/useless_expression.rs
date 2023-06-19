@@ -12,6 +12,22 @@ pub(crate) enum Kind {
     Attribute,
 }
 
+/// ## What it does
+/// Checks for useless expressions.
+///
+/// ## Why is this bad?
+/// Useless expressions are pointless and waste CPU instructions. Remove the
+/// expression or assign it to a variable.
+///
+/// ## Example
+/// ```python
+/// 1 + 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = 1 + 1
+/// ```
 #[violation]
 pub struct UselessExpression {
     kind: Kind,

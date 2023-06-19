@@ -9,6 +9,37 @@ use ruff_python_semantic::SemanticModel;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for abstract base classes with methods, but no abstract methods.
+///
+/// ## Why is this bad?
+/// Abstract base classes exist to be subclassed. A lack of abstract methods is
+/// indicative of unfinished code or mistake. Instead, add an abstract method
+/// to the class or remove the `ABC` base class.
+///
+/// ## Example
+/// ```python
+/// from abc import ABC
+///
+///
+/// class Foo(ABC):
+///     def method(self):
+///         bar()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from abc import ABC, abstractmethod
+///
+///
+/// class Foo(ABC):
+///     @abstractmethod
+///     def method(self):
+///         bar()
+/// ```
+///
+/// ## References
+/// - [Python documentation: abc](https://docs.python.org/3/library/abc.html)
 #[violation]
 pub struct AbstractBaseClassWithoutAbstractMethod {
     name: String,
@@ -21,6 +52,38 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
+/// ## What it does
+/// Checks for empty methods in abstract base classes without an abstract
+/// decorator.
+///
+/// ## Why is this bad?
+/// Empty methods in abstract base classes without an abstract decorator are
+/// indicative of unfinished code or mistake. Instead, add an abstract decorator
+/// to the method to indicate that it is abstract, or implement the method.
+///
+/// ## Example
+/// ```python
+/// from abc import ABC
+///
+///
+/// class Foo(ABC):
+///     def method(self):
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from abc import ABC, abstractmethod
+///
+///
+/// class Foo(ABC):
+///     @abstractmethod
+///     def method(self):
+///         ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: abc](https://docs.python.org/3/library/abc.html)
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
     name: String,

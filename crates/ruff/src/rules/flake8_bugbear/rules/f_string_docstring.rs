@@ -6,6 +6,27 @@ use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for f-strings used as docstrings.
+///
+/// ## Why is this bad?
+/// Python will interpret this as a joined string, rather than a docstring.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     f"""Not a docstring."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     """A docstring."""
+/// ```
+///
+/// ## References
+/// - [PEP 257](https://peps.python.org/pep-0257/)
+/// - [Python documentation: Formatted string literals](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct FStringDocstring;
 
