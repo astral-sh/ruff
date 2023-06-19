@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Identifier, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,7 +27,7 @@ impl AlwaysAutofixableViolation for GetAttrWithConstant {
 fn attribute(value: &Expr, attr: &str) -> Expr {
     ast::ExprAttribute {
         value: Box::new(value.clone()),
-        attr: attr.into(),
+        attr: Identifier::new(attr.to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     }

@@ -1,13 +1,16 @@
-use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-use crate::comments::CommentTextPosition;
-use crate::trivia::{SimpleTokenizer, Token, TokenKind};
+use std::cmp::Ordering;
+
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
+
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
 use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
-use std::cmp::Ordering;
+
+use crate::comments::visitor::{CommentPlacement, DecoratedComment};
+use crate::comments::CommentTextPosition;
+use crate::trivia::{SimpleTokenizer, Token, TokenKind};
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
@@ -623,8 +626,13 @@ fn handle_positional_only_arguments_separator_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    let is_last_positional_argument = are_same_optional(last_argument_or_default, arguments.posonlyargs.last())
-            // If the preceding node is the default for the last positional argument
+    let is_last_positional_argument =
+        // If the preceding node is the identifier for the last positional argument (`a`).
+        // ```python
+        // def test(a, /, b): pass
+        // ```
+        are_same_optional(last_argument_or_default, arguments.posonlyargs.last().map(|arg| &arg.def))
+            // If the preceding node is the default for the last positional argument (`10`).
             // ```python
             // def test(a=10, /, b): pass
             // ```

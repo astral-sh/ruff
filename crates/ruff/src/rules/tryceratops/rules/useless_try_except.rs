@@ -50,7 +50,7 @@ pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[ExceptHandle
             if let Some(expr) = exc {
                 // E.g., `except ... as e: raise e`
                 if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
-                    if Some(id) == name.as_ref() {
+                    if name.as_ref().map_or(false, |name| name.as_str() == id) {
                         return Some(Diagnostic::new(UselessTryExcept, handler.range()));
                     }
                 }

@@ -86,7 +86,7 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
                         names
                     };
                     for expr in names {
-                        if expr.id == *target {
+                        if expr.id == target.as_str() {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(VerboseLogMessage, expr.range()));

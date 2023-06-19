@@ -43,7 +43,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     if alias.name.contains('.') {
         return;
     }
-    if &alias.name != asname {
+    if alias.name.as_str() != asname.as_str() {
         return;
     }
 

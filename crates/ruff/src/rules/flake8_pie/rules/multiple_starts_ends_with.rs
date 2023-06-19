@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 
 use ruff_text_size::TextRange;
 
-use rustpython_parser::ast::{self, BoolOp, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, BoolOp, Expr, ExprContext, Identifier, Ranged};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -140,7 +140,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
                 let node2 = Expr::Attribute(ast::ExprAttribute {
                     value: Box::new(node1),
-                    attr: attr_name.into(),
+                    attr: Identifier::new(attr_name.to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 });
