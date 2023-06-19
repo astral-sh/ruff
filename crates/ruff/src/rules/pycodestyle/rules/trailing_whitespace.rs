@@ -97,15 +97,9 @@ pub(crate) fn trailing_whitespace(
                     if let Some(prev) = prev_line {
                         let trimmed = prev.trim_end();
                         if trimmed.ends_with('\\') {
-                            let initial_len = prev.text_len();
+                            // Shift the diagnostic to remove the continuation as well.
                             diagnostic.range = range.sub_start(
-                                // Shift by the amount of whitespace in the previous line, plus the
-                                // newline, plus the slash, plus any remaining whitespace after it.
-                                initial_len - trimmed.text_len()
-                                    + TextSize::from(1)
-                                    + '\\'.text_len()
-                                    + (trimmed.text_len() - trimmed.trim_end().text_len()
-                                        + TextSize::from(1)),
+                                (prev.text_len() - trimmed.text_len()) + TextSize::from(2),
                             );
                         }
                     }
@@ -118,8 +112,7 @@ pub(crate) fn trailing_whitespace(
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
             if settings.rules.should_fix(Rule::TrailingWhitespace) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
+                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(range)));
             }
             return Some(diagnostic);
         }
