@@ -106,7 +106,9 @@ print("hello world")  # Trailing comment (end-of-line)
 
 Comments are automatically attached as `Leading` or `Trailing` to a node close to them, or `Dangling`
 if there are only tokens and no nodes surrounding it. Categorization is automatic but sometimes
-needs to be overridden in [`place_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L13) in `placement.rs`, which this section is about.
+needs to be overridden in
+[`place_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L13)
+in `placement.rs`, which this section is about.
 
 ```Python
 [
@@ -173,7 +175,8 @@ The preceding token of the leading else comment is the `break`, which has a node
 token is the `else`, which lacks a node, so by default the comment would be marked as trailing
 the `break` and wrongly formatted as such. We avoid this by finding comments between
 two bodies that have the same indentation level as the keyword in
-[`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196) and marking them as dangling. Similarly, we find and
+[`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196)
+and marking them as dangling. Similarly, we find and
 mark comment after the colon(s).
 
 The comments don't carry any extra information such as why we marked the comment as trailing,
