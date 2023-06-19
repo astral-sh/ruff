@@ -40,7 +40,7 @@ pub mod types;
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct AllSettings {
     pub cli: CliSettings,
     pub lib: Settings,

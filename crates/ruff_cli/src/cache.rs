@@ -296,3 +296,80 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use std::env::temp_dir;
+    use std::fs;
+
+    use ruff::settings::{flags, AllSettings};
+
+    use crate::cache::{self, Cache};
+    use crate::diagnostics::{lint_path, Diagnostics};
+
+    #[test]
+    fn same_results() {
+        let mut cache_dir = temp_dir();
+        cache_dir.push("ruff_tests/cache_same_results");
+        let _ = fs::remove_dir_all(&cache_dir);
+        cache::init(&cache_dir).unwrap();
+
+        let settings = AllSettings::default();
+
+        let package_root = fs::canonicalize("../ruff/resources/test/fixtures").unwrap();
+        let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
+        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+
+        let mut paths = Vec::new();
+        let mut expected_diagnostics = Diagnostics::default();
+        for entry in fs::read_dir(&package_root).unwrap() {
+            let entry = entry.unwrap();
+            if !entry.file_type().unwrap().is_dir() {
+                continue;
+            }
+
+            for entry in fs::read_dir(entry.path()).unwrap() {
+                let entry = entry.unwrap();
+                if !entry.file_type().unwrap().is_file() {
+                    continue;
+                }
+
+                let path = entry.path();
+                expected_diagnostics += lint_path(
+                    &path,
+                    Some(&package_root),
+                    &settings,
+                    Some(&cache),
+                    flags::Noqa::Enabled,
+                    flags::FixMode::Generate,
+                )
+                .unwrap();
+                paths.push(path);
+            }
+        }
+        assert!(paths.len() >= 1, "no files checked");
+
+        cache.store().unwrap();
+
+        let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
+        assert!(cache.package.files.len() >= 1);
+
+        let mut got_diagnostics = Diagnostics::default();
+        for path in paths {
+            got_diagnostics += lint_path(
+                &path,
+                Some(&package_root),
+                &settings,
+                Some(&cache),
+                flags::Noqa::Enabled,
+                flags::FixMode::Generate,
+            )
+            .unwrap();
+        }
+
+        // Not stored in the cache.
+        expected_diagnostics.source_kind.clear();
+        got_diagnostics.source_kind.clear();
+        assert!(expected_diagnostics == got_diagnostics);
+    }
+}
