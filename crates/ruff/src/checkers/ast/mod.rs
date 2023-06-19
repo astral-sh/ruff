@@ -5,8 +5,8 @@ use log::error;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    self, Arg, Arguments, Comprehension, Constant, Excepthandler, Expr, ExprContext, Keyword,
-    Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
+    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ExceptHandler, Expr,
+    ExprContext, Keyword, Operator, Pattern, Ranged, Stmt, Suite, UnaryOp,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
@@ -17,7 +17,7 @@ use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, identifier, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
@@ -1759,34 +1759,24 @@ where
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
 
-                for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.annotation {
+                for arg_with_default in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &arg_with_default.def.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
                     }
-                }
-                for arg in &args.args {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_type_definition(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
+                    if let Some(expr) = &arg_with_default.default {
+                        self.visit_expr(expr);
                     }
                 }
                 if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_type_definition(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                for arg in &args.kwonlyargs {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
@@ -1810,12 +1800,6 @@ where
                     } else {
                         self.visit_annotation(expr);
                     };
-                }
-                for expr in &args.kw_defaults {
-                    self.visit_expr(expr);
-                }
-                for expr in &args.defaults {
-                    self.visit_expr(expr);
                 }
 
                 self.add_binding(
@@ -1929,8 +1913,8 @@ where
                 self.semantic.handled_exceptions.pop();
 
                 self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
-                for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler);
+                for except_handler in handlers {
+                    self.visit_except_handler(except_handler);
                 }
 
                 self.visit_body(orelse);
@@ -2100,7 +2084,7 @@ where
             expr,
             Expr::BoolOp(_)
                 | Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: Unaryop::Not,
+                    op: UnaryOp::Not,
                     ..
                 })
         ) {
@@ -3301,12 +3285,21 @@ where
                 }
 
                 // Visit the default arguments, but avoid the body, which will be deferred.
-                for expr in &args.kw_defaults {
-                    self.visit_expr(expr);
+                for ArgWithDefault {
+                    default,
+                    def: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &default {
+                        self.visit_expr(expr);
+                    }
                 }
-                for expr in &args.defaults {
-                    self.visit_expr(expr);
-                }
+
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
@@ -3794,9 +3787,9 @@ where
         self.semantic.pop_expr();
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
-        match excepthandler {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+    fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
+        match except_handler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
                 name,
                 body,
@@ -3807,7 +3800,7 @@ where
                     if let Some(diagnostic) = pycodestyle::rules::bare_except(
                         type_.as_deref(),
                         body,
-                        excepthandler,
+                        except_handler,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -3822,7 +3815,7 @@ where
                 if self.enabled(Rule::TryExceptPass) {
                     flake8_bandit::rules::try_except_pass(
                         self,
-                        excepthandler,
+                        except_handler,
                         type_.as_deref(),
                         name,
                         body,
@@ -3832,7 +3825,7 @@ where
                 if self.enabled(Rule::TryExceptContinue) {
                     flake8_bandit::rules::try_except_continue(
                         self,
-                        excepthandler,
+                        except_handler,
                         type_.as_deref(),
                         name,
                         body,
@@ -3840,20 +3833,20 @@ where
                     );
                 }
                 if self.enabled(Rule::ExceptWithEmptyTuple) {
-                    flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
+                    flake8_bugbear::rules::except_with_empty_tuple(self, except_handler);
                 }
                 if self.enabled(Rule::ExceptWithNonExceptionClasses) {
-                    flake8_bugbear::rules::except_with_non_exception_classes(self, excepthandler);
+                    flake8_bugbear::rules::except_with_non_exception_classes(self, except_handler);
                 }
                 if self.enabled(Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
                 if self.enabled(Rule::BinaryOpException) {
-                    pylint::rules::binary_op_exception(self, excepthandler);
+                    pylint::rules::binary_op_exception(self, except_handler);
                 }
                 match name {
                     Some(name) => {
-                        let range = excepthandler.try_identifier(self.locator).unwrap();
+                        let range = except_handler.try_identifier(self.locator).unwrap();
 
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
@@ -3866,7 +3859,7 @@ where
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 self,
                                 name,
-                                AnyShadowing::from(excepthandler),
+                                AnyShadowing::from(except_handler),
                             );
                         }
 
@@ -3878,7 +3871,7 @@ where
                             BindingFlags::empty(),
                         );
 
-                        walk_excepthandler(self, excepthandler);
+                        walk_except_handler(self, except_handler);
 
                         // Remove it from the scope immediately after.
                         self.add_binding(
@@ -3898,7 +3891,7 @@ where
                                 if self.patch(Rule::UnusedVariable) {
                                     diagnostic.try_set_fix(|| {
                                         pyflakes::fixes::remove_exception_handler_assignment(
-                                            excepthandler,
+                                            except_handler,
                                             self.locator,
                                         )
                                         .map(Fix::automatic)
@@ -3908,7 +3901,7 @@ where
                             }
                         }
                     }
-                    None => walk_excepthandler(self, excepthandler),
+                    None => walk_except_handler(self, except_handler),
                 }
             }
         }
@@ -3946,17 +3939,17 @@ where
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for arg in &arguments.posonlyargs {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.posonlyargs {
+            self.visit_arg(&arg_with_default.def);
         }
-        for arg in &arguments.args {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.args {
+            self.visit_arg(&arg_with_default.def);
         }
         if let Some(arg) = &arguments.vararg {
             self.visit_arg(arg);
         }
-        for arg in &arguments.kwonlyargs {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.kwonlyargs {
+            self.visit_arg(&arg_with_default.def);
         }
         if let Some(arg) = &arguments.kwarg {
             self.visit_arg(arg);

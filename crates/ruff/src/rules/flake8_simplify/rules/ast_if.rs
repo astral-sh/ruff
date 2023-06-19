@@ -1,7 +1,7 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -734,7 +734,7 @@ pub(crate) fn manual_dict_lookup(
     if orelse.len() != 1 {
         return;
     }
-    if !(ops.len() == 1 && ops[0] == Cmpop::Eq) {
+    if !(ops.len() == 1 && ops[0] == CmpOp::Eq) {
         return;
     }
     if comparators.len() != 1 {
@@ -807,7 +807,7 @@ pub(crate) fn manual_dict_lookup(
         let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
             return;
         };
-        if !(id == target && ops.len() == 1 && ops[0] == Cmpop::Eq) {
+        if !(id == target && ops.len() == 1 && ops[0] == CmpOp::Eq) {
             return;
         }
         if comparators.len() != 1 {
@@ -882,8 +882,8 @@ pub(crate) fn use_dict_get_with_default(
         return;
     }
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [Cmpop::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
-        [Cmpop::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
+        [CmpOp::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
+        [CmpOp::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
         _ => {
             return;
         }

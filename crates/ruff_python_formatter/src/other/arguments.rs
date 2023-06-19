@@ -1,12 +1,15 @@
+use std::usize;
+
+use rustpython_parser::ast::{Arguments, Ranged};
+
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+
 use crate::comments::{dangling_node_comments, leading_node_comments};
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
 use crate::FormatNodeRule;
-use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use rustpython_parser::ast::{Arg, Arguments, Expr, Ranged};
-use std::usize;
 
 #[derive(Default)]
 pub struct FormatArguments;
@@ -17,10 +20,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             range: _,
             posonlyargs,
             args,
-            defaults,
             vararg,
             kwonlyargs,
-            kw_defaults,
             kwarg,
         } = item;
 
@@ -32,30 +33,30 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             let mut joiner = f.join_with(separator);
             let mut last_node: Option<AnyNodeRef> = None;
 
-            let mut defaults = std::iter::repeat(None)
-                .take(posonlyargs.len() + args.len() - defaults.len())
-                .chain(defaults.iter().map(Some));
+            for arg_with_default in posonlyargs {
+                joiner.entry(&arg_with_default.into_format());
 
-            for positional in posonlyargs {
-                let default = defaults.next().ok_or(FormatError::SyntaxError)?;
-                joiner.entry(&ArgumentWithDefault {
-                    argument: positional,
-                    default,
-                });
-
-                last_node = Some(default.map_or_else(|| positional.into(), AnyNodeRef::from));
+                last_node = Some(
+                    arg_with_default
+                        .default
+                        .as_deref()
+                        .map_or_else(|| (&arg_with_default.def).into(), AnyNodeRef::from),
+                );
             }
 
             if !posonlyargs.is_empty() {
                 joiner.entry(&text("/"));
             }
 
-            for argument in args {
-                let default = defaults.next().ok_or(FormatError::SyntaxError)?;
+            for arg_with_default in args {
+                joiner.entry(&arg_with_default.into_format());
 
-                joiner.entry(&ArgumentWithDefault { argument, default });
-
-                last_node = Some(default.map_or_else(|| argument.into(), AnyNodeRef::from));
+                last_node = Some(
+                    arg_with_default
+                        .default
+                        .as_deref()
+                        .map_or_else(|| (&arg_with_default.def).into(), AnyNodeRef::from),
+                );
             }
 
             // kw only args need either a `*args` ahead of them capturing all var args or a `*`
@@ -72,23 +73,16 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 joiner.entry(&text("*"));
             }
 
-            debug_assert!(defaults.next().is_none());
+            for arg_with_default in kwonlyargs {
+                joiner.entry(&arg_with_default.into_format());
 
-            let mut defaults = std::iter::repeat(None)
-                .take(kwonlyargs.len() - kw_defaults.len())
-                .chain(kw_defaults.iter().map(Some));
-
-            for keyword_argument in kwonlyargs {
-                let default = defaults.next().ok_or(FormatError::SyntaxError)?;
-                joiner.entry(&ArgumentWithDefault {
-                    argument: keyword_argument,
-                    default,
-                });
-
-                last_node = Some(default.map_or_else(|| keyword_argument.into(), AnyNodeRef::from));
+                last_node = Some(
+                    arg_with_default
+                        .default
+                        .as_deref()
+                        .map_or_else(|| (&arg_with_default.def).into(), AnyNodeRef::from),
+                );
             }
-
-            debug_assert!(defaults.next().is_none());
 
             if let Some(kwarg) = kwarg {
                 joiner.entry(&format_args![
@@ -170,24 +164,6 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
     fn fmt_dangling_comments(&self, _node: &Arguments, _f: &mut PyFormatter) -> FormatResult<()> {
         // Handled in `fmt_fields`
-        Ok(())
-    }
-}
-
-struct ArgumentWithDefault<'a> {
-    argument: &'a Arg,
-    default: Option<&'a Expr>,
-}
-
-impl Format<PyFormatContext<'_>> for ArgumentWithDefault<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        write!(f, [self.argument.format()])?;
-
-        if let Some(default) = self.default {
-            let space = self.argument.annotation.is_some().then_some(space());
-            write!(f, [space, text("="), space, default.format()])?;
-        }
-
         Ok(())
     }
 }

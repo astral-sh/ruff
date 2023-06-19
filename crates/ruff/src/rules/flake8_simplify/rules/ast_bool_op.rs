@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Boolop, Cmpop, Expr, ExprContext, Ranged, Unaryop};
+use rustpython_parser::ast::{self, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -299,7 +299,7 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 
 /// SIM101
 pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ } )= expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ } )= expr else {
         return;
     };
 
@@ -402,7 +402,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                     // Generate the combined `BoolOp`.
                     let node = ast::ExprBoolOp {
-                        op: Boolop::Or,
+                        op: BoolOp::Or,
                         values: iter::once(call)
                             .chain(
                                 values
@@ -437,7 +437,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     if ops.len() != 1 || comparators.len() != 1 {
         return None;
     }
-    if !matches!(&ops[0], Cmpop::Eq) {
+    if !matches!(&ops[0], CmpOp::Eq) {
         return None;
     }
     let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
@@ -452,7 +452,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
 
 /// SIM109
 pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ }) = expr else {
         return;
     };
 
@@ -501,7 +501,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
-            ops: vec![Cmpop::In],
+            ops: vec![CmpOp::In],
             comparators: vec![node.into()],
             range: TextRange::default(),
         };
@@ -524,7 +524,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             } else {
                 // Wrap in a `x in (a, b) or ...` boolean operation.
                 let node = ast::ExprBoolOp {
-                    op: Boolop::Or,
+                    op: BoolOp::Or,
                     values: iter::once(in_expr).chain(unmatched).collect(),
                     range: TextRange::default(),
                 };
@@ -542,7 +542,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
 /// SIM220
 pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::And, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::And, values, range: _, }) = expr else {
         return;
     };
     if values.len() < 2 {
@@ -554,7 +554,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
     let mut non_negated_expr = vec![];
     for expr in values {
         if let Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::Not,
+            op: UnaryOp::Not,
             operand,
             range: _,
         }) = expr
@@ -597,7 +597,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
 
 /// SIM221
 pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _, }) = expr else {
         return;
     };
     if values.len() < 2 {
@@ -609,7 +609,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     let mut non_negated_expr = vec![];
     for expr in values {
         if let Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::Not,
+            op: UnaryOp::Not,
             operand,
             range: _,
         }) = expr
@@ -673,7 +673,7 @@ pub(crate) fn get_short_circuit_edit(
 
 fn is_short_circuit(
     expr: &Expr,
-    expected_op: Boolop,
+    expected_op: BoolOp,
     checker: &Checker,
 ) -> Option<(Edit, ContentAround)> {
     let Expr::BoolOp(ast::ExprBoolOp { op, values, range: _, }) = expr else {
@@ -683,8 +683,8 @@ fn is_short_circuit(
         return None;
     }
     let short_circuit_truthiness = match op {
-        Boolop::And => Truthiness::Falsey,
-        Boolop::Or => Truthiness::Truthy,
+        BoolOp::And => Truthiness::Falsey,
+        BoolOp::Or => Truthiness::Truthy,
     };
 
     let mut location = expr.start();
@@ -753,7 +753,7 @@ fn is_short_circuit(
 
 /// SIM222
 pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    if let Some((edit, remove)) = is_short_circuit(expr, Boolop::Or, checker) {
+    if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::Or, checker) {
         let mut diagnostic = Diagnostic::new(
             ExprOrTrue {
                 expr: edit.content().unwrap_or_default().to_string(),
@@ -771,7 +771,7 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 
 /// SIM223
 pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    if let Some((edit, remove)) = is_short_circuit(expr, Boolop::And, checker) {
+    if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::And, checker) {
         let mut diagnostic = Diagnostic::new(
             ExprAndFalse {
                 expr: edit.content().unwrap_or_default().to_string(),

@@ -1,6 +1,6 @@
 //! Specialized AST visitor trait and walk functions that only visit statements.
 
-use rustpython_parser::ast::{self, Excepthandler, MatchCase, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Stmt};
 
 /// A trait for AST visitors that only need to visit statements.
 pub trait StatementVisitor<'a> {
@@ -10,8 +10,8 @@ pub trait StatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);
     }
-    fn visit_excepthandler(&mut self, excepthandler: &'a Excepthandler) {
-        walk_excepthandler(self, excepthandler);
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+        walk_except_handler(self, except_handler);
     }
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
@@ -70,8 +70,8 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             range: _range,
         }) => {
             visitor.visit_body(body);
-            for excepthandler in handlers {
-                visitor.visit_excepthandler(excepthandler);
+            for except_handler in handlers {
+                visitor.visit_except_handler(except_handler);
             }
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);
@@ -84,8 +84,8 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             range: _range,
         }) => {
             visitor.visit_body(body);
-            for excepthandler in handlers {
-                visitor.visit_excepthandler(excepthandler);
+            for except_handler in handlers {
+                visitor.visit_except_handler(except_handler);
             }
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);
@@ -94,12 +94,12 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
     }
 }
 
-pub fn walk_excepthandler<'a, V: StatementVisitor<'a> + ?Sized>(
+pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
     visitor: &mut V,
-    excepthandler: &'a Excepthandler,
+    except_handler: &'a ExceptHandler,
 ) {
-    match excepthandler {
-        Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) => {
+    match except_handler {
+        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) => {
             visitor.visit_body(body);
         }
     }

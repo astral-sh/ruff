@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Excepthandler, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::Locator;
@@ -13,7 +13,7 @@ pub(super) fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
 pub(crate) enum AnyShadowing<'a> {
     Expression(&'a Expr),
     Statement(&'a Stmt),
-    ExceptHandler(&'a Excepthandler),
+    ExceptHandler(&'a ExceptHandler),
 }
 
 impl AnyShadowing<'_> {
@@ -38,8 +38,8 @@ impl<'a> From<&'a Expr> for AnyShadowing<'a> {
     }
 }
 
-impl<'a> From<&'a Excepthandler> for AnyShadowing<'a> {
-    fn from(value: &'a Excepthandler) -> Self {
+impl<'a> From<&'a ExceptHandler> for AnyShadowing<'a> {
+    fn from(value: &'a ExceptHandler) -> Self {
         AnyShadowing::ExceptHandler(value)
     }
 }

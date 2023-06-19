@@ -1,6 +1,6 @@
 use anyhow::bail;
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -8,28 +8,28 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum EmptyStringCmpop {
+pub(crate) enum EmptyStringCmpOp {
     Is,
     IsNot,
     Eq,
     NotEq,
 }
 
-impl TryFrom<&Cmpop> for EmptyStringCmpop {
+impl TryFrom<&CmpOp> for EmptyStringCmpOp {
     type Error = anyhow::Error;
 
-    fn try_from(value: &Cmpop) -> Result<Self, Self::Error> {
+    fn try_from(value: &CmpOp) -> Result<Self, Self::Error> {
         match value {
-            Cmpop::Is => Ok(Self::Is),
-            Cmpop::IsNot => Ok(Self::IsNot),
-            Cmpop::Eq => Ok(Self::Eq),
-            Cmpop::NotEq => Ok(Self::NotEq),
-            _ => bail!("{value:?} cannot be converted to EmptyStringCmpop"),
+            CmpOp::Is => Ok(Self::Is),
+            CmpOp::IsNot => Ok(Self::IsNot),
+            CmpOp::Eq => Ok(Self::Eq),
+            CmpOp::NotEq => Ok(Self::NotEq),
+            _ => bail!("{value:?} cannot be converted to EmptyStringCmpOp"),
         }
     }
 }
 
-impl EmptyStringCmpop {
+impl EmptyStringCmpOp {
     pub(crate) fn into_unary(self) -> &'static str {
         match self {
             Self::Is | Self::Eq => "not ",
@@ -38,7 +38,7 @@ impl EmptyStringCmpop {
     }
 }
 
-impl std::fmt::Display for EmptyStringCmpop {
+impl std::fmt::Display for EmptyStringCmpOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let repr = match self {
             Self::Is => "is",
@@ -93,7 +93,7 @@ impl Violation for CompareToEmptyString {
 pub(crate) fn compare_to_empty_string(
     checker: &mut Checker,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     // Omit string comparison rules within subscripts. This is mostly commonly used within
@@ -110,7 +110,7 @@ pub(crate) fn compare_to_empty_string(
         .tuple_windows::<(&Expr<_>, &Expr<_>)>()
         .zip(ops)
     {
-        if let Ok(op) = EmptyStringCmpop::try_from(op) {
+        if let Ok(op) = EmptyStringCmpOp::try_from(op) {
             if std::mem::take(&mut first) {
                 // Check the left-most expression.
                 if let Expr::Constant(ast::ExprConstant { value, .. }) = &lhs {

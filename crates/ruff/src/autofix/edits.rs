@@ -1,7 +1,7 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{self, Excepthandler, Expr, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -218,7 +218,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
                 || is_only(orelse, child)
                 || is_only(finalbody, child)
                 || handlers.iter().any(|handler| match handler {
-                    Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) => is_only(body, child),
                 })
