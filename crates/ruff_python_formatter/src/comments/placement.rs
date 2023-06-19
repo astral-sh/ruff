@@ -917,18 +917,17 @@ fn handle_dict_unpacking_comment<'a>(
         Some(preceding) => preceding.end(),
         None => comment.enclosing_node().start(),
     };
-    let range_start = preceding_end + TextSize::new(1);
-    if range_start > comment.slice().start() {
+    if preceding_end > comment.slice().start() {
         return CommentPlacement::Default(comment);
     }
     let tokens = SimpleTokenizer::new(
         locator.contents(),
-        TextRange::new(range_start, comment.slice().start()),
+        TextRange::new(preceding_end, comment.slice().start()),
     )
     .skip_trivia();
 
     let mut count = 0;
-    for token in tokens {
+    for token in tokens.skip(1) {
         if token.kind != TokenKind::Star {
             return CommentPlacement::Default(comment);
         }

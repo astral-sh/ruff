@@ -25,6 +25,14 @@ b
     b,
 }
 
+{
+    **a # comment before preceeding node's comma
+ ,
+    # before
+    ** # between
+    b,
+}
+
 {}
 
 {1:2,}
