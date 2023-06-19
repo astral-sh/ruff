@@ -94,6 +94,7 @@ pub(crate) fn run(
                         .and_then(|package| *package);
 
                     let settings = resolver.resolve_all(path, pyproject_config);
+                    let package_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
 
                     // Lazily create a cache per package, if enabled.
                     //
@@ -108,7 +109,6 @@ pub(crate) fn run(
                     // ensure that the cache for a package is only opened once,
                     // while block only the thread interested in the same
                     // package cache.
-                    let package_root = package.unwrap_or(path);
                     let cache_init = caches.as_ref().map(|caches| {
                         caches
                             .lock()
