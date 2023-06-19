@@ -11,8 +11,8 @@ use crate::checkers::ast::Checker;
 /// Checks for `except` clauses that catch non-exception classes.
 ///
 /// ## Why is this bad?
-/// Catching classes that do not inherit from `BaseException` will result in a
-/// `TypeError` being raised. Instead, catch only exception classes.
+/// Catching classes that do not inherit from `BaseException` will raise a 
+/// `TypeError`. Instead, catch only exception classes.
 ///
 /// ## Example
 /// ```python

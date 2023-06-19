@@ -15,9 +15,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// The loop variable is not bound in the function definition, so it will always
-/// have the value it had in the last iteration when the function is called. At
-/// that point, the loop has finished and the loop variable will have the last
-/// value it was assigned.
+/// have the value it had in the last iteration when the function is called.
 ///
 /// Instead, consider using a default argument to bind the loop variable at
 /// function definition time. Or, use `functools.partial`.

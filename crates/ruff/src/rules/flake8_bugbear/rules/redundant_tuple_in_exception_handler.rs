@@ -10,8 +10,8 @@ use crate::registry::AsRule;
 /// Checks for tuples with a single element in exception handlers.
 ///
 /// ## Why is this bad?
-/// A tuple with a single element is redundant. Write the element directly
-/// instead.
+/// A tuple with a single element is redundant. Write the exception class
+/// directly instead.
 ///
 /// ## Example
 /// ```python
