@@ -14,8 +14,8 @@ use crate::registry::Rule;
 ///
 /// ## Why is this bad?
 /// Abstract base classes exist to be subclassed. A lack of abstract methods is
-/// indicative of unfinished code or a mistake. 
-/// 
+/// indicative of unfinished code or a mistake.
+///
 /// Instead, add an abstract method to the class or remove the `ABC` base class
 /// from the class definition.
 ///
@@ -60,8 +60,8 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 ///
 /// ## Why is this bad?
 /// Empty methods in abstract base classes without an abstract decorator are
-/// indicative of unfinished code or a mistake. 
-/// 
+/// indicative of unfinished code or a mistake.
+///
 /// Instead, add an abstract method decorated to indicate that it is abstract,
 /// or implement the method.
 ///
