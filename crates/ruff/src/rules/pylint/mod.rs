@@ -105,6 +105,10 @@ mod tests {
     )]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"))]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"))]
+    #[test_case(
+        Rule::RepeatedEqualityComparisonTarget,
+        Path::new("repeated_equality_comparison_target.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
