@@ -1,4 +1,4 @@
-use crate::comments::{dangling_node_comments, Comments};
+use crate::comments::{dangling_node_comments, leading_comments, Comments};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
@@ -34,7 +34,16 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
                 ])]
             )
         } else {
-            write!(f, [group(&format_args![text("**"), self.value.format()])])
+            let comments = f.context().comments().clone();
+            let leading_value_comments = comments.leading_comments(self.value.into());
+            write!(
+                f,
+                [
+                    // make sure the leading comments are hoisted past the `**`
+                    leading_comments(leading_value_comments),
+                    group(&format_args![text("**"), self.value.format()])
+                ]
+            )
         }
     }
 }

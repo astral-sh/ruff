@@ -19,6 +19,12 @@ b # trailing
 b
 }
 
+{
+    # before
+    ** # between
+    b,
+}
+
 {}
 
 {1:2,}

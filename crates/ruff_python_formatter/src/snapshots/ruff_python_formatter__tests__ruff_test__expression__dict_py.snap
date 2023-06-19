@@ -25,6 +25,12 @@ b # trailing
 b
 }
 
+{
+    # before
+    ** # between
+    b,
+}
+
 {}
 
 {1:2,}
@@ -63,6 +69,11 @@ mapping = {
 
 {
     **b,  # middle with single item
+}
+
+{
+    # before
+    **b,  # between
 }
 
 {}
