@@ -72,7 +72,7 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, arguments: &Arguments, s
                 c_args: num_arguments,
                 max_args: checker.settings.pylint.max_args,
             },
-            stmt.identifier(checker.locator),
+            stmt.identifier(),
         ));
     }
 }

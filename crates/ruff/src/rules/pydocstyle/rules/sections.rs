@@ -763,7 +763,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
             UndocumentedParam { names },
-            stmt.identifier(checker.locator),
+            stmt.identifier(),
         ));
     }
 }
