@@ -1,6 +1,6 @@
 ---
 source: parser/src/parser.rs
-expression: "parse_program(source, \"<test>\").unwrap()"
+expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
 ---
 [
     ClassDef(
@@ -38,7 +38,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             "__init__",
                         ),
                         args: Arguments {
-                            range: 31..35,
+                            range: 30..36,
                             posonlyargs: [],
                             args: [
                                 ArgWithDefault {
@@ -77,7 +77,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             "method_with_default",
                         ),
                         args: Arguments {
-                            range: 70..89,
+                            range: 69..90,
                             posonlyargs: [],
                             args: [
                                 ArgWithDefault {

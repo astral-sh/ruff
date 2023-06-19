@@ -14,36 +14,46 @@ Ok(
                     range: 5..14,
                     posonlyargs: [],
                     args: [
-                        Arg {
+                        ArgWithDefault {
                             range: 6..7,
-                            arg: Identifier(
-                                "a",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 6..7,
+                                arg: Identifier(
+                                    "a",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 9..10,
-                            arg: Identifier(
-                                "b",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 9..10,
+                                arg: Identifier(
+                                    "b",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 12..13,
-                            arg: Identifier(
-                                "c",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 12..13,
+                                arg: Identifier(
+                                    "c",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
                     ],
                     vararg: None,
                     kwonlyargs: [],
-                    kw_defaults: [],
                     kwarg: None,
-                    defaults: [],
                 },
                 body: [
                     Pass(

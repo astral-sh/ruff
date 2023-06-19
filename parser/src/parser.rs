@@ -1114,10 +1114,10 @@ def test():
 class Abcd:
     pass
 "#
-                .trim(),
+            .trim(),
             "<test>",
         )
-            .unwrap();
+        .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 }

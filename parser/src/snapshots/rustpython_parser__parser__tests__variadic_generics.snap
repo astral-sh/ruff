@@ -10,7 +10,7 @@ expression: parse_ast
                 "args_to_tuple",
             ),
             args: Arguments {
-                range: 19..29,
+                range: 18..30,
                 posonlyargs: [],
                 args: [],
                 vararg: Some(

@@ -10,7 +10,7 @@ expression: parse_ast
                 "test",
             ),
             args: Arguments {
-                range: (),
+                range: 22..24,
                 posonlyargs: [],
                 args: [],
                 vararg: None,
@@ -25,15 +25,18 @@ expression: parse_ast
                 ),
             ],
             decorator_list: [
-                Name(
-                    ExprName {
-                        range: 1..13,
-                        id: Identifier(
-                            "my_decorator",
-                        ),
-                        ctx: Load,
-                    },
-                ),
+                Decorator {
+                    range: 0..13,
+                    expression: Name(
+                        ExprName {
+                            range: 1..13,
+                            id: Identifier(
+                                "my_decorator",
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
             ],
             returns: None,
             type_comment: None,
@@ -55,15 +58,18 @@ expression: parse_ast
                 ),
             ],
             decorator_list: [
-                Name(
-                    ExprName {
-                        range: 37..52,
-                        id: Identifier(
-                            "class_decorator",
-                        ),
-                        ctx: Load,
-                    },
-                ),
+                Decorator {
+                    range: 36..52,
+                    expression: Name(
+                        ExprName {
+                            range: 37..52,
+                            id: Identifier(
+                                "class_decorator",
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
             ],
         },
     ),

@@ -11,7 +11,7 @@ Ok(
                     "f",
                 ),
                 args: Arguments {
-                    range: 6..22,
+                    range: 5..23,
                     posonlyargs: [],
                     args: [],
                     vararg: None,

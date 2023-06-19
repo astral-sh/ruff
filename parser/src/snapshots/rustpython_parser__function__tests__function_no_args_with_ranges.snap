@@ -16,9 +16,7 @@ Ok(
                     args: [],
                     vararg: None,
                     kwonlyargs: [],
-                    kw_defaults: [],
                     kwarg: None,
-                    defaults: [],
                 },
                 body: [
                     Pass(
