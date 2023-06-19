@@ -1052,6 +1052,69 @@ impl<'a> SemanticModel<'a> {
     pub const fn future_annotations(&self) -> bool {
         self.flags.contains(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
+
+    /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
+    /// containing scope, and across scopes.
+    pub fn shadowed_bindings(
+        &self,
+        scope_id: ScopeId,
+        binding_id: BindingId,
+    ) -> impl Iterator<Item = ShadowedBinding> + '_ {
+        let mut first = true;
+        let mut binding_id = binding_id;
+        std::iter::from_fn(move || {
+            // First, check whether this binding is shadowing another binding in a different scope.
+            if std::mem::take(&mut first) {
+                if let Some(shadowed_id) = self.shadowed_bindings.get(&binding_id).copied() {
+                    return Some(ShadowedBinding {
+                        binding_id,
+                        shadowed_id,
+                        same_scope: false,
+                    });
+                }
+            }
+
+            // Otherwise, check whether this binding is shadowing another binding in the same scope.
+            if let Some(shadowed_id) = self.scopes[scope_id].shadowed_binding(binding_id) {
+                let next = ShadowedBinding {
+                    binding_id,
+                    shadowed_id,
+                    same_scope: true,
+                };
+
+                // Advance to the next binding in the scope.
+                first = true;
+                binding_id = shadowed_id;
+
+                return Some(next);
+            }
+
+            None
+        })
+    }
+}
+
+pub struct ShadowedBinding {
+    /// The binding that is shadowing another binding.
+    binding_id: BindingId,
+    /// The binding that is being shadowed.
+    shadowed_id: BindingId,
+    /// Whether the shadowing and shadowed bindings are in the same scope.
+    same_scope: bool,
+}
+
+impl ShadowedBinding {
+    pub const fn binding_id(&self) -> BindingId {
+        self.binding_id
+    }
+
+    pub const fn shadowed_id(&self) -> BindingId {
+        self.shadowed_id
+    }
+
+    pub const fn same_scope(&self) -> bool {
+        self.same_scope
+    }
 }
 
 bitflags! {

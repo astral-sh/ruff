@@ -126,6 +126,11 @@ impl<'a> Scope<'a> {
         })
     }
 
+    /// Returns the ID of the binding that the given binding shadows, if any.
+    pub fn shadowed_binding(&self, id: BindingId) -> Option<BindingId> {
+        self.shadowed_bindings.get(&id).copied()
+    }
+
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.
     pub fn add_star_import(&mut self, import: StarImport<'a>) {
         self.star_imports.push(import);
