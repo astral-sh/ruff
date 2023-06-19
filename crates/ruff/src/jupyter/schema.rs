@@ -32,6 +32,50 @@ fn sort_alphabetically<T: Serialize, S: serde::Serializer>(
     value.serialize(serializer)
 }
 
+/// This is used to serialize any value implementing [`Serialize`] alphabetically.
+///
+/// The reason for this is to maintain consistency in the generated JSON string,
+/// which is useful for diffing. The default serializer keeps the order of the
+/// fields as they are defined in the struct, which will not be consistent when
+/// there are `extra` fields.
+///
+/// # Example
+///
+/// ```
+/// use std::collections::BTreeMap;
+///
+/// use serde::Serialize;
+///
+/// use ruff::jupyter::SortAlphabetically;
+///
+/// #[derive(Serialize)]
+/// struct MyStruct {
+///    a: String,
+///    #[serde(flatten)]
+///    extra: BTreeMap<String, String>,
+///    b: String,
+/// }
+///
+/// let my_struct = MyStruct {
+///     a: "a".to_string(),
+///     extra: BTreeMap::from([
+///         ("d".to_string(), "d".to_string()),
+///         ("c".to_string(), "c".to_string()),
+///     ]),
+///     b: "b".to_string(),
+/// };
+///
+/// let serialized = serde_json::to_string_pretty(&SortAlphabetically(&my_struct)).unwrap();
+/// assert_eq!(
+///     serialized,
+/// r#"{
+///   "a": "a",
+///   "b": "b",
+///   "c": "c",
+///   "d": "d"
+/// }"#
+/// );
+/// ```
 #[derive(Serialize)]
 pub struct SortAlphabetically<T: Serialize>(#[serde(serialize_with = "sort_alphabetically")] pub T);
 
