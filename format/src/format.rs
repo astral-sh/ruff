@@ -1,11 +1,12 @@
 use itertools::{Itertools, PeekingNext};
-use malachite_bigint::{BigInt, Sign};
-use num_traits::FromPrimitive;
-use num_traits::{cast::ToPrimitive, Signed};
+
+use num_traits::{cast::ToPrimitive, FromPrimitive, Signed};
 use rustpython_literal::float;
 use rustpython_literal::format::Case;
 use std::ops::Deref;
 use std::{cmp, str::FromStr};
+
+use crate::bigint::{BigInt, Sign};
 
 trait FormatParse {
     fn parse(text: &str) -> (Option<Self>, &str)
