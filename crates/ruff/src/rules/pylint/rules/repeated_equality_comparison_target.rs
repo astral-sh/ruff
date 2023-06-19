@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Boolop, Expr, ExprBoolOp, ExprCompare};
+use rustpython_parser::ast::{Boolop, Expr, ExprBoolOp};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
