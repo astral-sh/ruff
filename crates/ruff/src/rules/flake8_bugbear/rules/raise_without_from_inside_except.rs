@@ -21,8 +21,10 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// try:
+///     ...
 /// except FileNotFoundError:
-///     if ...:
+///     if condition:
 ///         raise RuntimeError("...")
 ///     else:
 ///         raise UserWarning("...")
@@ -30,8 +32,10 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
+/// try:
+///     ...
 /// except FileNotFoundError as exc:
-///     if ...:
+///     if condition:
 ///         raise RuntimeError("...") from None
 ///     else:
 ///         raise UserWarning("...") from exc

@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// hasattr(obj, '__call__')
+/// hasattr(obj, "__call__")
 /// ```
 ///
 /// Use instead:

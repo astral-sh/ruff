@@ -25,6 +25,7 @@ use crate::checkers::ast::Checker;
 ///     some_list.append(item)
 ///     return some_list
 ///
+///
 /// l1 = add_to_list(0)  # [0]
 /// l2 = add_to_list(1)  # [0, 1]
 /// ```
@@ -36,6 +37,7 @@ use crate::checkers::ast::Checker;
 ///         some_list = []
 ///     some_list.append(item)
 ///     return some_list
+///
 ///
 /// l1 = add_to_list(0)  # [0]
 /// l2 = add_to_list(1)  # [1]

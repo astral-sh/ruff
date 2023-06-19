@@ -15,12 +15,16 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
+/// try:
+///     ...
 /// except (ValueError,):
 ///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// try:
+///     ...
 /// except ValueError:
 ///     ...
 /// ```

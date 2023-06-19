@@ -59,12 +59,16 @@ impl Violation for DuplicateTryBlockException {
 ///
 /// ## Example
 /// ```python
+/// try:
+///     ...
 /// except (Exception, ValueError):  # ValueError exceptions are caught by Exception.
 ///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// try:
+///     ...
 /// except Exception:
 ///     ...
 /// ```
