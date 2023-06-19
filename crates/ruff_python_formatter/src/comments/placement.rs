@@ -11,25 +11,30 @@ use std::cmp::Ordering;
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
-    comment: DecoratedComment<'a>,
+    mut comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment(
-        comment, locator,
-    )
-    .or_else(|comment| handle_match_comment(comment, locator))
-    .or_else(|comment| handle_in_between_bodies_own_line_comment(comment, locator))
-    .or_else(|comment| handle_in_between_bodies_end_of_line_comment(comment, locator))
-    .or_else(|comment| handle_trailing_body_comment(comment, locator))
-    .or_else(handle_trailing_end_of_line_body_comment)
-    .or_else(|comment| handle_trailing_end_of_line_condition_comment(comment, locator))
-    .or_else(|comment| {
-        handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
-    })
-    .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
-    .or_else(|comment| handle_trailing_binary_expression_left_or_operator_comment(comment, locator))
-    .or_else(handle_leading_function_with_decorators_comment)
-    .or_else(|comment| handle_dict_unpacking_comment(comment, locator))
+    let handlers = [
+        handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment,
+        handle_match_comment,
+        handle_in_between_bodies_own_line_comment,
+        handle_in_between_bodies_end_of_line_comment,
+        handle_trailing_body_comment,
+        handle_trailing_end_of_line_body_comment,
+        handle_trailing_end_of_line_condition_comment,
+        handle_module_level_own_line_comment_before_class_or_function_comment,
+        handle_positional_only_arguments_separator_comment,
+        handle_trailing_binary_expression_left_or_operator_comment,
+        handle_leading_function_with_decorators_comment,
+        handle_dict_unpacking_comment,
+    ];
+    for handler in handlers {
+        comment = match handler(comment, locator) {
+            CommentPlacement::Default(comment) => comment,
+            placement => return placement,
+        };
+    }
+    CommentPlacement::Default(comment)
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -480,7 +485,10 @@ fn handle_trailing_body_comment<'a>(
 ///     if something.changed:
 ///         do.stuff()  # trailing comment
 /// ```
-fn handle_trailing_end_of_line_body_comment(comment: DecoratedComment<'_>) -> CommentPlacement<'_> {
+fn handle_trailing_end_of_line_body_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
     // Must be an end of line comment
     if comment.text_position().is_own_line() {
         return CommentPlacement::Default(comment);
@@ -870,7 +878,10 @@ fn find_pos_only_slash_offset(
 /// def test():
 ///      ...
 /// ```
-fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) -> CommentPlacement {
+fn handle_leading_function_with_decorators_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
     let is_preceding_decorator = comment
         .preceding_node()
         .map_or(false, |node| node.is_decorator());
