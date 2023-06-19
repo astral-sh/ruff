@@ -174,11 +174,18 @@ impl FileCache {
 
         let messages = messages
             .iter()
-            .map(|msg| CacheMessage {
-                kind: msg.kind.clone(),
-                range: msg.range,
-                fix: msg.fix.clone(),
-                noqa_offset: msg.noqa_offset,
+            .map(|msg| {
+                // Make sure that all message use the same source file.
+                assert!(
+                    msg.file == messages.first().unwrap().file,
+                    "message uses a different source file"
+                );
+                CacheMessage {
+                    kind: msg.kind.clone(),
+                    range: msg.range,
+                    fix: msg.fix.clone(),
+                    noqa_offset: msg.noqa_offset,
+                }
             })
             .collect();
 
