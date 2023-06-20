@@ -92,22 +92,15 @@ pub(crate) fn trailing_whitespace(
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
-
                 if settings.rules.should_fix(Rule::BlankLineWithWhitespace) {
                     // Remove any preceding continuations, to avoid introducing a potential
                     // syntax error.
-                    if let Some(continuation) =
+                    diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::new(
                         helpers::preceded_by_continuations(line.start(), locator, indexer)
-                    {
-                        diagnostic.set_fix(Fix::suggested(Edit::range_deletion(TextRange::new(
-                            continuation,
-                            range.end(),
-                        ))));
-                    } else {
-                        diagnostic.set_fix(Fix::suggested(Edit::range_deletion(range)));
-                    }
+                            .unwrap_or(range.start()),
+                        range.end(),
+                    ))));
                 }
-
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {

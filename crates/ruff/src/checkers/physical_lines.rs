@@ -1,10 +1,11 @@
 //! Lint rules based on checking physical lines.
-use ruff_text_size::TextSize;
 use std::path::Path;
+
+use ruff_text_size::TextSize;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::{Line, UniversalNewlines};
+use ruff_python_whitespace::UniversalNewlines;
 
 use crate::registry::Rule;
 use crate::rules::copyright::rules::missing_copyright_notice;
@@ -184,9 +185,10 @@ pub(crate) fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
-    use std::path::Path;
 
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
