@@ -1,53 +1,8 @@
 [tool.ruff]
-allowed-confusables = ["−", "ρ", "∗"]
 line-length = 88
 extend-exclude = [
   "excluded_file.py",
   "migrations",
   "with_excluded_file/other_excluded_file.py",
 ]
-external = ["V101"]
 per-file-ignores = { "__init__.py" = ["F401"] }
-
-[tool.ruff.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
-
-[tool.ruff.flake8-builtins]
-builtins-ignorelist = ["id", "dir"]
-
-[tool.ruff.flake8-quotes]
-inline-quotes = "single"
-multiline-quotes = "double"
-docstring-quotes = "double"
-avoid-escape = true
-
-[tool.ruff.mccabe]
-max-complexity = 10
-
-[tool.ruff.pep8-naming]
-classmethod-decorators = ["pydantic.validator"]
-
-[tool.ruff.flake8-tidy-imports]
-ban-relative-imports = "parents"
-
-[tool.ruff.flake8-tidy-imports.banned-api]
-"cgi".msg = "The cgi module is deprecated."
-"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
-
-[tool.ruff.flake8-errmsg]
-max-string-length = 20
-
-[tool.ruff.flake8-import-conventions.aliases]
-pandas = "pd"
-
-[tool.ruff.flake8-import-conventions.extend-aliases]
-"dask.dataframe" = "dd"
-
-[tool.ruff.flake8-pytest-style]
-fixture-parentheses = false
-parametrize-names-type = "csv"
-parametrize-values-type = "tuple"
-parametrize-values-row-type = "list"
-raises-require-match-for = ["Exception", "TypeError", "KeyError"]
-raises-extend-require-match-for = ["requests.RequestException"]
-mark-parentheses = false

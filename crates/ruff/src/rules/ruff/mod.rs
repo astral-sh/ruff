@@ -90,13 +90,16 @@ mod tests {
     fn ruf100_0() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
-            &settings::Settings::for_rules(vec![
-                Rule::UnusedNOQA,
-                Rule::LineTooLong,
-                Rule::UnusedImport,
-                Rule::UnusedVariable,
-                Rule::TabIndentation,
-            ]),
+            &settings::Settings {
+                external: FxHashSet::from_iter(vec!["V101".to_string()]),
+                ..settings::Settings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::LineTooLong,
+                    Rule::UnusedImport,
+                    Rule::UnusedVariable,
+                    Rule::TabIndentation,
+                ])
+            },
         )?;
         assert_messages!(diagnostics);
         Ok(())
