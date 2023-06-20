@@ -10,14 +10,15 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for abstract base classes with methods, but no abstract methods.
+/// Checks for abstract classes without abstract methods.
 ///
 /// ## Why is this bad?
-/// Abstract base classes exist to be subclassed. A lack of abstract methods is
-/// indicative of unfinished code or a mistake.
+/// Abstract base classes are used to define interfaces. If they have no abstract
+/// methods, they are not useful.
 ///
-/// Instead, add an abstract method to the class or remove the `ABC` base class
-/// from the class definition.
+/// If the class is not meant to be used as an interface, it should not be an
+/// abstract base class. Remove the `ABC` base class from the class definition,
+/// or add an abstract method to the class.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +42,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: abc](https://docs.python.org/3/library/abc.html)
+/// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 #[violation]
 pub struct AbstractBaseClassWithoutAbstractMethod {
     name: String,

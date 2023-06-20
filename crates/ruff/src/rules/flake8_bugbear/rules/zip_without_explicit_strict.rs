@@ -12,11 +12,11 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// By default, if the iterables passed to `zip` are of different lengths, the
-/// resulting iterator will be truncated to the length of the shortest
-/// iterable. This can lead to hard-to-find bugs.
+/// resulting iterator will be silently truncated to the length of the shortest
+/// iterable. This can lead to subtle bugs.
 ///
 /// Use the `strict` parameter to raise a `ValueError` if the iterables are of
-/// different lengths.
+/// non-uniform length.
 ///
 /// ## Example
 /// ```python

@@ -6,11 +6,11 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `++n`.
+/// Checks for uses of the unary prefix increment operator (e.g., `++n`).
 ///
 /// ## Why is this bad?
-/// Python does not support the unary prefix increment. Writing `++n` is
-/// equivalent to `+(+(n))`, which equals `n`.
+/// Python does not support the unary prefix increment operator. Writing `++n`
+/// is equivalent to `+(+(n))`, which is equivalent to `n`.
 ///
 /// ## Example
 /// ```python

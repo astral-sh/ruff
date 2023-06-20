@@ -6,13 +6,15 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for star-arg unpacking after a keyword argument.
+/// Checks for function calls that use star-argument unpacking after providing a
+/// keyword argument
 ///
 /// ## Why is this bad?
-/// Star-arg unpacking works only when the keyword parameter is declared after
-/// all parameters supplied by the star-arg unpacking. This behavior is
-/// confusing and unlikely to be intended, and is legal only for backwards
-/// compatibility.
+/// In Python, you can use star-argument unpacking to pass a list or tuple of
+/// arguments to a function.
+///
+/// Providing a star-argument after a keyword argument can lead to confusing
+/// behavior, and is only supported for backwards compatibility.
 ///
 /// ## Example
 /// ```python
@@ -24,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// foo(1, *[2, 3])  # (1, 2, 3)
 /// # foo(x=1, *[2, 3])  # TypeError
 /// # foo(y=2, *[1, 3])  # TypeError
-/// foo(z=3, *[1, 2])  # (1, 2, 3) # This is OK, but confusing!
+/// foo(z=3, *[1, 2])  # (1, 2, 3)  # No error, but confusing!
 /// ```
 ///
 /// Use instead:

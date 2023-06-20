@@ -9,15 +9,18 @@ use ruff_python_stdlib::str::is_cased_lowercase;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `raise` statements without a `from` clause inside an `except` clause.
+/// Checks for `raise` statements in exception handlers that lack a `from`
+/// clause.
 ///
 /// ## Why is this bad?
-/// Raising exceptions without a `from` clause inside an `except` clause makes it
-/// difficult to distinguish between exceptions raised by the `raise` statement
-/// and exceptions raised by the `except` clause.
+/// In Python, `raise` can be used with or without an exception from which the
+/// current exception is derived. This is known as exception chaining. When
+/// printing the stack trace, chained exceptions are displayed in such a way
+/// so as make it easier to trace the exception back to its root cause.
 ///
-/// Instead, use the `from` clause to distinguish between the scenarios (for
-/// example, `raise ... from exc` or `raise ... from None`).
+/// When raising an exception from within an `except` clause, always include a
+/// `from` clause to facilitate exception chaining. If the exception is not
+/// chained, it will be difficult to trace the exception back to its root cause.
 ///
 /// ## Example
 /// ```python

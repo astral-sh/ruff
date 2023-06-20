@@ -7,10 +7,13 @@ use ruff_python_ast::identifier::Identifier;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for f-strings used as docstrings.
+/// Checks for docstrings that are written via f-strings.
 ///
 /// ## Why is this bad?
-/// Python will interpret this as a joined string, rather than a docstring.
+/// Python will interpret the f-string as a joined string, rather than as a
+/// docstring. As such, the "docstring" will not be accessible via the
+/// `__doc__` attribute, nor will it be picked up by any automated
+/// documentation tooling.
 ///
 /// ## Example
 /// ```python

@@ -9,13 +9,14 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `assert False`.
+/// Checks for uses of `assert False`.
 ///
 /// ## Why is this bad?
-/// Python removes `assert False` when running with the `-O` flag. This means
-/// `assert False` is an unreliable way to raise an `AssertionError`.
+/// Python removes `assert` statements when running in optimized mode
+/// (`python -O`), making `assert False` an unreliable means of
+/// raising an `AssertionError`.
 ///
-/// Instead, raise `AssertionError` directly.
+/// Instead, raise an `AssertionError` directly.
 ///
 /// ## Example
 /// ```python

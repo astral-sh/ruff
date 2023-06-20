@@ -10,12 +10,14 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `setattr` with a constant attribute value.
+/// Checks for uses of `setattr` that take a constant attribute value as an
+/// argument (e.g., `setattr(obj, "foo", 42)`).
 ///
 /// ## Why is this bad?
 /// `setattr` is used to set attributes dynamically. If the attribute is
-/// constant, it is not any safer than normal property access. Instead, use
-/// normal property access to set the attribute.
+/// defined as a constant, it is no safer than a typical property access. When
+/// possible, prefer property access over `setattr` calls, as the former is
+/// more concise and idiomatic.
 ///
 /// ## Example
 /// ```python

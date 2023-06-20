@@ -15,7 +15,7 @@ use crate::cst::matchers::{match_call_mut, match_expression, match_name};
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for usages of `str()`, `repr()`, and `ascii()` as explicit type
+/// Checks for uses of `str()`, `repr()`, and `ascii()` as explicit type
 /// conversions within f-strings.
 ///
 /// ## Why is this bad?

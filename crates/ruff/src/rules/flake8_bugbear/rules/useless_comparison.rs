@@ -9,9 +9,9 @@ use crate::checkers::ast::Checker;
 /// Checks for useless comparisons.
 ///
 /// ## Why is this bad?
-/// Useless comparisons are pointless and waste CPU instructions. Remove the
-/// comparison or prepend `assert` to make it raise an exception if the
-/// comparison evaluates to `false`.
+/// Useless comparisons have no effect on the program, and are often included
+/// by mistake. If the comparison is intended to enforce an invariant, prepend
+/// the comparison with an `assert`. Otherwise, remove it entirely.
 ///
 /// ## Example
 /// ```python
@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
-/// assert foo == bar
+/// assert foo == bar, "`foo` and `bar` should be equal."
 /// ```
 ///
 /// ## References

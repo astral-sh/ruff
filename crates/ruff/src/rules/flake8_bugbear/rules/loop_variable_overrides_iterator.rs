@@ -9,12 +9,13 @@ use ruff_python_ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for loop control variables that override the iterable it iterates.
+/// Checks for loop control variables that override the loop iterable.
 ///
 /// ## Why is this bad?
-/// Loop control variables should not override the iterable it iterates. This
-/// makes the code harder to read and understand. Rename the loop control
-/// variable to something else.
+/// Loop control variables should not override the loop iterable, as this can
+/// lead to confusing behavior.
+///
+/// Instead, use a distinct variable name for any loop control variables.
 ///
 /// ## Example
 /// ```python

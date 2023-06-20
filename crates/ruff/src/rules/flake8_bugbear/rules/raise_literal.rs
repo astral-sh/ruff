@@ -6,11 +6,12 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for raising a literal.
+/// Checks for `raise` statements that raise a literal value.
 ///
 /// ## Why is this bad?
-/// Exceptions must be instances of `BaseException` or a subclass of it. Raising
-/// a literal is not allowed and will raise a `TypeError`.
+/// `raise` must be followed by an exception instance or an exception class,
+/// and exceptions must be instances of `BaseException` or a subclass thereof.
+/// Raising a literal will raise a `TypeError` at runtime.
 ///
 /// ## Example
 /// ```python

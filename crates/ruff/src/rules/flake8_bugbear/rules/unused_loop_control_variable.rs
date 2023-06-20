@@ -16,12 +16,15 @@ enum Certainty {
 }
 
 /// ## What it does
-/// Checks for unused loop variables.
+/// Checks for unused variables in loops (e.g., `for` and `while` statements).
 ///
 /// ## Why is this bad?
-/// Unused loop variables are indicative of a bug or unfinished code. If the
-/// variable is intended to be unused, it should be prefixed with an underscore.
-/// Otherwise, it should be removed.
+/// Defining a variable in a loop statement that is never used can confuse
+/// readers.
+///
+/// If the variable is intended to be unused (e.g., to facilitate
+/// destructuring of a tuple or other object), prefix it with an underscore
+/// to indicate the intent. Otherwise, remove the variable entirely.
 ///
 /// ## Example
 /// ```python
@@ -34,6 +37,7 @@ enum Certainty {
 /// for i, _j in foo:
 ///     bar(i)
 /// ```
+///
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[violation]

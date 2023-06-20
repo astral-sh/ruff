@@ -6,17 +6,16 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `break`, `continue`, and `return` statements inside `finally`
+/// Checks for `break`, `continue`, and `return` statements in `finally`
 /// blocks.
 ///
 /// ## Why is this bad?
-/// `break`, `continue`, and `return` statements inside `finally` blocks cause
-/// exceptions from the `try` and `except` blocks to be silenced. This can lead
-/// to unexpected behavior.
+/// The use of `break`, `continue`, and `return` statements in `finally` blocks
+/// can cause exceptions to be silenced.
 ///
-/// Instead, refactor the code to not use `break`, `continue`, and `return`
-/// statements inside `finally` blocks. If the exception is intended to be
-/// silenced, silence it in the `except` block explicitly.
+/// `finally` blocks execute regardless of whether an exception is raised. If a
+/// `break`, `continue`, or `return` statement is reached in a `finally` block,
+/// any exception raised in the `try` or `except` blocks will be silenced.
 ///
 /// ## Example
 /// ```python
@@ -26,7 +25,7 @@ use crate::checkers::ast::Checker;
 ///     except ZeroDivisionError:
 ///         raise ValueError("Time cannot be zero")
 ///     finally:
-///         return 299792458  # prevents the exception from being re-raised
+///         return 299792458  # `ValueError` is silenced
 /// ```
 ///
 /// Use instead:

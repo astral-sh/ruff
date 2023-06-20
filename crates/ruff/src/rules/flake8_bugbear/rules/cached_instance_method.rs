@@ -7,37 +7,46 @@ use ruff_python_semantic::SemanticModel;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for using `functools.lru_cache` or `functools.cache` on methods.
+/// Checks for uses of the `functools.lru_cache` and `functools.cache`
+/// decorators on methods.
 ///
 /// ## Why is this bad?
-/// Using `functools.lru_cache` or `functools.cache` on methods can create memory
-/// leaks. This is because the global cache will keep a reference to the
-/// instance of the class, which will prevent it from being garbage collected.
+/// Using the `functools.lru_cache` and `functools.cache` decorators on methods
+/// can lead to memory leaks, as the global cache will retain a reference to
+/// the instance, preventing it from being garbage collected.
 ///
 /// Instead, refactor the method to depend only on its arguments and not on the
-/// instance of the class.
+/// instance of the class, or use the `@lru_cache` decorator on a function
+/// outside of the class.
 ///
 /// ## Example
 /// ```python
 /// from functools import lru_cache
 ///
+/// def square(x: int) -> int:
+///    return x * x
 ///
-/// class Foo:
+/// class Number:
+///     value: int
+///
 ///     @lru_cache
-///     def bar(self):
-///         ...
+///     def squared(self):
+///         return square(self.value)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from functools import lru_cache
 ///
+/// @lru_cache
+/// def square(x: int) -> int:
+///    return x * x
 ///
-/// class Foo:
-///     @staticmethod
-///     @lru_cache
-///     def bar():  # No longer depends on `self`.
-///         ...
+/// class Number:
+///     value: int
+///
+///     def squared(self):
+///         return square(self.value)
 /// ```
 ///
 /// ## References

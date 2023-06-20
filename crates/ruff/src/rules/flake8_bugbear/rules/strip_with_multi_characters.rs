@@ -7,14 +7,18 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for multi-character strings in `.strip()`, `.lstrip()`, and
-/// `.rstrip()`.
+/// Checks for uses of multi-character strings in `.strip()`, `.lstrip()`, and
+/// `.rstrip()` calls.
 ///
 /// ## Why is this bad?
 /// All characters in the call to `.strip()`, `.lstrip()`, or `.rstrip()` are
 /// removed from the leading and trailing ends of the string. If the string
 /// contains multiple characters, the reader may be misled into thinking that
-/// substring is removed from the leading and trailing ends of the string.
+/// a prefix or suffix is being removed, rather than a set of characters.
+///
+/// In Python 3.9 and later, you can use `str#removeprefix` and
+/// `str#removesuffix` to remove an exact prefix or suffix from a string,
+/// respectively, which should be preferred when possible.
 ///
 /// ## Example
 /// ```python
@@ -23,7 +27,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
-/// "abcba".strip("a").strip("b")  # "c"
+/// "abcba".removeprefix("ab").removesuffix("ba")  # "c"
 /// ```
 ///
 /// ## References

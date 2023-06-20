@@ -9,12 +9,15 @@ use crate::checkers::ast::Checker;
 /// Checks for assignments to `os.environ`.
 ///
 /// ## Why is this bad?
-/// Assigning to `os.environ` doesn't clear the environment. It only updates the
-/// environment of the current process. This can lead to unexpected behavior
-/// when running the program in a subprocess.
+/// In Python, `os.environ` is a mapping that represents the environment of the
+/// current process.
 ///
-/// Instead, use `os.environ.clear()` to clear the environment. Or, use
-/// the `env` argument of `subprocess.Popen` to pass a custom environment to
+/// However, reassigning to `os.environ` does not clear the environment. Instead,
+/// it merely updates the `os.environ` for the current process. This can lead to
+/// unexpected behavior, especially when running the program in a subprocess.
+///
+/// Instead, use `os.environ.clear()` to clear the environment, or use the
+/// `env` argument of `subprocess.Popen` to pass a custom environment to
 /// a subprocess.
 ///
 /// ## Example

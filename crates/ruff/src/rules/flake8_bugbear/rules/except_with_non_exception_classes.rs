@@ -8,11 +8,11 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `except` clauses that catch non-exception classes.
+/// Checks for exception handlers that catch non-exception classes.
 ///
 /// ## Why is this bad?
 /// Catching classes that do not inherit from `BaseException` will raise a
-/// `TypeError`. Instead, catch only exception classes.
+/// `TypeError`.
 ///
 /// ## Example
 /// ```python

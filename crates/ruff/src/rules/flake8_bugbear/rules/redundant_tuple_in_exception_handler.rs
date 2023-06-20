@@ -7,11 +7,12 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for tuples with a single element in exception handlers.
+/// Checks for single-element tuples in exception handlers (e.g.,
+/// `except (ValueError,):`).
 ///
 /// ## Why is this bad?
-/// A tuple with a single element is redundant. Write the exception class
-/// directly instead.
+/// A tuple with a single element can be more concisely and idiomatically
+/// expressed as a single value.
 ///
 /// ## Example
 /// ```python

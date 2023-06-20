@@ -17,7 +17,7 @@ use crate::registry::{AsRule, Rule};
 ///
 /// ## Why is this bad?
 /// Duplicate exception handlers are redundant, as the first handler will catch
-/// the exception. Instead, remove the duplicate handler.
+/// the exception, making the second handler unreachable.
 ///
 /// ## Example
 /// ```python
@@ -51,17 +51,22 @@ impl Violation for DuplicateTryBlockException {
         format!("try-except block with duplicate exception `{name}`")
     }
 }
+
 /// ## What it does
-/// Checks for `try-except` blocks with duplicate exception handlers.
+/// Checks for exception handlers that catch duplicate exceptions.
 ///
 /// ## Why is this bad?
-/// Duplicate exception handlers are redundant.
+/// Including the same exception multiple times in the same handler is redundant,
+/// as the first exception will catch the exception, making the second exception
+/// unreachable. The same applies to exception hierarchies, as a handler for a
+/// parent exception (like `Exception`) will also catch child exceptions (like
+/// `ValueError`).
 ///
 /// ## Example
 /// ```python
 /// try:
 ///     ...
-/// except (Exception, ValueError):  # ValueError exceptions are caught by Exception.
+/// except (Exception, ValueError):  # `Exception` includes `ValueError`.
 ///     ...
 /// ```
 ///
