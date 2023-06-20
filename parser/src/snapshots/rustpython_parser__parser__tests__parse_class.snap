@@ -94,7 +94,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     default: None,
                                 },
                                 ArgWithDefault {
-                                    range: 76..79,
+                                    range: 76..89,
                                     def: Arg {
                                         range: 76..79,
                                         arg: Identifier {

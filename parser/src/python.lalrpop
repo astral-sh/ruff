@@ -1067,8 +1067,12 @@ ParameterDefs<ArgType>: (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>) = {
 
 ParameterDef<ArgType>: ast::ArgWithDefault = {
     <i:ArgType> => i,
-    <mut i:ArgType> "=" <e:Test<"all">> => {
+    <mut i:ArgType> "=" <e:Test<"all">> <end_location:@R> => {
         i.default = Some(Box::new(e));
+        #[cfg(feature = "all-nodes-with-ranges")]
+        {
+            i.range = optional_range(i.range.start(), end_location);
+        }
         i
     },
 };

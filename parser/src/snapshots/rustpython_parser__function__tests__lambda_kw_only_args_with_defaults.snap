@@ -30,7 +30,7 @@ Ok(
                                     default: None,
                                 },
                                 ArgWithDefault {
-                                    range: 13..14,
+                                    range: 13..17,
                                     def: Arg {
                                         range: 13..14,
                                         arg: Identifier {
@@ -53,7 +53,7 @@ Ok(
                                     ),
                                 },
                                 ArgWithDefault {
-                                    range: 19..20,
+                                    range: 19..23,
                                     def: Arg {
                                         range: 19..20,
                                         arg: Identifier {

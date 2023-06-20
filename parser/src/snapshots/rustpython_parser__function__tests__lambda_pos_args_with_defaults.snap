@@ -28,7 +28,7 @@ Ok(
                                     default: None,
                                 },
                                 ArgWithDefault {
-                                    range: 10..11,
+                                    range: 10..14,
                                     def: Arg {
                                         range: 10..11,
                                         arg: Identifier {
@@ -51,7 +51,7 @@ Ok(
                                     ),
                                 },
                                 ArgWithDefault {
-                                    range: 16..17,
+                                    range: 16..20,
                                     def: Arg {
                                         range: 16..17,
                                         arg: Identifier {
