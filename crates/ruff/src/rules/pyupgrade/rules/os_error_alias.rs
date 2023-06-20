@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -151,9 +151,9 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
 }
 
 /// UP024
-pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = handler;
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
         let Some(expr) = type_.as_ref() else {
             continue;
         };

@@ -1,13 +1,13 @@
 use std::fmt;
 
 use anyhow::Result;
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -307,24 +307,23 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 
 /// RUF011
 pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
-    let arguments_with_defaults = arguments
-        .kwonlyargs
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
         .iter()
-        .rev()
-        .zip(arguments.kw_defaults.iter().rev())
-        .chain(
-            arguments
-                .args
-                .iter()
-                .rev()
-                .chain(arguments.posonlyargs.iter().rev())
-                .zip(arguments.defaults.iter().rev()),
-        );
-    for (arg, default) in arguments_with_defaults {
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+    {
+        let Some(default) = default else {
+            continue
+        };
         if !is_const_none(default) {
             continue;
         }
-        let Some(annotation) = &arg.annotation else {
+        let Some(annotation) = &def.annotation else {
             continue
         };
         let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic()) else {

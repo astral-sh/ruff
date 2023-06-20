@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Excepthandler, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -19,7 +19,7 @@ impl Violation for TryExceptPass {
 /// S110
 pub(crate) fn try_except_pass(
     checker: &mut Checker,
-    excepthandler: &Excepthandler,
+    except_handler: &ExceptHandler,
     type_: Option<&Expr>,
     _name: Option<&str>,
     body: &[Stmt],
@@ -31,6 +31,6 @@ pub(crate) fn try_except_pass(
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(TryExceptPass, excepthandler.range()));
+            .push(Diagnostic::new(TryExceptPass, except_handler.range()));
     }
 }

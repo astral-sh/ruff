@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -147,8 +147,8 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                             .iter()
                             .map(|handler| {
                                 1 + {
-                                    let Excepthandler::ExceptHandler(
-                                        ast::ExcepthandlerExceptHandler { body, .. },
+                                    let ExceptHandler::ExceptHandler(
+                                        ast::ExceptHandlerExceptHandler { body, .. },
                                     ) = handler;
                                     num_branches(body)
                                 }

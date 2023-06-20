@@ -13,8 +13,8 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::is_typing_extension;
 
 use crate::binding::{
-    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImportation,
-    Importation, SubmoduleImportation,
+    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
+    SubmoduleImport,
 };
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
@@ -40,7 +40,6 @@ pub struct SemanticModel<'a> {
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
-    pub dead_scopes: Vec<ScopeId>,
 
     /// Stack of all definitions created in any scope, at any point in execution.
     pub definitions: Definitions<'a>,
@@ -130,7 +129,6 @@ impl<'a> SemanticModel<'a> {
             exprs: Vec::default(),
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
-            dead_scopes: Vec::default(),
             definitions: Definitions::for_module(module),
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
@@ -419,7 +417,7 @@ impl<'a> SemanticModel<'a> {
         let head = call_path.first()?;
         let binding = self.find_binding(head)?;
         match &binding.kind {
-            BindingKind::Importation(Importation {
+            BindingKind::Import(Import {
                 qualified_name: name,
             }) => {
                 if name.starts_with('.') {
@@ -436,7 +434,7 @@ impl<'a> SemanticModel<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation {
+            BindingKind::SubmoduleImport(SubmoduleImport {
                 qualified_name: name,
             }) => {
                 let name = name.split('.').next().unwrap_or(name);
@@ -444,7 +442,7 @@ impl<'a> SemanticModel<'a> {
                 source_path.extend(call_path.into_iter().skip(1));
                 Some(source_path)
             }
-            BindingKind::FromImportation(FromImportation {
+            BindingKind::FromImport(FromImport {
                 qualified_name: name,
             }) => {
                 if name.starts_with('.') {
@@ -495,7 +493,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { qualified_name }) => {
+                    BindingKind::Import(Import { qualified_name }) => {
                         if qualified_name == &module {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
@@ -516,7 +514,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { qualified_name }) => {
+                    BindingKind::FromImport(FromImport { qualified_name }) => {
                         if let Some((target_module, target_member)) = qualified_name.split_once('.')
                         {
                             if target_module == module && target_member == member {
@@ -539,7 +537,7 @@ impl<'a> SemanticModel<'a> {
                     }
                     // Ex) Given `module="os"` and `object="name"`:
                     // `import os.path ` -> `os.name`
-                    BindingKind::SubmoduleImportation(SubmoduleImportation { .. }) => {
+                    BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
                         if name == module {
                             if let Some(source) = binding.source {
                                 // Verify that `os` isn't bound in an inner scope.
@@ -596,7 +594,6 @@ impl<'a> SemanticModel<'a> {
 
     /// Pop the current [`Scope`] off the stack.
     pub fn pop_scope(&mut self) {
-        self.dead_scopes.push(self.scope_id);
         self.scope_id = self.scopes[self.scope_id]
             .parent
             .expect("Attempted to pop without scope");

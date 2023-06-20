@@ -65,8 +65,7 @@ fn generate_fix(
     } else {
         (stderr, stdout)
     };
-    #[allow(deprecated)]
-    Ok(Fix::unspecified_edits(
+    Ok(Fix::suggested_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
             locator,

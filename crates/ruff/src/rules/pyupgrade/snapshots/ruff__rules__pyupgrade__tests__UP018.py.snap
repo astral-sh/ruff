@@ -11,7 +11,7 @@ UP018.py:21:1: UP018 [*] Unnecessary call to `str`
    |
    = help: Replace with empty string
 
-ℹ Suggested fix
+ℹ Fix
 18 18 | f"{f'{str()}'}"
 19 19 | 
 20 20 | # These become string or byte literals
@@ -32,7 +32,7 @@ UP018.py:22:1: UP018 [*] Unnecessary call to `str`
    |
    = help: Replace with empty string
 
-ℹ Suggested fix
+ℹ Fix
 19 19 | 
 20 20 | # These become string or byte literals
 21 21 | str()
@@ -54,7 +54,7 @@ UP018.py:23:1: UP018 [*] Unnecessary call to `str`
    |
    = help: Replace with empty string
 
-ℹ Suggested fix
+ℹ Fix
 20 20 | # These become string or byte literals
 21 21 | str()
 22 22 | str("foo")
@@ -77,7 +77,7 @@ UP018.py:25:1: UP018 [*] Unnecessary call to `bytes`
    |
    = help: Replace with empty bytes
 
-ℹ Suggested fix
+ℹ Fix
 22 22 | str("foo")
 23 23 | str("""
 24 24 | foo""")
@@ -98,7 +98,7 @@ UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
    |
    = help: Replace with empty bytes
 
-ℹ Suggested fix
+ℹ Fix
 23 23 | str("""
 24 24 | foo""")
 25 25 | bytes()
@@ -119,7 +119,7 @@ UP018.py:27:1: UP018 [*] Unnecessary call to `bytes`
    |
    = help: Replace with empty bytes
 
-ℹ Suggested fix
+ℹ Fix
 24 24 | foo""")
 25 25 | bytes()
 26 26 | bytes(b"foo")
@@ -138,7 +138,7 @@ UP018.py:29:4: UP018 [*] Unnecessary call to `str`
    |
    = help: Replace with empty string
 
-ℹ Suggested fix
+ℹ Fix
 26 26 | bytes(b"foo")
 27 27 | bytes(b"""
 28 28 | foo""")

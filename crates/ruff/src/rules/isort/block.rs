@@ -1,5 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Excepthandler, MatchCase, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Ranged, Stmt};
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
@@ -267,8 +267,8 @@ where
                 finalbody,
                 range: _,
             }) => {
-                for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler);
+                for except_handler in handlers {
+                    self.visit_except_handler(except_handler);
                 }
 
                 for stmt in body {
@@ -291,12 +291,12 @@ where
         self.nested = prev_nested;
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
+    fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
         let prev_nested = self.nested;
         self.nested = true;
 
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-            excepthandler;
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
+            except_handler;
         for stmt in body {
             self.visit_stmt(stmt);
         }

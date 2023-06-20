@@ -208,11 +208,11 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(comprehension);
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &'ast Excepthandler) {
-        if self.start_node(excepthandler).is_traverse() {
-            walk_excepthandler(self, excepthandler);
+    fn visit_except_handler(&mut self, except_handler: &'ast ExceptHandler) {
+        if self.start_node(except_handler).is_traverse() {
+            walk_except_handler(self, except_handler);
         }
-        self.finish_node(excepthandler);
+        self.finish_node(except_handler);
     }
 
     fn visit_format_spec(&mut self, format_spec: &'ast Expr) {
@@ -250,12 +250,12 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(alias);
     }
 
-    fn visit_withitem(&mut self, withitem: &'ast Withitem) {
-        if self.start_node(withitem).is_traverse() {
-            walk_withitem(self, withitem);
+    fn visit_with_item(&mut self, with_item: &'ast WithItem) {
+        if self.start_node(with_item).is_traverse() {
+            walk_with_item(self, with_item);
         }
 
-        self.finish_node(withitem);
+        self.finish_node(with_item);
     }
 
     fn visit_match_case(&mut self, match_case: &'ast MatchCase) {

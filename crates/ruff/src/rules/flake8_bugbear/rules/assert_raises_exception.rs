@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt, Withitem};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -50,7 +50,7 @@ impl Violation for AssertRaisesException {
 }
 
 /// B017
-pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[Withitem]) {
+pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[WithItem]) {
     let Some(item) = items.first() else {
         return;
     };

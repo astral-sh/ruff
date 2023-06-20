@@ -1,7 +1,7 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{self, Excepthandler, Expr, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -29,7 +29,6 @@ pub(crate) fn delete_stmt(
     parent: Option<&Stmt>,
     locator: &Locator,
     indexer: &Indexer,
-    stylist: &Stylist,
 ) -> Edit {
     if parent
         .map(|parent| is_lone_child(stmt, parent))
@@ -39,18 +38,15 @@ pub(crate) fn delete_stmt(
         // it with a `pass`.
         Edit::range_replacement("pass".to_string(), stmt.range())
     } else {
-        if let Some(semicolon) = trailing_semicolon(stmt, locator) {
+        if let Some(semicolon) = trailing_semicolon(stmt.end(), locator) {
             let next = next_stmt_break(semicolon, locator);
             Edit::deletion(stmt.start(), next)
-        } else if helpers::has_leading_content(stmt, locator) {
+        } else if helpers::has_leading_content(stmt.start(), locator) {
             Edit::range_deletion(stmt.range())
-        } else if helpers::preceded_by_continuation(stmt, indexer, locator) {
-            if is_end_of_file(stmt, locator) && locator.is_at_start_of_line(stmt.start()) {
-                // Special-case: a file can't end in a continuation.
-                Edit::range_replacement(stylist.line_ending().to_string(), stmt.range())
-            } else {
-                Edit::range_deletion(stmt.range())
-            }
+        } else if let Some(start) =
+            helpers::preceded_by_continuations(stmt.start(), locator, indexer)
+        {
+            Edit::range_deletion(TextRange::new(start, stmt.end()))
         } else {
             let range = locator.full_lines_range(stmt.range());
             Edit::range_deletion(range)
@@ -68,7 +64,7 @@ pub(crate) fn remove_unused_imports<'a>(
     stylist: &Stylist,
 ) -> Result<Edit> {
     match codemods::remove_imports(unused_imports, stmt, locator, stylist)? {
-        None => Ok(delete_stmt(stmt, parent, locator, indexer, stylist)),
+        None => Ok(delete_stmt(stmt, parent, locator, indexer)),
         Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
     }
 }
@@ -218,7 +214,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
                 || is_only(orelse, child)
                 || is_only(finalbody, child)
                 || handlers.iter().any(|handler| match handler {
-                    Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) => is_only(body, child),
                 })
@@ -238,15 +234,15 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
 
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part
 /// of a multi-statement line.
-fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<TextSize> {
-    let contents = locator.after(stmt.end());
+fn trailing_semicolon(offset: TextSize, locator: &Locator) -> Option<TextSize> {
+    let contents = locator.after(offset);
 
     for line in NewlineWithTrailingNewline::from(contents) {
         let trimmed = line.trim_whitespace_start();
 
         if trimmed.starts_with(';') {
             let colon_offset = line.text_len() - trimmed.text_len();
-            return Some(stmt.end() + line.start() + colon_offset);
+            return Some(offset + line.start() + colon_offset);
         }
 
         if !trimmed.starts_with('\\') {
@@ -284,16 +280,11 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
     locator.line_end(start_location)
 }
 
-/// Return `true` if a `Stmt` occurs at the end of a file.
-fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
-    stmt.end() == locator.contents().text_len()
-}
-
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
     use ruff_text_size::TextSize;
-    use rustpython_parser::ast::Suite;
+    use rustpython_parser::ast::{Ranged, Suite};
     use rustpython_parser::Parse;
 
     use ruff_python_ast::source_code::Locator;
@@ -306,19 +297,25 @@ mod tests {
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert_eq!(trailing_semicolon(stmt, &locator), None);
+        assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
 
         let contents = "x = 1; y = 1";
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert_eq!(trailing_semicolon(stmt, &locator), Some(TextSize::from(5)));
+        assert_eq!(
+            trailing_semicolon(stmt.end(), &locator),
+            Some(TextSize::from(5))
+        );
 
         let contents = "x = 1 ; y = 1";
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert_eq!(trailing_semicolon(stmt, &locator), Some(TextSize::from(6)));
+        assert_eq!(
+            trailing_semicolon(stmt.end(), &locator),
+            Some(TextSize::from(6))
+        );
 
         let contents = r#"
 x = 1 \
@@ -328,7 +325,10 @@ x = 1 \
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert_eq!(trailing_semicolon(stmt, &locator), Some(TextSize::from(10)));
+        assert_eq!(
+            trailing_semicolon(stmt.end(), &locator),
+            Some(TextSize::from(10))
+        );
 
         Ok(())
     }

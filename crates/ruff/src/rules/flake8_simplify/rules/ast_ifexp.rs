@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -219,7 +219,7 @@ pub(crate) fn explicit_false_true_in_ifexpr(
     if checker.patch(diagnostic.kind.rule()) {
         let node = test.clone();
         let node1 = ast::ExprUnaryOp {
-            op: Unaryop::Not,
+            op: UnaryOp::Not,
             operand: Box::new(node),
             range: TextRange::default(),
         };

@@ -1,7 +1,7 @@
 use std::{fmt, iter};
 
 use regex::Regex;
-use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt, Withitem};
+use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -308,7 +308,7 @@ fn assignment_targets_from_expr<'a>(
 }
 
 fn assignment_targets_from_with_items<'a>(
-    items: &'a [Withitem],
+    items: &'a [WithItem],
     dummy_variable_rgx: &'a Regex,
 ) -> impl Iterator<Item = &'a Expr> + 'a {
     items

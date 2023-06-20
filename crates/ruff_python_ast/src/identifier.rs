@@ -20,8 +20,8 @@ use std::ops::{Add, Sub};
 use std::str::Chars;
 
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{Alias, Arg, Pattern};
-use rustpython_parser::ast::{self, Excepthandler, Ranged, Stmt};
+use rustpython_ast::{Alias, Arg, ArgWithDefault, Pattern};
+use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_python_whitespace::is_python_whitespace;
 
@@ -94,13 +94,26 @@ impl Identifier for Arg {
     ///
     /// For example, return the range of `x` in:
     /// ```python
-    /// def f(x: int = 0):
+    /// def f(x: int):
     ///     ...
     /// ```
     fn identifier(&self, locator: &Locator) -> TextRange {
         IdentifierTokenizer::new(locator.contents(), self.range())
             .next()
             .expect("Failed to find argument identifier")
+    }
+}
+
+impl Identifier for ArgWithDefault {
+    /// Return the [`TextRange`] for the identifier defining an [`ArgWithDefault`].
+    ///
+    /// For example, return the range of `x` in:
+    /// ```python
+    /// def f(x: int = 0):
+    ///     ...
+    /// ```
+    fn identifier(&self, locator: &Locator) -> TextRange {
+        self.def.identifier(locator)
     }
 }
 
@@ -239,8 +252,8 @@ impl TryIdentifier for Pattern {
     }
 }
 
-impl TryIdentifier for Excepthandler {
-    /// Return the [`TextRange`] of a named exception in an [`Excepthandler`].
+impl TryIdentifier for ExceptHandler {
+    /// Return the [`TextRange`] of a named exception in an [`ExceptHandler`].
     ///
     /// For example, return the range of `e` in:
     /// ```python
@@ -250,7 +263,7 @@ impl TryIdentifier for Excepthandler {
     ///     ...
     /// ```
     fn try_identifier(&self, locator: &Locator) -> Option<TextRange> {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, name, .. }) =
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, name, .. }) =
             self;
 
         if name.is_none() {
@@ -284,11 +297,11 @@ pub fn names<'a>(stmt: &Stmt, locator: &'a Locator<'a>) -> impl Iterator<Item = 
     IdentifierTokenizer::new(locator.contents(), stmt.range()).skip(1)
 }
 
-/// Return the [`TextRange`] of the `except` token in an [`Excepthandler`].
-pub fn except(handler: &Excepthandler, locator: &Locator) -> TextRange {
+/// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`].
+pub fn except(handler: &ExceptHandler, locator: &Locator) -> TextRange {
     IdentifierTokenizer::new(locator.contents(), handler.range())
         .next()
-        .expect("Failed to find `except` token in `Excepthandler`")
+        .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
 /// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.

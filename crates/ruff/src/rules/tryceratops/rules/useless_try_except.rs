@@ -1,5 +1,4 @@
-use rustpython_parser::ast::Excepthandler::ExceptHandler;
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerExceptHandler, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, ExceptHandlerExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,11 +38,12 @@ impl Violation for UselessTryExcept {
 }
 
 /// TRY302
-pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[ExceptHandler]) {
     if let Some(diagnostics) = handlers
         .iter()
         .map(|handler| {
-            let ExceptHandler(ExcepthandlerExceptHandler { name, body, .. }) = handler;
+            let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { name, body, .. }) =
+                handler;
             let Some(Stmt::Raise(ast::StmtRaise {  exc, cause: None, .. })) = &body.first() else {
                 return None;
             };

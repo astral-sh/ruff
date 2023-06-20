@@ -1,11 +1,12 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
+use rustpython_ast::ArgWithDefault;
 use std::ops::Deref;
 
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
-    Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
+    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, WithItem,
 };
 
 use ruff_python_whitespace::LineEnding;
@@ -501,7 +502,7 @@ impl<'a> Generator<'a> {
                     let mut first = true;
                     for item in items {
                         self.p_delim(&mut first, ", ");
-                        self.unparse_withitem(item);
+                        self.unparse_with_item(item);
                     }
                     self.p(":");
                 });
@@ -513,7 +514,7 @@ impl<'a> Generator<'a> {
                     let mut first = true;
                     for item in items {
                         self.p_delim(&mut first, ", ");
-                        self.unparse_withitem(item);
+                        self.unparse_with_item(item);
                     }
                     self.p(":");
                 });
@@ -568,7 +569,7 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_excepthandler(handler, false);
+                        self.unparse_except_handler(handler, false);
                     });
                 }
 
@@ -599,7 +600,7 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_excepthandler(handler, true);
+                        self.unparse_except_handler(handler, true);
                     });
                 }
 
@@ -717,9 +718,9 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>, star: bool) {
+    fn unparse_except_handler<U>(&mut self, ast: &ExceptHandler<U>, star: bool) {
         match ast {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
                 name,
                 body,
@@ -870,7 +871,7 @@ impl<'a> Generator<'a> {
                 values,
                 range: _range,
             }) => {
-                let (op, prec) = opprec!(bin, op, Boolop, And("and", AND), Or("or", OR));
+                let (op, prec) = opprec!(bin, op, BoolOp, And("and", AND), Or("or", OR));
                 group_if!(prec, {
                     let mut first = true;
                     for val in values {
@@ -929,7 +930,7 @@ impl<'a> Generator<'a> {
                 let (op, prec) = opprec!(
                     un,
                     op,
-                    rustpython_parser::ast::Unaryop,
+                    rustpython_parser::ast::UnaryOp,
                     Invert("~", INVERT),
                     Not("not ", NOT),
                     UAdd("+", UADD),
@@ -1087,16 +1088,16 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(left, new_lvl);
                     for (op, cmp) in ops.iter().zip(comparators) {
                         let op = match op {
-                            Cmpop::Eq => " == ",
-                            Cmpop::NotEq => " != ",
-                            Cmpop::Lt => " < ",
-                            Cmpop::LtE => " <= ",
-                            Cmpop::Gt => " > ",
-                            Cmpop::GtE => " >= ",
-                            Cmpop::Is => " is ",
-                            Cmpop::IsNot => " is not ",
-                            Cmpop::In => " in ",
-                            Cmpop::NotIn => " not in ",
+                            CmpOp::Eq => " == ",
+                            CmpOp::NotEq => " != ",
+                            CmpOp::Lt => " < ",
+                            CmpOp::LtE => " <= ",
+                            CmpOp::Gt => " > ",
+                            CmpOp::GtE => " >= ",
+                            CmpOp::Is => " is ",
+                            CmpOp::IsNot => " is not ",
+                            CmpOp::In => " in ",
+                            CmpOp::NotIn => " not in ",
                         };
                         self.p(op);
                         self.unparse_expr(cmp, new_lvl);
@@ -1290,14 +1291,9 @@ impl<'a> Generator<'a> {
 
     fn unparse_args<U>(&mut self, args: &Arguments<U>) {
         let mut first = true;
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
+        for (i, arg_with_default) in args.posonlyargs.iter().chain(&args.args).enumerate() {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg(arg);
-            if let Some(i) = i.checked_sub(defaults_start) {
-                self.p("=");
-                self.unparse_expr(&args.defaults[i], precedence::COMMA);
-            }
+            self.unparse_arg_with_default(arg_with_default);
             self.p_if(i + 1 == args.posonlyargs.len(), ", /");
         }
         if args.vararg.is_some() || !args.kwonlyargs.is_empty() {
@@ -1307,17 +1303,9 @@ impl<'a> Generator<'a> {
         if let Some(vararg) = &args.vararg {
             self.unparse_arg(vararg);
         }
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
+        for kwarg in &args.kwonlyargs {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg(kwarg);
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                self.p("=");
-                self.unparse_expr(default, precedence::COMMA);
-            }
+            self.unparse_arg_with_default(kwarg);
         }
         if let Some(kwarg) = &args.kwarg {
             self.p_delim(&mut first, ", ");
@@ -1331,6 +1319,14 @@ impl<'a> Generator<'a> {
         if let Some(ann) = &arg.annotation {
             self.p(": ");
             self.unparse_expr(ann, precedence::COMMA);
+        }
+    }
+
+    fn unparse_arg_with_default<U>(&mut self, arg_with_default: &ArgWithDefault<U>) {
+        self.unparse_arg(&arg_with_default.def);
+        if let Some(default) = &arg_with_default.default {
+            self.p("=");
+            self.unparse_expr(default, precedence::COMMA);
         }
     }
 
@@ -1445,9 +1441,9 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_withitem<U>(&mut self, withitem: &Withitem<U>) {
-        self.unparse_expr(&withitem.context_expr, precedence::MAX);
-        if let Some(optional_vars) = &withitem.optional_vars {
+    fn unparse_with_item<U>(&mut self, with_item: &WithItem<U>) {
+        self.unparse_expr(&with_item.context_expr, precedence::MAX);
+        if let Some(optional_vars) = &with_item.optional_vars {
             self.p(" as ");
             self.unparse_expr(optional_vars, precedence::MAX);
         }

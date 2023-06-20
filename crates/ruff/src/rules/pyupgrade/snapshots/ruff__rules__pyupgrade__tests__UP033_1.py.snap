@@ -10,7 +10,7 @@ UP033_1.py:4:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cac
   |
   = help: Rewrite with `@functools.cache
 
-ℹ Suggested fix
+ℹ Fix
 1   |-from functools import lru_cache
   1 |+from functools import lru_cache, cache
 2 2 | 
@@ -31,7 +31,7 @@ UP033_1.py:10:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
    |
    = help: Rewrite with `@functools.cache
 
-ℹ Suggested fix
+ℹ Fix
 1     |-from functools import lru_cache
    1  |+from functools import lru_cache, cache
 2  2  | 
@@ -56,7 +56,7 @@ UP033_1.py:15:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
    |
    = help: Rewrite with `@functools.cache
 
-ℹ Suggested fix
+ℹ Fix
 1     |-from functools import lru_cache
    1  |+from functools import lru_cache, cache
 2  2  | 

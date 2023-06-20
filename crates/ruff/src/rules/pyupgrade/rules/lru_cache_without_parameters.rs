@@ -81,8 +81,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 TextRange::new(func.end(), decorator.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     checker.generator().expr(func),
                     decorator.expression.range(),
                 )));

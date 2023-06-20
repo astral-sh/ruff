@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,9 +57,9 @@ impl<'a> Visitor<'a> for NameVisitor<'a> {
 }
 
 /// TRY401
-pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { name, body, .. }) =
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) =
             handler;
         let Some(target) = name else {
             continue;
