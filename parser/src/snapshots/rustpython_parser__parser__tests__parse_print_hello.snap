@@ -12,9 +12,7 @@ expression: parse_ast
                     func: Name(
                         ExprName {
                             range: 0..5,
-                            id: Identifier(
-                                "print",
-                            ),
+                            id: "print",
                             ctx: Load,
                         },
                     ),

@@ -57,8 +57,8 @@ impl<R> Expr<R> {
 #[cfg(target_arch = "x86_64")]
 static_assertions::assert_eq_size!(crate::Expr, [u8; 72]);
 #[cfg(target_arch = "x86_64")]
-static_assertions::assert_eq_size!(crate::Stmt, [u8; 136]);
+static_assertions::assert_eq_size!(crate::Stmt, [u8; 144]);
 #[cfg(target_arch = "x86_64")]
 static_assertions::assert_eq_size!(crate::Pattern, [u8; 96]);
 #[cfg(target_arch = "x86_64")]
-static_assertions::assert_eq_size!(crate::ExceptHandler, [u8; 64]);
+static_assertions::assert_eq_size!(crate::ExceptHandler, [u8; 72]);

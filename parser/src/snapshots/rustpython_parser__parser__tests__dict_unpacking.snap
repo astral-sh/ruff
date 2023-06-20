@@ -43,9 +43,7 @@ Dict(
             Name(
                 ExprName {
                     range: 13..14,
-                    id: Identifier(
-                        "c",
-                    ),
+                    id: "c",
                     ctx: Load,
                 },
             ),

@@ -90,7 +90,7 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
             Some((start, end, name)) => {
                 // Check for duplicate keyword arguments in the call.
                 if let Some(keyword_name) = &name {
-                    if !keyword_names.insert(keyword_name.clone()) {
+                    if !keyword_names.insert(keyword_name.to_string()) {
                         return Err(LexicalError {
                             error: LexicalErrorType::DuplicateKeywordArgumentError(
                                 keyword_name.to_string(),
@@ -103,7 +103,7 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
                 }
 
                 keywords.push(ast::Keyword {
-                    arg: name.map(ast::Identifier::new),
+                    arg: name.map(|name| ast::Identifier::new(name, TextRange::new(start, end))),
                     value,
                     range: TextRange::new(start, end),
                 });

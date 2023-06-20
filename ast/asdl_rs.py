@@ -630,6 +630,12 @@ class StructVisitor(EmitVisitor):
         if typ == "Int":
             typ = BUILTIN_INT_NAMES.get(field.name, typ)
         name = rust_field(field.name)
+
+        # Use a String, rather than an Identifier, for the `id` field of `Expr::Name`.
+        # Names already include a range, so there's no need to duplicate the span.
+        if name == "id":
+            typ = "String"
+
         self.emit(f"{vis}{name}: {typ},", depth)
 
     def visitProduct(self, product, type, depth):

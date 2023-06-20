@@ -1,37 +1,46 @@
 //! `builtin_types` in asdl.py and Attributed
 
+use rustpython_parser_core::text_size::TextRange;
+
 use crate::bigint::BigInt;
+use crate::Ranged;
 
 pub type String = std::string::String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Identifier(String);
+pub struct Identifier {
+    id: String,
+    range: TextRange,
+}
 
 impl Identifier {
     #[inline]
-    pub fn new(s: impl Into<String>) -> Self {
-        Self(s.into())
+    pub fn new(id: impl Into<String>, range: TextRange) -> Self {
+        Self {
+            id: id.into(),
+            range,
+        }
     }
 }
 
 impl Identifier {
     #[inline]
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        self.id.as_str()
     }
 }
 
-impl std::cmp::PartialEq<str> for Identifier {
+impl PartialEq<str> for Identifier {
     #[inline]
     fn eq(&self, other: &str) -> bool {
-        self.0 == other
+        self.id == other
     }
 }
 
-impl std::cmp::PartialEq<String> for Identifier {
+impl PartialEq<String> for Identifier {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        &self.0 == other
+        &self.id == other
     }
 }
 
@@ -39,48 +48,40 @@ impl std::ops::Deref for Identifier {
     type Target = str;
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.0.as_str()
+        self.id.as_str()
     }
 }
 
 impl AsRef<str> for Identifier {
     #[inline]
     fn as_ref(&self) -> &str {
-        self.0.as_str()
+        self.id.as_str()
     }
 }
 
 impl AsRef<String> for Identifier {
     #[inline]
     fn as_ref(&self) -> &String {
-        &self.0
+        &self.id
     }
 }
 
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        self.id.fmt(f)
     }
 }
 
 impl From<Identifier> for String {
     #[inline]
-    fn from(id: Identifier) -> String {
-        id.0
+    fn from(identifier: Identifier) -> String {
+        identifier.id
     }
 }
 
-impl From<String> for Identifier {
-    #[inline]
-    fn from(id: String) -> Self {
-        Self(id)
-    }
-}
-
-impl<'a> From<&'a str> for Identifier {
-    #[inline]
-    fn from(id: &'a str) -> Identifier {
-        id.to_owned().into()
+impl Ranged for Identifier {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -207,6 +208,7 @@ impl std::fmt::Display for Constant {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_is_macro() {
         let none = Constant::None;

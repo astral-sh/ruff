@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.19.8"
-// sha3: 92ca230320ea7accf7008dbd11a0a45bbf94a004e6e869cf44e6486fe8f0216f
+// sha3: 14e81ae63fc1bc518b1a33a3fc6271ec1586361626d59701a3688b51fbb96c46
 use crate::{
     ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
@@ -5708,62 +5708,11 @@ mod __parse__Top {
                 __reduce24(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             25 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(916);
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(919);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant61(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym4.2.clone();
-                let __nt = match super::__action916::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (5, 15)
-            }
-            26 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(917);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action917::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (4, 15)
-            }
-            27 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(918);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant9(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant61(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym5.2.clone();
-                let __nt = match super::__action918::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (6, 15)
-            }
-            28 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(919);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant9(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant12(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
@@ -5775,55 +5724,61 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (5, 15)
             }
-            29 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter => ActionFn(920);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant61(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym2.2.clone();
-                let __nt = match super::__action920::<>(__sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (3, 15)
-            }
-            30 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*" => ActionFn(921);
-                assert!(__symbols.len() >= 2);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym1.2.clone();
-                let __nt = match super::__action921::<>(__sym0, __sym1) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (2, 15)
-            }
-            31 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(922);
+            26 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(920);
                 assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant61(__symbols);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action922::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action920::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (4, 15)
             }
-            32 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(923);
-                assert!(__symbols.len() >= 3);
+            27 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(921);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant9(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant61(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym5.2.clone();
+                let __nt = match super::__action921::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (6, 15)
+            }
+            28 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(922);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym4.2.clone();
+                let __nt = match super::__action922::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (5, 15)
+            }
+            29 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter => ActionFn(923);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
@@ -5835,63 +5790,57 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (3, 15)
             }
-            33 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(940);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant9(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant61(__symbols);
+            30 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*" => ActionFn(924);
+                assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym4.2.clone();
-                let __nt = match super::__action940::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action924::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (5, 16)
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (2, 15)
             }
-            34 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(941);
+            31 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(925);
                 assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action941::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (4, 16)
-            }
-            35 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(942);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant9(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym5.2.clone();
-                let __nt = match super::__action942::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action925::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (6, 16)
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (4, 15)
             }
-            36 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(943);
+            32 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>) = ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(926);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action926::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (3, 15)
+            }
+            33 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(943);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
@@ -5903,55 +5852,61 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant14(__nt), __end));
                 (5, 16)
             }
-            37 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter => ActionFn(944);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant61(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym2.2.clone();
-                let __nt = match super::__action944::<>(__sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (3, 16)
-            }
-            38 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*" => ActionFn(945);
-                assert!(__symbols.len() >= 2);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym1.2.clone();
-                let __nt = match super::__action945::<>(__sym0, __sym1) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (2, 16)
-            }
-            39 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(946);
+            34 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(944);
                 assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant61(__symbols);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action946::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action944::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
                 __symbols.push((__start, __Symbol::Variant14(__nt), __end));
                 (4, 16)
             }
-            40 => {
-                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(947);
-                assert!(__symbols.len() >= 3);
+            35 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(945);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant9(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant61(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym5.2.clone();
+                let __nt = match super::__action945::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (6, 16)
+            }
+            36 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(946);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym4.2.clone();
+                let __nt = match super::__action946::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (5, 16)
+            }
+            37 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter => ActionFn(947);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
@@ -5963,66 +5918,60 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant14(__nt), __end));
                 (3, 16)
             }
-            41 => {
-                __reduce41(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
-            }
-            42 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(976);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant9(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant61(__symbols);
+            38 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*" => ActionFn(948);
+                assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym4.2.clone();
-                let __nt = match super::__action976::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action948::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (5, 17)
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (2, 16)
             }
-            43 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(977);
+            39 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(949);
                 assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action977::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (4, 17)
-            }
-            44 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(978);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant9(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym5.2.clone();
-                let __nt = match super::__action978::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action949::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (6, 17)
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (4, 16)
             }
-            45 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(979);
+            40 => {
+                // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? = ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(950);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action950::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (3, 16)
+            }
+            41 => {
+                __reduce41(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
+            }
+            42 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(979);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
@@ -6034,55 +5983,61 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (5, 17)
             }
-            46 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter => ActionFn(980);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant61(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym2.2.clone();
-                let __nt = match super::__action980::<>(__sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (3, 17)
-            }
-            47 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*" => ActionFn(981);
-                assert!(__symbols.len() >= 2);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym1.2.clone();
-                let __nt = match super::__action981::<>(__sym0, __sym1) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (2, 17)
-            }
-            48 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(982);
+            43 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(980);
                 assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant61(__symbols);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action982::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action980::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (4, 17)
             }
-            49 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(983);
-                assert!(__symbols.len() >= 3);
+            44 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(981);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant9(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant61(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym5.2.clone();
+                let __nt = match super::__action981::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (6, 17)
+            }
+            45 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(982);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym4.2.clone();
+                let __nt = match super::__action982::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (5, 17)
+            }
+            46 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter => ActionFn(983);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
@@ -6094,63 +6049,57 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (3, 17)
             }
-            50 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1000);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant9(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant61(__symbols);
+            47 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*" => ActionFn(984);
+                assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym4.2.clone();
-                let __nt = match super::__action1000::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action984::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (5, 18)
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (2, 17)
             }
-            51 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1001);
+            48 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(985);
                 assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action1001::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (4, 18)
-            }
-            52 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1002);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant9(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym5.2.clone();
-                let __nt = match super::__action1002::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action985::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-                (6, 18)
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (4, 17)
             }
-            53 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1003);
+            49 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>) = ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(986);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action986::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (3, 17)
+            }
+            50 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1003);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
@@ -6162,15 +6111,66 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant14(__nt), __end));
                 (5, 18)
             }
+            51 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1004);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action1004::<>(__sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (4, 18)
+            }
+            52 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1005);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant9(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant61(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym5.2.clone();
+                let __nt = match super::__action1005::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (6, 18)
+            }
+            53 => {
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1006);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym4.2.clone();
+                let __nt = match super::__action1006::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (5, 18)
+            }
             54 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter => ActionFn(1004);
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter => ActionFn(1007);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant61(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1004::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1007::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6178,13 +6178,13 @@ mod __parse__Top {
                 (3, 18)
             }
             55 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*" => ActionFn(1005);
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*" => ActionFn(1008);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1005::<>(__sym0, __sym1) {
+                let __nt = match super::__action1008::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6192,7 +6192,7 @@ mod __parse__Top {
                 (2, 18)
             }
             56 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1006);
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1009);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant61(__symbols);
@@ -6200,7 +6200,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1006::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1009::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6208,14 +6208,14 @@ mod __parse__Top {
                 (4, 18)
             }
             57 => {
-                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1007);
+                // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter>>)? = ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1010);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant12(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1007::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1010::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6526,11 +6526,11 @@ mod __parse__Top {
                 __reduce158(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             159 => {
-                // ArgumentList = FunctionArgument => ActionFn(1463);
+                // ArgumentList = FunctionArgument => ActionFn(1469);
                 let __sym0 = __pop_Variant29(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym0.2.clone();
-                let __nt = match super::__action1463::<>(__sym0) {
+                let __nt = match super::__action1469::<>(__sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6538,10 +6538,10 @@ mod __parse__Top {
                 (1, 83)
             }
             160 => {
-                // ArgumentList =  => ActionFn(1464);
+                // ArgumentList =  => ActionFn(1470);
                 let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
                 let __end = __start.clone();
-                let __nt = match super::__action1464::<>(&__start, &__end) {
+                let __nt = match super::__action1470::<>(&__start, &__end) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6549,13 +6549,13 @@ mod __parse__Top {
                 (0, 83)
             }
             161 => {
-                // ArgumentList = (<FunctionArgument> ",")+, FunctionArgument => ActionFn(1465);
+                // ArgumentList = (<FunctionArgument> ",")+, FunctionArgument => ActionFn(1471);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant29(__symbols);
                 let __sym0 = __pop_Variant30(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1465::<>(__sym0, __sym1) {
+                let __nt = match super::__action1471::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6563,11 +6563,11 @@ mod __parse__Top {
                 (2, 83)
             }
             162 => {
-                // ArgumentList = (<FunctionArgument> ",")+ => ActionFn(1466);
+                // ArgumentList = (<FunctionArgument> ",")+ => ActionFn(1472);
                 let __sym0 = __pop_Variant30(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym0.2.clone();
-                let __nt = match super::__action1466::<>(__sym0) {
+                let __nt = match super::__action1472::<>(__sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6587,14 +6587,14 @@ mod __parse__Top {
                 __reduce166(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             167 => {
-                // AsPattern = OrPattern, "as", Identifier => ActionFn(1158);
+                // AsPattern = OrPattern, "as", Identifier => ActionFn(1161);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant23(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant33(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1158::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1161::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6662,7 +6662,7 @@ mod __parse__Top {
                 __reduce184(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             185 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1167);
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1170);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -6672,7 +6672,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1167::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1170::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6680,7 +6680,7 @@ mod __parse__Top {
                 (6, 92)
             }
             186 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1168);
+                // Atom<"all"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1171);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -6688,7 +6688,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1168::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1171::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6696,7 +6696,7 @@ mod __parse__Top {
                 (4, 92)
             }
             187 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1169);
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1172);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -6707,7 +6707,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1169::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1172::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6715,7 +6715,7 @@ mod __parse__Top {
                 (7, 92)
             }
             188 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1170);
+                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1173);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -6724,7 +6724,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1170::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1173::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6732,7 +6732,7 @@ mod __parse__Top {
                 (5, 92)
             }
             189 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1171);
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1174);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant15(__symbols);
@@ -6741,7 +6741,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1171::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1174::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6749,14 +6749,14 @@ mod __parse__Top {
                 (5, 92)
             }
             190 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ")" => ActionFn(1172);
+                // Atom<"all"> = "(", NamedOrStarExpr, ")" => ActionFn(1175);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1172::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1175::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6764,7 +6764,7 @@ mod __parse__Top {
                 (3, 92)
             }
             191 => {
-                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1173);
+                // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1176);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant17(__symbols);
@@ -6774,7 +6774,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1173::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1176::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6782,7 +6782,7 @@ mod __parse__Top {
                 (6, 92)
             }
             192 => {
-                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1174);
+                // Atom<"all"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1177);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant17(__symbols);
@@ -6790,7 +6790,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1174::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1177::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6807,7 +6807,7 @@ mod __parse__Top {
                 __reduce195(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             196 => {
-                // Atom<"all"> = "(", "**", Expression<"all">, ")" => ActionFn(1177);
+                // Atom<"all"> = "(", "**", Expression<"all">, ")" => ActionFn(1180);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant15(__symbols);
@@ -6815,7 +6815,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1177::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1180::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6877,7 +6877,7 @@ mod __parse__Top {
                 __reduce211(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             212 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1190);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ",", ")" => ActionFn(1193);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -6887,7 +6887,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1190::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1193::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6895,7 +6895,7 @@ mod __parse__Top {
                 (6, 93)
             }
             213 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1191);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ",", ")" => ActionFn(1194);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -6903,7 +6903,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1191::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1194::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6911,7 +6911,7 @@ mod __parse__Top {
                 (4, 93)
             }
             214 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1192);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1195);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -6922,7 +6922,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1192::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1195::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6930,7 +6930,7 @@ mod __parse__Top {
                 (7, 93)
             }
             215 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1193);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ",", ")" => ActionFn(1196);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -6939,7 +6939,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1193::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1196::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6947,7 +6947,7 @@ mod __parse__Top {
                 (5, 93)
             }
             216 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1194);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ")" => ActionFn(1197);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant15(__symbols);
@@ -6956,7 +6956,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1194::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1197::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6964,14 +6964,14 @@ mod __parse__Top {
                 (5, 93)
             }
             217 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ")" => ActionFn(1195);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ")" => ActionFn(1198);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1195::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1198::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6979,7 +6979,7 @@ mod __parse__Top {
                 (3, 93)
             }
             218 => {
-                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1196);
+                // Atom<"no-withitems"> = "(", OneOrMore<Test<"all">>, ",", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1199);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant17(__symbols);
@@ -6989,7 +6989,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1196::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1199::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -6997,7 +6997,7 @@ mod __parse__Top {
                 (6, 93)
             }
             219 => {
-                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1197);
+                // Atom<"no-withitems"> = "(", NamedOrStarExpr, ("," <TestOrStarNamedExpr>)+, ")" => ActionFn(1200);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant17(__symbols);
@@ -7005,7 +7005,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1197::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1200::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -7022,7 +7022,7 @@ mod __parse__Top {
                 __reduce222(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             223 => {
-                // Atom<"no-withitems"> = "(", "**", Expression<"all">, ")" => ActionFn(1200);
+                // Atom<"no-withitems"> = "(", "**", Expression<"all">, ")" => ActionFn(1203);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant15(__symbols);
@@ -7030,7 +7030,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1200::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1203::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -7668,7 +7668,7 @@ mod __parse__Top {
                 __reduce433(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             434 => {
-                // LambdaDef = "lambda", ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>, ":", Test<"all"> => ActionFn(1633);
+                // LambdaDef = "lambda", ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>, ":", Test<"all"> => ActionFn(1639);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant15(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -7676,7 +7676,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1633::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1639::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -7684,14 +7684,14 @@ mod __parse__Top {
                 (4, 162)
             }
             435 => {
-                // LambdaDef = "lambda", ":", Test<"all"> => ActionFn(1634);
+                // LambdaDef = "lambda", ":", Test<"all"> => ActionFn(1640);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant15(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1634::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1640::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -7726,11 +7726,11 @@ mod __parse__Top {
                 __reduce444(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             445 => {
-                // LiteralPattern = (@L string @R)+ => ActionFn(1276);
+                // LiteralPattern = (@L string @R)+ => ActionFn(1282);
                 let __sym0 = __pop_Variant41(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym0.2.clone();
-                let __nt = match super::__action1276::<>(__sym0) {
+                let __nt = match super::__action1282::<>(__sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -7756,11 +7756,11 @@ mod __parse__Top {
                 __reduce451(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             452 => {
-                // MappingKey = (@L string @R)+ => ActionFn(810);
+                // MappingKey = (@L string @R)+ => ActionFn(813);
                 let __sym0 = __pop_Variant41(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym0.2.clone();
-                let __nt = match super::__action810::<>(__sym0) {
+                let __nt = match super::__action813::<>(__sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8011,7 +8011,7 @@ mod __parse__Top {
                 __reduce533(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             534 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1513);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1519);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -8022,7 +8022,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1513::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1519::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8030,7 +8030,7 @@ mod __parse__Top {
                 (7, 202)
             }
             535 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1514);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1520);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -8043,7 +8043,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1514::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1520::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8051,7 +8051,7 @@ mod __parse__Top {
                 (9, 202)
             }
             536 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1515);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1521);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -8065,7 +8065,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1515::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1521::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8073,7 +8073,7 @@ mod __parse__Top {
                 (10, 202)
             }
             537 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1516);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1522);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
@@ -8083,7 +8083,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1516::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1522::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8091,7 +8091,7 @@ mod __parse__Top {
                 (6, 202)
             }
             538 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1517);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1523);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant9(__symbols);
@@ -8103,7 +8103,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1517::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1523::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8111,7 +8111,7 @@ mod __parse__Top {
                 (8, 202)
             }
             539 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1518);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1524);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -8124,7 +8124,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1518::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1524::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8132,7 +8132,7 @@ mod __parse__Top {
                 (9, 202)
             }
             540 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1519);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1525);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant9(__symbols);
@@ -8144,7 +8144,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1519::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1525::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8152,7 +8152,7 @@ mod __parse__Top {
                 (8, 202)
             }
             541 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1520);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1526);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -8166,7 +8166,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1520::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1526::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8174,7 +8174,7 @@ mod __parse__Top {
                 (10, 202)
             }
             542 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1521);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1527);
                 assert!(__symbols.len() >= 11);
                 let __sym10 = __pop_Variant0(__symbols);
                 let __sym9 = __pop_Variant9(__symbols);
@@ -8189,7 +8189,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym10.2.clone();
-                let __nt = match super::__action1521::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
+                let __nt = match super::__action1527::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8197,7 +8197,7 @@ mod __parse__Top {
                 (11, 202)
             }
             543 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1522);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1528);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -8208,7 +8208,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1522::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1528::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8216,7 +8216,7 @@ mod __parse__Top {
                 (7, 202)
             }
             544 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1523);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1529);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -8229,7 +8229,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1523::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1529::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8237,7 +8237,7 @@ mod __parse__Top {
                 (9, 202)
             }
             545 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1524);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1530);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -8251,7 +8251,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1524::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1530::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8259,7 +8259,7 @@ mod __parse__Top {
                 (10, 202)
             }
             546 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, "," => ActionFn(1525);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, "," => ActionFn(1531);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant61(__symbols);
@@ -8268,7 +8268,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1525::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1531::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8276,7 +8276,7 @@ mod __parse__Top {
                 (5, 202)
             }
             547 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, "," => ActionFn(1526);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, "," => ActionFn(1532);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant61(__symbols);
@@ -8287,7 +8287,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1526::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1532::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8295,7 +8295,7 @@ mod __parse__Top {
                 (7, 202)
             }
             548 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, "," => ActionFn(1527);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, "," => ActionFn(1533);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant61(__symbols);
@@ -8307,7 +8307,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1527::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1533::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8315,7 +8315,7 @@ mod __parse__Top {
                 (8, 202)
             }
             549 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", "," => ActionFn(1528);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", "," => ActionFn(1534);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -8323,7 +8323,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1528::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1534::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8331,7 +8331,7 @@ mod __parse__Top {
                 (4, 202)
             }
             550 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1529);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1535);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -8341,7 +8341,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1529::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1535::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8349,7 +8349,7 @@ mod __parse__Top {
                 (6, 202)
             }
             551 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", "," => ActionFn(1530);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", "," => ActionFn(1536);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -8360,7 +8360,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1530::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1536::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8368,7 +8368,7 @@ mod __parse__Top {
                 (7, 202)
             }
             552 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1531);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1537);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant12(__symbols);
@@ -8378,7 +8378,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1531::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1537::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8386,7 +8386,7 @@ mod __parse__Top {
                 (6, 202)
             }
             553 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1532);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1538);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -8398,7 +8398,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1532::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1538::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8406,7 +8406,7 @@ mod __parse__Top {
                 (8, 202)
             }
             554 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1533);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1539);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant12(__symbols);
@@ -8419,7 +8419,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1533::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1539::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8427,7 +8427,7 @@ mod __parse__Top {
                 (9, 202)
             }
             555 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1534);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1540);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
@@ -8436,7 +8436,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1534::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1540::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8444,7 +8444,7 @@ mod __parse__Top {
                 (5, 202)
             }
             556 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1535);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1541);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant12(__symbols);
@@ -8455,7 +8455,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1535::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1541::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8463,7 +8463,7 @@ mod __parse__Top {
                 (7, 202)
             }
             557 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1536);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1542);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -8475,7 +8475,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1536::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1542::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8483,13 +8483,13 @@ mod __parse__Top {
                 (8, 202)
             }
             558 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, "," => ActionFn(1537);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, "," => ActionFn(1543);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1537::<>(__sym0, __sym1) {
+                let __nt = match super::__action1543::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8497,7 +8497,7 @@ mod __parse__Top {
                 (2, 202)
             }
             559 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", "," => ActionFn(1538);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", "," => ActionFn(1544);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -8505,7 +8505,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1538::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1544::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8513,7 +8513,7 @@ mod __parse__Top {
                 (4, 202)
             }
             560 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1539);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1545);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
@@ -8522,7 +8522,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1539::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1545::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8530,7 +8530,7 @@ mod __parse__Top {
                 (5, 202)
             }
             561 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1540);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1546);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -8540,7 +8540,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1540::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1546::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8548,7 +8548,7 @@ mod __parse__Top {
                 (6, 202)
             }
             562 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1541);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1547);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -8560,7 +8560,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1541::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1547::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8568,7 +8568,7 @@ mod __parse__Top {
                 (8, 202)
             }
             563 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1542);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1548);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -8581,7 +8581,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1542::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1548::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8589,7 +8589,7 @@ mod __parse__Top {
                 (9, 202)
             }
             564 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1543);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1549);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -8598,7 +8598,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1543::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1549::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8606,7 +8606,7 @@ mod __parse__Top {
                 (5, 202)
             }
             565 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1544);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1550);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant9(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -8617,7 +8617,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1544::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1550::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8625,7 +8625,7 @@ mod __parse__Top {
                 (7, 202)
             }
             566 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1545);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1551);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -8637,7 +8637,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1545::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1551::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8645,7 +8645,7 @@ mod __parse__Top {
                 (8, 202)
             }
             567 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1546);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1552);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant9(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -8656,7 +8656,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1546::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1552::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8664,7 +8664,7 @@ mod __parse__Top {
                 (7, 202)
             }
             568 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1547);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1553);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -8677,7 +8677,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1547::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1553::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8685,7 +8685,7 @@ mod __parse__Top {
                 (9, 202)
             }
             569 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1548);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1554);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant9(__symbols);
                 let __sym8 = __pop_Variant0(__symbols);
@@ -8699,7 +8699,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1548::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1554::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8707,7 +8707,7 @@ mod __parse__Top {
                 (10, 202)
             }
             570 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1549);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1555);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -8717,7 +8717,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1549::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1555::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8725,7 +8725,7 @@ mod __parse__Top {
                 (6, 202)
             }
             571 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1550);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1556);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -8737,7 +8737,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1550::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1556::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8745,7 +8745,7 @@ mod __parse__Top {
                 (8, 202)
             }
             572 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1551);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1557);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -8758,7 +8758,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1551::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1557::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8766,7 +8766,7 @@ mod __parse__Top {
                 (9, 202)
             }
             573 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter => ActionFn(1552);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter => ActionFn(1558);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant61(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -8774,7 +8774,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1552::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1558::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8782,7 +8782,7 @@ mod __parse__Top {
                 (4, 202)
             }
             574 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter => ActionFn(1553);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter => ActionFn(1559);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant61(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -8792,7 +8792,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1553::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1559::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8800,7 +8800,7 @@ mod __parse__Top {
                 (6, 202)
             }
             575 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter => ActionFn(1554);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter => ActionFn(1560);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant61(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -8811,7 +8811,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1554::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1560::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8819,14 +8819,14 @@ mod __parse__Top {
                 (7, 202)
             }
             576 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*" => ActionFn(1555);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*" => ActionFn(1561);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1555::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1561::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8834,7 +8834,7 @@ mod __parse__Top {
                 (3, 202)
             }
             577 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*" => ActionFn(1556);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*" => ActionFn(1562);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -8843,7 +8843,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1556::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1562::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8851,7 +8851,7 @@ mod __parse__Top {
                 (5, 202)
             }
             578 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*" => ActionFn(1557);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*" => ActionFn(1563);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -8861,7 +8861,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1557::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1563::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8869,7 +8869,7 @@ mod __parse__Top {
                 (6, 202)
             }
             579 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1558);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1564);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant12(__symbols);
                 let __sym3 = __pop_Variant61(__symbols);
@@ -8878,7 +8878,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1558::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1564::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8886,7 +8886,7 @@ mod __parse__Top {
                 (5, 202)
             }
             580 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1559);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1565);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant12(__symbols);
                 let __sym5 = __pop_Variant61(__symbols);
@@ -8897,7 +8897,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1559::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1565::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8905,7 +8905,7 @@ mod __parse__Top {
                 (7, 202)
             }
             581 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1560);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1566);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant12(__symbols);
                 let __sym6 = __pop_Variant61(__symbols);
@@ -8917,7 +8917,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1560::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1566::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -8925,106 +8925,10 @@ mod __parse__Top {
                 (8, 202)
             }
             582 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1561);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1567);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action1561::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (4, 202)
-            }
-            583 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1562);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant12(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym5.2.clone();
-                let __nt = match super::__action1562::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (6, 202)
-            }
-            584 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1563);
-                assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant12(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym6.2.clone();
-                let __nt = match super::__action1563::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (7, 202)
-            }
-            585 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>> => ActionFn(1564);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym0.2.clone();
-                let __nt = match super::__action1564::<>(__sym0) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (1, 202)
-            }
-            586 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/" => ActionFn(1565);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym2.2.clone();
-                let __nt = match super::__action1565::<>(__sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (3, 202)
-            }
-            587 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1566);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action1566::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (4, 202)
-            }
-            588 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1567);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
@@ -9036,11 +8940,11 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant44(__nt), __end));
                 (4, 202)
             }
-            589 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1568);
+            583 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1568);
                 assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant9(__symbols);
+                let __sym5 = __pop_Variant12(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
@@ -9054,11 +8958,11 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant44(__nt), __end));
                 (6, 202)
             }
-            590 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1569);
+            584 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1569);
                 assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant9(__symbols);
+                let __sym6 = __pop_Variant12(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -9073,15 +8977,111 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant44(__nt), __end));
                 (7, 202)
             }
+            585 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>> => ActionFn(1570);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action1570::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (1, 202)
+            }
+            586 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/" => ActionFn(1571);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action1571::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (3, 202)
+            }
+            587 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1572);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action1572::<>(__sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (4, 202)
+            }
+            588 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1573);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant9(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action1573::<>(__sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (4, 202)
+            }
+            589 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1574);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym5.2.clone();
+                let __nt = match super::__action1574::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (6, 202)
+            }
+            590 => {
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1575);
+                assert!(__symbols.len() >= 7);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant9(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym6.2.clone();
+                let __nt = match super::__action1575::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (7, 202)
+            }
             591 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1570);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1576);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1570::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1576::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9089,7 +9089,7 @@ mod __parse__Top {
                 (3, 202)
             }
             592 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1571);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1577);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -9098,7 +9098,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1571::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1577::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9106,7 +9106,7 @@ mod __parse__Top {
                 (5, 202)
             }
             593 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1572);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, ",", "/", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1578);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -9116,7 +9116,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1572::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1578::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9124,7 +9124,7 @@ mod __parse__Top {
                 (6, 202)
             }
             594 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1317);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1323);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -9133,7 +9133,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1317::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1323::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9141,7 +9141,7 @@ mod __parse__Top {
                 (5, 202)
             }
             595 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1318);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1324);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
@@ -9149,7 +9149,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1318::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1324::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9157,7 +9157,7 @@ mod __parse__Top {
                 (4, 202)
             }
             596 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1319);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1325);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
@@ -9167,7 +9167,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1319::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1325::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9175,7 +9175,7 @@ mod __parse__Top {
                 (6, 202)
             }
             597 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1320);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1326);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -9184,7 +9184,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1320::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1326::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9192,14 +9192,14 @@ mod __parse__Top {
                 (5, 202)
             }
             598 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, "," => ActionFn(1321);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, "," => ActionFn(1327);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1321::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1327::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9207,13 +9207,13 @@ mod __parse__Top {
                 (3, 202)
             }
             599 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", "," => ActionFn(1322);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", "," => ActionFn(1328);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1322::<>(__sym0, __sym1) {
+                let __nt = match super::__action1328::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9221,7 +9221,7 @@ mod __parse__Top {
                 (2, 202)
             }
             600 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1323);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1329);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
@@ -9229,7 +9229,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1323::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1329::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9237,14 +9237,14 @@ mod __parse__Top {
                 (4, 202)
             }
             601 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1324);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, "," => ActionFn(1330);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1324::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1330::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9252,7 +9252,7 @@ mod __parse__Top {
                 (3, 202)
             }
             602 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1325);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1331);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -9260,7 +9260,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1325::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1331::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9268,14 +9268,14 @@ mod __parse__Top {
                 (4, 202)
             }
             603 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1326);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1332);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1326::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1332::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9283,7 +9283,7 @@ mod __parse__Top {
                 (3, 202)
             }
             604 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1327);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1333);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -9292,7 +9292,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1327::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1333::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9300,7 +9300,7 @@ mod __parse__Top {
                 (5, 202)
             }
             605 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1328);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(1334);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -9308,7 +9308,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1328::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1334::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9316,13 +9316,13 @@ mod __parse__Top {
                 (4, 202)
             }
             606 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter => ActionFn(1329);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter => ActionFn(1335);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1329::<>(__sym0, __sym1) {
+                let __nt = match super::__action1335::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9330,11 +9330,11 @@ mod __parse__Top {
                 (2, 202)
             }
             607 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*" => ActionFn(1330);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*" => ActionFn(1336);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym0.2.clone();
-                let __nt = match super::__action1330::<>(__sym0) {
+                let __nt = match super::__action1336::<>(__sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9342,14 +9342,14 @@ mod __parse__Top {
                 (1, 202)
             }
             608 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1331);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1337);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant12(__symbols);
                 let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1331::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1337::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9357,13 +9357,13 @@ mod __parse__Top {
                 (3, 202)
             }
             609 => {
-                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1332);
+                // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(1338);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1332::<>(__sym0, __sym1) {
+                let __nt = match super::__action1338::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9377,7 +9377,7 @@ mod __parse__Top {
                 __reduce611(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             612 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1573);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1579);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -9388,7 +9388,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1573::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1579::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9396,7 +9396,7 @@ mod __parse__Top {
                 (7, 203)
             }
             613 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1574);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1580);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -9409,7 +9409,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1574::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1580::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9417,7 +9417,7 @@ mod __parse__Top {
                 (9, 203)
             }
             614 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1575);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1581);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -9431,7 +9431,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1575::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1581::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9439,7 +9439,7 @@ mod __parse__Top {
                 (10, 203)
             }
             615 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1576);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1582);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
@@ -9449,7 +9449,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1576::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1582::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9457,7 +9457,7 @@ mod __parse__Top {
                 (6, 203)
             }
             616 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1577);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1583);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant9(__symbols);
@@ -9469,7 +9469,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1577::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1583::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9477,7 +9477,7 @@ mod __parse__Top {
                 (8, 203)
             }
             617 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1578);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1584);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -9490,7 +9490,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1578::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1584::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9498,7 +9498,7 @@ mod __parse__Top {
                 (9, 203)
             }
             618 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1579);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1585);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant9(__symbols);
@@ -9510,7 +9510,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1579::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1585::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9518,7 +9518,7 @@ mod __parse__Top {
                 (8, 203)
             }
             619 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1580);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1586);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -9532,7 +9532,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1580::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1586::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9540,7 +9540,7 @@ mod __parse__Top {
                 (10, 203)
             }
             620 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1581);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1587);
                 assert!(__symbols.len() >= 11);
                 let __sym10 = __pop_Variant0(__symbols);
                 let __sym9 = __pop_Variant9(__symbols);
@@ -9555,7 +9555,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym10.2.clone();
-                let __nt = match super::__action1581::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
+                let __nt = match super::__action1587::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9563,7 +9563,7 @@ mod __parse__Top {
                 (11, 203)
             }
             621 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1582);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1588);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant9(__symbols);
@@ -9574,7 +9574,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1582::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1588::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9582,7 +9582,7 @@ mod __parse__Top {
                 (7, 203)
             }
             622 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1583);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1589);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant9(__symbols);
@@ -9595,7 +9595,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1583::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1589::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9603,7 +9603,7 @@ mod __parse__Top {
                 (9, 203)
             }
             623 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1584);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1590);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant0(__symbols);
                 let __sym8 = __pop_Variant9(__symbols);
@@ -9617,7 +9617,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1584::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1590::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9625,7 +9625,7 @@ mod __parse__Top {
                 (10, 203)
             }
             624 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, "," => ActionFn(1585);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, "," => ActionFn(1591);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant61(__symbols);
@@ -9634,7 +9634,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1585::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1591::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9642,7 +9642,7 @@ mod __parse__Top {
                 (5, 203)
             }
             625 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, "," => ActionFn(1586);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, "," => ActionFn(1592);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant61(__symbols);
@@ -9653,7 +9653,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1586::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1592::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9661,7 +9661,7 @@ mod __parse__Top {
                 (7, 203)
             }
             626 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, "," => ActionFn(1587);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, "," => ActionFn(1593);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant61(__symbols);
@@ -9673,7 +9673,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1587::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1593::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9681,7 +9681,7 @@ mod __parse__Top {
                 (8, 203)
             }
             627 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", "," => ActionFn(1588);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", "," => ActionFn(1594);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -9689,7 +9689,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1588::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1594::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9697,7 +9697,7 @@ mod __parse__Top {
                 (4, 203)
             }
             628 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1589);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", "," => ActionFn(1595);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -9707,7 +9707,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1589::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1595::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9715,7 +9715,7 @@ mod __parse__Top {
                 (6, 203)
             }
             629 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", "," => ActionFn(1590);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", "," => ActionFn(1596);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -9726,7 +9726,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1590::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1596::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9734,7 +9734,7 @@ mod __parse__Top {
                 (7, 203)
             }
             630 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1591);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1597);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant12(__symbols);
@@ -9744,7 +9744,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1591::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1597::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9752,7 +9752,7 @@ mod __parse__Top {
                 (6, 203)
             }
             631 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1592);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1598);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -9764,7 +9764,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1592::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1598::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9772,7 +9772,7 @@ mod __parse__Top {
                 (8, 203)
             }
             632 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1593);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1599);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant0(__symbols);
                 let __sym7 = __pop_Variant12(__symbols);
@@ -9785,7 +9785,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1593::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1599::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9793,7 +9793,7 @@ mod __parse__Top {
                 (9, 203)
             }
             633 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1594);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1600);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
@@ -9802,7 +9802,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1594::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1600::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9810,7 +9810,7 @@ mod __parse__Top {
                 (5, 203)
             }
             634 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1595);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1601);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant0(__symbols);
                 let __sym5 = __pop_Variant12(__symbols);
@@ -9821,7 +9821,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1595::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1601::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9829,7 +9829,7 @@ mod __parse__Top {
                 (7, 203)
             }
             635 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1596);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1602);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant0(__symbols);
                 let __sym6 = __pop_Variant12(__symbols);
@@ -9841,7 +9841,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1596::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1602::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9849,13 +9849,13 @@ mod __parse__Top {
                 (8, 203)
             }
             636 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, "," => ActionFn(1597);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, "," => ActionFn(1603);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1597::<>(__sym0, __sym1) {
+                let __nt = match super::__action1603::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9863,7 +9863,7 @@ mod __parse__Top {
                 (2, 203)
             }
             637 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", "," => ActionFn(1598);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", "," => ActionFn(1604);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -9871,7 +9871,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1598::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1604::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9879,7 +9879,7 @@ mod __parse__Top {
                 (4, 203)
             }
             638 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1599);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1605);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
@@ -9888,7 +9888,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1599::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1605::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9896,7 +9896,7 @@ mod __parse__Top {
                 (5, 203)
             }
             639 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1600);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1606);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -9906,7 +9906,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1600::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1606::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9914,7 +9914,7 @@ mod __parse__Top {
                 (6, 203)
             }
             640 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1601);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1607);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -9926,7 +9926,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1601::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1607::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9934,7 +9934,7 @@ mod __parse__Top {
                 (8, 203)
             }
             641 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1602);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1608);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -9947,7 +9947,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1602::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1608::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9955,7 +9955,7 @@ mod __parse__Top {
                 (9, 203)
             }
             642 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1603);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1609);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -9964,7 +9964,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1603::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1609::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9972,7 +9972,7 @@ mod __parse__Top {
                 (5, 203)
             }
             643 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1604);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1610);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant9(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -9983,7 +9983,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1604::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1610::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -9991,7 +9991,7 @@ mod __parse__Top {
                 (7, 203)
             }
             644 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1605);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1611);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -10003,7 +10003,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1605::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1611::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10011,7 +10011,7 @@ mod __parse__Top {
                 (8, 203)
             }
             645 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1606);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1612);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant9(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -10022,7 +10022,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1606::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1612::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10030,7 +10030,7 @@ mod __parse__Top {
                 (7, 203)
             }
             646 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1607);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1613);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -10043,7 +10043,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1607::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1613::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10051,7 +10051,7 @@ mod __parse__Top {
                 (9, 203)
             }
             647 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1608);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1614);
                 assert!(__symbols.len() >= 10);
                 let __sym9 = __pop_Variant9(__symbols);
                 let __sym8 = __pop_Variant0(__symbols);
@@ -10065,7 +10065,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym9.2.clone();
-                let __nt = match super::__action1608::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
+                let __nt = match super::__action1614::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10073,7 +10073,7 @@ mod __parse__Top {
                 (10, 203)
             }
             648 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1609);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1615);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -10083,7 +10083,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1609::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1615::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10091,7 +10091,7 @@ mod __parse__Top {
                 (6, 203)
             }
             649 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1610);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1616);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant9(__symbols);
                 let __sym6 = __pop_Variant0(__symbols);
@@ -10103,7 +10103,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1610::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1616::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10111,7 +10111,7 @@ mod __parse__Top {
                 (8, 203)
             }
             650 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1611);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1617);
                 assert!(__symbols.len() >= 9);
                 let __sym8 = __pop_Variant9(__symbols);
                 let __sym7 = __pop_Variant0(__symbols);
@@ -10124,7 +10124,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym8.2.clone();
-                let __nt = match super::__action1611::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
+                let __nt = match super::__action1617::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10132,7 +10132,7 @@ mod __parse__Top {
                 (9, 203)
             }
             651 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter => ActionFn(1612);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter => ActionFn(1618);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant61(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -10140,7 +10140,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1612::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1618::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10148,7 +10148,7 @@ mod __parse__Top {
                 (4, 203)
             }
             652 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter => ActionFn(1613);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter => ActionFn(1619);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant61(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -10158,7 +10158,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1613::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1619::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10166,7 +10166,7 @@ mod __parse__Top {
                 (6, 203)
             }
             653 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter => ActionFn(1614);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter => ActionFn(1620);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant61(__symbols);
                 let __sym5 = __pop_Variant0(__symbols);
@@ -10177,7 +10177,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1614::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1620::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10185,14 +10185,14 @@ mod __parse__Top {
                 (7, 203)
             }
             654 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*" => ActionFn(1615);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*" => ActionFn(1621);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1615::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1621::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10200,7 +10200,7 @@ mod __parse__Top {
                 (3, 203)
             }
             655 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*" => ActionFn(1616);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*" => ActionFn(1622);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -10209,7 +10209,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1616::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1622::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10217,7 +10217,7 @@ mod __parse__Top {
                 (5, 203)
             }
             656 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*" => ActionFn(1617);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*" => ActionFn(1623);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -10227,7 +10227,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1617::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1623::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10235,7 +10235,7 @@ mod __parse__Top {
                 (6, 203)
             }
             657 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1618);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1624);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant12(__symbols);
                 let __sym3 = __pop_Variant61(__symbols);
@@ -10244,7 +10244,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1618::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1624::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10252,7 +10252,7 @@ mod __parse__Top {
                 (5, 203)
             }
             658 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1619);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1625);
                 assert!(__symbols.len() >= 7);
                 let __sym6 = __pop_Variant12(__symbols);
                 let __sym5 = __pop_Variant61(__symbols);
@@ -10263,7 +10263,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym6.2.clone();
-                let __nt = match super::__action1619::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                let __nt = match super::__action1625::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10271,7 +10271,7 @@ mod __parse__Top {
                 (7, 203)
             }
             659 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1620);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1626);
                 assert!(__symbols.len() >= 8);
                 let __sym7 = __pop_Variant12(__symbols);
                 let __sym6 = __pop_Variant61(__symbols);
@@ -10283,7 +10283,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym7.2.clone();
-                let __nt = match super::__action1620::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
+                let __nt = match super::__action1626::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10291,106 +10291,10 @@ mod __parse__Top {
                 (8, 203)
             }
             660 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1621);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1627);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action1621::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (4, 203)
-            }
-            661 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1622);
-                assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant12(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym5.2.clone();
-                let __nt = match super::__action1622::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (6, 203)
-            }
-            662 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1623);
-                assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant12(__symbols);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym6.2.clone();
-                let __nt = match super::__action1623::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (7, 203)
-            }
-            663 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>> => ActionFn(1624);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym0.2.clone();
-                let __nt = match super::__action1624::<>(__sym0) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (1, 203)
-            }
-            664 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/" => ActionFn(1625);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym2.2.clone();
-                let __nt = match super::__action1625::<>(__sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (3, 203)
-            }
-            665 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1626);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant12(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant78(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action1626::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
-                (4, 203)
-            }
-            666 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1627);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
@@ -10402,11 +10306,11 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant44(__nt), __end));
                 (4, 203)
             }
-            667 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1628);
+            661 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1628);
                 assert!(__symbols.len() >= 6);
-                let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant9(__symbols);
+                let __sym5 = __pop_Variant12(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
@@ -10420,11 +10324,11 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant44(__nt), __end));
                 (6, 203)
             }
-            668 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1629);
+            662 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1629);
                 assert!(__symbols.len() >= 7);
-                let __sym6 = __pop_Variant0(__symbols);
-                let __sym5 = __pop_Variant9(__symbols);
+                let __sym6 = __pop_Variant12(__symbols);
+                let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -10439,15 +10343,111 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant44(__nt), __end));
                 (7, 203)
             }
+            663 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>> => ActionFn(1630);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action1630::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (1, 203)
+            }
+            664 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/" => ActionFn(1631);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action1631::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (3, 203)
+            }
+            665 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1632);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action1632::<>(__sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (4, 203)
+            }
+            666 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1633);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant9(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action1633::<>(__sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (4, 203)
+            }
+            667 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1634);
+                assert!(__symbols.len() >= 6);
+                let __sym5 = __pop_Variant0(__symbols);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym5.2.clone();
+                let __nt = match super::__action1634::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (6, 203)
+            }
+            668 => {
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1635);
+                assert!(__symbols.len() >= 7);
+                let __sym6 = __pop_Variant0(__symbols);
+                let __sym5 = __pop_Variant9(__symbols);
+                let __sym4 = __pop_Variant0(__symbols);
+                let __sym3 = __pop_Variant12(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant78(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym6.2.clone();
+                let __nt = match super::__action1635::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                (7, 203)
+            }
             669 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter> => ActionFn(1630);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", KwargParameter<StarUntypedParameter> => ActionFn(1636);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1630::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1636::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10455,7 +10455,7 @@ mod __parse__Top {
                 (3, 203)
             }
             670 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter> => ActionFn(1631);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ",", KwargParameter<StarUntypedParameter> => ActionFn(1637);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -10464,7 +10464,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1631::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1637::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10472,7 +10472,7 @@ mod __parse__Top {
                 (5, 203)
             }
             671 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1632);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, ",", "/", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1638);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant9(__symbols);
                 let __sym4 = __pop_Variant0(__symbols);
@@ -10482,7 +10482,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant78(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1632::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1638::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10490,7 +10490,7 @@ mod __parse__Top {
                 (6, 203)
             }
             672 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1355);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1361);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -10499,7 +10499,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1355::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1361::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10507,7 +10507,7 @@ mod __parse__Top {
                 (5, 203)
             }
             673 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1356);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1362);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
@@ -10515,7 +10515,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1356::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1362::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10523,7 +10523,7 @@ mod __parse__Top {
                 (4, 203)
             }
             674 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1357);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1363);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
                 let __sym4 = __pop_Variant9(__symbols);
@@ -10533,7 +10533,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym5.2.clone();
-                let __nt = match super::__action1357::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
+                let __nt = match super::__action1363::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10541,7 +10541,7 @@ mod __parse__Top {
                 (6, 203)
             }
             675 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1358);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter>, "," => ActionFn(1364);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
                 let __sym3 = __pop_Variant9(__symbols);
@@ -10550,7 +10550,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1358::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1364::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10558,14 +10558,14 @@ mod __parse__Top {
                 (5, 203)
             }
             676 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, "," => ActionFn(1359);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, "," => ActionFn(1365);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1359::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1365::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10573,13 +10573,13 @@ mod __parse__Top {
                 (3, 203)
             }
             677 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", "," => ActionFn(1360);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", "," => ActionFn(1366);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1360::<>(__sym0, __sym1) {
+                let __nt = match super::__action1366::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10587,7 +10587,7 @@ mod __parse__Top {
                 (2, 203)
             }
             678 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1361);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1367);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
@@ -10595,7 +10595,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1361::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1367::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10603,14 +10603,14 @@ mod __parse__Top {
                 (4, 203)
             }
             679 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1362);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, "," => ActionFn(1368);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1362::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1368::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10618,7 +10618,7 @@ mod __parse__Top {
                 (3, 203)
             }
             680 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1363);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(1369);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -10626,7 +10626,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1363::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1369::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10634,14 +10634,14 @@ mod __parse__Top {
                 (4, 203)
             }
             681 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1364);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(1370);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1364::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1370::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10649,7 +10649,7 @@ mod __parse__Top {
                 (3, 203)
             }
             682 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1365);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1371);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant9(__symbols);
                 let __sym3 = __pop_Variant0(__symbols);
@@ -10658,7 +10658,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym4.2.clone();
-                let __nt = match super::__action1365::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __nt = match super::__action1371::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10666,7 +10666,7 @@ mod __parse__Top {
                 (5, 203)
             }
             683 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1366);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(1372);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
@@ -10674,7 +10674,7 @@ mod __parse__Top {
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
-                let __nt = match super::__action1366::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __nt = match super::__action1372::<>(__sym0, __sym1, __sym2, __sym3) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10682,13 +10682,13 @@ mod __parse__Top {
                 (4, 203)
             }
             684 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter => ActionFn(1367);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter => ActionFn(1373);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1367::<>(__sym0, __sym1) {
+                let __nt = match super::__action1373::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10696,11 +10696,11 @@ mod __parse__Top {
                 (2, 203)
             }
             685 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*" => ActionFn(1368);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*" => ActionFn(1374);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym0.2.clone();
-                let __nt = match super::__action1368::<>(__sym0) {
+                let __nt = match super::__action1374::<>(__sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10708,14 +10708,14 @@ mod __parse__Top {
                 (1, 203)
             }
             686 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1369);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1375);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant12(__symbols);
                 let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1369::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1375::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10723,13 +10723,13 @@ mod __parse__Top {
                 (3, 203)
             }
             687 => {
-                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1370);
+                // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(1376);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1370::<>(__sym0, __sym1) {
+                let __nt = match super::__action1376::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -10749,59 +10749,11 @@ mod __parse__Top {
                 __reduce691(__lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             692 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(849);
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(852);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant61(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action849::<>(__sym0, __sym1, __sym2, __sym3) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (4, 205)
-            }
-            693 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(850);
-                assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant9(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym2.2.clone();
-                let __nt = match super::__action850::<>(__sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (3, 205)
-            }
-            694 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(851);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant9(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant12(__symbols);
-                let __sym1 = __pop_Variant61(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym4.2.clone();
-                let __nt = match super::__action851::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (5, 205)
-            }
-            695 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(852);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant12(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
@@ -10812,51 +10764,58 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (4, 205)
             }
-            696 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter => ActionFn(853);
-                assert!(__symbols.len() >= 2);
-                let __sym1 = __pop_Variant61(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym1.2.clone();
-                let __nt = match super::__action853::<>(__sym0, __sym1) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (2, 205)
-            }
-            697 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*" => ActionFn(854);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym0.2.clone();
-                let __nt = match super::__action854::<>(__sym0) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (1, 205)
-            }
-            698 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(855);
+            693 => {
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(853);
                 assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant12(__symbols);
-                let __sym1 = __pop_Variant61(__symbols);
+                let __sym2 = __pop_Variant9(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action855::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action853::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (3, 205)
             }
-            699 => {
-                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(856);
-                assert!(__symbols.len() >= 2);
+            694 => {
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(854);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant61(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym4.2.clone();
+                let __nt = match super::__action854::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (5, 205)
+            }
+            695 => {
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+, ",", KwargParameter<DoubleStarTypedParameter> => ActionFn(855);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant12(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action855::<>(__sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (4, 205)
+            }
+            696 => {
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter => ActionFn(856);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
@@ -10867,60 +10826,53 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (2, 205)
             }
-            700 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(968);
-                assert!(__symbols.len() >= 4);
-                let __sym3 = __pop_Variant9(__symbols);
-                let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant61(__symbols);
+            697 => {
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*" => ActionFn(857);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym3.2.clone();
-                let __nt = match super::__action968::<>(__sym0, __sym1, __sym2, __sym3) {
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action857::<>(__sym0) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (4, 206)
+                (1, 205)
             }
-            701 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(969);
+            698 => {
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", StarTypedParameter, ("," <ParameterDef<TypedParameter>>)+ => ActionFn(858);
                 assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant9(__symbols);
-                let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym2.2.clone();
-                let __nt = match super::__action969::<>(__sym0, __sym1, __sym2) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (3, 206)
-            }
-            702 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(970);
-                assert!(__symbols.len() >= 5);
-                let __sym4 = __pop_Variant9(__symbols);
-                let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant12(__symbols);
                 let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
-                let __end = __sym4.2.clone();
-                let __nt = match super::__action970::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action858::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (5, 206)
+                (3, 205)
             }
-            703 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(971);
+            699 => {
+                // ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = "*", ("," <ParameterDef<TypedParameter>>)+ => ActionFn(859);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant12(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action859::<>(__sym0, __sym1) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (2, 205)
+            }
+            700 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ",", KwargParameter<StarUntypedParameter> => ActionFn(971);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant9(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
-                let __sym1 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym3.2.clone();
@@ -10931,51 +10883,58 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (4, 206)
             }
-            704 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter => ActionFn(972);
-                assert!(__symbols.len() >= 2);
-                let __sym1 = __pop_Variant61(__symbols);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym1.2.clone();
-                let __nt = match super::__action972::<>(__sym0, __sym1) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (2, 206)
-            }
-            705 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*" => ActionFn(973);
-                let __sym0 = __pop_Variant0(__symbols);
-                let __start = __sym0.0.clone();
-                let __end = __sym0.2.clone();
-                let __nt = match super::__action973::<>(__sym0) {
-                    Ok(v) => v,
-                    Err(e) => return Some(Err(e)),
-                };
-                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
-                (1, 206)
-            }
-            706 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(974);
+            701 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ",", KwargParameter<StarUntypedParameter> => ActionFn(972);
                 assert!(__symbols.len() >= 3);
-                let __sym2 = __pop_Variant12(__symbols);
-                let __sym1 = __pop_Variant61(__symbols);
+                let __sym2 = __pop_Variant9(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action974::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action972::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (3, 206)
             }
-            707 => {
-                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(975);
-                assert!(__symbols.len() >= 2);
+            702 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(973);
+                assert!(__symbols.len() >= 5);
+                let __sym4 = __pop_Variant9(__symbols);
+                let __sym3 = __pop_Variant0(__symbols);
+                let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant61(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym4.2.clone();
+                let __nt = match super::__action973::<>(__sym0, __sym1, __sym2, __sym3, __sym4) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (5, 206)
+            }
+            703 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+, ",", KwargParameter<StarUntypedParameter> => ActionFn(974);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant9(__symbols);
+                let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant12(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym3.2.clone();
+                let __nt = match super::__action974::<>(__sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (4, 206)
+            }
+            704 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter => ActionFn(975);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant61(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
@@ -10986,15 +10945,56 @@ mod __parse__Top {
                 __symbols.push((__start, __Symbol::Variant13(__nt), __end));
                 (2, 206)
             }
+            705 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*" => ActionFn(976);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action976::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (1, 206)
+            }
+            706 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", StarUntypedParameter, ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(977);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant12(__symbols);
+                let __sym1 = __pop_Variant61(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action977::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (3, 206)
+            }
+            707 => {
+                // ParameterListStarArgs<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = "*", ("," <ParameterDef<UntypedParameter>>)+ => ActionFn(978);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant12(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action978::<>(__sym0, __sym1) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant13(__nt), __end));
+                (2, 206)
+            }
             708 => {
-                // Parameters = "(", ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>, ")" => ActionFn(1453);
+                // Parameters = "(", ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>, ")" => ActionFn(1459);
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant44(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym2.2.clone();
-                let __nt = match super::__action1453::<>(__sym0, __sym1, __sym2) {
+                let __nt = match super::__action1459::<>(__sym0, __sym1, __sym2) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -11002,13 +11002,13 @@ mod __parse__Top {
                 (3, 207)
             }
             709 => {
-                // Parameters = "(", ")" => ActionFn(1454);
+                // Parameters = "(", ")" => ActionFn(1460);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0.clone();
                 let __end = __sym1.2.clone();
-                let __nt = match super::__action1454::<>(__sym0, __sym1) {
+                let __nt = match super::__action1460::<>(__sym0, __sym1) {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
@@ -12885,13 +12885,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("," <Test<"all">>)? = ",", Test<"all"> => ActionFn(1026);
+        // ("," <Test<"all">>)? = ",", Test<"all"> => ActionFn(1029);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1026::<>(__sym0, __sym1);
+        let __nt = super::__action1029::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 20)
     }
@@ -12962,13 +12962,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("," <TestOrStarNamedExpr>)+ = ",", TestOrStarNamedExpr => ActionFn(1029);
+        // ("," <TestOrStarNamedExpr>)+ = ",", TestOrStarNamedExpr => ActionFn(1032);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1029::<>(__sym0, __sym1);
+        let __nt = super::__action1032::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 23)
     }
@@ -12979,14 +12979,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("," <TestOrStarNamedExpr>)+ = ("," <TestOrStarNamedExpr>)+, ",", TestOrStarNamedExpr => ActionFn(1030);
+        // ("," <TestOrStarNamedExpr>)+ = ("," <TestOrStarNamedExpr>)+, ",", TestOrStarNamedExpr => ActionFn(1033);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1030::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1033::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (3, 23)
     }
@@ -13043,13 +13043,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("," <WithItem<"all">>)+ = ",", WithItem<"all"> => ActionFn(1039);
+        // ("," <WithItem<"all">>)+ = ",", WithItem<"all"> => ActionFn(1042);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant18(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1039::<>(__sym0, __sym1);
+        let __nt = super::__action1042::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant19(__nt), __end));
         (2, 26)
     }
@@ -13060,14 +13060,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("," <WithItem<"all">>)+ = ("," <WithItem<"all">>)+, ",", WithItem<"all"> => ActionFn(1040);
+        // ("," <WithItem<"all">>)+ = ("," <WithItem<"all">>)+, ",", WithItem<"all"> => ActionFn(1043);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant18(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant19(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1040::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1043::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant19(__nt), __end));
         (3, 26)
     }
@@ -13095,13 +13095,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("->" <Test<"all">>)? = "->", Test<"all"> => ActionFn(1045);
+        // ("->" <Test<"all">>)? = "->", Test<"all"> => ActionFn(1048);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1045::<>(__sym0, __sym1);
+        let __nt = super::__action1048::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 28)
     }
@@ -13143,13 +13143,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("." Identifier)+ = ".", Identifier => ActionFn(1050);
+        // ("." Identifier)+ = ".", Identifier => ActionFn(1053);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1050::<>(__sym0, __sym1);
+        let __nt = super::__action1053::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (2, 30)
     }
@@ -13160,14 +13160,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("." Identifier)+ = ("." Identifier)+, ".", Identifier => ActionFn(1051);
+        // ("." Identifier)+ = ("." Identifier)+, ".", Identifier => ActionFn(1054);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant21(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1051::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1054::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (3, 30)
     }
@@ -13195,13 +13195,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (":" <Test<"all">>)? = ":", Test<"all"> => ActionFn(1052);
+        // (":" <Test<"all">>)? = ":", Test<"all"> => ActionFn(1055);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1052::<>(__sym0, __sym1);
+        let __nt = super::__action1055::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 32)
     }
@@ -13243,13 +13243,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (":" <TestOrStarExpr>)? = ":", TestOrStarExpr => ActionFn(1057);
+        // (":" <TestOrStarExpr>)? = ":", TestOrStarExpr => ActionFn(1060);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1057::<>(__sym0, __sym1);
+        let __nt = super::__action1060::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 34)
     }
@@ -13318,11 +13318,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("\n")+ = "\n" => ActionFn(1060);
+        // ("\n")+ = "\n" => ActionFn(1063);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1060::<>(__sym0);
+        let __nt = super::__action1063::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (1, 37)
     }
@@ -13333,13 +13333,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("\n")+ = ("\n")+, "\n" => ActionFn(1061);
+        // ("\n")+ = ("\n")+, "\n" => ActionFn(1064);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant22(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1061::<>(__sym0, __sym1);
+        let __nt = super::__action1064::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (2, 37)
     }
@@ -13367,13 +13367,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("as" <Identifier>)? = "as", Identifier => ActionFn(1064);
+        // ("as" <Identifier>)? = "as", Identifier => ActionFn(1067);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1064::<>(__sym0, __sym1);
+        let __nt = super::__action1067::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant24(__nt), __end));
         (2, 39)
     }
@@ -13416,14 +13416,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("else" ":" <Suite>)? = "else", ":", Suite => ActionFn(1069);
+        // ("else" ":" <Suite>)? = "else", ":", Suite => ActionFn(1072);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant25(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1069::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1072::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant26(__nt), __end));
         (3, 41)
     }
@@ -13466,14 +13466,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("finally" ":" <Suite>)? = "finally", ":", Suite => ActionFn(1082);
+        // ("finally" ":" <Suite>)? = "finally", ":", Suite => ActionFn(1085);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant25(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1082::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1085::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant26(__nt), __end));
         (3, 43)
     }
@@ -13515,13 +13515,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ("from" <Test<"all">>)? = "from", Test<"all"> => ActionFn(1092);
+        // ("from" <Test<"all">>)? = "from", Test<"all"> => ActionFn(1095);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1092::<>(__sym0, __sym1);
+        let __nt = super::__action1095::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 45)
     }
@@ -13594,7 +13594,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+ = "elif", NamedExpressionTest, ":", Suite => ActionFn(1095);
+        // (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+ = "elif", NamedExpressionTest, ":", Suite => ActionFn(1098);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -13602,7 +13602,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1095::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1098::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant28(__nt), __end));
         (4, 48)
     }
@@ -13613,7 +13613,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+ = (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+, "elif", NamedExpressionTest, ":", Suite => ActionFn(1096);
+        // (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+ = (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+, "elif", NamedExpressionTest, ":", Suite => ActionFn(1099);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -13622,7 +13622,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant28(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1096::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1099::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant28(__nt), __end));
         (5, 48)
     }
@@ -13650,13 +13650,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<AndTest<"all">> "or")+ = AndTest<"all">, "or" => ActionFn(1101);
+        // (<AndTest<"all">> "or")+ = AndTest<"all">, "or" => ActionFn(1104);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1101::<>(__sym0, __sym1);
+        let __nt = super::__action1104::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 50)
     }
@@ -13667,14 +13667,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<AndTest<"all">> "or")+ = (<AndTest<"all">> "or")+, AndTest<"all">, "or" => ActionFn(1102);
+        // (<AndTest<"all">> "or")+ = (<AndTest<"all">> "or")+, AndTest<"all">, "or" => ActionFn(1105);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1102::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1105::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (3, 50)
     }
@@ -13731,13 +13731,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<FunctionArgument> ",")+ = FunctionArgument, "," => ActionFn(1103);
+        // (<FunctionArgument> ",")+ = FunctionArgument, "," => ActionFn(1106);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant29(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1103::<>(__sym0, __sym1);
+        let __nt = super::__action1106::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant30(__nt), __end));
         (2, 53)
     }
@@ -13748,14 +13748,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<FunctionArgument> ",")+ = (<FunctionArgument> ",")+, FunctionArgument, "," => ActionFn(1104);
+        // (<FunctionArgument> ",")+ = (<FunctionArgument> ",")+, FunctionArgument, "," => ActionFn(1107);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant29(__symbols);
         let __sym0 = __pop_Variant30(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1104::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1107::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant30(__nt), __end));
         (3, 53)
     }
@@ -13783,13 +13783,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<NotTest<"all">> "and")+ = NotTest<"all">, "and" => ActionFn(1107);
+        // (<NotTest<"all">> "and")+ = NotTest<"all">, "and" => ActionFn(1110);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1107::<>(__sym0, __sym1);
+        let __nt = super::__action1110::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 55)
     }
@@ -13800,14 +13800,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<NotTest<"all">> "and")+ = (<NotTest<"all">> "and")+, NotTest<"all">, "and" => ActionFn(1108);
+        // (<NotTest<"all">> "and")+ = (<NotTest<"all">> "and")+, NotTest<"all">, "and" => ActionFn(1111);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1108::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1111::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (3, 55)
     }
@@ -13835,13 +13835,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<OneOrMore<Test<"all">>> ",")? = OneOrMore<Test<"all">>, "," => ActionFn(1109);
+        // (<OneOrMore<Test<"all">>> ",")? = OneOrMore<Test<"all">>, "," => ActionFn(1112);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1109::<>(__sym0, __sym1);
+        let __nt = super::__action1112::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant32(__nt), __end));
         (2, 57)
     }
@@ -13912,13 +13912,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<Pattern> ",")+ = Pattern, "," => ActionFn(1126);
+        // (<Pattern> ",")+ = Pattern, "," => ActionFn(1129);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1126::<>(__sym0, __sym1);
+        let __nt = super::__action1129::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant34(__nt), __end));
         (2, 60)
     }
@@ -13929,14 +13929,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<Pattern> ",")+ = (<Pattern> ",")+, Pattern, "," => ActionFn(1127);
+        // (<Pattern> ",")+ = (<Pattern> ",")+, Pattern, "," => ActionFn(1130);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant34(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1127::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1130::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant34(__nt), __end));
         (3, 60)
     }
@@ -13993,13 +13993,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<SmallStatement> ";")+ = SmallStatement, ";" => ActionFn(1130);
+        // (<SmallStatement> ";")+ = SmallStatement, ";" => ActionFn(1133);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant35(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1130::<>(__sym0, __sym1);
+        let __nt = super::__action1133::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant36(__nt), __end));
         (2, 63)
     }
@@ -14010,14 +14010,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<SmallStatement> ";")+ = (<SmallStatement> ";")+, SmallStatement, ";" => ActionFn(1131);
+        // (<SmallStatement> ";")+ = (<SmallStatement> ";")+, SmallStatement, ";" => ActionFn(1134);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant36(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1131::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1134::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant36(__nt), __end));
         (3, 63)
     }
@@ -14046,13 +14046,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<WithItemsNoAs> ",") = OneOrMore<Test<"all">>, "," => ActionFn(1433);
+        // (<WithItemsNoAs> ",") = OneOrMore<Test<"all">>, "," => ActionFn(1439);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1433::<>(__sym0, __sym1);
+        let __nt = super::__action1439::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (2, 65)
     }
@@ -14063,13 +14063,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (<WithItemsNoAs> ",")? = OneOrMore<Test<"all">>, "," => ActionFn(1436);
+        // (<WithItemsNoAs> ",")? = OneOrMore<Test<"all">>, "," => ActionFn(1442);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1436::<>(__sym0, __sym1);
+        let __nt = super::__action1442::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant39(__nt), __end));
         (2, 66)
     }
@@ -14094,11 +14094,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (@L string @R) = string => ActionFn(1150);
+        // (@L string @R) = string => ActionFn(1153);
         let __sym0 = __pop_Variant5(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1150::<>(__sym0);
+        let __nt = super::__action1153::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (1, 67)
     }
@@ -14109,11 +14109,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (@L string @R)+ = string => ActionFn(1445);
+        // (@L string @R)+ = string => ActionFn(1451);
         let __sym0 = __pop_Variant5(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1445::<>(__sym0);
+        let __nt = super::__action1451::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant41(__nt), __end));
         (1, 68)
     }
@@ -14124,13 +14124,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (@L string @R)+ = (@L string @R)+, string => ActionFn(1446);
+        // (@L string @R)+ = (@L string @R)+, string => ActionFn(1452);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant5(__symbols);
         let __sym0 = __pop_Variant41(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1446::<>(__sym0, __sym1);
+        let __nt = super::__action1452::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant41(__nt), __end));
         (2, 68)
     }
@@ -14158,13 +14158,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (CompOp Expression<"all">)+ = CompOp, Expression<"all"> => ActionFn(1447);
+        // (CompOp Expression<"all">)+ = CompOp, Expression<"all"> => ActionFn(1453);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant53(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1447::<>(__sym0, __sym1);
+        let __nt = super::__action1453::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant43(__nt), __end));
         (2, 70)
     }
@@ -14175,14 +14175,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (CompOp Expression<"all">)+ = (CompOp Expression<"all">)+, CompOp, Expression<"all"> => ActionFn(1448);
+        // (CompOp Expression<"all">)+ = (CompOp Expression<"all">)+, CompOp, Expression<"all"> => ActionFn(1454);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant53(__symbols);
         let __sym0 = __pop_Variant43(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1448::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1454::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant43(__nt), __end));
         (3, 70)
     }
@@ -14208,11 +14208,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (Guard)? = Guard => ActionFn(1449);
+        // (Guard)? = Guard => ActionFn(1455);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1449::<>(__sym0);
+        let __nt = super::__action1455::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (1, 72)
     }
@@ -14252,11 +14252,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // (ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>)? = ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> => ActionFn(1452);
+        // (ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>)? = ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> => ActionFn(1458);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1452::<>(__sym0);
+        let __nt = super::__action1458::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant45(__nt), __end));
         (1, 74)
     }
@@ -14339,14 +14339,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AddOpExpr = ConstantExpr, AddOp, ConstantAtom => ActionFn(1151);
+        // AddOpExpr = ConstantExpr, AddOp, ConstantAtom => ActionFn(1154);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1151::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1154::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 78)
     }
@@ -14357,14 +14357,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AndExpression<"all"> = AndExpression<"all">, "&", ShiftExpression<"all"> => ActionFn(1152);
+        // AndExpression<"all"> = AndExpression<"all">, "&", ShiftExpression<"all"> => ActionFn(1155);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1152::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1155::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 79)
     }
@@ -14390,14 +14390,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AndExpression<"no-withitems"> = AndExpression<"all">, "&", ShiftExpression<"all"> => ActionFn(1153);
+        // AndExpression<"no-withitems"> = AndExpression<"all">, "&", ShiftExpression<"all"> => ActionFn(1156);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1153::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1156::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 80)
     }
@@ -14423,13 +14423,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AndTest<"all"> = (<NotTest<"all">> "and")+, NotTest<"all"> => ActionFn(1154);
+        // AndTest<"all"> = (<NotTest<"all">> "and")+, NotTest<"all"> => ActionFn(1157);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1154::<>(__sym0, __sym1);
+        let __nt = super::__action1157::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 81)
     }
@@ -14455,13 +14455,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AndTest<"no-withitems"> = (<NotTest<"all">> "and")+, NotTest<"all"> => ActionFn(1155);
+        // AndTest<"no-withitems"> = (<NotTest<"all">> "and")+, NotTest<"all"> => ActionFn(1158);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1155::<>(__sym0, __sym1);
+        let __nt = super::__action1158::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 82)
     }
@@ -14487,14 +14487,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ArithmeticExpression<"all"> = ArithmeticExpression<"all">, AddOp, Term<"all"> => ActionFn(1156);
+        // ArithmeticExpression<"all"> = ArithmeticExpression<"all">, AddOp, Term<"all"> => ActionFn(1159);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1156::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1159::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 84)
     }
@@ -14520,14 +14520,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ArithmeticExpression<"no-withitems"> = ArithmeticExpression<"all">, AddOp, Term<"all"> => ActionFn(1157);
+        // ArithmeticExpression<"no-withitems"> = ArithmeticExpression<"all">, AddOp, Term<"all"> => ActionFn(1160);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1157::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1160::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 85)
     }
@@ -14553,7 +14553,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AssertStatement = "assert", Test<"all">, ",", Test<"all"> => ActionFn(1159);
+        // AssertStatement = "assert", Test<"all">, ",", Test<"all"> => ActionFn(1162);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -14561,7 +14561,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1159::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1162::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 87)
     }
@@ -14572,13 +14572,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AssertStatement = "assert", Test<"all"> => ActionFn(1160);
+        // AssertStatement = "assert", Test<"all"> => ActionFn(1163);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1160::<>(__sym0, __sym1);
+        let __nt = super::__action1163::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 87)
     }
@@ -14696,11 +14696,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = Constant => ActionFn(1161);
+        // Atom<"all"> = Constant => ActionFn(1164);
         let __sym0 = __pop_Variant54(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1161::<>(__sym0);
+        let __nt = super::__action1164::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 92)
     }
@@ -14711,11 +14711,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = Identifier => ActionFn(1162);
+        // Atom<"all"> = Identifier => ActionFn(1165);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1162::<>(__sym0);
+        let __nt = super::__action1165::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 92)
     }
@@ -14726,14 +14726,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "[", ListLiteralValues, "]" => ActionFn(1509);
+        // Atom<"all"> = "[", ListLiteralValues, "]" => ActionFn(1515);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1509::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1515::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 92)
     }
@@ -14744,13 +14744,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "[", "]" => ActionFn(1510);
+        // Atom<"all"> = "[", "]" => ActionFn(1516);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1510::<>(__sym0, __sym1);
+        let __nt = super::__action1516::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 92)
     }
@@ -14761,7 +14761,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1164);
+        // Atom<"all"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1167);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -14769,7 +14769,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1164::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1167::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 92)
     }
@@ -14780,7 +14780,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", ")" => ActionFn(1165);
+        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ",", ")" => ActionFn(1168);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -14788,7 +14788,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1165::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1168::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 92)
     }
@@ -14799,14 +14799,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ")" => ActionFn(1166);
+        // Atom<"all"> = "(", OneOrMore<Test<"all">>, ")" => ActionFn(1169);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1166::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1169::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 92)
     }
@@ -14817,13 +14817,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", ")" => ActionFn(1175);
+        // Atom<"all"> = "(", ")" => ActionFn(1178);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1175::<>(__sym0, __sym1);
+        let __nt = super::__action1178::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 92)
     }
@@ -14852,7 +14852,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1176);
+        // Atom<"all"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1179);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -14860,7 +14860,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1176::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1179::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 92)
     }
@@ -14871,14 +14871,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", DictLiteralValues, "}" => ActionFn(1493);
+        // Atom<"all"> = "{", DictLiteralValues, "}" => ActionFn(1499);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant59(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1493::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1499::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 92)
     }
@@ -14889,13 +14889,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", "}" => ActionFn(1494);
+        // Atom<"all"> = "{", "}" => ActionFn(1500);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1494::<>(__sym0, __sym1);
+        let __nt = super::__action1500::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 92)
     }
@@ -14906,7 +14906,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", DictEntry, CompFor, "}" => ActionFn(1179);
+        // Atom<"all"> = "{", DictEntry, CompFor, "}" => ActionFn(1182);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -14914,7 +14914,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1179::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1182::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 92)
     }
@@ -14925,14 +14925,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", SetLiteralValues, "}" => ActionFn(1180);
+        // Atom<"all"> = "{", SetLiteralValues, "}" => ActionFn(1183);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1180::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1183::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 92)
     }
@@ -14943,7 +14943,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1181);
+        // Atom<"all"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1184);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -14951,7 +14951,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1181::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1184::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 92)
     }
@@ -14962,11 +14962,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "True" => ActionFn(1182);
+        // Atom<"all"> = "True" => ActionFn(1185);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1182::<>(__sym0);
+        let __nt = super::__action1185::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 92)
     }
@@ -14977,11 +14977,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "False" => ActionFn(1183);
+        // Atom<"all"> = "False" => ActionFn(1186);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1183::<>(__sym0);
+        let __nt = super::__action1186::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 92)
     }
@@ -14992,11 +14992,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "None" => ActionFn(1184);
+        // Atom<"all"> = "None" => ActionFn(1187);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1184::<>(__sym0);
+        let __nt = super::__action1187::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 92)
     }
@@ -15007,11 +15007,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"all"> = "..." => ActionFn(1185);
+        // Atom<"all"> = "..." => ActionFn(1188);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1185::<>(__sym0);
+        let __nt = super::__action1188::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 92)
     }
@@ -15022,11 +15022,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = Constant => ActionFn(1186);
+        // Atom<"no-withitems"> = Constant => ActionFn(1189);
         let __sym0 = __pop_Variant54(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1186::<>(__sym0);
+        let __nt = super::__action1189::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 93)
     }
@@ -15037,11 +15037,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = Identifier => ActionFn(1187);
+        // Atom<"no-withitems"> = Identifier => ActionFn(1190);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1187::<>(__sym0);
+        let __nt = super::__action1190::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 93)
     }
@@ -15052,14 +15052,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "[", ListLiteralValues, "]" => ActionFn(1511);
+        // Atom<"no-withitems"> = "[", ListLiteralValues, "]" => ActionFn(1517);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1511::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1517::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 93)
     }
@@ -15070,13 +15070,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "[", "]" => ActionFn(1512);
+        // Atom<"no-withitems"> = "[", "]" => ActionFn(1518);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1512::<>(__sym0, __sym1);
+        let __nt = super::__action1518::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 93)
     }
@@ -15087,7 +15087,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1189);
+        // Atom<"no-withitems"> = "[", TestOrStarNamedExpr, CompFor, "]" => ActionFn(1192);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -15095,7 +15095,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1189::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1192::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 93)
     }
@@ -15106,13 +15106,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "(", ")" => ActionFn(1198);
+        // Atom<"no-withitems"> = "(", ")" => ActionFn(1201);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1198::<>(__sym0, __sym1);
+        let __nt = super::__action1201::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 93)
     }
@@ -15141,7 +15141,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1199);
+        // Atom<"no-withitems"> = "(", NamedExpressionTest, CompFor, ")" => ActionFn(1202);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -15149,7 +15149,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1199::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1202::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 93)
     }
@@ -15160,14 +15160,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", DictLiteralValues, "}" => ActionFn(1495);
+        // Atom<"no-withitems"> = "{", DictLiteralValues, "}" => ActionFn(1501);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant59(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1495::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1501::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 93)
     }
@@ -15178,13 +15178,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", "}" => ActionFn(1496);
+        // Atom<"no-withitems"> = "{", "}" => ActionFn(1502);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1496::<>(__sym0, __sym1);
+        let __nt = super::__action1502::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 93)
     }
@@ -15195,7 +15195,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", DictEntry, CompFor, "}" => ActionFn(1202);
+        // Atom<"no-withitems"> = "{", DictEntry, CompFor, "}" => ActionFn(1205);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -15203,7 +15203,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1202::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1205::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 93)
     }
@@ -15214,14 +15214,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", SetLiteralValues, "}" => ActionFn(1203);
+        // Atom<"no-withitems"> = "{", SetLiteralValues, "}" => ActionFn(1206);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1203::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1206::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 93)
     }
@@ -15232,7 +15232,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1204);
+        // Atom<"no-withitems"> = "{", NamedExpressionTest, CompFor, "}" => ActionFn(1207);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant51(__symbols);
@@ -15240,7 +15240,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1204::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1207::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 93)
     }
@@ -15251,11 +15251,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "True" => ActionFn(1205);
+        // Atom<"no-withitems"> = "True" => ActionFn(1208);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1205::<>(__sym0);
+        let __nt = super::__action1208::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 93)
     }
@@ -15266,11 +15266,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "False" => ActionFn(1206);
+        // Atom<"no-withitems"> = "False" => ActionFn(1209);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1206::<>(__sym0);
+        let __nt = super::__action1209::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 93)
     }
@@ -15281,11 +15281,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "None" => ActionFn(1207);
+        // Atom<"no-withitems"> = "None" => ActionFn(1210);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1207::<>(__sym0);
+        let __nt = super::__action1210::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 93)
     }
@@ -15296,11 +15296,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Atom<"no-withitems"> = "..." => ActionFn(1208);
+        // Atom<"no-withitems"> = "..." => ActionFn(1211);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1208::<>(__sym0);
+        let __nt = super::__action1211::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 93)
     }
@@ -15326,7 +15326,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"all"> = AtomExpr2<"all">, "(", ArgumentList, ")" => ActionFn(1209);
+        // AtomExpr2<"all"> = AtomExpr2<"all">, "(", ArgumentList, ")" => ActionFn(1212);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant48(__symbols);
@@ -15334,7 +15334,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1209::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1212::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 94)
     }
@@ -15345,7 +15345,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"all"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1210);
+        // AtomExpr2<"all"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1213);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
@@ -15353,7 +15353,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1210::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1213::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 94)
     }
@@ -15364,14 +15364,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"all"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1211);
+        // AtomExpr2<"all"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1214);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1211::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1214::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 94)
     }
@@ -15397,7 +15397,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, "(", ArgumentList, ")" => ActionFn(1212);
+        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, "(", ArgumentList, ")" => ActionFn(1215);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant48(__symbols);
@@ -15405,7 +15405,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1212::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1215::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 95)
     }
@@ -15416,7 +15416,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1213);
+        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, "[", SubscriptList, "]" => ActionFn(1216);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
@@ -15424,7 +15424,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1213::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1216::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 95)
     }
@@ -15435,14 +15435,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1214);
+        // AtomExpr2<"no-withitems"> = AtomExpr2<"all">, ".", Identifier => ActionFn(1217);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1214::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1217::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 95)
     }
@@ -15453,13 +15453,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr<"all"> = "await", AtomExpr2<"all"> => ActionFn(1215);
+        // AtomExpr<"all"> = "await", AtomExpr2<"all"> => ActionFn(1218);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1215::<>(__sym0, __sym1);
+        let __nt = super::__action1218::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 96)
     }
@@ -15485,13 +15485,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // AtomExpr<"no-withitems"> = "await", AtomExpr2<"all"> => ActionFn(1216);
+        // AtomExpr<"no-withitems"> = "await", AtomExpr2<"all"> => ActionFn(1219);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1216::<>(__sym0, __sym1);
+        let __nt = super::__action1219::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 97)
     }
@@ -15712,11 +15712,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // CapturePattern = Identifier => ActionFn(1217);
+        // CapturePattern = Identifier => ActionFn(1220);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1217::<>(__sym0);
+        let __nt = super::__action1220::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 99)
     }
@@ -15727,7 +15727,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, "(", ArgumentList, ")", ":", Suite => ActionFn(1481);
+        // ClassDef = "class", Identifier, "(", ArgumentList, ")", ":", Suite => ActionFn(1487);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -15738,7 +15738,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1481::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1487::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 100)
     }
@@ -15749,7 +15749,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, "(", ArgumentList, ")", ":", Suite => ActionFn(1482);
+        // ClassDef = Decorator+, "class", Identifier, "(", ArgumentList, ")", ":", Suite => ActionFn(1488);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
@@ -15761,7 +15761,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant56(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym7.2.clone();
-        let __nt = super::__action1482::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1488::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (8, 100)
     }
@@ -15772,7 +15772,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, ":", Suite => ActionFn(1483);
+        // ClassDef = "class", Identifier, ":", Suite => ActionFn(1489);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -15780,7 +15780,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1483::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1489::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 100)
     }
@@ -15791,7 +15791,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, ":", Suite => ActionFn(1484);
+        // ClassDef = Decorator+, "class", Identifier, ":", Suite => ActionFn(1490);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -15800,7 +15800,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant56(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1484::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1490::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 100)
     }
@@ -15811,7 +15811,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1218);
+        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1221);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -15822,7 +15822,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1218::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1221::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (7, 101)
     }
@@ -15833,7 +15833,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1219);
+        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1222);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant76(__symbols);
@@ -15843,7 +15843,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1219::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1222::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (6, 101)
     }
@@ -15854,7 +15854,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ",", ")" => ActionFn(1220);
+        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ",", ")" => ActionFn(1223);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -15863,7 +15863,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1220::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1223::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (5, 101)
     }
@@ -15874,7 +15874,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ")" => ActionFn(1221);
+        // ClassPattern = MatchName, "(", OneOrMore<Pattern>, ")" => ActionFn(1224);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant50(__symbols);
@@ -15882,7 +15882,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1221::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1224::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 101)
     }
@@ -15893,7 +15893,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, "(", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1222);
+        // ClassPattern = MatchName, "(", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1225);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -15902,7 +15902,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1222::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1225::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (5, 101)
     }
@@ -15913,7 +15913,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, "(", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1223);
+        // ClassPattern = MatchName, "(", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1226);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant76(__symbols);
@@ -15921,7 +15921,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1223::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1226::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 101)
     }
@@ -15932,14 +15932,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchName, "(", ")" => ActionFn(1224);
+        // ClassPattern = MatchName, "(", ")" => ActionFn(1227);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1224::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1227::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 101)
     }
@@ -15950,7 +15950,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1225);
+        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1228);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -15961,7 +15961,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1225::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1228::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (7, 101)
     }
@@ -15972,7 +15972,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1226);
+        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1229);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant76(__symbols);
@@ -15982,7 +15982,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1226::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1229::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (6, 101)
     }
@@ -15993,7 +15993,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ",", ")" => ActionFn(1227);
+        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ",", ")" => ActionFn(1230);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -16002,7 +16002,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1227::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1230::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (5, 101)
     }
@@ -16013,7 +16013,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ")" => ActionFn(1228);
+        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<Pattern>, ")" => ActionFn(1231);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant50(__symbols);
@@ -16021,7 +16021,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1228::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1231::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 101)
     }
@@ -16032,7 +16032,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1229);
+        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<MatchKeywordEntry>, ",", ")" => ActionFn(1232);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -16041,7 +16041,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1229::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1232::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (5, 101)
     }
@@ -16052,7 +16052,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1230);
+        // ClassPattern = MatchNameOrAttr, "(", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1233);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant76(__symbols);
@@ -16060,7 +16060,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1230::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1233::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 101)
     }
@@ -16071,14 +16071,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassPattern = MatchNameOrAttr, "(", ")" => ActionFn(1231);
+        // ClassPattern = MatchNameOrAttr, "(", ")" => ActionFn(1234);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1231::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1234::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 101)
     }
@@ -16194,11 +16194,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> = FunctionArgument => ActionFn(1459);
+        // Comma<FunctionArgument> = FunctionArgument => ActionFn(1465);
         let __sym0 = __pop_Variant29(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1459::<>(__sym0);
+        let __nt = super::__action1465::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 103)
     }
@@ -16209,10 +16209,10 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> =  => ActionFn(1460);
+        // Comma<FunctionArgument> =  => ActionFn(1466);
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
-        let __nt = super::__action1460::<>(&__start, &__end);
+        let __nt = super::__action1466::<>(&__start, &__end);
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (0, 103)
     }
@@ -16223,13 +16223,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> = (<FunctionArgument> ",")+, FunctionArgument => ActionFn(1461);
+        // Comma<FunctionArgument> = (<FunctionArgument> ",")+, FunctionArgument => ActionFn(1467);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant29(__symbols);
         let __sym0 = __pop_Variant30(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1461::<>(__sym0, __sym1);
+        let __nt = super::__action1467::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (2, 103)
     }
@@ -16240,11 +16240,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<FunctionArgument> = (<FunctionArgument> ",")+ => ActionFn(1462);
+        // Comma<FunctionArgument> = (<FunctionArgument> ",")+ => ActionFn(1468);
         let __sym0 = __pop_Variant30(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1462::<>(__sym0);
+        let __nt = super::__action1468::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 103)
     }
@@ -16255,11 +16255,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> = Pattern => ActionFn(1467);
+        // Comma<Pattern> = Pattern => ActionFn(1473);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1467::<>(__sym0);
+        let __nt = super::__action1473::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant50(__nt), __end));
         (1, 104)
     }
@@ -16270,10 +16270,10 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> =  => ActionFn(1468);
+        // Comma<Pattern> =  => ActionFn(1474);
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
-        let __nt = super::__action1468::<>(&__start, &__end);
+        let __nt = super::__action1474::<>(&__start, &__end);
         __symbols.push((__start, __Symbol::Variant50(__nt), __end));
         (0, 104)
     }
@@ -16284,13 +16284,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> = (<Pattern> ",")+, Pattern => ActionFn(1469);
+        // Comma<Pattern> = (<Pattern> ",")+, Pattern => ActionFn(1475);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant34(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1469::<>(__sym0, __sym1);
+        let __nt = super::__action1475::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant50(__nt), __end));
         (2, 104)
     }
@@ -16301,11 +16301,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comma<Pattern> = (<Pattern> ",")+ => ActionFn(1470);
+        // Comma<Pattern> = (<Pattern> ",")+ => ActionFn(1476);
         let __sym0 = __pop_Variant34(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1470::<>(__sym0);
+        let __nt = super::__action1476::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant50(__nt), __end));
         (1, 104)
     }
@@ -16514,13 +16514,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comparison<"all"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1232);
+        // Comparison<"all"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1235);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant43(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1232::<>(__sym0, __sym1);
+        let __nt = super::__action1235::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 108)
     }
@@ -16546,13 +16546,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Comparison<"no-withitems"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1233);
+        // Comparison<"no-withitems"> = Expression<"all">, (CompOp Expression<"all">)+ => ActionFn(1236);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant43(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1233::<>(__sym0, __sym1);
+        let __nt = super::__action1236::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 109)
     }
@@ -16821,11 +16821,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ConstantAtom = Constant => ActionFn(1234);
+        // ConstantAtom = Constant => ActionFn(1237);
         let __sym0 = __pop_Variant54(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1234::<>(__sym0);
+        let __nt = super::__action1237::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 115)
     }
@@ -16851,13 +16851,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ConstantExpr = "-", ConstantAtom => ActionFn(1235);
+        // ConstantExpr = "-", ConstantAtom => ActionFn(1238);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1235::<>(__sym0, __sym1);
+        let __nt = super::__action1238::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 116)
     }
@@ -16868,14 +16868,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Decorator = "@", NamedExpressionTest, "\n" => ActionFn(1236);
+        // Decorator = "@", NamedExpressionTest, "\n" => ActionFn(1239);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1236::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1239::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant55(__nt), __end));
         (3, 117)
     }
@@ -16947,13 +16947,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DelStatement = "del", ExpressionList2 => ActionFn(1237);
+        // DelStatement = "del", ExpressionList2 => ActionFn(1240);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1237::<>(__sym0, __sym1);
+        let __nt = super::__action1240::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 120)
     }
@@ -17075,11 +17075,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DottedName = name => ActionFn(66);
+        // DottedName = name => ActionFn(1241);
         let __sym0 = __pop_Variant4(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action66::<>(__sym0);
+        let __nt = super::__action1241::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (1, 125)
     }
@@ -17090,13 +17090,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DottedName = name, ("." Identifier)+ => ActionFn(67);
+        // DottedName = name, ("." Identifier)+ => ActionFn(1242);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant21(__symbols);
         let __sym0 = __pop_Variant4(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action67::<>(__sym0, __sym1);
+        let __nt = super::__action1242::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (2, 125)
     }
@@ -17107,14 +17107,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DoubleStarTypedParameter = Identifier, ":", Test<"all"> => ActionFn(1238);
+        // DoubleStarTypedParameter = Identifier, ":", Test<"all"> => ActionFn(1243);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1238::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1243::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (3, 126)
     }
@@ -17125,11 +17125,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // DoubleStarTypedParameter = Identifier => ActionFn(1239);
+        // DoubleStarTypedParameter = Identifier => ActionFn(1244);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1239::<>(__sym0);
+        let __nt = super::__action1244::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (1, 126)
     }
@@ -17169,7 +17169,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExceptClause = "except", Test<"all">, ":", Suite => ActionFn(1637);
+        // ExceptClause = "except", Test<"all">, ":", Suite => ActionFn(1643);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -17177,7 +17177,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1637::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1643::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (4, 128)
     }
@@ -17188,14 +17188,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExceptClause = "except", ":", Suite => ActionFn(1638);
+        // ExceptClause = "except", ":", Suite => ActionFn(1644);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant25(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1638::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1644::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (3, 128)
     }
@@ -17206,7 +17206,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExceptClause = "except", Test<"all">, "as", Identifier, ":", Suite => ActionFn(1148);
+        // ExceptClause = "except", Test<"all">, "as", Identifier, ":", Suite => ActionFn(1151);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -17216,7 +17216,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1148::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1151::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (6, 128)
     }
@@ -17259,7 +17259,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExceptStarClause = "except", "*", Test<"all">, ":", Suite => ActionFn(765);
+        // ExceptStarClause = "except", "*", Test<"all">, ":", Suite => ActionFn(767);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -17268,7 +17268,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action765::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action767::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (5, 130)
     }
@@ -17279,7 +17279,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExceptStarClause = "except", "*", Test<"all">, "as", Identifier, ":", Suite => ActionFn(1149);
+        // ExceptStarClause = "except", "*", Test<"all">, "as", Identifier, ":", Suite => ActionFn(1152);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -17290,7 +17290,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1149::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1152::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (7, 130)
     }
@@ -17333,14 +17333,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Expression<"all"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1240);
+        // Expression<"all"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1245);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1240::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1245::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 132)
     }
@@ -17366,14 +17366,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Expression<"no-withitems"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1241);
+        // Expression<"no-withitems"> = Expression<"all">, "|", XorExpression<"all"> => ActionFn(1246);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1241::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1246::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 133)
     }
@@ -17491,11 +17491,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = GenericList<TestOrStarExpr> => ActionFn(1662);
+        // ExpressionStatement = GenericList<TestOrStarExpr> => ActionFn(1668);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1662::<>(__sym0);
+        let __nt = super::__action1668::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 138)
     }
@@ -17506,13 +17506,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = GenericList<TestOrStarExpr>, AssignSuffix+ => ActionFn(1663);
+        // ExpressionStatement = GenericList<TestOrStarExpr>, AssignSuffix+ => ActionFn(1669);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant17(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1663::<>(__sym0, __sym1);
+        let __nt = super::__action1669::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 138)
     }
@@ -17523,14 +17523,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = GenericList<TestOrStarExpr>, AugAssign, TestListOrYieldExpr => ActionFn(1664);
+        // ExpressionStatement = GenericList<TestOrStarExpr>, AugAssign, TestListOrYieldExpr => ActionFn(1670);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1664::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1670::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 138)
     }
@@ -17541,7 +17541,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = Test<"all">, ":", Test<"all">, AssignSuffix => ActionFn(1457);
+        // ExpressionStatement = Test<"all">, ":", Test<"all">, AssignSuffix => ActionFn(1463);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
@@ -17549,7 +17549,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1457::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1463::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 138)
     }
@@ -17560,14 +17560,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ExpressionStatement = Test<"all">, ":", Test<"all"> => ActionFn(1458);
+        // ExpressionStatement = Test<"all">, ":", Test<"all"> => ActionFn(1464);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1458::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1464::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 138)
     }
@@ -17578,13 +17578,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Factor<"all"> = UnaryOp, Factor<"all"> => ActionFn(1245);
+        // Factor<"all"> = UnaryOp, Factor<"all"> => ActionFn(1250);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant87(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1245::<>(__sym0, __sym1);
+        let __nt = super::__action1250::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 139)
     }
@@ -17610,13 +17610,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Factor<"no-withitems"> = UnaryOp, Factor<"all"> => ActionFn(1246);
+        // Factor<"no-withitems"> = UnaryOp, Factor<"all"> => ActionFn(1251);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant87(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1246::<>(__sym0, __sym1);
+        let __nt = super::__action1251::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 140)
     }
@@ -17642,11 +17642,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "break" => ActionFn(1247);
+        // FlowStatement = "break" => ActionFn(1252);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1247::<>(__sym0);
+        let __nt = super::__action1252::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 141)
     }
@@ -17657,11 +17657,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "continue" => ActionFn(1248);
+        // FlowStatement = "continue" => ActionFn(1253);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1248::<>(__sym0);
+        let __nt = super::__action1253::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 141)
     }
@@ -17672,13 +17672,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "return", GenericList<TestOrStarExpr> => ActionFn(1658);
+        // FlowStatement = "return", GenericList<TestOrStarExpr> => ActionFn(1664);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1658::<>(__sym0, __sym1);
+        let __nt = super::__action1664::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 141)
     }
@@ -17689,11 +17689,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = "return" => ActionFn(1659);
+        // FlowStatement = "return" => ActionFn(1665);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1659::<>(__sym0);
+        let __nt = super::__action1665::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 141)
     }
@@ -17704,11 +17704,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FlowStatement = YieldExpr => ActionFn(1250);
+        // FlowStatement = YieldExpr => ActionFn(1255);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1250::<>(__sym0);
+        let __nt = super::__action1255::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 141)
     }
@@ -17734,7 +17734,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1649);
+        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1655);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant25(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
@@ -17748,7 +17748,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym9.2.clone();
-        let __nt = super::__action1649::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
+        let __nt = super::__action1655::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (10, 142)
     }
@@ -17759,7 +17759,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1650);
+        // ForStatement = "async", "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1656);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -17770,7 +17770,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1650::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1656::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 142)
     }
@@ -17781,7 +17781,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1651);
+        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite, "else", ":", Suite => ActionFn(1657);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant25(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
@@ -17794,7 +17794,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym8.2.clone();
-        let __nt = super::__action1651::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
+        let __nt = super::__action1657::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (9, 142)
     }
@@ -17805,7 +17805,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1652);
+        // ForStatement = "for", ExpressionList, "in", GenericList<TestOrStarExpr>, ":", Suite => ActionFn(1658);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -17815,7 +17815,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1652::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1658::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (6, 142)
     }
@@ -17826,7 +17826,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1485);
+        // FuncDef = "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1491);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
@@ -17838,7 +17838,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym7.2.clone();
-        let __nt = super::__action1485::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1491::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (8, 143)
     }
@@ -17849,7 +17849,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1486);
+        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1492);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant25(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
@@ -17862,7 +17862,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant56(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym8.2.clone();
-        let __nt = super::__action1486::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
+        let __nt = super::__action1492::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (9, 143)
     }
@@ -17873,7 +17873,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1487);
+        // FuncDef = "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1493);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -17883,7 +17883,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1487::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1493::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (6, 143)
     }
@@ -17894,7 +17894,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1488);
+        // FuncDef = Decorator+, "async", "def", Identifier, Parameters, ":", Suite => ActionFn(1494);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -17905,7 +17905,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant56(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1488::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1494::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 143)
     }
@@ -17916,7 +17916,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1489);
+        // FuncDef = "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1495);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -17927,7 +17927,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1489::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1495::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 143)
     }
@@ -17938,7 +17938,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1490);
+        // FuncDef = Decorator+, "def", Identifier, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1496);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
@@ -17950,7 +17950,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant56(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym7.2.clone();
-        let __nt = super::__action1490::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1496::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (8, 143)
     }
@@ -17961,7 +17961,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, Parameters, ":", Suite => ActionFn(1491);
+        // FuncDef = "def", Identifier, Parameters, ":", Suite => ActionFn(1497);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -17970,7 +17970,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1491::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1497::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 143)
     }
@@ -17981,7 +17981,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, Parameters, ":", Suite => ActionFn(1492);
+        // FuncDef = Decorator+, "def", Identifier, Parameters, ":", Suite => ActionFn(1498);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -17991,7 +17991,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant56(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1492::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1498::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (6, 143)
     }
@@ -18002,13 +18002,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = NamedExpressionTest, CompFor => ActionFn(1475);
+        // FunctionArgument = NamedExpressionTest, CompFor => ActionFn(1481);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant51(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1475::<>(__sym0, __sym1);
+        let __nt = super::__action1481::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant29(__nt), __end));
         (2, 144)
     }
@@ -18019,11 +18019,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = NamedExpressionTest => ActionFn(1476);
+        // FunctionArgument = NamedExpressionTest => ActionFn(1482);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1476::<>(__sym0);
+        let __nt = super::__action1482::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant29(__nt), __end));
         (1, 144)
     }
@@ -18034,14 +18034,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = Identifier, "=", Test<"all"> => ActionFn(1252);
+        // FunctionArgument = Identifier, "=", Test<"all"> => ActionFn(1257);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1252::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1257::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant29(__nt), __end));
         (3, 144)
     }
@@ -18052,13 +18052,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = "*", Test<"all"> => ActionFn(1253);
+        // FunctionArgument = "*", Test<"all"> => ActionFn(1258);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1253::<>(__sym0, __sym1);
+        let __nt = super::__action1258::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant29(__nt), __end));
         (2, 144)
     }
@@ -18069,13 +18069,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FunctionArgument = "**", Test<"all"> => ActionFn(1254);
+        // FunctionArgument = "**", Test<"all"> => ActionFn(1259);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1254::<>(__sym0, __sym1);
+        let __nt = super::__action1259::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant29(__nt), __end));
         (2, 144)
     }
@@ -18115,13 +18115,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression>, "," => ActionFn(1255);
+        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression>, "," => ActionFn(1260);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1255::<>(__sym0, __sym1);
+        let __nt = super::__action1260::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 146)
     }
@@ -18132,11 +18132,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression> => ActionFn(1256);
+        // GenericList<ExpressionOrStarExpression> = OneOrMore<ExpressionOrStarExpression> => ActionFn(1261);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1256::<>(__sym0);
+        let __nt = super::__action1261::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 146)
     }
@@ -18147,13 +18147,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr>, "," => ActionFn(1257);
+        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr>, "," => ActionFn(1262);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1257::<>(__sym0, __sym1);
+        let __nt = super::__action1262::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 147)
     }
@@ -18164,11 +18164,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr> => ActionFn(1258);
+        // GenericList<TestOrStarExpr> = OneOrMore<TestOrStarExpr> => ActionFn(1263);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1258::<>(__sym0);
+        let __nt = super::__action1263::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 147)
     }
@@ -18179,13 +18179,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // GlobalStatement = "global", OneOrMore<Identifier> => ActionFn(1259);
+        // GlobalStatement = "global", OneOrMore<Identifier> => ActionFn(1264);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant75(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1259::<>(__sym0, __sym1);
+        let __nt = super::__action1264::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 148)
     }
@@ -18213,11 +18213,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Identifier = name => ActionFn(224);
+        // Identifier = name => ActionFn(1265);
         let __sym0 = __pop_Variant4(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action224::<>(__sym0);
+        let __nt = super::__action1265::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (1, 150)
     }
@@ -18228,7 +18228,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // IfStatement = "if", NamedExpressionTest, ":", Suite, "else", ":", Suite => ActionFn(1097);
+        // IfStatement = "if", NamedExpressionTest, ":", Suite, "else", ":", Suite => ActionFn(1100);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -18239,7 +18239,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1097::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1100::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 151)
     }
@@ -18250,7 +18250,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // IfStatement = "if", NamedExpressionTest, ":", Suite, (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+, "else", ":", Suite => ActionFn(1098);
+        // IfStatement = "if", NamedExpressionTest, ":", Suite, (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+, "else", ":", Suite => ActionFn(1101);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
@@ -18262,7 +18262,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym7.2.clone();
-        let __nt = super::__action1098::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action1101::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (8, 151)
     }
@@ -18273,7 +18273,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // IfStatement = "if", NamedExpressionTest, ":", Suite => ActionFn(1099);
+        // IfStatement = "if", NamedExpressionTest, ":", Suite => ActionFn(1102);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -18281,7 +18281,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1099::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1102::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 151)
     }
@@ -18292,7 +18292,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // IfStatement = "if", NamedExpressionTest, ":", Suite, (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+ => ActionFn(1100);
+        // IfStatement = "if", NamedExpressionTest, ":", Suite, (<@L> "elif" <NamedExpressionTest> ":" <Suite>)+ => ActionFn(1103);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant28(__symbols);
         let __sym3 = __pop_Variant25(__symbols);
@@ -18301,7 +18301,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1100::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1103::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 151)
     }
@@ -18312,14 +18312,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<DottedName> = DottedName, "as", Identifier => ActionFn(1260);
+        // ImportAsAlias<DottedName> = DottedName, "as", Identifier => ActionFn(1266);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1260::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1266::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (3, 152)
     }
@@ -18330,11 +18330,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<DottedName> = DottedName => ActionFn(1261);
+        // ImportAsAlias<DottedName> = DottedName => ActionFn(1267);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1261::<>(__sym0);
+        let __nt = super::__action1267::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (1, 152)
     }
@@ -18345,14 +18345,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<Identifier> = Identifier, "as", Identifier => ActionFn(1262);
+        // ImportAsAlias<Identifier> = Identifier, "as", Identifier => ActionFn(1268);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1262::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1268::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (3, 153)
     }
@@ -18363,11 +18363,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsAlias<Identifier> = Identifier => ActionFn(1263);
+        // ImportAsAlias<Identifier> = Identifier => ActionFn(1269);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1263::<>(__sym0);
+        let __nt = super::__action1269::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (1, 153)
     }
@@ -18378,11 +18378,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = OneOrMore<ImportAsAlias<Identifier>> => ActionFn(1264);
+        // ImportAsNames = OneOrMore<ImportAsAlias<Identifier>> => ActionFn(1270);
         let __sym0 = __pop_Variant67(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1264::<>(__sym0);
+        let __nt = super::__action1270::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (1, 154)
     }
@@ -18393,7 +18393,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ",", ")" => ActionFn(1265);
+        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ",", ")" => ActionFn(1271);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -18401,7 +18401,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1265::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1271::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (4, 154)
     }
@@ -18412,14 +18412,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ")" => ActionFn(1266);
+        // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ")" => ActionFn(1272);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant67(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1266::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1272::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (3, 154)
     }
@@ -18430,11 +18430,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportAsNames = "*" => ActionFn(1267);
+        // ImportAsNames = "*" => ActionFn(1273);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1267::<>(__sym0);
+        let __nt = super::__action1273::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (1, 154)
     }
@@ -18536,11 +18536,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportFromLocation = DottedName => ActionFn(1507);
+        // ImportFromLocation = DottedName => ActionFn(1513);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1507::<>(__sym0);
+        let __nt = super::__action1513::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (1, 158)
     }
@@ -18551,13 +18551,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportFromLocation = ImportDots+, DottedName => ActionFn(1508);
+        // ImportFromLocation = ImportDots+, DottedName => ActionFn(1514);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant69(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1508::<>(__sym0, __sym1);
+        let __nt = super::__action1514::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (2, 158)
     }
@@ -18583,13 +18583,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportStatement = "import", OneOrMore<ImportAsAlias<DottedName>> => ActionFn(1268);
+        // ImportStatement = "import", OneOrMore<ImportAsAlias<DottedName>> => ActionFn(1274);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant67(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1268::<>(__sym0, __sym1);
+        let __nt = super::__action1274::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 159)
     }
@@ -18600,7 +18600,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ImportStatement = "from", ImportFromLocation, "import", ImportAsNames => ActionFn(1269);
+        // ImportStatement = "from", ImportFromLocation, "import", ImportAsNames => ActionFn(1275);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant67(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -18608,7 +18608,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1269::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1275::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 159)
     }
@@ -18619,13 +18619,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // KwargParameter<DoubleStarTypedParameter> = "**", DoubleStarTypedParameter => ActionFn(1497);
+        // KwargParameter<DoubleStarTypedParameter> = "**", DoubleStarTypedParameter => ActionFn(1503);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant61(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1497::<>(__sym0, __sym1);
+        let __nt = super::__action1503::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 160)
     }
@@ -18636,11 +18636,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // KwargParameter<DoubleStarTypedParameter> = "**" => ActionFn(1498);
+        // KwargParameter<DoubleStarTypedParameter> = "**" => ActionFn(1504);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1498::<>(__sym0);
+        let __nt = super::__action1504::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (1, 160)
     }
@@ -18651,13 +18651,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // KwargParameter<StarUntypedParameter> = "**", StarUntypedParameter => ActionFn(966);
+        // KwargParameter<StarUntypedParameter> = "**", StarUntypedParameter => ActionFn(969);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant61(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action966::<>(__sym0, __sym1);
+        let __nt = super::__action969::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 161)
     }
@@ -18668,11 +18668,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // KwargParameter<StarUntypedParameter> = "**" => ActionFn(967);
+        // KwargParameter<StarUntypedParameter> = "**" => ActionFn(970);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action967::<>(__sym0);
+        let __nt = super::__action970::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (1, 161)
     }
@@ -18744,11 +18744,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = "None" => ActionFn(1271);
+        // LiteralPattern = "None" => ActionFn(1277);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1271::<>(__sym0);
+        let __nt = super::__action1277::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 165)
     }
@@ -18759,11 +18759,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = "True" => ActionFn(1272);
+        // LiteralPattern = "True" => ActionFn(1278);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1272::<>(__sym0);
+        let __nt = super::__action1278::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 165)
     }
@@ -18774,11 +18774,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = "False" => ActionFn(1273);
+        // LiteralPattern = "False" => ActionFn(1279);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1273::<>(__sym0);
+        let __nt = super::__action1279::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 165)
     }
@@ -18789,11 +18789,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = ConstantExpr => ActionFn(1274);
+        // LiteralPattern = ConstantExpr => ActionFn(1280);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1274::<>(__sym0);
+        let __nt = super::__action1280::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 165)
     }
@@ -18804,11 +18804,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // LiteralPattern = AddOpExpr => ActionFn(1275);
+        // LiteralPattern = AddOpExpr => ActionFn(1281);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1275::<>(__sym0);
+        let __nt = super::__action1281::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 165)
     }
@@ -18864,11 +18864,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingKey = "None" => ActionFn(1277);
+        // MappingKey = "None" => ActionFn(1283);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1277::<>(__sym0);
+        let __nt = super::__action1283::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 166)
     }
@@ -18879,11 +18879,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingKey = "True" => ActionFn(1278);
+        // MappingKey = "True" => ActionFn(1284);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1278::<>(__sym0);
+        let __nt = super::__action1284::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 166)
     }
@@ -18894,11 +18894,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingKey = "False" => ActionFn(1279);
+        // MappingKey = "False" => ActionFn(1285);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1279::<>(__sym0);
+        let __nt = super::__action1285::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 166)
     }
@@ -18909,13 +18909,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", "}" => ActionFn(1280);
+        // MappingPattern = "{", "}" => ActionFn(1286);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1280::<>(__sym0, __sym1);
+        let __nt = super::__action1286::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 167)
     }
@@ -18926,7 +18926,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "}" => ActionFn(1281);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "}" => ActionFn(1287);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -18934,7 +18934,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1281::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1287::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 167)
     }
@@ -18945,14 +18945,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, "}" => ActionFn(1282);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, "}" => ActionFn(1288);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant77(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1282::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1288::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 167)
     }
@@ -18963,7 +18963,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", "**", Identifier, ",", "}" => ActionFn(1283);
+        // MappingPattern = "{", "**", Identifier, ",", "}" => ActionFn(1289);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -18972,7 +18972,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1283::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1289::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (5, 167)
     }
@@ -18983,7 +18983,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", "**", Identifier, "}" => ActionFn(1284);
+        // MappingPattern = "{", "**", Identifier, "}" => ActionFn(1290);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
@@ -18991,7 +18991,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1284::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1290::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 167)
     }
@@ -19002,7 +19002,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, ",", "}" => ActionFn(1285);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, ",", "}" => ActionFn(1291);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -19013,7 +19013,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1285::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1291::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (7, 167)
     }
@@ -19024,7 +19024,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, "}" => ActionFn(1286);
+        // MappingPattern = "{", OneOrMore<MatchMappingEntry>, ",", "**", Identifier, "}" => ActionFn(1292);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant23(__symbols);
@@ -19034,7 +19034,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1286::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1292::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (6, 167)
     }
@@ -19045,7 +19045,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchCase = "case", Patterns, Guard, ":", Suite => ActionFn(1450);
+        // MatchCase = "case", Patterns, Guard, ":", Suite => ActionFn(1456);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -19054,7 +19054,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1450::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1456::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (5, 168)
     }
@@ -19065,7 +19065,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchCase = "case", Patterns, ":", Suite => ActionFn(1451);
+        // MatchCase = "case", Patterns, ":", Suite => ActionFn(1457);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -19073,7 +19073,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1451::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1457::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (4, 168)
     }
@@ -19152,11 +19152,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchName = Identifier => ActionFn(1287);
+        // MatchName = Identifier => ActionFn(1293);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1287::<>(__sym0);
+        let __nt = super::__action1293::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 172)
     }
@@ -19167,14 +19167,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchNameOrAttr = MatchName, ".", Identifier => ActionFn(1288);
+        // MatchNameOrAttr = MatchName, ".", Identifier => ActionFn(1294);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1288::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1294::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 173)
     }
@@ -19185,14 +19185,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchNameOrAttr = MatchNameOrAttr, ".", Identifier => ActionFn(1289);
+        // MatchNameOrAttr = MatchNameOrAttr, ".", Identifier => ActionFn(1295);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1289::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1295::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 173)
     }
@@ -19203,7 +19203,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchStatement = "match", TestOrStarNamedExpr, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(822);
+        // MatchStatement = "match", TestOrStarNamedExpr, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(825);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant72(__symbols);
@@ -19214,7 +19214,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action822::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action825::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 174)
     }
@@ -19225,7 +19225,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchStatement = "match", TestOrStarNamedExpr, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(823);
+        // MatchStatement = "match", TestOrStarNamedExpr, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(826);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant0(__symbols);
         let __sym6 = __pop_Variant72(__symbols);
@@ -19237,7 +19237,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym7.2.clone();
-        let __nt = super::__action823::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action826::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (8, 174)
     }
@@ -19248,7 +19248,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchStatement = "match", TwoOrMore<TestOrStarNamedExpr, ",">, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(824);
+        // MatchStatement = "match", TwoOrMore<TestOrStarNamedExpr, ",">, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(827);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant0(__symbols);
         let __sym6 = __pop_Variant72(__symbols);
@@ -19260,7 +19260,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym7.2.clone();
-        let __nt = super::__action824::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
+        let __nt = super::__action827::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (8, 174)
     }
@@ -19271,7 +19271,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // MatchStatement = "match", TwoOrMore<TestOrStarNamedExpr, ",">, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(825);
+        // MatchStatement = "match", TwoOrMore<TestOrStarNamedExpr, ",">, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(828);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant72(__symbols);
@@ -19282,7 +19282,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action825::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action828::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 174)
     }
@@ -19368,14 +19368,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NamedExpression = Identifier, ":=", Test<"all"> => ActionFn(1290);
+        // NamedExpression = Identifier, ":=", Test<"all"> => ActionFn(1296);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1290::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1296::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 176)
     }
@@ -19446,13 +19446,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NonlocalStatement = "nonlocal", OneOrMore<Identifier> => ActionFn(1291);
+        // NonlocalStatement = "nonlocal", OneOrMore<Identifier> => ActionFn(1297);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant75(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1291::<>(__sym0, __sym1);
+        let __nt = super::__action1297::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 179)
     }
@@ -19463,13 +19463,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NotTest<"all"> = "not", NotTest<"all"> => ActionFn(1292);
+        // NotTest<"all"> = "not", NotTest<"all"> => ActionFn(1298);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1292::<>(__sym0, __sym1);
+        let __nt = super::__action1298::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 180)
     }
@@ -19495,13 +19495,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // NotTest<"no-withitems"> = "not", NotTest<"all"> => ActionFn(1293);
+        // NotTest<"no-withitems"> = "not", NotTest<"all"> => ActionFn(1299);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1293::<>(__sym0, __sym1);
+        let __nt = super::__action1299::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 181)
     }
@@ -19626,14 +19626,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = DottedName, "as", Identifier => ActionFn(1499);
+        // OneOrMore<ImportAsAlias<DottedName>> = DottedName, "as", Identifier => ActionFn(1505);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1499::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1505::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (3, 185)
     }
@@ -19644,11 +19644,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = DottedName => ActionFn(1500);
+        // OneOrMore<ImportAsAlias<DottedName>> = DottedName => ActionFn(1506);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1500::<>(__sym0);
+        let __nt = super::__action1506::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (1, 185)
     }
@@ -19659,7 +19659,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName, "as", Identifier => ActionFn(1501);
+        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName, "as", Identifier => ActionFn(1507);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -19668,7 +19668,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant67(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1501::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1507::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (5, 185)
     }
@@ -19679,14 +19679,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName => ActionFn(1502);
+        // OneOrMore<ImportAsAlias<DottedName>> = OneOrMore<ImportAsAlias<DottedName>>, ",", DottedName => ActionFn(1508);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant67(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1502::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1508::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (3, 185)
     }
@@ -19697,14 +19697,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = Identifier, "as", Identifier => ActionFn(1503);
+        // OneOrMore<ImportAsAlias<Identifier>> = Identifier, "as", Identifier => ActionFn(1509);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1503::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1509::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (3, 186)
     }
@@ -19715,11 +19715,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = Identifier => ActionFn(1504);
+        // OneOrMore<ImportAsAlias<Identifier>> = Identifier => ActionFn(1510);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1504::<>(__sym0);
+        let __nt = super::__action1510::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (1, 186)
     }
@@ -19730,7 +19730,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier, "as", Identifier => ActionFn(1505);
+        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier, "as", Identifier => ActionFn(1511);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -19739,7 +19739,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant67(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1505::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1511::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (5, 186)
     }
@@ -19750,14 +19750,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier => ActionFn(1506);
+        // OneOrMore<ImportAsAlias<Identifier>> = OneOrMore<ImportAsAlias<Identifier>>, ",", Identifier => ActionFn(1512);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant67(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1506::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1512::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (3, 186)
     }
@@ -20047,11 +20047,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OrPattern = TwoOrMore<ClosedPattern, "|"> => ActionFn(1294);
+        // OrPattern = TwoOrMore<ClosedPattern, "|"> => ActionFn(1300);
         let __sym0 = __pop_Variant50(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1294::<>(__sym0);
+        let __nt = super::__action1300::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 195)
     }
@@ -20062,13 +20062,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OrTest<"all"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1295);
+        // OrTest<"all"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1301);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1295::<>(__sym0, __sym1);
+        let __nt = super::__action1301::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 196)
     }
@@ -20094,13 +20094,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // OrTest<"no-withitems"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1296);
+        // OrTest<"no-withitems"> = (<AndTest<"all">> "or")+, AndTest<"all"> => ActionFn(1302);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant17(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1296::<>(__sym0, __sym1);
+        let __nt = super::__action1302::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 197)
     }
@@ -20296,13 +20296,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1333);
+        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter>, "," => ActionFn(1339);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1333::<>(__sym0, __sym1);
+        let __nt = super::__action1339::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (2, 202)
     }
@@ -20313,11 +20313,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter> => ActionFn(1334);
+        // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = KwargParameter<DoubleStarTypedParameter> => ActionFn(1340);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1334::<>(__sym0);
+        let __nt = super::__action1340::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 202)
     }
@@ -20328,13 +20328,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter>, "," => ActionFn(1371);
+        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter>, "," => ActionFn(1377);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1371::<>(__sym0, __sym1);
+        let __nt = super::__action1377::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (2, 203)
     }
@@ -20345,11 +20345,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter> => ActionFn(1372);
+        // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = KwargParameter<StarUntypedParameter> => ActionFn(1378);
         let __sym0 = __pop_Variant9(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1372::<>(__sym0);
+        let __nt = super::__action1378::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 203)
     }
@@ -20389,11 +20389,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // PassStatement = "pass" => ActionFn(1374);
+        // PassStatement = "pass" => ActionFn(1380);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1374::<>(__sym0);
+        let __nt = super::__action1380::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 208)
     }
@@ -20463,13 +20463,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Patterns = Pattern, "," => ActionFn(1375);
+        // Patterns = Pattern, "," => ActionFn(1381);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant33(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1375::<>(__sym0, __sym1);
+        let __nt = super::__action1381::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 211)
     }
@@ -20480,13 +20480,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Patterns = TwoOrMore<Pattern, ",">, "," => ActionFn(1376);
+        // Patterns = TwoOrMore<Pattern, ",">, "," => ActionFn(1382);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant50(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1376::<>(__sym0, __sym1);
+        let __nt = super::__action1382::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 211)
     }
@@ -20497,11 +20497,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Patterns = TwoOrMore<Pattern, ","> => ActionFn(1377);
+        // Patterns = TwoOrMore<Pattern, ","> => ActionFn(1383);
         let __sym0 = __pop_Variant50(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1377::<>(__sym0);
+        let __nt = super::__action1383::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 211)
     }
@@ -20527,14 +20527,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Power<"all"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1378);
+        // Power<"all"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1384);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1378::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1384::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 212)
     }
@@ -20560,14 +20560,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Power<"no-withitems"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1379);
+        // Power<"no-withitems"> = AtomExpr<"all">, "**", Factor<"all"> => ActionFn(1385);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1379::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1385::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 213)
     }
@@ -20624,7 +20624,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Program = Program, SmallStatement, ";", "\n" => ActionFn(1132);
+        // Program = Program, SmallStatement, ";", "\n" => ActionFn(1135);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -20632,7 +20632,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant25(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1132::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1135::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (4, 214)
     }
@@ -20643,7 +20643,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Program = Program, (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1133);
+        // Program = Program, (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1136);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -20652,7 +20652,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant25(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1133::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1136::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (5, 214)
     }
@@ -20663,14 +20663,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Program = Program, SmallStatement, "\n" => ActionFn(1134);
+        // Program = Program, SmallStatement, "\n" => ActionFn(1137);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant25(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1134::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1137::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 214)
     }
@@ -20681,7 +20681,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Program = Program, (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1135);
+        // Program = Program, (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1138);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant35(__symbols);
@@ -20689,7 +20689,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant25(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1135::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1138::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (4, 214)
     }
@@ -20717,11 +20717,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // RaiseStatement = "raise" => ActionFn(1380);
+        // RaiseStatement = "raise" => ActionFn(1386);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1380::<>(__sym0);
+        let __nt = super::__action1386::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 215)
     }
@@ -20732,7 +20732,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // RaiseStatement = "raise", Test<"all">, "from", Test<"all"> => ActionFn(1381);
+        // RaiseStatement = "raise", Test<"all">, "from", Test<"all"> => ActionFn(1387);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -20740,7 +20740,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1381::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1387::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 215)
     }
@@ -20751,13 +20751,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // RaiseStatement = "raise", Test<"all"> => ActionFn(1382);
+        // RaiseStatement = "raise", Test<"all"> => ActionFn(1388);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1382::<>(__sym0, __sym1);
+        let __nt = super::__action1388::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 215)
     }
@@ -20768,14 +20768,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", Pattern, ")" => ActionFn(1383);
+        // SequencePattern = "(", Pattern, ")" => ActionFn(1389);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1383::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1389::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 216)
     }
@@ -20786,13 +20786,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", ")" => ActionFn(1384);
+        // SequencePattern = "(", ")" => ActionFn(1390);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1384::<>(__sym0, __sym1);
+        let __nt = super::__action1390::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 216)
     }
@@ -20803,7 +20803,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", Pattern, ",", ")" => ActionFn(1385);
+        // SequencePattern = "(", Pattern, ",", ")" => ActionFn(1391);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -20811,7 +20811,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1385::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1391::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 216)
     }
@@ -20822,7 +20822,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ",", ")" => ActionFn(1386);
+        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ",", ")" => ActionFn(1392);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -20831,7 +20831,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1386::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1392::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (5, 216)
     }
@@ -20842,7 +20842,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ")" => ActionFn(1387);
+        // SequencePattern = "(", (<Pattern> ",")+, Pattern, ")" => ActionFn(1393);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant33(__symbols);
@@ -20850,7 +20850,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1387::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1393::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 216)
     }
@@ -20861,14 +20861,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", Pattern, "]" => ActionFn(1471);
+        // SequencePattern = "[", Pattern, "]" => ActionFn(1477);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant33(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1471::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1477::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 216)
     }
@@ -20879,13 +20879,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", "]" => ActionFn(1472);
+        // SequencePattern = "[", "]" => ActionFn(1478);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1472::<>(__sym0, __sym1);
+        let __nt = super::__action1478::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 216)
     }
@@ -20896,7 +20896,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", (<Pattern> ",")+, Pattern, "]" => ActionFn(1473);
+        // SequencePattern = "[", (<Pattern> ",")+, Pattern, "]" => ActionFn(1479);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant33(__symbols);
@@ -20904,7 +20904,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1473::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1479::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (4, 216)
     }
@@ -20915,14 +20915,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SequencePattern = "[", (<Pattern> ",")+, "]" => ActionFn(1474);
+        // SequencePattern = "[", (<Pattern> ",")+, "]" => ActionFn(1480);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant34(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1474::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1480::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 216)
     }
@@ -20965,14 +20965,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ShiftExpression<"all"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1389);
+        // ShiftExpression<"all"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1395);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1389::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1395::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 218)
     }
@@ -20998,14 +20998,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ShiftExpression<"no-withitems"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1390);
+        // ShiftExpression<"no-withitems"> = ShiftExpression<"all">, ShiftOp, ArithmeticExpression<"all"> => ActionFn(1396);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1390::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1396::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 219)
     }
@@ -21061,7 +21061,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1477);
+        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1483);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -21070,7 +21070,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1477::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1483::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (5, 221)
     }
@@ -21081,7 +21081,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1478);
+        // SingleForComprehension = "async", "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1484);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant17(__symbols);
         let __sym4 = __pop_Variant15(__symbols);
@@ -21091,7 +21091,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1478::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1484::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (6, 221)
     }
@@ -21102,7 +21102,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1479);
+        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all"> => ActionFn(1485);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant15(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -21110,7 +21110,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1479::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1485::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (4, 221)
     }
@@ -21121,7 +21121,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1480);
+        // SingleForComprehension = "for", ExpressionList, "in", OrTest<"all">, ComprehensionIf+ => ActionFn(1486);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant17(__symbols);
         let __sym3 = __pop_Variant15(__symbols);
@@ -21130,7 +21130,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1480::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1486::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (5, 221)
     }
@@ -21173,13 +21173,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SliceOp = ":", Test<"all"> => ActionFn(1639);
+        // SliceOp = ":", Test<"all"> => ActionFn(1645);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1639::<>(__sym0, __sym1);
+        let __nt = super::__action1645::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant83(__nt), __end));
         (2, 223)
     }
@@ -21190,11 +21190,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SliceOp = ":" => ActionFn(1640);
+        // SliceOp = ":" => ActionFn(1646);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1640::<>(__sym0);
+        let __nt = super::__action1646::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant83(__nt), __end));
         (1, 223)
     }
@@ -21354,13 +21354,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarExpr = "*", Expression<"all"> => ActionFn(1393);
+        // StarExpr = "*", Expression<"all"> => ActionFn(1399);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1393::<>(__sym0, __sym1);
+        let __nt = super::__action1399::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 226)
     }
@@ -21371,13 +21371,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarPattern = "*", Identifier => ActionFn(1394);
+        // StarPattern = "*", Identifier => ActionFn(1400);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1394::<>(__sym0, __sym1);
+        let __nt = super::__action1400::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 227)
     }
@@ -21388,14 +21388,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarTypedParameter = Identifier, ":", TestOrStarExpr => ActionFn(1395);
+        // StarTypedParameter = Identifier, ":", TestOrStarExpr => ActionFn(1401);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1395::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1401::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (3, 228)
     }
@@ -21406,11 +21406,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarTypedParameter = Identifier => ActionFn(1396);
+        // StarTypedParameter = Identifier => ActionFn(1402);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1396::<>(__sym0);
+        let __nt = super::__action1402::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (1, 228)
     }
@@ -21450,11 +21450,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // StarUntypedParameter = Identifier => ActionFn(1397);
+        // StarUntypedParameter = Identifier => ActionFn(1403);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1397::<>(__sym0);
+        let __nt = super::__action1403::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (1, 230)
     }
@@ -21494,14 +21494,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = SmallStatement, ";", "\n" => ActionFn(1136);
+        // Statements = SmallStatement, ";", "\n" => ActionFn(1139);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant35(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1136::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1139::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (3, 232)
     }
@@ -21512,7 +21512,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1137);
+        // Statements = (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1140);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -21520,7 +21520,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant36(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1137::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1140::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (4, 232)
     }
@@ -21531,13 +21531,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = SmallStatement, "\n" => ActionFn(1138);
+        // Statements = SmallStatement, "\n" => ActionFn(1141);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant35(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1138::<>(__sym0, __sym1);
+        let __nt = super::__action1141::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (2, 232)
     }
@@ -21548,14 +21548,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1139);
+        // Statements = (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1142);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant36(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1139::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1142::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (3, 232)
     }
@@ -21598,7 +21598,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = Statements, SmallStatement, ";", "\n" => ActionFn(1140);
+        // Statements = Statements, SmallStatement, ";", "\n" => ActionFn(1143);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -21606,7 +21606,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant85(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1140::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1143::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (4, 232)
     }
@@ -21617,7 +21617,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = Statements, (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1141);
+        // Statements = Statements, (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1144);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -21626,7 +21626,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant85(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1141::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1144::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (5, 232)
     }
@@ -21637,14 +21637,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = Statements, SmallStatement, "\n" => ActionFn(1142);
+        // Statements = Statements, SmallStatement, "\n" => ActionFn(1145);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant85(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1142::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1145::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (3, 232)
     }
@@ -21655,7 +21655,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Statements = Statements, (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1143);
+        // Statements = Statements, (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1146);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant35(__symbols);
@@ -21663,7 +21663,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant85(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1143::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1146::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (4, 232)
     }
@@ -21689,7 +21689,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":", Test<"all">, SliceOp => ActionFn(1641);
+        // Subscript = Test<"all">, ":", Test<"all">, SliceOp => ActionFn(1647);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant83(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
@@ -21697,7 +21697,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1641::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1647::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 233)
     }
@@ -21708,14 +21708,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":", SliceOp => ActionFn(1642);
+        // Subscript = Test<"all">, ":", SliceOp => ActionFn(1648);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant83(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1642::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1648::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 233)
     }
@@ -21726,14 +21726,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":", Test<"all">, SliceOp => ActionFn(1643);
+        // Subscript = ":", Test<"all">, SliceOp => ActionFn(1649);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant83(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1643::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1649::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 233)
     }
@@ -21744,13 +21744,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":", SliceOp => ActionFn(1644);
+        // Subscript = ":", SliceOp => ActionFn(1650);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant83(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1644::<>(__sym0, __sym1);
+        let __nt = super::__action1650::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 233)
     }
@@ -21761,14 +21761,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":", Test<"all"> => ActionFn(1645);
+        // Subscript = Test<"all">, ":", Test<"all"> => ActionFn(1651);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1645::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1651::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 233)
     }
@@ -21779,13 +21779,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = Test<"all">, ":" => ActionFn(1646);
+        // Subscript = Test<"all">, ":" => ActionFn(1652);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1646::<>(__sym0, __sym1);
+        let __nt = super::__action1652::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 233)
     }
@@ -21796,13 +21796,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":", Test<"all"> => ActionFn(1647);
+        // Subscript = ":", Test<"all"> => ActionFn(1653);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1647::<>(__sym0, __sym1);
+        let __nt = super::__action1653::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 233)
     }
@@ -21813,11 +21813,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Subscript = ":" => ActionFn(1648);
+        // Subscript = ":" => ActionFn(1654);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1648::<>(__sym0);
+        let __nt = super::__action1654::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 233)
     }
@@ -21828,11 +21828,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SubscriptList = Subscript => ActionFn(1399);
+        // SubscriptList = Subscript => ActionFn(1405);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1399::<>(__sym0);
+        let __nt = super::__action1405::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 234)
     }
@@ -21843,13 +21843,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SubscriptList = Subscript, "," => ActionFn(1400);
+        // SubscriptList = Subscript, "," => ActionFn(1406);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1400::<>(__sym0, __sym1);
+        let __nt = super::__action1406::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 234)
     }
@@ -21860,13 +21860,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SubscriptList = TwoOrMore<Subscript, ",">, "," => ActionFn(1401);
+        // SubscriptList = TwoOrMore<Subscript, ",">, "," => ActionFn(1407);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1401::<>(__sym0, __sym1);
+        let __nt = super::__action1407::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 234)
     }
@@ -21877,11 +21877,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // SubscriptList = TwoOrMore<Subscript, ","> => ActionFn(1402);
+        // SubscriptList = TwoOrMore<Subscript, ","> => ActionFn(1408);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1402::<>(__sym0);
+        let __nt = super::__action1408::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 234)
     }
@@ -21892,14 +21892,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Suite = SmallStatement, ";", "\n" => ActionFn(1144);
+        // Suite = SmallStatement, ";", "\n" => ActionFn(1147);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant35(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1144::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1147::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 235)
     }
@@ -21910,7 +21910,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Suite = (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1145);
+        // Suite = (<SmallStatement> ";")+, SmallStatement, ";", "\n" => ActionFn(1148);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -21918,7 +21918,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant36(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1145::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1148::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (4, 235)
     }
@@ -21929,13 +21929,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Suite = SmallStatement, "\n" => ActionFn(1146);
+        // Suite = SmallStatement, "\n" => ActionFn(1149);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant35(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1146::<>(__sym0, __sym1);
+        let __nt = super::__action1149::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (2, 235)
     }
@@ -21946,14 +21946,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Suite = (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1147);
+        // Suite = (<SmallStatement> ";")+, SmallStatement, "\n" => ActionFn(1150);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant35(__symbols);
         let __sym0 = __pop_Variant36(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1147::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1150::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 235)
     }
@@ -21983,14 +21983,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Term<"all"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1403);
+        // Term<"all"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1409);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1403::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1409::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 236)
     }
@@ -22016,14 +22016,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Term<"no-withitems"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1404);
+        // Term<"no-withitems"> = Term<"all">, MulOp, Factor<"all"> => ActionFn(1410);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant47(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1404::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1410::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 237)
     }
@@ -22049,7 +22049,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Test<"all"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1405);
+        // Test<"all"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1411);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -22058,7 +22058,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1405::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1411::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (5, 238)
     }
@@ -22128,7 +22128,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Test<"no-withitems"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1406);
+        // Test<"no-withitems"> = OrTest<"all">, "if", OrTest<"all">, "else", Test<"all"> => ActionFn(1412);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -22137,7 +22137,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action1406::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action1412::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (5, 240)
     }
@@ -22193,11 +22193,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TestList? = GenericList<TestOrStarExpr> => ActionFn(1653);
+        // TestList? = GenericList<TestOrStarExpr> => ActionFn(1659);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1653::<>(__sym0);
+        let __nt = super::__action1659::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (1, 242)
     }
@@ -22222,11 +22222,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TestListOrYieldExpr = GenericList<TestOrStarExpr> => ActionFn(1654);
+        // TestListOrYieldExpr = GenericList<TestOrStarExpr> => ActionFn(1660);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1654::<>(__sym0);
+        let __nt = super::__action1660::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 243)
     }
@@ -22282,11 +22282,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TestOrStarExprList = GenericList<TestOrStarExpr> => ActionFn(1655);
+        // TestOrStarExprList = GenericList<TestOrStarExpr> => ActionFn(1661);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1655::<>(__sym0);
+        let __nt = super::__action1661::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 245)
     }
@@ -22327,13 +22327,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Top = StartModule, Program => ActionFn(1407);
+        // Top = StartModule, Program => ActionFn(1413);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant25(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1407::<>(__sym0, __sym1);
+        let __nt = super::__action1413::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (2, 247)
     }
@@ -22344,13 +22344,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Top = StartInteractive, Program => ActionFn(1408);
+        // Top = StartInteractive, Program => ActionFn(1414);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant25(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1408::<>(__sym0, __sym1);
+        let __nt = super::__action1414::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (2, 247)
     }
@@ -22361,13 +22361,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Top = StartExpression, GenericList<TestOrStarExpr> => ActionFn(1656);
+        // Top = StartExpression, GenericList<TestOrStarExpr> => ActionFn(1662);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1656::<>(__sym0, __sym1);
+        let __nt = super::__action1662::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (2, 247)
     }
@@ -22378,14 +22378,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // Top = StartExpression, GenericList<TestOrStarExpr>, ("\n")+ => ActionFn(1657);
+        // Top = StartExpression, GenericList<TestOrStarExpr>, ("\n")+ => ActionFn(1663);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1657::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1663::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (3, 247)
     }
@@ -22396,7 +22396,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1411);
+        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1417);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant25(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
@@ -22410,7 +22410,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym9.2.clone();
-        let __nt = super::__action1411::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
+        let __nt = super::__action1417::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (10, 248)
     }
@@ -22421,7 +22421,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite => ActionFn(1412);
+        // TryStatement = "try", ":", Suite, ExceptClause+, "else", ":", Suite => ActionFn(1418);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -22432,7 +22432,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1412::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1418::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 248)
     }
@@ -22443,7 +22443,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+, "finally", ":", Suite => ActionFn(1413);
+        // TryStatement = "try", ":", Suite, ExceptClause+, "finally", ":", Suite => ActionFn(1419);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -22454,7 +22454,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1413::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1419::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 248)
     }
@@ -22465,7 +22465,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptClause+ => ActionFn(1414);
+        // TryStatement = "try", ":", Suite, ExceptClause+ => ActionFn(1420);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant64(__symbols);
         let __sym2 = __pop_Variant25(__symbols);
@@ -22473,7 +22473,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1414::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1420::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 248)
     }
@@ -22484,7 +22484,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1415);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite, "finally", ":", Suite => ActionFn(1421);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant25(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
@@ -22498,7 +22498,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym9.2.clone();
-        let __nt = super::__action1415::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
+        let __nt = super::__action1421::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (10, 248)
     }
@@ -22509,7 +22509,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite => ActionFn(1416);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+, "else", ":", Suite => ActionFn(1422);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -22520,7 +22520,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1416::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1422::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 248)
     }
@@ -22531,7 +22531,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+, "finally", ":", Suite => ActionFn(1417);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+, "finally", ":", Suite => ActionFn(1423);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -22542,7 +22542,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1417::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1423::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 248)
     }
@@ -22553,7 +22553,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, ExceptStarClause+ => ActionFn(1418);
+        // TryStatement = "try", ":", Suite, ExceptStarClause+ => ActionFn(1424);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant64(__symbols);
         let __sym2 = __pop_Variant25(__symbols);
@@ -22561,7 +22561,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1418::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1424::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 248)
     }
@@ -22572,7 +22572,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TryStatement = "try", ":", Suite, "finally", ":", Suite => ActionFn(1083);
+        // TryStatement = "try", ":", Suite, "finally", ":", Suite => ActionFn(1086);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
@@ -22582,7 +22582,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym5.2.clone();
-        let __nt = super::__action1083::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        let __nt = super::__action1086::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (6, 248)
     }
@@ -22737,14 +22737,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypedParameter = Identifier, ":", Test<"all"> => ActionFn(1419);
+        // TypedParameter = Identifier, ":", Test<"all"> => ActionFn(1425);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1419::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1425::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (3, 253)
     }
@@ -22755,11 +22755,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypedParameter = Identifier => ActionFn(1420);
+        // TypedParameter = Identifier => ActionFn(1426);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1420::<>(__sym0);
+        let __nt = super::__action1426::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 253)
     }
@@ -22815,11 +22815,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // UntypedParameter = Identifier => ActionFn(1421);
+        // UntypedParameter = Identifier => ActionFn(1427);
         let __sym0 = __pop_Variant23(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1421::<>(__sym0);
+        let __nt = super::__action1427::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 255)
     }
@@ -22830,11 +22830,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ValuePattern = MatchNameOrAttr => ActionFn(1422);
+        // ValuePattern = MatchNameOrAttr => ActionFn(1428);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1422::<>(__sym0);
+        let __nt = super::__action1428::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 256)
     }
@@ -22845,7 +22845,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WhileStatement = "while", NamedExpressionTest, ":", Suite, "else", ":", Suite => ActionFn(1080);
+        // WhileStatement = "while", NamedExpressionTest, ":", Suite, "else", ":", Suite => ActionFn(1083);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
@@ -22856,7 +22856,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym6.2.clone();
-        let __nt = super::__action1080::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        let __nt = super::__action1083::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 257)
     }
@@ -22867,7 +22867,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WhileStatement = "while", NamedExpressionTest, ":", Suite => ActionFn(1081);
+        // WhileStatement = "while", NamedExpressionTest, ":", Suite => ActionFn(1084);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -22875,7 +22875,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1081::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1084::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 257)
     }
@@ -22886,11 +22886,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItem<"all"> = Test<"all"> => ActionFn(1423);
+        // WithItem<"all"> = Test<"all"> => ActionFn(1429);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1423::<>(__sym0);
+        let __nt = super::__action1429::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (1, 258)
     }
@@ -22901,14 +22901,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItem<"all"> = Test<"all">, "as", Expression<"all"> => ActionFn(1424);
+        // WithItem<"all"> = Test<"all">, "as", Expression<"all"> => ActionFn(1430);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1424::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1430::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (3, 258)
     }
@@ -22919,14 +22919,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItem<"as"> = Test<"all">, "as", Expression<"all"> => ActionFn(1425);
+        // WithItem<"as"> = Test<"all">, "as", Expression<"all"> => ActionFn(1431);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1425::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1431::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (3, 259)
     }
@@ -22937,11 +22937,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItem<"no-withitems"> = Test<"no-withitems"> => ActionFn(1426);
+        // WithItem<"no-withitems"> = Test<"no-withitems"> => ActionFn(1432);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1426::<>(__sym0);
+        let __nt = super::__action1432::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (1, 260)
     }
@@ -22952,14 +22952,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItem<"no-withitems"> = Test<"all">, "as", Expression<"all"> => ActionFn(1427);
+        // WithItem<"no-withitems"> = Test<"all">, "as", Expression<"all"> => ActionFn(1433);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1427::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1433::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (3, 260)
     }
@@ -22970,7 +22970,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItems = "(", OneOrMore<Test<"all">>, ",", ")" => ActionFn(1434);
+        // WithItems = "(", OneOrMore<Test<"all">>, ",", ")" => ActionFn(1440);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -22978,7 +22978,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1434::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1440::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (4, 261)
     }
@@ -22989,14 +22989,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItems = "(", OneOrMore<Test<"all">>, ")" => ActionFn(1435);
+        // WithItems = "(", OneOrMore<Test<"all">>, ")" => ActionFn(1441);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant31(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1435::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1441::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (3, 261)
     }
@@ -23007,130 +23007,10 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ",", ")" => ActionFn(1437);
+        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ",", ")" => ActionFn(1443);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant18(__symbols);
-        let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant31(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym5.2.clone();
-        let __nt = super::__action1437::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
-        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
-        (6, 261)
-    }
-    pub(crate) fn __reduce865<
-    >(
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // WithItems = "(", WithItem<"as">, ",", ")" => ActionFn(1438);
-        assert!(__symbols.len() >= 4);
-        let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant18(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym3.2.clone();
-        let __nt = super::__action1438::<>(__sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
-        (4, 261)
-    }
-    pub(crate) fn __reduce866<
-    >(
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ("," <WithItem<"all">>)+, ",", ")" => ActionFn(1439);
-        assert!(__symbols.len() >= 7);
-        let __sym6 = __pop_Variant0(__symbols);
-        let __sym5 = __pop_Variant0(__symbols);
-        let __sym4 = __pop_Variant19(__symbols);
-        let __sym3 = __pop_Variant18(__symbols);
-        let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant31(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym6.2.clone();
-        let __nt = super::__action1439::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
-        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
-        (7, 261)
-    }
-    pub(crate) fn __reduce867<
-    >(
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // WithItems = "(", WithItem<"as">, ("," <WithItem<"all">>)+, ",", ")" => ActionFn(1440);
-        assert!(__symbols.len() >= 5);
-        let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant19(__symbols);
-        let __sym1 = __pop_Variant18(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym4.2.clone();
-        let __nt = super::__action1440::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
-        (5, 261)
-    }
-    pub(crate) fn __reduce868<
-    >(
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ")" => ActionFn(1441);
-        assert!(__symbols.len() >= 5);
-        let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant18(__symbols);
-        let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant31(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym4.2.clone();
-        let __nt = super::__action1441::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
-        (5, 261)
-    }
-    pub(crate) fn __reduce869<
-    >(
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // WithItems = "(", WithItem<"as">, ")" => ActionFn(1442);
-        assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant18(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym2.2.clone();
-        let __nt = super::__action1442::<>(__sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
-        (3, 261)
-    }
-    pub(crate) fn __reduce870<
-    >(
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ("," <WithItem<"all">>)+, ")" => ActionFn(1443);
-        assert!(__symbols.len() >= 6);
-        let __sym5 = __pop_Variant0(__symbols);
-        let __sym4 = __pop_Variant19(__symbols);
         let __sym3 = __pop_Variant18(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant31(__symbols);
@@ -23141,6 +23021,126 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (6, 261)
     }
+    pub(crate) fn __reduce865<
+    >(
+        __lookahead_start: Option<&TextSize>,
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
+        _: core::marker::PhantomData<()>,
+    ) -> (usize, usize)
+    {
+        // WithItems = "(", WithItem<"as">, ",", ")" => ActionFn(1444);
+        assert!(__symbols.len() >= 4);
+        let __sym3 = __pop_Variant0(__symbols);
+        let __sym2 = __pop_Variant0(__symbols);
+        let __sym1 = __pop_Variant18(__symbols);
+        let __sym0 = __pop_Variant0(__symbols);
+        let __start = __sym0.0.clone();
+        let __end = __sym3.2.clone();
+        let __nt = super::__action1444::<>(__sym0, __sym1, __sym2, __sym3);
+        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
+        (4, 261)
+    }
+    pub(crate) fn __reduce866<
+    >(
+        __lookahead_start: Option<&TextSize>,
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
+        _: core::marker::PhantomData<()>,
+    ) -> (usize, usize)
+    {
+        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ("," <WithItem<"all">>)+, ",", ")" => ActionFn(1445);
+        assert!(__symbols.len() >= 7);
+        let __sym6 = __pop_Variant0(__symbols);
+        let __sym5 = __pop_Variant0(__symbols);
+        let __sym4 = __pop_Variant19(__symbols);
+        let __sym3 = __pop_Variant18(__symbols);
+        let __sym2 = __pop_Variant0(__symbols);
+        let __sym1 = __pop_Variant31(__symbols);
+        let __sym0 = __pop_Variant0(__symbols);
+        let __start = __sym0.0.clone();
+        let __end = __sym6.2.clone();
+        let __nt = super::__action1445::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6);
+        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
+        (7, 261)
+    }
+    pub(crate) fn __reduce867<
+    >(
+        __lookahead_start: Option<&TextSize>,
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
+        _: core::marker::PhantomData<()>,
+    ) -> (usize, usize)
+    {
+        // WithItems = "(", WithItem<"as">, ("," <WithItem<"all">>)+, ",", ")" => ActionFn(1446);
+        assert!(__symbols.len() >= 5);
+        let __sym4 = __pop_Variant0(__symbols);
+        let __sym3 = __pop_Variant0(__symbols);
+        let __sym2 = __pop_Variant19(__symbols);
+        let __sym1 = __pop_Variant18(__symbols);
+        let __sym0 = __pop_Variant0(__symbols);
+        let __start = __sym0.0.clone();
+        let __end = __sym4.2.clone();
+        let __nt = super::__action1446::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
+        (5, 261)
+    }
+    pub(crate) fn __reduce868<
+    >(
+        __lookahead_start: Option<&TextSize>,
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
+        _: core::marker::PhantomData<()>,
+    ) -> (usize, usize)
+    {
+        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ")" => ActionFn(1447);
+        assert!(__symbols.len() >= 5);
+        let __sym4 = __pop_Variant0(__symbols);
+        let __sym3 = __pop_Variant18(__symbols);
+        let __sym2 = __pop_Variant0(__symbols);
+        let __sym1 = __pop_Variant31(__symbols);
+        let __sym0 = __pop_Variant0(__symbols);
+        let __start = __sym0.0.clone();
+        let __end = __sym4.2.clone();
+        let __nt = super::__action1447::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
+        (5, 261)
+    }
+    pub(crate) fn __reduce869<
+    >(
+        __lookahead_start: Option<&TextSize>,
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
+        _: core::marker::PhantomData<()>,
+    ) -> (usize, usize)
+    {
+        // WithItems = "(", WithItem<"as">, ")" => ActionFn(1448);
+        assert!(__symbols.len() >= 3);
+        let __sym2 = __pop_Variant0(__symbols);
+        let __sym1 = __pop_Variant18(__symbols);
+        let __sym0 = __pop_Variant0(__symbols);
+        let __start = __sym0.0.clone();
+        let __end = __sym2.2.clone();
+        let __nt = super::__action1448::<>(__sym0, __sym1, __sym2);
+        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
+        (3, 261)
+    }
+    pub(crate) fn __reduce870<
+    >(
+        __lookahead_start: Option<&TextSize>,
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
+        _: core::marker::PhantomData<()>,
+    ) -> (usize, usize)
+    {
+        // WithItems = "(", OneOrMore<Test<"all">>, ",", WithItem<"as">, ("," <WithItem<"all">>)+, ")" => ActionFn(1449);
+        assert!(__symbols.len() >= 6);
+        let __sym5 = __pop_Variant0(__symbols);
+        let __sym4 = __pop_Variant19(__symbols);
+        let __sym3 = __pop_Variant18(__symbols);
+        let __sym2 = __pop_Variant0(__symbols);
+        let __sym1 = __pop_Variant31(__symbols);
+        let __sym0 = __pop_Variant0(__symbols);
+        let __start = __sym0.0.clone();
+        let __end = __sym5.2.clone();
+        let __nt = super::__action1449::<>(__sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
+        __symbols.push((__start, __Symbol::Variant38(__nt), __end));
+        (6, 261)
+    }
     pub(crate) fn __reduce871<
     >(
         __lookahead_start: Option<&TextSize>,
@@ -23148,7 +23148,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItems = "(", WithItem<"as">, ("," <WithItem<"all">>)+, ")" => ActionFn(1444);
+        // WithItems = "(", WithItem<"as">, ("," <WithItem<"all">>)+, ")" => ActionFn(1450);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant19(__symbols);
@@ -23156,7 +23156,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action1444::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action1450::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (4, 261)
     }
@@ -23199,11 +23199,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithItemsNoAs = OneOrMore<Test<"all">> => ActionFn(1428);
+        // WithItemsNoAs = OneOrMore<Test<"all">> => ActionFn(1434);
         let __sym0 = __pop_Variant31(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1428::<>(__sym0);
+        let __nt = super::__action1434::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (1, 262)
     }
@@ -23214,7 +23214,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithStatement = "async", "with", WithItems, ":", Suite => ActionFn(910);
+        // WithStatement = "async", "with", WithItems, ":", Suite => ActionFn(913);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -23223,7 +23223,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym4.2.clone();
-        let __nt = super::__action910::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
+        let __nt = super::__action913::<>(__sym0, __sym1, __sym2, __sym3, __sym4);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 263)
     }
@@ -23234,7 +23234,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // WithStatement = "with", WithItems, ":", Suite => ActionFn(911);
+        // WithStatement = "with", WithItems, ":", Suite => ActionFn(914);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant25(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -23242,7 +23242,7 @@ mod __parse__Top {
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym3.2.clone();
-        let __nt = super::__action911::<>(__sym0, __sym1, __sym2, __sym3);
+        let __nt = super::__action914::<>(__sym0, __sym1, __sym2, __sym3);
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 263)
     }
@@ -23253,14 +23253,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // XorExpression<"all"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1429);
+        // XorExpression<"all"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1435);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1429::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1435::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 264)
     }
@@ -23286,14 +23286,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // XorExpression<"no-withitems"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1430);
+        // XorExpression<"no-withitems"> = XorExpression<"all">, "^", AndExpression<"all"> => ActionFn(1436);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1430::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1436::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 265)
     }
@@ -23319,13 +23319,13 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // YieldExpr = "yield", GenericList<TestOrStarExpr> => ActionFn(1660);
+        // YieldExpr = "yield", GenericList<TestOrStarExpr> => ActionFn(1666);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym1.2.clone();
-        let __nt = super::__action1660::<>(__sym0, __sym1);
+        let __nt = super::__action1666::<>(__sym0, __sym1);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 266)
     }
@@ -23336,11 +23336,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // YieldExpr = "yield" => ActionFn(1661);
+        // YieldExpr = "yield" => ActionFn(1667);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
-        let __nt = super::__action1661::<>(__sym0);
+        let __nt = super::__action1667::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 266)
     }
@@ -23351,14 +23351,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // YieldExpr = "yield", "from", Test<"all"> => ActionFn(1432);
+        // YieldExpr = "yield", "from", Test<"all"> => ActionFn(1438);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0.clone();
         let __end = __sym2.2.clone();
-        let __nt = super::__action1432::<>(__sym0, __sym1, __sym2);
+        let __nt = super::__action1438::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 266)
     }
@@ -24079,22 +24079,26 @@ fn __action65<
 {
     {
         // Star import all
-        vec![ast::Alias { name: ast::Identifier::new("*"), asname: None, range: (location..end_location).into() }]
+        vec![ast::Alias { name: ast::Identifier::new("*", (location..end_location).into()), asname: None, range: (location..end_location).into() }]
     }
 }
 
 fn __action66<
 >(
+    (_, location, _): (TextSize, TextSize, TextSize),
     (_, n, _): (TextSize, String, TextSize),
+    (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
-    ast::Identifier::new(n)
+    ast::Identifier::new(n, (location..end_location).into())
 }
 
 fn __action67<
 >(
+    (_, location, _): (TextSize, TextSize, TextSize),
     (_, n, _): (TextSize, String, TextSize),
     (_, n2, _): (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
+    (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
     {
@@ -24103,7 +24107,7 @@ fn __action67<
             r.push('.');
             r.push_str(x.1.as_str());
         }
-        ast::Identifier::new(r)
+        ast::Identifier::new(r, (location..end_location).into())
     }
 }
 
@@ -24760,12 +24764,12 @@ fn __action115<
 fn __action116<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, name, _): (TextSize, ast::Identifier, TextSize),
+    (_, id, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
     ast::Expr::Name(
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load, range: (location..end_location).into() },
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() },
     )
 }
 
@@ -25765,7 +25769,7 @@ fn __action170<
         ast::Expr::NamedExpr(
             ast::ExprNamedExpr {
                 target: Box::new(ast::Expr::Name(
-                    ast::ExprName { id, ctx: ast::ExprContext::Store, range: (location..end_location).into() },
+                    ast::ExprName { id: id.into(), ctx: ast::ExprContext::Store, range: (location..end_location).into() },
                 )),
                 range: (location..value.end()).into(),
                 value: Box::new(value),
@@ -26313,10 +26317,12 @@ fn __action223<
 
 fn __action224<
 >(
+    (_, location, _): (TextSize, TextSize, TextSize),
     (_, s, _): (TextSize, String, TextSize),
+    (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
-    ast::Identifier::new(s)
+    ast::Identifier::new(s, (location..end_location).into())
 }
 
 fn __action225<
@@ -29177,12 +29183,12 @@ fn __action501<
 fn __action502<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, name, _): (TextSize, ast::Identifier, TextSize),
+    (_, id, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
     ast::Expr::Name(
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load, range: (location..end_location).into() }
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() }
     )
 }
 
@@ -29734,12 +29740,12 @@ fn __action546<
 fn __action547<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, name, _): (TextSize, ast::Identifier, TextSize),
+    (_, id, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
     ast::Expr::Name(
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load, range: (location..end_location).into() }
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() }
     )
 }
 
@@ -34853,6 +34859,48 @@ fn __action761<
 
 fn __action762<
 >(
+    __0: (TextSize, String, TextSize),
+    __1: (TextSize, TextSize, TextSize),
+) -> ast::Identifier
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.0.clone();
+    let __temp0 = __action373(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action66(
+        __temp0,
+        __0,
+        __1,
+    )
+}
+
+fn __action763<
+>(
+    __0: (TextSize, String, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
+    __2: (TextSize, TextSize, TextSize),
+) -> ast::Identifier
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.0.clone();
+    let __temp0 = __action373(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action67(
+        __temp0,
+        __0,
+        __1,
+        __2,
+    )
+}
+
+fn __action764<
+>(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
@@ -34873,7 +34921,7 @@ fn __action762<
     )
 }
 
-fn __action763<
+fn __action765<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
@@ -34897,7 +34945,7 @@ fn __action763<
     )
 }
 
-fn __action764<
+fn __action766<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, (ast::Expr, ast::Identifier), TextSize),
@@ -34921,7 +34969,7 @@ fn __action764<
     )
 }
 
-fn __action765<
+fn __action767<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -34947,7 +34995,7 @@ fn __action765<
     )
 }
 
-fn __action766<
+fn __action768<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -34973,7 +35021,7 @@ fn __action766<
     )
 }
 
-fn __action767<
+fn __action769<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -34997,7 +35045,7 @@ fn __action767<
     )
 }
 
-fn __action768<
+fn __action770<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35021,7 +35069,7 @@ fn __action768<
     )
 }
 
-fn __action769<
+fn __action771<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
@@ -35043,7 +35091,7 @@ fn __action769<
     )
 }
 
-fn __action770<
+fn __action772<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -35067,7 +35115,7 @@ fn __action770<
     )
 }
 
-fn __action771<
+fn __action773<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35093,7 +35141,7 @@ fn __action771<
     )
 }
 
-fn __action772<
+fn __action774<
 >(
     __0: (TextSize, ast::UnaryOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -35115,7 +35163,7 @@ fn __action772<
     )
 }
 
-fn __action773<
+fn __action775<
 >(
     __0: (TextSize, ast::UnaryOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -35137,7 +35185,7 @@ fn __action773<
     )
 }
 
-fn __action774<
+fn __action776<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35157,7 +35205,7 @@ fn __action774<
     )
 }
 
-fn __action775<
+fn __action777<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35177,7 +35225,7 @@ fn __action775<
     )
 }
 
-fn __action776<
+fn __action778<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
@@ -35199,7 +35247,7 @@ fn __action776<
     )
 }
 
-fn __action777<
+fn __action779<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35219,7 +35267,7 @@ fn __action777<
     )
 }
 
-fn __action778<
+fn __action780<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35251,7 +35299,7 @@ fn __action778<
     )
 }
 
-fn __action779<
+fn __action781<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -35281,7 +35329,7 @@ fn __action779<
     )
 }
 
-fn __action780<
+fn __action782<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35313,7 +35361,7 @@ fn __action780<
     )
 }
 
-fn __action781<
+fn __action783<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35343,7 +35391,7 @@ fn __action781<
     )
 }
 
-fn __action782<
+fn __action784<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Comprehension>>, TextSize),
@@ -35365,7 +35413,7 @@ fn __action782<
     )
 }
 
-fn __action783<
+fn __action785<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35389,7 +35437,7 @@ fn __action783<
     )
 }
 
-fn __action784<
+fn __action786<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -35411,7 +35459,7 @@ fn __action784<
     )
 }
 
-fn __action785<
+fn __action787<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -35433,7 +35481,7 @@ fn __action785<
     )
 }
 
-fn __action786<
+fn __action788<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35455,7 +35503,7 @@ fn __action786<
     )
 }
 
-fn __action787<
+fn __action789<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35475,7 +35523,7 @@ fn __action787<
     )
 }
 
-fn __action788<
+fn __action790<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35497,7 +35545,7 @@ fn __action788<
     )
 }
 
-fn __action789<
+fn __action791<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35517,7 +35565,7 @@ fn __action789<
     )
 }
 
-fn __action790<
+fn __action792<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Identifier>, TextSize),
@@ -35539,7 +35587,27 @@ fn __action790<
     )
 }
 
-fn __action791<
+fn __action793<
+>(
+    __0: (TextSize, String, TextSize),
+    __1: (TextSize, TextSize, TextSize),
+) -> ast::Identifier
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.0.clone();
+    let __temp0 = __action373(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action224(
+        __temp0,
+        __0,
+        __1,
+    )
+}
+
+fn __action794<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -35567,7 +35635,7 @@ fn __action791<
     )
 }
 
-fn __action792<
+fn __action795<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Identifier>, TextSize),
@@ -35589,7 +35657,7 @@ fn __action792<
     )
 }
 
-fn __action793<
+fn __action796<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Identifier>, TextSize),
@@ -35611,7 +35679,7 @@ fn __action793<
     )
 }
 
-fn __action794<
+fn __action797<
 >(
     __0: (TextSize, Vec<ast::Alias>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35631,7 +35699,7 @@ fn __action794<
     )
 }
 
-fn __action795<
+fn __action798<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Alias>, TextSize),
@@ -35657,7 +35725,7 @@ fn __action795<
     )
 }
 
-fn __action796<
+fn __action799<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Alias>, TextSize),
@@ -35681,7 +35749,7 @@ fn __action796<
     )
 }
 
-fn __action797<
+fn __action800<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35701,7 +35769,7 @@ fn __action797<
     )
 }
 
-fn __action798<
+fn __action801<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Alias>, TextSize),
@@ -35723,7 +35791,7 @@ fn __action798<
     )
 }
 
-fn __action799<
+fn __action802<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, (Option<ast::Int>, Option<ast::Identifier>), TextSize),
@@ -35749,7 +35817,7 @@ fn __action799<
     )
 }
 
-fn __action800<
+fn __action803<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
@@ -35775,7 +35843,7 @@ fn __action800<
     )
 }
 
-fn __action801<
+fn __action804<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35795,7 +35863,7 @@ fn __action801<
     )
 }
 
-fn __action802<
+fn __action805<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35815,7 +35883,7 @@ fn __action802<
     )
 }
 
-fn __action803<
+fn __action806<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35835,7 +35903,7 @@ fn __action803<
     )
 }
 
-fn __action804<
+fn __action807<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35855,7 +35923,7 @@ fn __action804<
     )
 }
 
-fn __action805<
+fn __action808<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35875,7 +35943,7 @@ fn __action805<
     )
 }
 
-fn __action806<
+fn __action809<
 >(
     __0: (TextSize, alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35895,7 +35963,7 @@ fn __action806<
     )
 }
 
-fn __action807<
+fn __action810<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35915,7 +35983,7 @@ fn __action807<
     )
 }
 
-fn __action808<
+fn __action811<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35935,7 +36003,7 @@ fn __action808<
     )
 }
 
-fn __action809<
+fn __action812<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -35955,7 +36023,7 @@ fn __action809<
     )
 }
 
-fn __action810<
+fn __action813<
 >(
     __0: (TextSize, alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -35973,7 +36041,7 @@ fn __action810<
     )
 }
 
-fn __action811<
+fn __action814<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -35995,7 +36063,7 @@ fn __action811<
     )
 }
 
-fn __action812<
+fn __action815<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
@@ -36021,7 +36089,7 @@ fn __action812<
     )
 }
 
-fn __action813<
+fn __action816<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
@@ -36045,7 +36113,7 @@ fn __action813<
     )
 }
 
-fn __action814<
+fn __action817<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36073,7 +36141,7 @@ fn __action814<
     )
 }
 
-fn __action815<
+fn __action818<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36099,7 +36167,7 @@ fn __action815<
     )
 }
 
-fn __action816<
+fn __action819<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
@@ -36131,7 +36199,7 @@ fn __action816<
     )
 }
 
-fn __action817<
+fn __action820<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
@@ -36161,7 +36229,7 @@ fn __action817<
     )
 }
 
-fn __action818<
+fn __action821<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -36187,7 +36255,7 @@ fn __action818<
     )
 }
 
-fn __action819<
+fn __action822<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -36207,7 +36275,7 @@ fn __action819<
     )
 }
 
-fn __action820<
+fn __action823<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36231,7 +36299,7 @@ fn __action820<
     )
 }
 
-fn __action821<
+fn __action824<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36255,7 +36323,7 @@ fn __action821<
     )
 }
 
-fn __action822<
+fn __action825<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -36285,7 +36353,7 @@ fn __action822<
     )
 }
 
-fn __action823<
+fn __action826<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -36317,7 +36385,7 @@ fn __action823<
     )
 }
 
-fn __action824<
+fn __action827<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -36349,7 +36417,7 @@ fn __action824<
     )
 }
 
-fn __action825<
+fn __action828<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -36379,7 +36447,7 @@ fn __action825<
     )
 }
 
-fn __action826<
+fn __action829<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -36403,7 +36471,7 @@ fn __action826<
     )
 }
 
-fn __action827<
+fn __action830<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Identifier>, TextSize),
@@ -36425,7 +36493,7 @@ fn __action827<
     )
 }
 
-fn __action828<
+fn __action831<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -36447,7 +36515,7 @@ fn __action828<
     )
 }
 
-fn __action829<
+fn __action832<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -36469,7 +36537,7 @@ fn __action829<
     )
 }
 
-fn __action830<
+fn __action833<
 >(
     __0: (TextSize, Vec<ast::Pattern>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -36489,7 +36557,7 @@ fn __action830<
     )
 }
 
-fn __action831<
+fn __action834<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -36511,7 +36579,7 @@ fn __action831<
     )
 }
 
-fn __action832<
+fn __action835<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -36533,7 +36601,7 @@ fn __action832<
     )
 }
 
-fn __action833<
+fn __action836<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
@@ -36557,7 +36625,7 @@ fn __action833<
     )
 }
 
-fn __action834<
+fn __action837<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
@@ -36579,7 +36647,7 @@ fn __action834<
     )
 }
 
-fn __action835<
+fn __action838<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36605,7 +36673,7 @@ fn __action835<
     )
 }
 
-fn __action836<
+fn __action839<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36629,7 +36697,7 @@ fn __action836<
     )
 }
 
-fn __action837<
+fn __action840<
 >(
     __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36651,7 +36719,7 @@ fn __action837<
     )
 }
 
-fn __action838<
+fn __action841<
 >(
     __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -36671,7 +36739,7 @@ fn __action838<
     )
 }
 
-fn __action839<
+fn __action842<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36693,7 +36761,7 @@ fn __action839<
     )
 }
 
-fn __action840<
+fn __action843<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -36713,7 +36781,7 @@ fn __action840<
     )
 }
 
-fn __action841<
+fn __action844<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
@@ -36737,7 +36805,7 @@ fn __action841<
     )
 }
 
-fn __action842<
+fn __action845<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
@@ -36759,7 +36827,7 @@ fn __action842<
     )
 }
 
-fn __action843<
+fn __action846<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36785,7 +36853,7 @@ fn __action843<
     )
 }
 
-fn __action844<
+fn __action847<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36809,7 +36877,7 @@ fn __action844<
     )
 }
 
-fn __action845<
+fn __action848<
 >(
     __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36831,7 +36899,7 @@ fn __action845<
     )
 }
 
-fn __action846<
+fn __action849<
 >(
     __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -36851,7 +36919,7 @@ fn __action846<
     )
 }
 
-fn __action847<
+fn __action850<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36873,7 +36941,7 @@ fn __action847<
     )
 }
 
-fn __action848<
+fn __action851<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -36893,7 +36961,7 @@ fn __action848<
     )
 }
 
-fn __action849<
+fn __action852<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -36917,7 +36985,7 @@ fn __action849<
     )
 }
 
-fn __action850<
+fn __action853<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -36939,7 +37007,7 @@ fn __action850<
     )
 }
 
-fn __action851<
+fn __action854<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -36965,7 +37033,7 @@ fn __action851<
     )
 }
 
-fn __action852<
+fn __action855<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
@@ -36989,7 +37057,7 @@ fn __action852<
     )
 }
 
-fn __action853<
+fn __action856<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -37009,7 +37077,7 @@ fn __action853<
     )
 }
 
-fn __action854<
+fn __action857<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -37027,7 +37095,7 @@ fn __action854<
     )
 }
 
-fn __action855<
+fn __action858<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -37049,7 +37117,7 @@ fn __action855<
     )
 }
 
-fn __action856<
+fn __action859<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
@@ -37069,7 +37137,7 @@ fn __action856<
     )
 }
 
-fn __action857<
+fn __action860<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
@@ -37093,7 +37161,7 @@ fn __action857<
     )
 }
 
-fn __action858<
+fn __action861<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
@@ -37119,7 +37187,7 @@ fn __action858<
     )
 }
 
-fn __action859<
+fn __action862<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
@@ -37139,7 +37207,7 @@ fn __action859<
     )
 }
 
-fn __action860<
+fn __action863<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
@@ -37161,7 +37229,7 @@ fn __action860<
     )
 }
 
-fn __action861<
+fn __action864<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
@@ -37185,7 +37253,7 @@ fn __action861<
     )
 }
 
-fn __action862<
+fn __action865<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -37205,7 +37273,7 @@ fn __action862<
     )
 }
 
-fn __action863<
+fn __action866<
 >(
     __0: (TextSize, ast::Pattern, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37227,7 +37295,7 @@ fn __action863<
     )
 }
 
-fn __action864<
+fn __action867<
 >(
     __0: (TextSize, Vec<ast::Pattern>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37249,7 +37317,7 @@ fn __action864<
     )
 }
 
-fn __action865<
+fn __action868<
 >(
     __0: (TextSize, Vec<ast::Pattern>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -37269,7 +37337,7 @@ fn __action865<
     )
 }
 
-fn __action866<
+fn __action869<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37293,7 +37361,7 @@ fn __action866<
     )
 }
 
-fn __action867<
+fn __action870<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37317,7 +37385,7 @@ fn __action867<
     )
 }
 
-fn __action868<
+fn __action871<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -37337,7 +37405,7 @@ fn __action868<
     )
 }
 
-fn __action869<
+fn __action872<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -37361,7 +37429,7 @@ fn __action869<
     )
 }
 
-fn __action870<
+fn __action873<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -37385,7 +37453,7 @@ fn __action870<
     )
 }
 
-fn __action871<
+fn __action874<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37407,7 +37475,7 @@ fn __action871<
     )
 }
 
-fn __action872<
+fn __action875<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -37433,7 +37501,7 @@ fn __action872<
     )
 }
 
-fn __action873<
+fn __action876<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
@@ -37461,7 +37529,7 @@ fn __action873<
     )
 }
 
-fn __action874<
+fn __action877<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
@@ -37487,7 +37555,7 @@ fn __action874<
     )
 }
 
-fn __action875<
+fn __action878<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Pattern>, TextSize),
@@ -37511,7 +37579,7 @@ fn __action875<
     )
 }
 
-fn __action876<
+fn __action879<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -37535,7 +37603,7 @@ fn __action876<
     )
 }
 
-fn __action877<
+fn __action880<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -37559,7 +37627,7 @@ fn __action877<
     )
 }
 
-fn __action878<
+fn __action881<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37589,7 +37657,7 @@ fn __action878<
     )
 }
 
-fn __action879<
+fn __action882<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -37617,7 +37685,7 @@ fn __action879<
     )
 }
 
-fn __action880<
+fn __action883<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
@@ -37637,7 +37705,7 @@ fn __action880<
     )
 }
 
-fn __action881<
+fn __action884<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -37659,7 +37727,7 @@ fn __action881<
     )
 }
 
-fn __action882<
+fn __action885<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -37681,7 +37749,7 @@ fn __action882<
     )
 }
 
-fn __action883<
+fn __action886<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
@@ -37703,7 +37771,7 @@ fn __action883<
     )
 }
 
-fn __action884<
+fn __action887<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -37723,7 +37791,7 @@ fn __action884<
     )
 }
 
-fn __action885<
+fn __action888<
 >(
     __0: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37749,7 +37817,7 @@ fn __action885<
     )
 }
 
-fn __action886<
+fn __action889<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -37769,7 +37837,7 @@ fn __action886<
     )
 }
 
-fn __action887<
+fn __action890<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37791,7 +37859,7 @@ fn __action887<
     )
 }
 
-fn __action888<
+fn __action891<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37813,7 +37881,7 @@ fn __action888<
     )
 }
 
-fn __action889<
+fn __action892<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -37833,7 +37901,7 @@ fn __action889<
     )
 }
 
-fn __action890<
+fn __action893<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -37857,7 +37925,7 @@ fn __action890<
     )
 }
 
-fn __action891<
+fn __action894<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -37881,7 +37949,7 @@ fn __action891<
     )
 }
 
-fn __action892<
+fn __action895<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37909,7 +37977,7 @@ fn __action892<
     )
 }
 
-fn __action893<
+fn __action896<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -37937,7 +38005,7 @@ fn __action893<
     )
 }
 
-fn __action894<
+fn __action897<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Suite, TextSize),
@@ -37959,7 +38027,7 @@ fn __action894<
     )
 }
 
-fn __action895<
+fn __action898<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Suite, TextSize),
@@ -37981,7 +38049,7 @@ fn __action895<
     )
 }
 
-fn __action896<
+fn __action899<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -38005,7 +38073,7 @@ fn __action896<
     )
 }
 
-fn __action897<
+fn __action900<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38035,7 +38103,7 @@ fn __action897<
     )
 }
 
-fn __action898<
+fn __action901<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38065,7 +38133,7 @@ fn __action898<
     )
 }
 
-fn __action899<
+fn __action902<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38089,7 +38157,7 @@ fn __action899<
     )
 }
 
-fn __action900<
+fn __action903<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
@@ -38111,7 +38179,7 @@ fn __action900<
     )
 }
 
-fn __action901<
+fn __action904<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -38131,7 +38199,7 @@ fn __action901<
     )
 }
 
-fn __action902<
+fn __action905<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -38151,7 +38219,7 @@ fn __action902<
     )
 }
 
-fn __action903<
+fn __action906<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -38177,7 +38245,7 @@ fn __action903<
     )
 }
 
-fn __action904<
+fn __action907<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -38197,7 +38265,7 @@ fn __action904<
     )
 }
 
-fn __action905<
+fn __action908<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38221,7 +38289,7 @@ fn __action905<
     )
 }
 
-fn __action906<
+fn __action909<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38245,7 +38313,7 @@ fn __action906<
     )
 }
 
-fn __action907<
+fn __action910<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -38265,7 +38333,7 @@ fn __action907<
     )
 }
 
-fn __action908<
+fn __action911<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38289,7 +38357,7 @@ fn __action908<
     )
 }
 
-fn __action909<
+fn __action912<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -38309,7 +38377,7 @@ fn __action909<
     )
 }
 
-fn __action910<
+fn __action913<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38335,7 +38403,7 @@ fn __action910<
     )
 }
 
-fn __action911<
+fn __action914<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::WithItem>, TextSize),
@@ -38359,7 +38427,7 @@ fn __action911<
     )
 }
 
-fn __action912<
+fn __action915<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38383,7 +38451,7 @@ fn __action912<
     )
 }
 
-fn __action913<
+fn __action916<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38407,7 +38475,7 @@ fn __action913<
     )
 }
 
-fn __action914<
+fn __action917<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
@@ -38429,7 +38497,7 @@ fn __action914<
     )
 }
 
-fn __action915<
+fn __action918<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38453,83 +38521,11 @@ fn __action915<
     )
 }
 
-fn __action916<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action849(
-        __1,
-        __2,
-        __3,
-        __4,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action398(
-        __0,
-        __temp0,
-    ))
-}
-
-fn __action917<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action850(
-        __1,
-        __2,
-        __3,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action398(
-        __0,
-        __temp0,
-    ))
-}
-
-fn __action918<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action851(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action398(
-        __0,
-        __temp0,
-    ))
-}
-
 fn __action919<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -38553,14 +38549,16 @@ fn __action920<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
+    let __end0 = __3.2.clone();
     let __temp0 = __action853(
         __1,
         __2,
+        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
     Ok(__action398(
@@ -38573,12 +38571,20 @@ fn __action921<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __1.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action854(
         __1,
+        __2,
+        __3,
+        __4,
+        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
     Ok(__action398(
@@ -38591,16 +38597,18 @@ fn __action922<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action855(
         __1,
         __2,
         __3,
+        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
     Ok(__action398(
@@ -38613,7 +38621,7 @@ fn __action923<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
@@ -38632,6 +38640,66 @@ fn __action923<
 fn __action924<
 >(
     __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action857(
+        __1,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action398(
+        __0,
+        __temp0,
+    ))
+}
+
+fn __action925<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action858(
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action398(
+        __0,
+        __temp0,
+    ))
+}
+
+fn __action926<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action859(
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action398(
+        __0,
+        __temp0,
+    ))
+}
+
+fn __action927<
+>(
+    __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
@@ -38641,21 +38709,21 @@ fn __action924<
 {
     let __start0 = __0.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action849(
+    let __temp0 = __action852(
         __0,
         __1,
         __2,
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
+    Ok(__action840(
         __temp0,
         __4,
         __5,
     ))
 }
 
-fn __action925<
+fn __action928<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -38666,20 +38734,20 @@ fn __action925<
 {
     let __start0 = __0.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action850(
+    let __temp0 = __action853(
         __0,
         __1,
         __2,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
+    Ok(__action840(
         __temp0,
         __3,
         __4,
     ))
 }
 
-fn __action926<
+fn __action929<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -38692,7 +38760,7 @@ fn __action926<
 {
     let __start0 = __0.0.clone();
     let __end0 = __4.2.clone();
-    let __temp0 = __action851(
+    let __temp0 = __action854(
         __0,
         __1,
         __2,
@@ -38700,14 +38768,14 @@ fn __action926<
         __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
+    Ok(__action840(
         __temp0,
         __5,
         __6,
     ))
 }
 
-fn __action927<
+fn __action930<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
@@ -38719,90 +38787,24 @@ fn __action927<
 {
     let __start0 = __0.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action852(
+    let __temp0 = __action855(
         __0,
         __1,
         __2,
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
+    Ok(__action840(
         __temp0,
         __4,
         __5,
     ))
 }
 
-fn __action928<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action853(
-        __0,
-        __1,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
-        __temp0,
-        __2,
-        __3,
-    ))
-}
-
-fn __action929<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action854(
-        __0,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
-        __temp0,
-        __1,
-        __2,
-    ))
-}
-
-fn __action930<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action855(
-        __0,
-        __1,
-        __2,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
-        __temp0,
-        __3,
-        __4,
-    ))
-}
-
 fn __action931<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -38814,7 +38816,7 @@ fn __action931<
         __1,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action837(
+    Ok(__action840(
         __temp0,
         __2,
         __3,
@@ -38824,79 +38826,73 @@ fn __action931<
 fn __action932<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __4: (TextSize, TextSize, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action849(
+    let __end0 = __0.2.clone();
+    let __temp0 = __action857(
         __0,
-        __1,
-        __2,
-        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action840(
         __temp0,
-        __4,
+        __1,
+        __2,
     ))
 }
 
 fn __action933<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __3: (TextSize, TextSize, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action850(
+    let __temp0 = __action858(
         __0,
         __1,
         __2,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action840(
         __temp0,
         __3,
+        __4,
     ))
 }
 
 fn __action934<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action851(
+    let __end0 = __1.2.clone();
+    let __temp0 = __action859(
         __0,
         __1,
-        __2,
-        __3,
-        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action840(
         __temp0,
-        __5,
+        __2,
+        __3,
     ))
 }
 
 fn __action935<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
@@ -38911,7 +38907,7 @@ fn __action935<
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action841(
         __temp0,
         __4,
     ))
@@ -38920,67 +38916,79 @@ fn __action935<
 fn __action936<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, TextSize, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __1.2.clone();
+    let __end0 = __2.2.clone();
     let __temp0 = __action853(
         __0,
         __1,
+        __2,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action841(
         __temp0,
-        __2,
+        __3,
     ))
 }
 
 fn __action937<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, TextSize, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action854(
         __0,
+        __1,
+        __2,
+        __3,
+        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action841(
         __temp0,
-        __1,
+        __5,
     ))
 }
 
 fn __action938<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
+    let __end0 = __3.2.clone();
     let __temp0 = __action855(
         __0,
         __1,
         __2,
+        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action841(
         __temp0,
-        __3,
+        __4,
     ))
 }
 
 fn __action939<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -38991,7 +38999,7 @@ fn __action939<
         __1,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action838(
+    Ok(__action841(
         __temp0,
         __2,
     ))
@@ -39000,72 +39008,60 @@ fn __action939<
 fn __action940<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action916(
+    let __end0 = __0.2.clone();
+    let __temp0 = __action857(
         __0,
-        __1,
-        __2,
-        __3,
-        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action396(
+    Ok(__action841(
         __temp0,
+        __1,
     ))
 }
 
 fn __action941<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action917(
+    let __end0 = __2.2.clone();
+    let __temp0 = __action858(
         __0,
         __1,
         __2,
-        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action396(
+    Ok(__action841(
         __temp0,
+        __3,
     ))
 }
 
 fn __action942<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action918(
+    let __end0 = __1.2.clone();
+    let __temp0 = __action859(
         __0,
         __1,
-        __2,
-        __3,
-        __4,
-        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action396(
+    Ok(__action841(
         __temp0,
+        __2,
     ))
 }
 
@@ -39073,7 +39069,7 @@ fn __action943<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -39097,51 +39093,13 @@ fn __action944<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action920(
-        __0,
-        __1,
-        __2,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action396(
-        __temp0,
-    ))
-}
-
-fn __action945<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action921(
-        __0,
-        __1,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action396(
-        __temp0,
-    ))
-}
-
-fn __action946<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action922(
+    let __temp0 = __action920(
         __0,
         __1,
         __2,
@@ -39153,11 +39111,61 @@ fn __action946<
     ))
 }
 
-fn __action947<
+fn __action945<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __5.2.clone();
+    let __temp0 = __action921(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action396(
+        __temp0,
+    ))
+}
+
+fn __action946<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action922(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action396(
+        __temp0,
+    ))
+}
+
+fn __action947<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
 ) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
@@ -39175,6 +39183,66 @@ fn __action947<
 
 fn __action948<
 >(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action924(
+        __0,
+        __1,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action396(
+        __temp0,
+    ))
+}
+
+fn __action949<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action925(
+        __0,
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action396(
+        __temp0,
+    ))
+}
+
+fn __action950<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action926(
+        __0,
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action396(
+        __temp0,
+    ))
+}
+
+fn __action951<
+>(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
@@ -39187,7 +39255,7 @@ fn __action948<
 {
     let __start0 = __1.0.clone();
     let __end0 = __5.2.clone();
-    let __temp0 = __action940(
+    let __temp0 = __action943(
         __1,
         __2,
         __3,
@@ -39195,7 +39263,7 @@ fn __action948<
         __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action833(
+    __action836(
         __0,
         __temp0,
         __6,
@@ -39203,7 +39271,7 @@ fn __action948<
     )
 }
 
-fn __action949<
+fn __action952<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -39216,14 +39284,14 @@ fn __action949<
 {
     let __start0 = __1.0.clone();
     let __end0 = __4.2.clone();
-    let __temp0 = __action941(
+    let __temp0 = __action944(
         __1,
         __2,
         __3,
         __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action833(
+    __action836(
         __0,
         __temp0,
         __5,
@@ -39231,7 +39299,7 @@ fn __action949<
     )
 }
 
-fn __action950<
+fn __action953<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -39246,7 +39314,7 @@ fn __action950<
 {
     let __start0 = __1.0.clone();
     let __end0 = __6.2.clone();
-    let __temp0 = __action942(
+    let __temp0 = __action945(
         __1,
         __2,
         __3,
@@ -39255,7 +39323,7 @@ fn __action950<
         __6,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action833(
+    __action836(
         __0,
         __temp0,
         __7,
@@ -39263,7 +39331,7 @@ fn __action950<
     )
 }
 
-fn __action951<
+fn __action954<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -39277,97 +39345,19 @@ fn __action951<
 {
     let __start0 = __1.0.clone();
     let __end0 = __5.2.clone();
-    let __temp0 = __action943(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action833(
-        __0,
-        __temp0,
-        __6,
-        __7,
-    )
-}
-
-fn __action952<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action944(
-        __1,
-        __2,
-        __3,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action833(
-        __0,
-        __temp0,
-        __4,
-        __5,
-    )
-}
-
-fn __action953<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action945(
-        __1,
-        __2,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action833(
-        __0,
-        __temp0,
-        __3,
-        __4,
-    )
-}
-
-fn __action954<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
     let __temp0 = __action946(
         __1,
         __2,
         __3,
         __4,
+        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action833(
+    __action836(
         __0,
         __temp0,
-        __5,
         __6,
+        __7,
     )
 }
 
@@ -39376,7 +39366,7 @@ fn __action955<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -39389,7 +39379,7 @@ fn __action955<
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action833(
+    __action836(
         __0,
         __temp0,
         __4,
@@ -39398,6 +39388,84 @@ fn __action955<
 }
 
 fn __action956<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action948(
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action836(
+        __0,
+        __temp0,
+        __3,
+        __4,
+    )
+}
+
+fn __action957<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action949(
+        __1,
+        __2,
+        __3,
+        __4,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action836(
+        __0,
+        __temp0,
+        __5,
+        __6,
+    )
+}
+
+fn __action958<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action950(
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action836(
+        __0,
+        __temp0,
+        __4,
+        __5,
+    )
+}
+
+fn __action959<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -39411,95 +39479,11 @@ fn __action956<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action833(
+    __action836(
         __0,
         __temp0,
         __1,
         __2,
-    )
-}
-
-fn __action957<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action940(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action834(
-        __0,
-        __temp0,
-        __6,
-    )
-}
-
-fn __action958<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action941(
-        __1,
-        __2,
-        __3,
-        __4,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action834(
-        __0,
-        __temp0,
-        __5,
-    )
-}
-
-fn __action959<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action942(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action834(
-        __0,
-        __temp0,
-        __7,
     )
 }
 
@@ -39508,7 +39492,7 @@ fn __action960<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __6: (TextSize, TextSize, TextSize),
@@ -39524,7 +39508,7 @@ fn __action960<
         __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action834(
+    __action837(
         __0,
         __temp0,
         __6,
@@ -39536,22 +39520,24 @@ fn __action961<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, TextSize, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action944(
         __1,
         __2,
         __3,
+        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action834(
+    __action837(
         __0,
         __temp0,
-        __4,
+        __5,
     )
 }
 
@@ -39560,20 +39546,28 @@ fn __action962<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, TextSize, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
+    let __end0 = __6.2.clone();
     let __temp0 = __action945(
         __1,
         __2,
+        __3,
+        __4,
+        __5,
+        __6,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action834(
+    __action837(
         __0,
         __temp0,
-        __3,
+        __7,
     )
 }
 
@@ -39582,24 +39576,26 @@ fn __action963<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, TextSize, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action946(
         __1,
         __2,
         __3,
         __4,
+        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action834(
+    __action837(
         __0,
         __temp0,
-        __5,
+        __6,
     )
 }
 
@@ -39608,7 +39604,7 @@ fn __action964<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -39620,7 +39616,7 @@ fn __action964<
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action834(
+    __action837(
         __0,
         __temp0,
         __4,
@@ -39628,6 +39624,78 @@ fn __action964<
 }
 
 fn __action965<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action948(
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action837(
+        __0,
+        __temp0,
+        __3,
+    )
+}
+
+fn __action966<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action949(
+        __1,
+        __2,
+        __3,
+        __4,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action837(
+        __0,
+        __temp0,
+        __5,
+    )
+}
+
+fn __action967<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action950(
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action837(
+        __0,
+        __temp0,
+        __4,
+    )
+}
+
+fn __action968<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -39640,14 +39708,14 @@ fn __action965<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action834(
+    __action837(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action966<
+fn __action969<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -39665,7 +39733,7 @@ fn __action966<
     )
 }
 
-fn __action967<
+fn __action970<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> Option<Box<ast::Arg>>
@@ -39683,7 +39751,7 @@ fn __action967<
     )
 }
 
-fn __action968<
+fn __action971<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -39697,7 +39765,7 @@ fn __action968<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action857(
+    __action860(
         __0,
         __temp0,
         __2,
@@ -39705,7 +39773,7 @@ fn __action968<
     )
 }
 
-fn __action969<
+fn __action972<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -39719,7 +39787,7 @@ fn __action969<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action857(
+    __action860(
         __0,
         __temp0,
         __1,
@@ -39727,7 +39795,7 @@ fn __action969<
     )
 }
 
-fn __action970<
+fn __action973<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -39742,7 +39810,7 @@ fn __action970<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action858(
+    __action861(
         __0,
         __temp0,
         __2,
@@ -39751,7 +39819,7 @@ fn __action970<
     )
 }
 
-fn __action971<
+fn __action974<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
@@ -39766,7 +39834,7 @@ fn __action971<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action858(
+    __action861(
         __0,
         __temp0,
         __1,
@@ -39775,7 +39843,7 @@ fn __action971<
     )
 }
 
-fn __action972<
+fn __action975<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -39787,13 +39855,13 @@ fn __action972<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action859(
+    __action862(
         __0,
         __temp0,
     )
 }
 
-fn __action973<
+fn __action976<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -39805,13 +39873,13 @@ fn __action973<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action859(
+    __action862(
         __0,
         __temp0,
     )
 }
 
-fn __action974<
+fn __action977<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -39824,14 +39892,14 @@ fn __action974<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action860(
+    __action863(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action975<
+fn __action978<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
@@ -39844,90 +39912,18 @@ fn __action975<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action860(
+    __action863(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action976<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action968(
-        __1,
-        __2,
-        __3,
-        __4,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action406(
-        __0,
-        __temp0,
-    ))
-}
-
-fn __action977<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action969(
-        __1,
-        __2,
-        __3,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action406(
-        __0,
-        __temp0,
-    ))
-}
-
-fn __action978<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action970(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action406(
-        __0,
-        __temp0,
-    ))
-}
-
 fn __action979<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -39951,14 +39947,16 @@ fn __action980<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
+    let __end0 = __3.2.clone();
     let __temp0 = __action972(
         __1,
         __2,
+        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
     Ok(__action406(
@@ -39971,12 +39969,20 @@ fn __action981<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __1.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action973(
         __1,
+        __2,
+        __3,
+        __4,
+        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
     Ok(__action406(
@@ -39989,16 +39995,18 @@ fn __action982<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action974(
         __1,
         __2,
         __3,
+        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
     Ok(__action406(
@@ -40011,7 +40019,7 @@ fn __action983<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
 ) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
@@ -40030,6 +40038,66 @@ fn __action983<
 fn __action984<
 >(
     __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action976(
+        __1,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action406(
+        __0,
+        __temp0,
+    ))
+}
+
+fn __action985<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action977(
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action406(
+        __0,
+        __temp0,
+    ))
+}
+
+fn __action986<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action978(
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action406(
+        __0,
+        __temp0,
+    ))
+}
+
+fn __action987<
+>(
+    __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
@@ -40039,21 +40107,21 @@ fn __action984<
 {
     let __start0 = __0.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action968(
+    let __temp0 = __action971(
         __0,
         __1,
         __2,
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
+    Ok(__action848(
         __temp0,
         __4,
         __5,
     ))
 }
 
-fn __action985<
+fn __action988<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -40064,20 +40132,20 @@ fn __action985<
 {
     let __start0 = __0.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action969(
+    let __temp0 = __action972(
         __0,
         __1,
         __2,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
+    Ok(__action848(
         __temp0,
         __3,
         __4,
     ))
 }
 
-fn __action986<
+fn __action989<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -40090,7 +40158,7 @@ fn __action986<
 {
     let __start0 = __0.0.clone();
     let __end0 = __4.2.clone();
-    let __temp0 = __action970(
+    let __temp0 = __action973(
         __0,
         __1,
         __2,
@@ -40098,14 +40166,14 @@ fn __action986<
         __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
+    Ok(__action848(
         __temp0,
         __5,
         __6,
     ))
 }
 
-fn __action987<
+fn __action990<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
@@ -40117,90 +40185,24 @@ fn __action987<
 {
     let __start0 = __0.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action971(
+    let __temp0 = __action974(
         __0,
         __1,
         __2,
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
+    Ok(__action848(
         __temp0,
         __4,
         __5,
     ))
 }
 
-fn __action988<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action972(
-        __0,
-        __1,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
-        __temp0,
-        __2,
-        __3,
-    ))
-}
-
-fn __action989<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action973(
-        __0,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
-        __temp0,
-        __1,
-        __2,
-    ))
-}
-
-fn __action990<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action974(
-        __0,
-        __1,
-        __2,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
-        __temp0,
-        __3,
-        __4,
-    ))
-}
-
 fn __action991<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -40212,7 +40214,7 @@ fn __action991<
         __1,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action845(
+    Ok(__action848(
         __temp0,
         __2,
         __3,
@@ -40222,79 +40224,73 @@ fn __action991<
 fn __action992<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __4: (TextSize, TextSize, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action968(
+    let __end0 = __0.2.clone();
+    let __temp0 = __action976(
         __0,
-        __1,
-        __2,
-        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action848(
         __temp0,
-        __4,
+        __1,
+        __2,
     ))
 }
 
 fn __action993<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __3: (TextSize, TextSize, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action969(
+    let __temp0 = __action977(
         __0,
         __1,
         __2,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action848(
         __temp0,
         __3,
+        __4,
     ))
 }
 
 fn __action994<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action970(
+    let __end0 = __1.2.clone();
+    let __temp0 = __action978(
         __0,
         __1,
-        __2,
-        __3,
-        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action848(
         __temp0,
-        __5,
+        __2,
+        __3,
     ))
 }
 
 fn __action995<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
@@ -40309,7 +40305,7 @@ fn __action995<
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action849(
         __temp0,
         __4,
     ))
@@ -40318,67 +40314,79 @@ fn __action995<
 fn __action996<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, TextSize, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __1.2.clone();
+    let __end0 = __2.2.clone();
     let __temp0 = __action972(
         __0,
         __1,
+        __2,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action849(
         __temp0,
-        __2,
+        __3,
     ))
 }
 
 fn __action997<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, TextSize, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action973(
         __0,
+        __1,
+        __2,
+        __3,
+        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action849(
         __temp0,
-        __1,
+        __5,
     ))
 }
 
 fn __action998<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
+    let __end0 = __3.2.clone();
     let __temp0 = __action974(
         __0,
         __1,
         __2,
+        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action849(
         __temp0,
-        __3,
+        __4,
     ))
 }
 
 fn __action999<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -40389,7 +40397,7 @@ fn __action999<
         __1,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action846(
+    Ok(__action849(
         __temp0,
         __2,
     ))
@@ -40398,72 +40406,60 @@ fn __action999<
 fn __action1000<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __4.2.clone();
+    let __end0 = __0.2.clone();
     let __temp0 = __action976(
         __0,
-        __1,
-        __2,
-        __3,
-        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action404(
+    Ok(__action849(
         __temp0,
+        __1,
     ))
 }
 
 fn __action1001<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __3.2.clone();
+    let __end0 = __2.2.clone();
     let __temp0 = __action977(
         __0,
         __1,
         __2,
-        __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action404(
+    Ok(__action849(
         __temp0,
+        __3,
     ))
 }
 
 fn __action1002<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __5.2.clone();
+    let __end0 = __1.2.clone();
     let __temp0 = __action978(
         __0,
         __1,
-        __2,
-        __3,
-        __4,
-        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action404(
+    Ok(__action849(
         __temp0,
+        __2,
     ))
 }
 
@@ -40471,7 +40467,7 @@ fn __action1003<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -40495,51 +40491,13 @@ fn __action1004<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action980(
-        __0,
-        __1,
-        __2,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action404(
-        __temp0,
-    ))
-}
-
-fn __action1005<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action981(
-        __0,
-        __1,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    Ok(__action404(
-        __temp0,
-    ))
-}
-
-fn __action1006<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action982(
+    let __temp0 = __action980(
         __0,
         __1,
         __2,
@@ -40551,11 +40509,61 @@ fn __action1006<
     ))
 }
 
-fn __action1007<
+fn __action1005<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __5.2.clone();
+    let __temp0 = __action981(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action404(
+        __temp0,
+    ))
+}
+
+fn __action1006<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action982(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action404(
+        __temp0,
+    ))
+}
+
+fn __action1007<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
 ) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
@@ -40573,6 +40581,66 @@ fn __action1007<
 
 fn __action1008<
 >(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action984(
+        __0,
+        __1,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action404(
+        __temp0,
+    ))
+}
+
+fn __action1009<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action985(
+        __0,
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action404(
+        __temp0,
+    ))
+}
+
+fn __action1010<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action986(
+        __0,
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    Ok(__action404(
+        __temp0,
+    ))
+}
+
+fn __action1011<
+>(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
@@ -40585,7 +40653,7 @@ fn __action1008<
 {
     let __start0 = __1.0.clone();
     let __end0 = __5.2.clone();
-    let __temp0 = __action1000(
+    let __temp0 = __action1003(
         __1,
         __2,
         __3,
@@ -40593,7 +40661,7 @@ fn __action1008<
         __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action841(
+    __action844(
         __0,
         __temp0,
         __6,
@@ -40601,7 +40669,7 @@ fn __action1008<
     )
 }
 
-fn __action1009<
+fn __action1012<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -40614,14 +40682,14 @@ fn __action1009<
 {
     let __start0 = __1.0.clone();
     let __end0 = __4.2.clone();
-    let __temp0 = __action1001(
+    let __temp0 = __action1004(
         __1,
         __2,
         __3,
         __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action841(
+    __action844(
         __0,
         __temp0,
         __5,
@@ -40629,7 +40697,7 @@ fn __action1009<
     )
 }
 
-fn __action1010<
+fn __action1013<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -40644,7 +40712,7 @@ fn __action1010<
 {
     let __start0 = __1.0.clone();
     let __end0 = __6.2.clone();
-    let __temp0 = __action1002(
+    let __temp0 = __action1005(
         __1,
         __2,
         __3,
@@ -40653,7 +40721,7 @@ fn __action1010<
         __6,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action841(
+    __action844(
         __0,
         __temp0,
         __7,
@@ -40661,7 +40729,7 @@ fn __action1010<
     )
 }
 
-fn __action1011<
+fn __action1014<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -40675,97 +40743,19 @@ fn __action1011<
 {
     let __start0 = __1.0.clone();
     let __end0 = __5.2.clone();
-    let __temp0 = __action1003(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action841(
-        __0,
-        __temp0,
-        __6,
-        __7,
-    )
-}
-
-fn __action1012<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action1004(
-        __1,
-        __2,
-        __3,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action841(
-        __0,
-        __temp0,
-        __4,
-        __5,
-    )
-}
-
-fn __action1013<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1005(
-        __1,
-        __2,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action841(
-        __0,
-        __temp0,
-        __3,
-        __4,
-    )
-}
-
-fn __action1014<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
     let __temp0 = __action1006(
         __1,
         __2,
         __3,
         __4,
+        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action841(
+    __action844(
         __0,
         __temp0,
-        __5,
         __6,
+        __7,
     )
 }
 
@@ -40774,7 +40764,7 @@ fn __action1015<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -40787,7 +40777,7 @@ fn __action1015<
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action841(
+    __action844(
         __0,
         __temp0,
         __4,
@@ -40796,6 +40786,84 @@ fn __action1015<
 }
 
 fn __action1016<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1008(
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action844(
+        __0,
+        __temp0,
+        __3,
+        __4,
+    )
+}
+
+fn __action1017<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action1009(
+        __1,
+        __2,
+        __3,
+        __4,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action844(
+        __0,
+        __temp0,
+        __5,
+        __6,
+    )
+}
+
+fn __action1018<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action1010(
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action844(
+        __0,
+        __temp0,
+        __4,
+        __5,
+    )
+}
+
+fn __action1019<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -40809,95 +40877,11 @@ fn __action1016<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action841(
+    __action844(
         __0,
         __temp0,
         __1,
         __2,
-    )
-}
-
-fn __action1017<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action1000(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action842(
-        __0,
-        __temp0,
-        __6,
-    )
-}
-
-fn __action1018<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action1001(
-        __1,
-        __2,
-        __3,
-        __4,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action842(
-        __0,
-        __temp0,
-        __5,
-    )
-}
-
-fn __action1019<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action1002(
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-    )?;
-    let __temp0 = (__start0, __temp0, __end0);
-    __action842(
-        __0,
-        __temp0,
-        __7,
     )
 }
 
@@ -40906,7 +40890,7 @@ fn __action1020<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __6: (TextSize, TextSize, TextSize),
@@ -40922,7 +40906,7 @@ fn __action1020<
         __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action842(
+    __action845(
         __0,
         __temp0,
         __6,
@@ -40934,22 +40918,24 @@ fn __action1021<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, TextSize, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __3.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action1004(
         __1,
         __2,
         __3,
+        __4,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action842(
+    __action845(
         __0,
         __temp0,
-        __4,
+        __5,
     )
 }
 
@@ -40958,20 +40944,28 @@ fn __action1022<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, TextSize, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
+    let __end0 = __6.2.clone();
     let __temp0 = __action1005(
         __1,
         __2,
+        __3,
+        __4,
+        __5,
+        __6,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action842(
+    __action845(
         __0,
         __temp0,
-        __3,
+        __7,
     )
 }
 
@@ -40980,24 +40974,26 @@ fn __action1023<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, TextSize, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
-    let __end0 = __4.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action1006(
         __1,
         __2,
         __3,
         __4,
+        __5,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action842(
+    __action845(
         __0,
         __temp0,
-        __5,
+        __6,
     )
 }
 
@@ -41006,7 +41002,7 @@ fn __action1024<
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -41018,7 +41014,7 @@ fn __action1024<
         __3,
     )?;
     let __temp0 = (__start0, __temp0, __end0);
-    __action842(
+    __action845(
         __0,
         __temp0,
         __4,
@@ -41026,6 +41022,78 @@ fn __action1024<
 }
 
 fn __action1025<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1008(
+        __1,
+        __2,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action845(
+        __0,
+        __temp0,
+        __3,
+    )
+}
+
+fn __action1026<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action1009(
+        __1,
+        __2,
+        __3,
+        __4,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action845(
+        __0,
+        __temp0,
+        __5,
+    )
+}
+
+fn __action1027<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, TextSize, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action1010(
+        __1,
+        __2,
+        __3,
+    )?;
+    let __temp0 = (__start0, __temp0, __end0);
+    __action845(
+        __0,
+        __temp0,
+        __4,
+    )
+}
+
+fn __action1028<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -41038,14 +41106,14 @@ fn __action1025<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action842(
+    __action845(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1026<
+fn __action1029<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41063,7 +41131,7 @@ fn __action1026<
     )
 }
 
-fn __action1027<
+fn __action1030<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41074,7 +41142,7 @@ fn __action1027<
 {
     let __start0 = __2.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action1026(
+    let __temp0 = __action1029(
         __2,
         __3,
     );
@@ -41087,7 +41155,7 @@ fn __action1027<
     )
 }
 
-fn __action1028<
+fn __action1031<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41109,7 +41177,7 @@ fn __action1028<
     )
 }
 
-fn __action1029<
+fn __action1032<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41127,7 +41195,7 @@ fn __action1029<
     )
 }
 
-fn __action1030<
+fn __action1033<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41147,109 +41215,29 @@ fn __action1030<
     )
 }
 
-fn __action1031<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __3.0.clone();
-    let __temp0 = __action525(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action700(
-        __0,
-        __1,
-        __2,
-        __temp0,
-        __3,
-        __4,
-        __5,
-    )
-}
-
-fn __action1032<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __3.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action526(
-        __3,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action700(
-        __0,
-        __1,
-        __2,
-        __temp0,
-        __4,
-        __5,
-        __6,
-    )
-}
-
-fn __action1033<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __3.0.clone();
-    let __temp0 = __action525(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action701(
-        __0,
-        __1,
-        __2,
-        __temp0,
-        __3,
-        __4,
-    )
-}
-
 fn __action1034<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __3.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action526(
-        __3,
+    let __start0 = __2.2.clone();
+    let __end0 = __3.0.clone();
+    let __temp0 = __action525(
+        &__start0,
+        &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action701(
+    __action700(
         __0,
         __1,
         __2,
         __temp0,
+        __3,
         __4,
         __5,
     )
@@ -41260,6 +41248,86 @@ fn __action1035<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __3.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action526(
+        __3,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action700(
+        __0,
+        __1,
+        __2,
+        __temp0,
+        __4,
+        __5,
+        __6,
+    )
+}
+
+fn __action1036<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __3.0.clone();
+    let __temp0 = __action525(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action701(
+        __0,
+        __1,
+        __2,
+        __temp0,
+        __3,
+        __4,
+    )
+}
+
+fn __action1037<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __3.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action526(
+        __3,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action701(
+        __0,
+        __1,
+        __2,
+        __temp0,
+        __4,
+        __5,
+    )
+}
+
+fn __action1038<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
@@ -41283,7 +41351,7 @@ fn __action1035<
     )
 }
 
-fn __action1036<
+fn __action1039<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
@@ -41311,7 +41379,7 @@ fn __action1036<
     )
 }
 
-fn __action1037<
+fn __action1040<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
@@ -41337,7 +41405,7 @@ fn __action1037<
     )
 }
 
-fn __action1038<
+fn __action1041<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
@@ -41363,7 +41431,7 @@ fn __action1038<
     )
 }
 
-fn __action1039<
+fn __action1042<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::WithItem, TextSize),
@@ -41381,7 +41449,7 @@ fn __action1039<
     )
 }
 
-fn __action1040<
+fn __action1043<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41401,7 +41469,7 @@ fn __action1040<
     )
 }
 
-fn __action1041<
+fn __action1044<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
@@ -41427,7 +41495,7 @@ fn __action1041<
     )
 }
 
-fn __action1042<
+fn __action1045<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
@@ -41453,7 +41521,7 @@ fn __action1042<
     )
 }
 
-fn __action1043<
+fn __action1046<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
@@ -41477,7 +41545,7 @@ fn __action1043<
     )
 }
 
-fn __action1044<
+fn __action1047<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::WithItem>>, TextSize),
@@ -41501,7 +41569,7 @@ fn __action1044<
     )
 }
 
-fn __action1045<
+fn __action1048<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41519,7 +41587,7 @@ fn __action1045<
     )
 }
 
-fn __action1046<
+fn __action1049<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41534,12 +41602,12 @@ fn __action1046<
 {
     let __start0 = __5.0.clone();
     let __end0 = __6.2.clone();
-    let __temp0 = __action1045(
+    let __temp0 = __action1048(
         __5,
         __6,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action780(
+    __action782(
         __0,
         __1,
         __2,
@@ -41551,7 +41619,7 @@ fn __action1046<
     )
 }
 
-fn __action1047<
+fn __action1050<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41569,7 +41637,7 @@ fn __action1047<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action780(
+    __action782(
         __0,
         __1,
         __2,
@@ -41581,7 +41649,7 @@ fn __action1047<
     )
 }
 
-fn __action1048<
+fn __action1051<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41595,12 +41663,12 @@ fn __action1048<
 {
     let __start0 = __4.0.clone();
     let __end0 = __5.2.clone();
-    let __temp0 = __action1045(
+    let __temp0 = __action1048(
         __4,
         __5,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action781(
+    __action783(
         __0,
         __1,
         __2,
@@ -41611,7 +41679,7 @@ fn __action1048<
     )
 }
 
-fn __action1049<
+fn __action1052<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41628,7 +41696,7 @@ fn __action1049<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action781(
+    __action783(
         __0,
         __1,
         __2,
@@ -41639,7 +41707,7 @@ fn __action1049<
     )
 }
 
-fn __action1050<
+fn __action1053<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -41657,7 +41725,7 @@ fn __action1050<
     )
 }
 
-fn __action1051<
+fn __action1054<
 >(
     __0: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41677,7 +41745,7 @@ fn __action1051<
     )
 }
 
-fn __action1052<
+fn __action1055<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41695,91 +41763,91 @@ fn __action1052<
     )
 }
 
-fn __action1053<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, TextSize, TextSize),
-) -> ast::Arg
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1052(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action762(
-        __0,
-        __temp0,
-        __3,
-    )
-}
-
-fn __action1054<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, TextSize, TextSize),
-) -> ast::Arg
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action261(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action762(
-        __0,
-        __temp0,
-        __1,
-    )
-}
-
-fn __action1055<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1052(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action900(
-        __0,
-        __temp0,
-        __3,
-    )
-}
-
 fn __action1056<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> ast::Arg
 {
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action261(
-        &__start0,
-        &__end0,
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1055(
+        __1,
+        __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action900(
+    __action764(
         __0,
         __temp0,
-        __1,
+        __3,
     )
 }
 
 fn __action1057<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, TextSize, TextSize),
+) -> ast::Arg
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action261(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action764(
+        __0,
+        __temp0,
+        __1,
+    )
+}
+
+fn __action1058<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> ast::ArgWithDefault
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1055(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action903(
+        __0,
+        __temp0,
+        __3,
+    )
+}
+
+fn __action1059<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, TextSize, TextSize),
+) -> ast::ArgWithDefault
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action261(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action903(
+        __0,
+        __temp0,
+        __1,
+    )
+}
+
+fn __action1060<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41797,7 +41865,7 @@ fn __action1057<
     )
 }
 
-fn __action1058<
+fn __action1061<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41807,19 +41875,19 @@ fn __action1058<
 {
     let __start0 = __1.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1057(
+    let __temp0 = __action1060(
         __1,
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action883(
+    __action886(
         __0,
         __temp0,
         __3,
     )
 }
 
-fn __action1059<
+fn __action1062<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
@@ -41832,14 +41900,14 @@ fn __action1059<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action883(
+    __action886(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1060<
+fn __action1063<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> alloc::vec::Vec<token::Tok>
@@ -41855,7 +41923,7 @@ fn __action1060<
     )
 }
 
-fn __action1061<
+fn __action1064<
 >(
     __0: (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -41873,7 +41941,7 @@ fn __action1061<
     )
 }
 
-fn __action1062<
+fn __action1065<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41887,7 +41955,7 @@ fn __action1062<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action896(
+    __action899(
         __0,
         __1,
         __temp0,
@@ -41895,7 +41963,7 @@ fn __action1062<
     )
 }
 
-fn __action1063<
+fn __action1066<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -41909,7 +41977,7 @@ fn __action1063<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action896(
+    __action899(
         __0,
         __1,
         __temp0,
@@ -41917,7 +41985,7 @@ fn __action1063<
     )
 }
 
-fn __action1064<
+fn __action1067<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -41935,91 +42003,91 @@ fn __action1064<
     )
 }
 
-fn __action1065<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, TextSize, TextSize),
-) -> ast::Alias
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1064(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action792(
-        __0,
-        __temp0,
-        __3,
-    )
-}
-
-fn __action1066<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, TextSize, TextSize),
-) -> ast::Alias
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action381(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action792(
-        __0,
-        __temp0,
-        __1,
-    )
-}
-
-fn __action1067<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, TextSize, TextSize),
-) -> ast::Alias
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1064(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action793(
-        __0,
-        __temp0,
-        __3,
-    )
-}
-
 fn __action1068<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, TextSize, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+    __3: (TextSize, TextSize, TextSize),
 ) -> ast::Alias
 {
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action381(
-        &__start0,
-        &__end0,
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1067(
+        __1,
+        __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action793(
+    __action795(
         __0,
         __temp0,
-        __1,
+        __3,
     )
 }
 
 fn __action1069<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, TextSize, TextSize),
+) -> ast::Alias
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action381(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action795(
+        __0,
+        __temp0,
+        __1,
+    )
+}
+
+fn __action1070<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> ast::Alias
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1067(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action796(
+        __0,
+        __temp0,
+        __3,
+    )
+}
+
+fn __action1071<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, TextSize, TextSize),
+) -> ast::Alias
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action381(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action796(
+        __0,
+        __temp0,
+        __1,
+    )
+}
+
+fn __action1072<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42039,7 +42107,7 @@ fn __action1069<
     )
 }
 
-fn __action1070<
+fn __action1073<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42055,13 +42123,13 @@ fn __action1070<
 {
     let __start0 = __7.0.clone();
     let __end0 = __9.2.clone();
-    let __temp0 = __action1069(
+    let __temp0 = __action1072(
         __7,
         __8,
         __9,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action778(
+    __action780(
         __0,
         __1,
         __2,
@@ -42073,7 +42141,7 @@ fn __action1070<
     )
 }
 
-fn __action1071<
+fn __action1074<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42091,7 +42159,7 @@ fn __action1071<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action778(
+    __action780(
         __0,
         __1,
         __2,
@@ -42103,7 +42171,7 @@ fn __action1071<
     )
 }
 
-fn __action1072<
+fn __action1075<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42118,13 +42186,13 @@ fn __action1072<
 {
     let __start0 = __6.0.clone();
     let __end0 = __8.2.clone();
-    let __temp0 = __action1069(
+    let __temp0 = __action1072(
         __6,
         __7,
         __8,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action779(
+    __action781(
         __0,
         __1,
         __2,
@@ -42135,7 +42203,7 @@ fn __action1072<
     )
 }
 
-fn __action1073<
+fn __action1076<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42152,7 +42220,7 @@ fn __action1073<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action779(
+    __action781(
         __0,
         __1,
         __2,
@@ -42163,7 +42231,7 @@ fn __action1073<
     )
 }
 
-fn __action1074<
+fn __action1077<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42177,13 +42245,13 @@ fn __action1074<
 {
     let __start0 = __5.0.clone();
     let __end0 = __7.2.clone();
-    let __temp0 = __action1069(
+    let __temp0 = __action1072(
         __5,
         __6,
         __7,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action791(
+    __action794(
         __0,
         __1,
         __2,
@@ -42193,7 +42261,7 @@ fn __action1074<
     )
 }
 
-fn __action1075<
+fn __action1078<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42209,105 +42277,13 @@ fn __action1075<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action791(
+    __action794(
         __0,
         __1,
         __2,
         __3,
         __4,
         __temp0,
-    )
-}
-
-fn __action1076<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Suite, TextSize),
-    __7: (TextSize, core::option::Option<ast::Suite>, TextSize),
-    __8: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __4.0.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action1069(
-        __4,
-        __5,
-        __6,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action897(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-        __7,
-        __8,
-    )
-}
-
-fn __action1077<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
-    __5: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __4.0.clone();
-    let __temp0 = __action303(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action897(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-        __4,
-        __5,
-    )
-}
-
-fn __action1078<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Suite, TextSize),
-    __7: (TextSize, core::option::Option<ast::Suite>, TextSize),
-    __8: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __4.0.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action1069(
-        __4,
-        __5,
-        __6,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action898(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-        __7,
-        __8,
     )
 }
 
@@ -42317,6 +42293,38 @@ fn __action1079<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Suite, TextSize),
     __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, ast::Suite, TextSize),
+    __7: (TextSize, core::option::Option<ast::Suite>, TextSize),
+    __8: (TextSize, TextSize, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __4.0.clone();
+    let __end0 = __6.2.clone();
+    let __temp0 = __action1072(
+        __4,
+        __5,
+        __6,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action900(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+        __7,
+        __8,
+    )
+}
+
+fn __action1080<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
     __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
@@ -42328,7 +42336,7 @@ fn __action1079<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action898(
+    __action900(
         __0,
         __1,
         __2,
@@ -42339,7 +42347,67 @@ fn __action1079<
     )
 }
 
-fn __action1080<
+fn __action1081<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, ast::Suite, TextSize),
+    __7: (TextSize, core::option::Option<ast::Suite>, TextSize),
+    __8: (TextSize, TextSize, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __4.0.clone();
+    let __end0 = __6.2.clone();
+    let __temp0 = __action1072(
+        __4,
+        __5,
+        __6,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action901(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+        __7,
+        __8,
+    )
+}
+
+fn __action1082<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __4.0.clone();
+    let __temp0 = __action303(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action901(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+        __4,
+        __5,
+    )
+}
+
+fn __action1083<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42352,13 +42420,13 @@ fn __action1080<
 {
     let __start0 = __4.0.clone();
     let __end0 = __6.2.clone();
-    let __temp0 = __action1069(
+    let __temp0 = __action1072(
         __4,
         __5,
         __6,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action903(
+    __action906(
         __0,
         __1,
         __2,
@@ -42367,7 +42435,7 @@ fn __action1080<
     )
 }
 
-fn __action1081<
+fn __action1084<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42382,7 +42450,7 @@ fn __action1081<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action903(
+    __action906(
         __0,
         __1,
         __2,
@@ -42391,7 +42459,7 @@ fn __action1081<
     )
 }
 
-fn __action1082<
+fn __action1085<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42411,7 +42479,7 @@ fn __action1082<
     )
 }
 
-fn __action1083<
+fn __action1086<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42429,7 +42497,7 @@ fn __action1083<
         __5,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action899(
+    __action902(
         __0,
         __1,
         __2,
@@ -42437,7 +42505,7 @@ fn __action1083<
     )
 }
 
-fn __action1084<
+fn __action1087<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42454,13 +42522,13 @@ fn __action1084<
 {
     let __start0 = __7.0.clone();
     let __end0 = __9.2.clone();
-    let __temp0 = __action1082(
+    let __temp0 = __action1085(
         __7,
         __8,
         __9,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1076(
+    __action1079(
         __0,
         __1,
         __2,
@@ -42473,7 +42541,7 @@ fn __action1084<
     )
 }
 
-fn __action1085<
+fn __action1088<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42492,7 +42560,7 @@ fn __action1085<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1076(
+    __action1079(
         __0,
         __1,
         __2,
@@ -42502,98 +42570,6 @@ fn __action1085<
         __6,
         __temp0,
         __7,
-    )
-}
-
-fn __action1086<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Suite, TextSize),
-    __7: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __4.0.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action1082(
-        __4,
-        __5,
-        __6,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1077(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-        __7,
-    )
-}
-
-fn __action1087<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __4.0.clone();
-    let __temp0 = __action296(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1077(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-        __4,
-    )
-}
-
-fn __action1088<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Suite, TextSize),
-    __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, token::Tok, TextSize),
-    __9: (TextSize, ast::Suite, TextSize),
-    __10: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __7.0.clone();
-    let __end0 = __9.2.clone();
-    let __temp0 = __action1082(
-        __7,
-        __8,
-        __9,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1078(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-        __temp0,
-        __10,
     )
 }
 
@@ -42609,57 +42585,25 @@ fn __action1089<
     __7: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
-    let __start0 = __6.2.clone();
-    let __end0 = __7.0.clone();
-    let __temp0 = __action296(
-        &__start0,
-        &__end0,
+    let __start0 = __4.0.clone();
+    let __end0 = __6.2.clone();
+    let __temp0 = __action1085(
+        __4,
+        __5,
+        __6,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1078(
+    __action1080(
         __0,
         __1,
         __2,
         __3,
-        __4,
-        __5,
-        __6,
         __temp0,
         __7,
     )
 }
 
 fn __action1090<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Suite, TextSize),
-    __7: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __4.0.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action1082(
-        __4,
-        __5,
-        __6,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1079(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-        __7,
-    )
-}
-
-fn __action1091<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42675,7 +42619,7 @@ fn __action1091<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1079(
+    __action1080(
         __0,
         __1,
         __2,
@@ -42685,7 +42629,131 @@ fn __action1091<
     )
 }
 
+fn __action1091<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, ast::Suite, TextSize),
+    __7: (TextSize, token::Tok, TextSize),
+    __8: (TextSize, token::Tok, TextSize),
+    __9: (TextSize, ast::Suite, TextSize),
+    __10: (TextSize, TextSize, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __7.0.clone();
+    let __end0 = __9.2.clone();
+    let __temp0 = __action1085(
+        __7,
+        __8,
+        __9,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1081(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __6,
+        __temp0,
+        __10,
+    )
+}
+
 fn __action1092<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, ast::Suite, TextSize),
+    __7: (TextSize, TextSize, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __6.2.clone();
+    let __end0 = __7.0.clone();
+    let __temp0 = __action296(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1081(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __6,
+        __temp0,
+        __7,
+    )
+}
+
+fn __action1093<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, ast::Suite, TextSize),
+    __7: (TextSize, TextSize, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __4.0.clone();
+    let __end0 = __6.2.clone();
+    let __temp0 = __action1085(
+        __4,
+        __5,
+        __6,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1082(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+        __7,
+    )
+}
+
+fn __action1094<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, TextSize, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __4.0.clone();
+    let __temp0 = __action296(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1082(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+        __4,
+    )
+}
+
+fn __action1095<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42703,7 +42771,7 @@ fn __action1092<
     )
 }
 
-fn __action1093<
+fn __action1096<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42714,12 +42782,12 @@ fn __action1093<
 {
     let __start0 = __2.0.clone();
     let __end0 = __3.2.clone();
-    let __temp0 = __action1092(
+    let __temp0 = __action1095(
         __2,
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action869(
+    __action872(
         __0,
         __1,
         __temp0,
@@ -42727,7 +42795,7 @@ fn __action1093<
     )
 }
 
-fn __action1094<
+fn __action1097<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42741,7 +42809,7 @@ fn __action1094<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action869(
+    __action872(
         __0,
         __1,
         __temp0,
@@ -42749,7 +42817,7 @@ fn __action1094<
     )
 }
 
-fn __action1095<
+fn __action1098<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42771,7 +42839,7 @@ fn __action1095<
     )
 }
 
-fn __action1096<
+fn __action1099<
 >(
     __0: (TextSize, alloc::vec::Vec<(TextSize, ast::Expr, ast::Suite)>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42795,7 +42863,7 @@ fn __action1096<
     )
 }
 
-fn __action1097<
+fn __action1100<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42813,7 +42881,7 @@ fn __action1097<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1074(
+    __action1077(
         __0,
         __1,
         __2,
@@ -42825,7 +42893,7 @@ fn __action1097<
     )
 }
 
-fn __action1098<
+fn __action1101<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42843,7 +42911,7 @@ fn __action1098<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1074(
+    __action1077(
         __0,
         __1,
         __2,
@@ -42855,7 +42923,7 @@ fn __action1098<
     )
 }
 
-fn __action1099<
+fn __action1102<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42870,7 +42938,7 @@ fn __action1099<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1075(
+    __action1078(
         __0,
         __1,
         __2,
@@ -42879,7 +42947,7 @@ fn __action1099<
     )
 }
 
-fn __action1100<
+fn __action1103<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42894,7 +42962,7 @@ fn __action1100<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1075(
+    __action1078(
         __0,
         __1,
         __2,
@@ -42903,7 +42971,7 @@ fn __action1100<
     )
 }
 
-fn __action1101<
+fn __action1104<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42921,7 +42989,7 @@ fn __action1101<
     )
 }
 
-fn __action1102<
+fn __action1105<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -42941,7 +43009,7 @@ fn __action1102<
     )
 }
 
-fn __action1103<
+fn __action1106<
 >(
     __0: (TextSize, (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -42959,7 +43027,7 @@ fn __action1103<
     )
 }
 
-fn __action1104<
+fn __action1107<
 >(
     __0: (TextSize, alloc::vec::Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
     __1: (TextSize, (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr), TextSize),
@@ -42979,7 +43047,7 @@ fn __action1104<
     )
 }
 
-fn __action1105<
+fn __action1108<
 >(
     __0: (TextSize, core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
 ) -> Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>
@@ -42997,7 +43065,7 @@ fn __action1105<
     )
 }
 
-fn __action1106<
+fn __action1109<
 >(
     __0: (TextSize, alloc::vec::Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
     __1: (TextSize, core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
@@ -43015,7 +43083,7 @@ fn __action1106<
     )
 }
 
-fn __action1107<
+fn __action1110<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -43033,7 +43101,7 @@ fn __action1107<
     )
 }
 
-fn __action1108<
+fn __action1111<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -43053,7 +43121,7 @@ fn __action1108<
     )
 }
 
-fn __action1109<
+fn __action1112<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -43071,7 +43139,7 @@ fn __action1109<
     )
 }
 
-fn __action1110<
+fn __action1113<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -43084,264 +43152,48 @@ fn __action1110<
 {
     let __start0 = __1.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
+    let __temp0 = __action1112(
         __1,
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1031(
+    __action1034(
         __0,
         __temp0,
         __3,
         __4,
         __5,
         __6,
-    )
-}
-
-fn __action1111<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action529(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1031(
-        __0,
-        __temp0,
-        __1,
-        __2,
-        __3,
-        __4,
-    )
-}
-
-fn __action1112<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Expr>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1032(
-        __0,
-        __temp0,
-        __3,
-        __4,
-        __5,
-        __6,
-        __7,
-    )
-}
-
-fn __action1113<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action529(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1032(
-        __0,
-        __temp0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
     )
 }
 
 fn __action1114<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, TextSize, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
-        __1,
-        __2,
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action529(
+        &__start0,
+        &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1033(
+    __action1034(
         __0,
         __temp0,
+        __1,
+        __2,
         __3,
         __4,
-        __5,
     )
 }
 
 fn __action1115<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action529(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1033(
-        __0,
-        __temp0,
-        __1,
-        __2,
-        __3,
-    )
-}
-
-fn __action1116<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Expr>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1034(
-        __0,
-        __temp0,
-        __3,
-        __4,
-        __5,
-        __6,
-    )
-}
-
-fn __action1117<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action529(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1034(
-        __0,
-        __temp0,
-        __1,
-        __2,
-        __3,
-        __4,
-    )
-}
-
-fn __action1118<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Expr>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1035(
-        __0,
-        __temp0,
-        __3,
-        __4,
-        __5,
-        __6,
-    )
-}
-
-fn __action1119<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action529(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1035(
-        __0,
-        __temp0,
-        __1,
-        __2,
-        __3,
-        __4,
-    )
-}
-
-fn __action1120<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -43355,12 +43207,12 @@ fn __action1120<
 {
     let __start0 = __1.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
+    let __temp0 = __action1112(
         __1,
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1036(
+    __action1035(
         __0,
         __temp0,
         __3,
@@ -43371,7 +43223,7 @@ fn __action1120<
     )
 }
 
-fn __action1121<
+fn __action1116<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -43388,7 +43240,7 @@ fn __action1121<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1036(
+    __action1035(
         __0,
         __temp0,
         __1,
@@ -43399,7 +43251,7 @@ fn __action1121<
     )
 }
 
-fn __action1122<
+fn __action1117<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -43411,7 +43263,58 @@ fn __action1122<
 {
     let __start0 = __1.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
+    let __temp0 = __action1112(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1036(
+        __0,
+        __temp0,
+        __3,
+        __4,
+        __5,
+    )
+}
+
+fn __action1118<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action529(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1036(
+        __0,
+        __temp0,
+        __1,
+        __2,
+        __3,
+    )
+}
+
+fn __action1119<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Expr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1112(
         __1,
         __2,
     );
@@ -43422,15 +43325,17 @@ fn __action1122<
         __3,
         __4,
         __5,
+        __6,
     )
 }
 
-fn __action1123<
+fn __action1120<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, TextSize, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2.clone();
@@ -43446,23 +43351,24 @@ fn __action1123<
         __1,
         __2,
         __3,
+        __4,
     )
 }
 
-fn __action1124<
+fn __action1121<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Expr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1109(
+    let __temp0 = __action1112(
         __1,
         __2,
     );
@@ -43477,11 +43383,11 @@ fn __action1124<
     )
 }
 
-fn __action1125<
+fn __action1122<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -43503,7 +43409,169 @@ fn __action1125<
     )
 }
 
+fn __action1123<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Expr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, token::Tok, TextSize),
+    __7: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1112(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1039(
+        __0,
+        __temp0,
+        __3,
+        __4,
+        __5,
+        __6,
+        __7,
+    )
+}
+
+fn __action1124<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action529(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1039(
+        __0,
+        __temp0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+    )
+}
+
+fn __action1125<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Expr, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1112(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1040(
+        __0,
+        __temp0,
+        __3,
+        __4,
+        __5,
+    )
+}
+
 fn __action1126<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action529(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1040(
+        __0,
+        __temp0,
+        __1,
+        __2,
+        __3,
+    )
+}
+
+fn __action1127<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Expr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1112(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1041(
+        __0,
+        __temp0,
+        __3,
+        __4,
+        __5,
+        __6,
+    )
+}
+
+fn __action1128<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, TextSize, TextSize),
+) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action529(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1041(
+        __0,
+        __temp0,
+        __1,
+        __2,
+        __3,
+        __4,
+    )
+}
+
+fn __action1129<
 >(
     __0: (TextSize, ast::Pattern, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -43521,7 +43589,7 @@ fn __action1126<
     )
 }
 
-fn __action1127<
+fn __action1130<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -43541,7 +43609,7 @@ fn __action1127<
     )
 }
 
-fn __action1128<
+fn __action1131<
 >(
     __0: (TextSize, core::option::Option<ast::Pattern>, TextSize),
 ) -> Vec<ast::Pattern>
@@ -43559,7 +43627,7 @@ fn __action1128<
     )
 }
 
-fn __action1129<
+fn __action1132<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
     __1: (TextSize, core::option::Option<ast::Pattern>, TextSize),
@@ -43577,7 +43645,7 @@ fn __action1129<
     )
 }
 
-fn __action1130<
+fn __action1133<
 >(
     __0: (TextSize, ast::Stmt, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -43595,7 +43663,7 @@ fn __action1130<
     )
 }
 
-fn __action1131<
+fn __action1134<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
     __1: (TextSize, ast::Stmt, TextSize),
@@ -43615,7 +43683,7 @@ fn __action1131<
     )
 }
 
-fn __action1132<
+fn __action1135<
 >(
     __0: (TextSize, ast::Suite, TextSize),
     __1: (TextSize, ast::Stmt, TextSize),
@@ -43639,7 +43707,7 @@ fn __action1132<
     )
 }
 
-fn __action1133<
+fn __action1136<
 >(
     __0: (TextSize, ast::Suite, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
@@ -43663,7 +43731,7 @@ fn __action1133<
     )
 }
 
-fn __action1134<
+fn __action1137<
 >(
     __0: (TextSize, ast::Suite, TextSize),
     __1: (TextSize, ast::Stmt, TextSize),
@@ -43685,7 +43753,7 @@ fn __action1134<
     )
 }
 
-fn __action1135<
+fn __action1138<
 >(
     __0: (TextSize, ast::Suite, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
@@ -43707,85 +43775,23 @@ fn __action1135<
     )
 }
 
-fn __action1136<
->(
-    __0: (TextSize, ast::Stmt, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Stmt>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.0.clone();
-    let __temp0 = __action366(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action631(
-        __temp0,
-        __0,
-        __1,
-        __2,
-    )
-}
-
-fn __action1137<
->(
-    __0: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
-    __1: (TextSize, ast::Stmt, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Stmt>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action367(
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action631(
-        __temp0,
-        __1,
-        __2,
-        __3,
-    )
-}
-
-fn __action1138<
->(
-    __0: (TextSize, ast::Stmt, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Stmt>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.0.clone();
-    let __temp0 = __action366(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action632(
-        __temp0,
-        __0,
-        __1,
-    )
-}
-
 fn __action1139<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
-    __1: (TextSize, ast::Stmt, TextSize),
+    __0: (TextSize, ast::Stmt, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> Vec<ast::Stmt>
 {
     let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action367(
-        __0,
+    let __end0 = __0.0.clone();
+    let __temp0 = __action366(
+        &__start0,
+        &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action632(
+    __action631(
         __temp0,
+        __0,
         __1,
         __2,
     )
@@ -43793,21 +43799,19 @@ fn __action1139<
 
 fn __action1140<
 >(
-    __0: (TextSize, Vec<ast::Stmt>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
     __1: (TextSize, ast::Stmt, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> Vec<ast::Stmt>
 {
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action366(
-        &__start0,
-        &__end0,
+    let __start0 = __0.0.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action367(
+        __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action633(
-        __0,
+    __action631(
         __temp0,
         __1,
         __2,
@@ -43817,6 +43821,70 @@ fn __action1140<
 
 fn __action1141<
 >(
+    __0: (TextSize, ast::Stmt, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::Stmt>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.0.clone();
+    let __temp0 = __action366(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action632(
+        __temp0,
+        __0,
+        __1,
+    )
+}
+
+fn __action1142<
+>(
+    __0: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
+    __1: (TextSize, ast::Stmt, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::Stmt>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action367(
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action632(
+        __temp0,
+        __1,
+        __2,
+    )
+}
+
+fn __action1143<
+>(
+    __0: (TextSize, Vec<ast::Stmt>, TextSize),
+    __1: (TextSize, ast::Stmt, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::Stmt>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action366(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action633(
+        __0,
+        __temp0,
+        __1,
+        __2,
+        __3,
+    )
+}
+
+fn __action1144<
+>(
     __0: (TextSize, Vec<ast::Stmt>, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
     __2: (TextSize, ast::Stmt, TextSize),
@@ -43839,7 +43907,7 @@ fn __action1141<
     )
 }
 
-fn __action1142<
+fn __action1145<
 >(
     __0: (TextSize, Vec<ast::Stmt>, TextSize),
     __1: (TextSize, ast::Stmt, TextSize),
@@ -43861,7 +43929,7 @@ fn __action1142<
     )
 }
 
-fn __action1143<
+fn __action1146<
 >(
     __0: (TextSize, Vec<ast::Stmt>, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
@@ -43883,7 +43951,7 @@ fn __action1143<
     )
 }
 
-fn __action1144<
+fn __action1147<
 >(
     __0: (TextSize, ast::Stmt, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -43905,7 +43973,7 @@ fn __action1144<
     )
 }
 
-fn __action1145<
+fn __action1148<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
     __1: (TextSize, ast::Stmt, TextSize),
@@ -43927,7 +43995,7 @@ fn __action1145<
     )
 }
 
-fn __action1146<
+fn __action1149<
 >(
     __0: (TextSize, ast::Stmt, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -43947,7 +44015,7 @@ fn __action1146<
     )
 }
 
-fn __action1147<
+fn __action1150<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Stmt>, TextSize),
     __1: (TextSize, ast::Stmt, TextSize),
@@ -43967,7 +44035,7 @@ fn __action1147<
     )
 }
 
-fn __action1148<
+fn __action1151<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -43985,7 +44053,7 @@ fn __action1148<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action764(
+    __action766(
         __0,
         __temp0,
         __4,
@@ -43993,7 +44061,7 @@ fn __action1148<
     )
 }
 
-fn __action1149<
+fn __action1152<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -44012,7 +44080,7 @@ fn __action1149<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action766(
+    __action768(
         __0,
         __1,
         __temp0,
@@ -44021,7 +44089,7 @@ fn __action1149<
     )
 }
 
-fn __action1150<
+fn __action1153<
 >(
     __0: (TextSize, (String, StringKind, bool), TextSize),
 ) -> (TextSize, (String, StringKind, bool), TextSize)
@@ -44039,7 +44107,7 @@ fn __action1150<
     )
 }
 
-fn __action1151<
+fn __action1154<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -44061,7 +44129,7 @@ fn __action1151<
     )
 }
 
-fn __action1152<
+fn __action1155<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -44083,7 +44151,7 @@ fn __action1152<
     )
 }
 
-fn __action1153<
+fn __action1156<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -44105,7 +44173,7 @@ fn __action1153<
     )
 }
 
-fn __action1154<
+fn __action1157<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44125,7 +44193,7 @@ fn __action1154<
     )
 }
 
-fn __action1155<
+fn __action1158<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44145,7 +44213,7 @@ fn __action1155<
     )
 }
 
-fn __action1156<
+fn __action1159<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -44167,7 +44235,7 @@ fn __action1156<
     )
 }
 
-fn __action1157<
+fn __action1160<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -44189,7 +44257,7 @@ fn __action1157<
     )
 }
 
-fn __action1158<
+fn __action1161<
 >(
     __0: (TextSize, ast::Pattern, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -44211,7 +44279,7 @@ fn __action1158<
     )
 }
 
-fn __action1159<
+fn __action1162<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44226,7 +44294,7 @@ fn __action1159<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1027(
+    __action1030(
         __0,
         __1,
         __2,
@@ -44235,7 +44303,7 @@ fn __action1159<
     )
 }
 
-fn __action1160<
+fn __action1163<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44248,14 +44316,14 @@ fn __action1160<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1028(
+    __action1031(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1161<
+fn __action1164<
 >(
     __0: (TextSize, ast::Constant, TextSize),
 ) -> ast::Expr
@@ -44273,7 +44341,7 @@ fn __action1161<
     )
 }
 
-fn __action1162<
+fn __action1165<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::Expr
@@ -44291,7 +44359,7 @@ fn __action1162<
     )
 }
 
-fn __action1163<
+fn __action1166<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
@@ -44313,7 +44381,7 @@ fn __action1163<
     )
 }
 
-fn __action1164<
+fn __action1167<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44337,7 +44405,7 @@ fn __action1164<
     )
 }
 
-fn __action1165<
+fn __action1168<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44361,7 +44429,7 @@ fn __action1165<
     )
 }
 
-fn __action1166<
+fn __action1169<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44383,7 +44451,7 @@ fn __action1166<
     )
 }
 
-fn __action1167<
+fn __action1170<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44400,7 +44468,7 @@ fn __action1167<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1110(
+    __action1113(
         __0,
         __1,
         __2,
@@ -44411,7 +44479,7 @@ fn __action1167<
     )
 }
 
-fn __action1168<
+fn __action1171<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44426,7 +44494,7 @@ fn __action1168<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1111(
+    __action1114(
         __0,
         __1,
         __2,
@@ -44435,7 +44503,7 @@ fn __action1168<
     )
 }
 
-fn __action1169<
+fn __action1172<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44453,7 +44521,7 @@ fn __action1169<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1112(
+    __action1115(
         __0,
         __1,
         __2,
@@ -44465,7 +44533,7 @@ fn __action1169<
     )
 }
 
-fn __action1170<
+fn __action1173<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44481,7 +44549,7 @@ fn __action1170<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1113(
+    __action1116(
         __0,
         __1,
         __2,
@@ -44491,7 +44559,7 @@ fn __action1170<
     )
 }
 
-fn __action1171<
+fn __action1174<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44507,7 +44575,7 @@ fn __action1171<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1114(
+    __action1117(
         __0,
         __1,
         __2,
@@ -44517,7 +44585,7 @@ fn __action1171<
     )
 }
 
-fn __action1172<
+fn __action1175<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44531,7 +44599,7 @@ fn __action1172<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1115(
+    __action1118(
         __0,
         __1,
         __2,
@@ -44539,7 +44607,7 @@ fn __action1172<
     )
 }
 
-fn __action1173<
+fn __action1176<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44556,7 +44624,7 @@ fn __action1173<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1116(
+    __action1119(
         __0,
         __1,
         __2,
@@ -44567,7 +44635,7 @@ fn __action1173<
     )
 }
 
-fn __action1174<
+fn __action1177<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44582,7 +44650,7 @@ fn __action1174<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1117(
+    __action1120(
         __0,
         __1,
         __2,
@@ -44591,7 +44659,7 @@ fn __action1174<
     )
 }
 
-fn __action1175<
+fn __action1178<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -44611,7 +44679,7 @@ fn __action1175<
     )
 }
 
-fn __action1176<
+fn __action1179<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44635,7 +44703,7 @@ fn __action1176<
     )
 }
 
-fn __action1177<
+fn __action1180<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -44659,7 +44727,7 @@ fn __action1177<
     )
 }
 
-fn __action1178<
+fn __action1181<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<(Option<Box<ast::Expr>>, ast::Expr)>>, TextSize),
@@ -44681,7 +44749,7 @@ fn __action1178<
     )
 }
 
-fn __action1179<
+fn __action1182<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, (ast::Expr, ast::Expr), TextSize),
@@ -44705,7 +44773,7 @@ fn __action1179<
     )
 }
 
-fn __action1180<
+fn __action1183<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44727,7 +44795,7 @@ fn __action1180<
     )
 }
 
-fn __action1181<
+fn __action1184<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44751,7 +44819,7 @@ fn __action1181<
     )
 }
 
-fn __action1182<
+fn __action1185<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -44769,7 +44837,7 @@ fn __action1182<
     )
 }
 
-fn __action1183<
+fn __action1186<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -44787,7 +44855,7 @@ fn __action1183<
     )
 }
 
-fn __action1184<
+fn __action1187<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -44805,7 +44873,7 @@ fn __action1184<
     )
 }
 
-fn __action1185<
+fn __action1188<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -44823,7 +44891,7 @@ fn __action1185<
     )
 }
 
-fn __action1186<
+fn __action1189<
 >(
     __0: (TextSize, ast::Constant, TextSize),
 ) -> ast::Expr
@@ -44841,7 +44909,7 @@ fn __action1186<
     )
 }
 
-fn __action1187<
+fn __action1190<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::Expr
@@ -44859,7 +44927,7 @@ fn __action1187<
     )
 }
 
-fn __action1188<
+fn __action1191<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Expr>>, TextSize),
@@ -44881,7 +44949,7 @@ fn __action1188<
     )
 }
 
-fn __action1189<
+fn __action1192<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44905,7 +44973,7 @@ fn __action1189<
     )
 }
 
-fn __action1190<
+fn __action1193<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44922,7 +44990,7 @@ fn __action1190<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1118(
+    __action1121(
         __0,
         __1,
         __2,
@@ -44933,7 +45001,7 @@ fn __action1190<
     )
 }
 
-fn __action1191<
+fn __action1194<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -44948,7 +45016,7 @@ fn __action1191<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1119(
+    __action1122(
         __0,
         __1,
         __2,
@@ -44957,7 +45025,7 @@ fn __action1191<
     )
 }
 
-fn __action1192<
+fn __action1195<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -44975,7 +45043,7 @@ fn __action1192<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1120(
+    __action1123(
         __0,
         __1,
         __2,
@@ -44987,7 +45055,7 @@ fn __action1192<
     )
 }
 
-fn __action1193<
+fn __action1196<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45003,7 +45071,7 @@ fn __action1193<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1121(
+    __action1124(
         __0,
         __1,
         __2,
@@ -45013,7 +45081,7 @@ fn __action1193<
     )
 }
 
-fn __action1194<
+fn __action1197<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -45029,7 +45097,7 @@ fn __action1194<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1122(
+    __action1125(
         __0,
         __1,
         __2,
@@ -45039,7 +45107,7 @@ fn __action1194<
     )
 }
 
-fn __action1195<
+fn __action1198<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45053,7 +45121,7 @@ fn __action1195<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1123(
+    __action1126(
         __0,
         __1,
         __2,
@@ -45061,7 +45129,7 @@ fn __action1195<
     )
 }
 
-fn __action1196<
+fn __action1199<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -45078,7 +45146,7 @@ fn __action1196<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1124(
+    __action1127(
         __0,
         __1,
         __2,
@@ -45089,7 +45157,7 @@ fn __action1196<
     )
 }
 
-fn __action1197<
+fn __action1200<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45104,7 +45172,7 @@ fn __action1197<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1125(
+    __action1128(
         __0,
         __1,
         __2,
@@ -45113,7 +45181,7 @@ fn __action1197<
     )
 }
 
-fn __action1198<
+fn __action1201<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45133,7 +45201,7 @@ fn __action1198<
     )
 }
 
-fn __action1199<
+fn __action1202<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45157,7 +45225,7 @@ fn __action1199<
     )
 }
 
-fn __action1200<
+fn __action1203<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45181,7 +45249,7 @@ fn __action1200<
     )
 }
 
-fn __action1201<
+fn __action1204<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<Vec<(Option<Box<ast::Expr>>, ast::Expr)>>, TextSize),
@@ -45203,7 +45271,7 @@ fn __action1201<
     )
 }
 
-fn __action1202<
+fn __action1205<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, (ast::Expr, ast::Expr), TextSize),
@@ -45227,7 +45295,7 @@ fn __action1202<
     )
 }
 
-fn __action1203<
+fn __action1206<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -45249,7 +45317,7 @@ fn __action1203<
     )
 }
 
-fn __action1204<
+fn __action1207<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45273,7 +45341,7 @@ fn __action1204<
     )
 }
 
-fn __action1205<
+fn __action1208<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -45291,7 +45359,7 @@ fn __action1205<
     )
 }
 
-fn __action1206<
+fn __action1209<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -45309,7 +45377,7 @@ fn __action1206<
     )
 }
 
-fn __action1207<
+fn __action1210<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -45327,7 +45395,7 @@ fn __action1207<
     )
 }
 
-fn __action1208<
+fn __action1211<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -45345,7 +45413,7 @@ fn __action1208<
     )
 }
 
-fn __action1209<
+fn __action1212<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45369,7 +45437,7 @@ fn __action1209<
     )
 }
 
-fn __action1210<
+fn __action1213<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45393,7 +45461,7 @@ fn __action1210<
     )
 }
 
-fn __action1211<
+fn __action1214<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45415,7 +45483,7 @@ fn __action1211<
     )
 }
 
-fn __action1212<
+fn __action1215<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45439,7 +45507,7 @@ fn __action1212<
     )
 }
 
-fn __action1213<
+fn __action1216<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45463,7 +45531,7 @@ fn __action1213<
     )
 }
 
-fn __action1214<
+fn __action1217<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45485,7 +45553,7 @@ fn __action1214<
     )
 }
 
-fn __action1215<
+fn __action1218<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45505,7 +45573,7 @@ fn __action1215<
     )
 }
 
-fn __action1216<
+fn __action1219<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45525,7 +45593,7 @@ fn __action1216<
     )
 }
 
-fn __action1217<
+fn __action1220<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::Pattern
@@ -45543,7 +45611,7 @@ fn __action1217<
     )
 }
 
-fn __action1218<
+fn __action1221<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45573,7 +45641,7 @@ fn __action1218<
     )
 }
 
-fn __action1219<
+fn __action1222<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45601,7 +45669,7 @@ fn __action1219<
     )
 }
 
-fn __action1220<
+fn __action1223<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45627,7 +45695,7 @@ fn __action1220<
     )
 }
 
-fn __action1221<
+fn __action1224<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45651,7 +45719,7 @@ fn __action1221<
     )
 }
 
-fn __action1222<
+fn __action1225<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45677,7 +45745,7 @@ fn __action1222<
     )
 }
 
-fn __action1223<
+fn __action1226<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45701,7 +45769,7 @@ fn __action1223<
     )
 }
 
-fn __action1224<
+fn __action1227<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45723,7 +45791,7 @@ fn __action1224<
     )
 }
 
-fn __action1225<
+fn __action1228<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45753,7 +45821,7 @@ fn __action1225<
     )
 }
 
-fn __action1226<
+fn __action1229<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45781,7 +45849,7 @@ fn __action1226<
     )
 }
 
-fn __action1227<
+fn __action1230<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45807,7 +45875,7 @@ fn __action1227<
     )
 }
 
-fn __action1228<
+fn __action1231<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45831,7 +45899,7 @@ fn __action1228<
     )
 }
 
-fn __action1229<
+fn __action1232<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45857,7 +45925,7 @@ fn __action1229<
     )
 }
 
-fn __action1230<
+fn __action1233<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45881,7 +45949,7 @@ fn __action1230<
     )
 }
 
-fn __action1231<
+fn __action1234<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -45903,7 +45971,7 @@ fn __action1231<
     )
 }
 
-fn __action1232<
+fn __action1235<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
@@ -45923,7 +45991,7 @@ fn __action1232<
     )
 }
 
-fn __action1233<
+fn __action1236<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
@@ -45943,7 +46011,7 @@ fn __action1233<
     )
 }
 
-fn __action1234<
+fn __action1237<
 >(
     __0: (TextSize, ast::Constant, TextSize),
 ) -> ast::Expr
@@ -45961,7 +46029,7 @@ fn __action1234<
     )
 }
 
-fn __action1235<
+fn __action1238<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -45981,7 +46049,7 @@ fn __action1235<
     )
 }
 
-fn __action1236<
+fn __action1239<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -46003,7 +46071,7 @@ fn __action1236<
     )
 }
 
-fn __action1237<
+fn __action1240<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -46023,7 +46091,45 @@ fn __action1237<
     )
 }
 
-fn __action1238<
+fn __action1241<
+>(
+    __0: (TextSize, String, TextSize),
+) -> ast::Identifier
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action762(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1242<
+>(
+    __0: (TextSize, String, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
+) -> ast::Identifier
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action763(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1243<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -46037,7 +46143,7 @@ fn __action1238<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1053(
+    __action1056(
         __0,
         __1,
         __2,
@@ -46045,7 +46151,7 @@ fn __action1238<
     )
 }
 
-fn __action1239<
+fn __action1244<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::Arg
@@ -46057,13 +46163,13 @@ fn __action1239<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1054(
+    __action1057(
         __0,
         __temp0,
     )
 }
 
-fn __action1240<
+fn __action1245<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -46072,49 +46178,6 @@ fn __action1240<
 {
     let __start0 = __2.2.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action767(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1241<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action768(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1242<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -46123,16 +46186,17 @@ fn __action1242<
     __action769(
         __0,
         __1,
+        __2,
         __temp0,
     )
 }
 
-fn __action1243<
+fn __action1246<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, ast::Operator, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Stmt
+) -> ast::Expr
 {
     let __start0 = __2.2.clone();
     let __end0 = __2.2.clone();
@@ -46149,7 +46213,49 @@ fn __action1243<
     )
 }
 
-fn __action1244<
+fn __action1247<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action771(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1248<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, ast::Operator, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action772(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1249<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -46164,7 +46270,7 @@ fn __action1244<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action771(
+    __action773(
         __0,
         __1,
         __2,
@@ -46173,7 +46279,7 @@ fn __action1244<
     )
 }
 
-fn __action1245<
+fn __action1250<
 >(
     __0: (TextSize, ast::UnaryOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -46181,45 +46287,6 @@ fn __action1245<
 {
     let __start0 = __1.2.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action772(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1246<
->(
-    __0: (TextSize, ast::UnaryOp, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action773(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1247<
->(
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -46227,11 +46294,32 @@ fn __action1247<
     let __temp0 = (__start0, __temp0, __end0);
     __action774(
         __0,
+        __1,
         __temp0,
     )
 }
 
-fn __action1248<
+fn __action1251<
+>(
+    __0: (TextSize, ast::UnaryOp, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action775(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1252<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Stmt
@@ -46243,35 +46331,15 @@ fn __action1248<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action775(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1249<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
     __action776(
         __0,
-        __1,
         __temp0,
     )
 }
 
-fn __action1250<
+fn __action1253<
 >(
-    __0: (TextSize, ast::Expr, TextSize),
+    __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __0.2.clone();
@@ -46287,11 +46355,11 @@ fn __action1250<
     )
 }
 
-fn __action1251<
+fn __action1254<
 >(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::Comprehension>>, TextSize),
-) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
+) -> ast::Stmt
 {
     let __start0 = __1.2.clone();
     let __end0 = __1.2.clone();
@@ -46300,39 +46368,35 @@ fn __action1251<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action782(
+    __action778(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1252<
+fn __action1255<
 >(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
+    __0: (TextSize, ast::Expr, TextSize),
+) -> ast::Stmt
 {
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action783(
+    __action779(
         __0,
-        __1,
-        __2,
         __temp0,
     )
 }
 
-fn __action1253<
+fn __action1256<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, core::option::Option<Vec<ast::Comprehension>>, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
     let __start0 = __1.2.clone();
@@ -46349,14 +46413,15 @@ fn __action1253<
     )
 }
 
-fn __action1254<
+fn __action1257<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -46365,15 +46430,16 @@ fn __action1254<
     __action785(
         __0,
         __1,
+        __2,
         __temp0,
     )
 }
 
-fn __action1255<
+fn __action1258<
 >(
-    __0: (TextSize, Vec<ast::Expr>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
     let __start0 = __1.2.clone();
     let __end0 = __1.2.clone();
@@ -46389,13 +46455,14 @@ fn __action1255<
     )
 }
 
-fn __action1256<
+fn __action1259<
 >(
-    __0: (TextSize, Vec<ast::Expr>, TextSize),
-) -> ast::Expr
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -46403,11 +46470,12 @@ fn __action1256<
     let __temp0 = (__start0, __temp0, __end0);
     __action787(
         __0,
+        __1,
         __temp0,
     )
 }
 
-fn __action1257<
+fn __action1260<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -46427,7 +46495,7 @@ fn __action1257<
     )
 }
 
-fn __action1258<
+fn __action1261<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
 ) -> ast::Expr
@@ -46445,11 +46513,11 @@ fn __action1258<
     )
 }
 
-fn __action1259<
+fn __action1262<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Identifier>, TextSize),
-) -> ast::Stmt
+    __0: (TextSize, Vec<ast::Expr>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> ast::Expr
 {
     let __start0 = __1.2.clone();
     let __end0 = __1.2.clone();
@@ -46465,72 +46533,10 @@ fn __action1259<
     )
 }
 
-fn __action1260<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-) -> ast::Alias
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1065(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1261<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::Alias
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1066(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1262<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-) -> ast::Alias
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1067(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
 fn __action1263<
 >(
-    __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::Alias
+    __0: (TextSize, Vec<ast::Expr>, TextSize),
+) -> ast::Expr
 {
     let __start0 = __0.2.clone();
     let __end0 = __0.2.clone();
@@ -46539,7 +46545,7 @@ fn __action1263<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1068(
+    __action791(
         __0,
         __temp0,
     )
@@ -46547,8 +46553,28 @@ fn __action1263<
 
 fn __action1264<
 >(
-    __0: (TextSize, Vec<ast::Alias>, TextSize),
-) -> Vec<ast::Alias>
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Identifier>, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action792(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1265<
+>(
+    __0: (TextSize, String, TextSize),
+) -> ast::Identifier
 {
     let __start0 = __0.2.clone();
     let __end0 = __0.2.clone();
@@ -46557,42 +46583,18 @@ fn __action1264<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action794(
+    __action793(
         __0,
-        __temp0,
-    )
-}
-
-fn __action1265<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Alias>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action795(
-        __0,
-        __1,
-        __2,
-        __3,
         __temp0,
     )
 }
 
 fn __action1266<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Alias>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::Alias>
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+) -> ast::Alias
 {
     let __start0 = __2.2.clone();
     let __end0 = __2.2.clone();
@@ -46601,7 +46603,7 @@ fn __action1266<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action796(
+    __action1068(
         __0,
         __1,
         __2,
@@ -46611,7 +46613,65 @@ fn __action1266<
 
 fn __action1267<
 >(
-    __0: (TextSize, token::Tok, TextSize),
+    __0: (TextSize, ast::Identifier, TextSize),
+) -> ast::Alias
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1069(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1268<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+) -> ast::Alias
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1070(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1269<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+) -> ast::Alias
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1071(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1270<
+>(
+    __0: (TextSize, Vec<ast::Alias>, TextSize),
 ) -> Vec<ast::Alias>
 {
     let __start0 = __0.2.clone();
@@ -46627,7 +46687,71 @@ fn __action1267<
     )
 }
 
-fn __action1268<
+fn __action1271<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Alias>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action798(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1272<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Alias>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action799(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1273<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action800(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1274<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Alias>, TextSize),
@@ -46640,14 +46764,14 @@ fn __action1268<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action798(
+    __action801(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1269<
+fn __action1275<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, (Option<ast::Int>, Option<ast::Identifier>), TextSize),
@@ -46662,7 +46786,7 @@ fn __action1269<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action799(
+    __action802(
         __0,
         __1,
         __2,
@@ -46671,7 +46795,7 @@ fn __action1269<
     )
 }
 
-fn __action1270<
+fn __action1276<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
@@ -46686,7 +46810,7 @@ fn __action1270<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action800(
+    __action803(
         __0,
         __1,
         __2,
@@ -46695,63 +46819,9 @@ fn __action1270<
     )
 }
 
-fn __action1271<
+fn __action1277<
 >(
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action801(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1272<
->(
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action802(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1273<
->(
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action803(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1274<
->(
-    __0: (TextSize, ast::Expr, TextSize),
 ) -> ast::Pattern
 {
     let __start0 = __0.2.clone();
@@ -46767,9 +46837,9 @@ fn __action1274<
     )
 }
 
-fn __action1275<
+fn __action1278<
 >(
-    __0: (TextSize, ast::Expr, TextSize),
+    __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Pattern
 {
     let __start0 = __0.2.clone();
@@ -46785,10 +46855,10 @@ fn __action1275<
     )
 }
 
-fn __action1276<
+fn __action1279<
 >(
-    __0: (TextSize, alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>, TextSize),
-) -> Result<ast::Pattern,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::Pattern
 {
     let __start0 = __0.2.clone();
     let __end0 = __0.2.clone();
@@ -46803,10 +46873,10 @@ fn __action1276<
     )
 }
 
-fn __action1277<
+fn __action1280<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
+    __0: (TextSize, ast::Expr, TextSize),
+) -> ast::Pattern
 {
     let __start0 = __0.2.clone();
     let __end0 = __0.2.clone();
@@ -46821,10 +46891,10 @@ fn __action1277<
     )
 }
 
-fn __action1278<
+fn __action1281<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
+    __0: (TextSize, ast::Expr, TextSize),
+) -> ast::Pattern
 {
     let __start0 = __0.2.clone();
     let __end0 = __0.2.clone();
@@ -46839,10 +46909,10 @@ fn __action1278<
     )
 }
 
-fn __action1279<
+fn __action1282<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
+    __0: (TextSize, alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>, TextSize),
+) -> Result<ast::Pattern,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2.clone();
     let __end0 = __0.2.clone();
@@ -46857,7 +46927,61 @@ fn __action1279<
     )
 }
 
-fn __action1280<
+fn __action1283<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action810(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1284<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action811(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1285<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action812(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1286<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -46870,90 +46994,18 @@ fn __action1280<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action811(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1281<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action812(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-    )
-}
-
-fn __action1282<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action813(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1283<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
     __action814(
         __0,
         __1,
-        __2,
-        __3,
-        __4,
         __temp0,
     )
 }
 
-fn __action1284<
+fn __action1287<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> ast::Pattern
 {
@@ -46973,7 +47025,79 @@ fn __action1284<
     )
 }
 
-fn __action1285<
+fn __action1288<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> ast::Pattern
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action816(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1289<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+) -> ast::Pattern
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action817(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1290<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+) -> ast::Pattern
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action818(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1291<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
@@ -46991,7 +47115,7 @@ fn __action1285<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action816(
+    __action819(
         __0,
         __1,
         __2,
@@ -47003,7 +47127,7 @@ fn __action1285<
     )
 }
 
-fn __action1286<
+fn __action1292<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize),
@@ -47020,7 +47144,7 @@ fn __action1286<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action817(
+    __action820(
         __0,
         __1,
         __2,
@@ -47031,7 +47155,7 @@ fn __action1286<
     )
 }
 
-fn __action1287<
+fn __action1293<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::Expr
@@ -47043,13 +47167,13 @@ fn __action1287<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action819(
+    __action822(
         __0,
         __temp0,
     )
 }
 
-fn __action1288<
+fn __action1294<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -47063,7 +47187,7 @@ fn __action1288<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action820(
+    __action823(
         __0,
         __1,
         __2,
@@ -47071,7 +47195,7 @@ fn __action1288<
     )
 }
 
-fn __action1289<
+fn __action1295<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -47085,7 +47209,7 @@ fn __action1289<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action821(
+    __action824(
         __0,
         __1,
         __2,
@@ -47093,7 +47217,7 @@ fn __action1289<
     )
 }
 
-fn __action1290<
+fn __action1296<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -47107,7 +47231,7 @@ fn __action1290<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action826(
+    __action829(
         __0,
         __temp0,
         __1,
@@ -47115,7 +47239,7 @@ fn __action1290<
     )
 }
 
-fn __action1291<
+fn __action1297<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Identifier>, TextSize),
@@ -47128,74 +47252,16 @@ fn __action1291<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action827(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1292<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action828(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1293<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action829(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1294<
->(
-    __0: (TextSize, Vec<ast::Pattern>, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
     __action830(
         __0,
+        __1,
         __temp0,
     )
 }
 
-fn __action1295<
+fn __action1298<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
 {
@@ -47213,9 +47279,9 @@ fn __action1295<
     )
 }
 
-fn __action1296<
+fn __action1299<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
 {
@@ -47233,102 +47299,70 @@ fn __action1296<
     )
 }
 
-fn __action1297<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __6.2.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action948(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-        __temp0,
-    )
-}
-
-fn __action1298<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __5.2.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action949(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __temp0,
-    )
-}
-
-fn __action1299<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __7.2.clone();
-    let __end0 = __7.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action950(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-        __7,
-        __temp0,
-    )
-}
-
 fn __action1300<
 >(
+    __0: (TextSize, Vec<ast::Pattern>, TextSize),
+) -> ast::Pattern
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action833(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1301<
+>(
+    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action834(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1302<
+>(
+    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action835(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1303<
+>(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -47353,17 +47387,18 @@ fn __action1300<
     )
 }
 
-fn __action1301<
+fn __action1304<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
+    let __start0 = __5.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47375,20 +47410,25 @@ fn __action1301<
         __2,
         __3,
         __4,
+        __5,
         __temp0,
     )
 }
 
-fn __action1302<
+fn __action1305<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
+    let __start0 = __7.2.clone();
+    let __end0 = __7.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47399,22 +47439,27 @@ fn __action1302<
         __1,
         __2,
         __3,
+        __4,
+        __5,
+        __6,
+        __7,
         __temp0,
     )
 }
 
-fn __action1303<
+fn __action1306<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __5.2.clone();
-    let __end0 = __5.2.clone();
+    let __start0 = __6.2.clone();
+    let __end0 = __6.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47427,16 +47472,17 @@ fn __action1303<
         __3,
         __4,
         __5,
+        __6,
         __temp0,
     )
 }
 
-fn __action1304<
+fn __action1307<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -47457,14 +47503,16 @@ fn __action1304<
     )
 }
 
-fn __action1305<
+fn __action1308<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47473,18 +47521,20 @@ fn __action1305<
     __action956(
         __0,
         __1,
+        __2,
+        __3,
         __temp0,
     )
 }
 
-fn __action1306<
+fn __action1309<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2.clone();
@@ -47505,13 +47555,13 @@ fn __action1306<
     )
 }
 
-fn __action1307<
+fn __action1310<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2.clone();
@@ -47531,19 +47581,14 @@ fn __action1307<
     )
 }
 
-fn __action1308<
+fn __action1311<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __6.2.clone();
-    let __end0 = __6.2.clone();
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47552,21 +47597,16 @@ fn __action1308<
     __action959(
         __0,
         __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
         __temp0,
     )
 }
 
-fn __action1309<
+fn __action1312<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -47589,16 +47629,17 @@ fn __action1309<
     )
 }
 
-fn __action1310<
+fn __action1313<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47609,19 +47650,24 @@ fn __action1310<
         __1,
         __2,
         __3,
+        __4,
         __temp0,
     )
 }
 
-fn __action1311<
+fn __action1314<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
+    let __start0 = __6.2.clone();
+    let __end0 = __6.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47631,21 +47677,26 @@ fn __action1311<
         __0,
         __1,
         __2,
+        __3,
+        __4,
+        __5,
+        __6,
         __temp0,
     )
 }
 
-fn __action1312<
+fn __action1315<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
+    let __start0 = __5.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -47657,16 +47708,17 @@ fn __action1312<
         __2,
         __3,
         __4,
+        __5,
         __temp0,
     )
 }
 
-fn __action1313<
+fn __action1316<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2.clone();
@@ -47685,7 +47737,79 @@ fn __action1313<
     )
 }
 
-fn __action1314<
+fn __action1317<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action965(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1318<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action966(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1319<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action967(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1320<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -47697,13 +47821,13 @@ fn __action1314<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action965(
+    __action968(
         __0,
         __temp0,
     )
 }
 
-fn __action1315<
+fn __action1321<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -47718,7 +47842,7 @@ fn __action1315<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action835(
+    __action838(
         __0,
         __1,
         __2,
@@ -47727,7 +47851,7 @@ fn __action1315<
     )
 }
 
-fn __action1316<
+fn __action1322<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -47741,7 +47865,7 @@ fn __action1316<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action836(
+    __action839(
         __0,
         __1,
         __2,
@@ -47749,88 +47873,10 @@ fn __action1316<
     )
 }
 
-fn __action1317<
+fn __action1323<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action924(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __temp0,
-    )
-}
-
-fn __action1318<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action925(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-    )
-}
-
-fn __action1319<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __5.2.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action926(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __temp0,
-    )
-}
-
-fn __action1320<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -47853,53 +47899,11 @@ fn __action1320<
     )
 }
 
-fn __action1321<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action928(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1322<
+fn __action1324<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action929(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1323<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -47910,7 +47914,7 @@ fn __action1323<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action930(
+    __action928(
         __0,
         __1,
         __2,
@@ -47919,10 +47923,64 @@ fn __action1323<
     )
 }
 
-fn __action1324<
+fn __action1325<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __5.2.clone();
+    let __end0 = __5.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action929(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __temp0,
+    )
+}
+
+fn __action1326<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action930(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1327<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -47941,12 +47999,32 @@ fn __action1324<
     )
 }
 
-fn __action1325<
+fn __action1328<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action932(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1329<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2.clone();
@@ -47956,7 +48034,7 @@ fn __action1325<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action932(
+    __action933(
         __0,
         __1,
         __2,
@@ -47965,11 +48043,11 @@ fn __action1325<
     )
 }
 
-fn __action1326<
+fn __action1330<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2.clone();
@@ -47979,44 +48057,18 @@ fn __action1326<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action933(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1327<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
     __action934(
         __0,
         __1,
         __2,
-        __3,
-        __4,
         __temp0,
     )
 }
 
-fn __action1328<
+fn __action1331<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -48037,49 +48089,11 @@ fn __action1328<
     )
 }
 
-fn __action1329<
+fn __action1332<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action936(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1330<
->(
-    __0: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action937(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1331<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2.clone();
@@ -48089,7 +48103,7 @@ fn __action1331<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action938(
+    __action936(
         __0,
         __1,
         __2,
@@ -48097,10 +48111,60 @@ fn __action1331<
     )
 }
 
-fn __action1332<
+fn __action1333<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action937(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1334<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action938(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1335<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2.clone();
@@ -48117,7 +48181,67 @@ fn __action1332<
     )
 }
 
-fn __action1333<
+fn __action1336<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action940(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1337<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action941(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1338<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action942(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1339<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -48130,14 +48254,14 @@ fn __action1333<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action839(
+    __action842(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1334<
+fn __action1340<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> ast::Arguments
@@ -48149,108 +48273,18 @@ fn __action1334<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action840(
+    __action843(
         __0,
         __temp0,
     )
 }
 
-fn __action1335<
+fn __action1341<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __6.2.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1008(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-        __temp0,
-    )
-}
-
-fn __action1336<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __5.2.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1009(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __temp0,
-    )
-}
-
-fn __action1337<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __7.2.clone();
-    let __end0 = __7.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1010(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-        __7,
-        __temp0,
-    )
-}
-
-fn __action1338<
->(
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -48275,17 +48309,18 @@ fn __action1338<
     )
 }
 
-fn __action1339<
+fn __action1342<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
+    let __start0 = __5.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48297,20 +48332,25 @@ fn __action1339<
         __2,
         __3,
         __4,
+        __5,
         __temp0,
     )
 }
 
-fn __action1340<
+fn __action1343<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
+    let __start0 = __7.2.clone();
+    let __end0 = __7.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48321,22 +48361,27 @@ fn __action1340<
         __1,
         __2,
         __3,
+        __4,
+        __5,
+        __6,
+        __7,
         __temp0,
     )
 }
 
-fn __action1341<
+fn __action1344<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __5.2.clone();
-    let __end0 = __5.2.clone();
+    let __start0 = __6.2.clone();
+    let __end0 = __6.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48349,16 +48394,17 @@ fn __action1341<
         __3,
         __4,
         __5,
+        __6,
         __temp0,
     )
 }
 
-fn __action1342<
+fn __action1345<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -48379,14 +48425,16 @@ fn __action1342<
     )
 }
 
-fn __action1343<
+fn __action1346<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48395,18 +48443,20 @@ fn __action1343<
     __action1016(
         __0,
         __1,
+        __2,
+        __3,
         __temp0,
     )
 }
 
-fn __action1344<
+fn __action1347<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2.clone();
@@ -48427,13 +48477,13 @@ fn __action1344<
     )
 }
 
-fn __action1345<
+fn __action1348<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2.clone();
@@ -48453,19 +48503,14 @@ fn __action1345<
     )
 }
 
-fn __action1346<
+fn __action1349<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __6.2.clone();
-    let __end0 = __6.2.clone();
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48474,21 +48519,16 @@ fn __action1346<
     __action1019(
         __0,
         __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
         __temp0,
     )
 }
 
-fn __action1347<
+fn __action1350<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -48511,16 +48551,17 @@ fn __action1347<
     )
 }
 
-fn __action1348<
+fn __action1351<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48531,19 +48572,24 @@ fn __action1348<
         __1,
         __2,
         __3,
+        __4,
         __temp0,
     )
 }
 
-fn __action1349<
+fn __action1352<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
+    let __start0 = __6.2.clone();
+    let __end0 = __6.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48553,21 +48599,26 @@ fn __action1349<
         __0,
         __1,
         __2,
+        __3,
+        __4,
+        __5,
+        __6,
         __temp0,
     )
 }
 
-fn __action1350<
+fn __action1353<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
+    let __start0 = __5.2.clone();
+    let __end0 = __5.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -48579,16 +48630,17 @@ fn __action1350<
         __2,
         __3,
         __4,
+        __5,
         __temp0,
     )
 }
 
-fn __action1351<
+fn __action1354<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2.clone();
@@ -48607,7 +48659,79 @@ fn __action1351<
     )
 }
 
-fn __action1352<
+fn __action1355<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1025(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1356<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Arg, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1026(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1357<
+>(
+    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1027(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1358<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -48619,13 +48743,13 @@ fn __action1352<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1025(
+    __action1028(
         __0,
         __temp0,
     )
 }
 
-fn __action1353<
+fn __action1359<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -48640,7 +48764,7 @@ fn __action1353<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action843(
+    __action846(
         __0,
         __1,
         __2,
@@ -48649,7 +48773,7 @@ fn __action1353<
     )
 }
 
-fn __action1354<
+fn __action1360<
 >(
     __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -48663,7 +48787,7 @@ fn __action1354<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action844(
+    __action847(
         __0,
         __1,
         __2,
@@ -48671,88 +48795,10 @@ fn __action1354<
     )
 }
 
-fn __action1355<
+fn __action1361<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action984(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __temp0,
-    )
-}
-
-fn __action1356<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action985(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-    )
-}
-
-fn __action1357<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __5.2.clone();
-    let __end0 = __5.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action986(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __temp0,
-    )
-}
-
-fn __action1358<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -48775,53 +48821,11 @@ fn __action1358<
     )
 }
 
-fn __action1359<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action988(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1360<
+fn __action1362<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action989(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1361<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -48832,7 +48836,7 @@ fn __action1361<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action990(
+    __action988(
         __0,
         __1,
         __2,
@@ -48841,10 +48845,64 @@ fn __action1361<
     )
 }
 
-fn __action1362<
+fn __action1363<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __5.2.clone();
+    let __end0 = __5.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action989(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __temp0,
+    )
+}
+
+fn __action1364<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action990(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1365<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -48863,12 +48921,32 @@ fn __action1362<
     )
 }
 
-fn __action1363<
+fn __action1366<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action992(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1367<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2.clone();
@@ -48878,7 +48956,7 @@ fn __action1363<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action992(
+    __action993(
         __0,
         __1,
         __2,
@@ -48887,11 +48965,11 @@ fn __action1363<
     )
 }
 
-fn __action1364<
+fn __action1368<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2.clone();
@@ -48901,44 +48979,18 @@ fn __action1364<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action993(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1365<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
     __action994(
         __0,
         __1,
         __2,
-        __3,
-        __4,
         __temp0,
     )
 }
 
-fn __action1366<
+fn __action1369<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -48959,49 +49011,11 @@ fn __action1366<
     )
 }
 
-fn __action1367<
+fn __action1370<
 >(
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action996(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1368<
->(
-    __0: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action997(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1369<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2.clone();
@@ -49011,7 +49025,7 @@ fn __action1369<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action998(
+    __action996(
         __0,
         __1,
         __2,
@@ -49019,10 +49033,60 @@ fn __action1369<
     )
 }
 
-fn __action1370<
+fn __action1371<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action997(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1372<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action998(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1373<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2.clone();
@@ -49039,7 +49103,67 @@ fn __action1370<
     )
 }
 
-fn __action1371<
+fn __action1374<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1000(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1375<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1001(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1376<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1002(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1377<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -49052,14 +49176,14 @@ fn __action1371<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action847(
+    __action850(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1372<
+fn __action1378<
 >(
     __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
 ) -> ast::Arguments
@@ -49071,13 +49195,13 @@ fn __action1372<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action848(
+    __action851(
         __0,
         __temp0,
     )
 }
 
-fn __action1373<
+fn __action1379<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
@@ -49091,127 +49215,7 @@ fn __action1373<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action861(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1374<
->(
-    __0: (TextSize, token::Tok, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action862(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1375<
->(
-    __0: (TextSize, ast::Pattern, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action863(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1376<
->(
-    __0: (TextSize, Vec<ast::Pattern>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
     __action864(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1377<
->(
-    __0: (TextSize, Vec<ast::Pattern>, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action865(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1378<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action866(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1379<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action867(
         __0,
         __1,
         __2,
@@ -49231,7 +49235,7 @@ fn __action1380<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action868(
+    __action865(
         __0,
         __temp0,
     )
@@ -49239,33 +49243,9 @@ fn __action1380<
 
 fn __action1381<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1093(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-    )
-}
-
-fn __action1382<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Expr, TextSize),
-) -> ast::Stmt
+    __0: (TextSize, ast::Pattern, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> ast::Pattern
 {
     let __start0 = __1.2.clone();
     let __end0 = __1.2.clone();
@@ -49274,7 +49254,27 @@ fn __action1382<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1094(
+    __action866(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1382<
+>(
+    __0: (TextSize, Vec<ast::Pattern>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+) -> ast::Pattern
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action867(
         __0,
         __1,
         __temp0,
@@ -49283,10 +49283,50 @@ fn __action1382<
 
 fn __action1383<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Pattern, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
+    __0: (TextSize, Vec<ast::Pattern>, TextSize),
 ) -> ast::Pattern
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action868(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1384<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action869(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1385<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
 {
     let __start0 = __2.2.clone();
     let __end0 = __2.2.clone();
@@ -49303,7 +49343,91 @@ fn __action1383<
     )
 }
 
-fn __action1384<
+fn __action1386<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action871(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1387<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::Expr, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1096(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1388<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Expr, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1097(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1389<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Pattern, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> ast::Pattern
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action873(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1390<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -49316,14 +49440,14 @@ fn __action1384<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action871(
+    __action874(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1385<
+fn __action1391<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -49338,7 +49462,7 @@ fn __action1385<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action872(
+    __action875(
         __0,
         __1,
         __2,
@@ -49347,7 +49471,7 @@ fn __action1385<
     )
 }
 
-fn __action1386<
+fn __action1392<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
@@ -49363,7 +49487,7 @@ fn __action1386<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action873(
+    __action876(
         __0,
         __1,
         __2,
@@ -49373,7 +49497,7 @@ fn __action1386<
     )
 }
 
-fn __action1387<
+fn __action1393<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
@@ -49388,7 +49512,7 @@ fn __action1387<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action874(
+    __action877(
         __0,
         __1,
         __2,
@@ -49397,7 +49521,7 @@ fn __action1387<
     )
 }
 
-fn __action1388<
+fn __action1394<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Pattern>, TextSize),
@@ -49411,7 +49535,7 @@ fn __action1388<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action875(
+    __action878(
         __0,
         __1,
         __2,
@@ -49419,7 +49543,7 @@ fn __action1388<
     )
 }
 
-fn __action1389<
+fn __action1395<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -49433,7 +49557,7 @@ fn __action1389<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action876(
+    __action879(
         __0,
         __1,
         __2,
@@ -49441,7 +49565,7 @@ fn __action1389<
     )
 }
 
-fn __action1390<
+fn __action1396<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -49455,7 +49579,7 @@ fn __action1390<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action877(
+    __action880(
         __0,
         __1,
         __2,
@@ -49463,7 +49587,7 @@ fn __action1390<
     )
 }
 
-fn __action1391<
+fn __action1397<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -49480,7 +49604,7 @@ fn __action1391<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action878(
+    __action881(
         __0,
         __1,
         __2,
@@ -49491,7 +49615,7 @@ fn __action1391<
     )
 }
 
-fn __action1392<
+fn __action1398<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -49507,7 +49631,7 @@ fn __action1392<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action879(
+    __action882(
         __0,
         __1,
         __2,
@@ -49517,7 +49641,7 @@ fn __action1392<
     )
 }
 
-fn __action1393<
+fn __action1399<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -49530,14 +49654,14 @@ fn __action1393<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action881(
+    __action884(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1394<
+fn __action1400<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -49550,14 +49674,14 @@ fn __action1394<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action882(
+    __action885(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1395<
+fn __action1401<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -49571,7 +49695,7 @@ fn __action1395<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1058(
+    __action1061(
         __0,
         __1,
         __2,
@@ -49579,7 +49703,7 @@ fn __action1395<
     )
 }
 
-fn __action1396<
+fn __action1402<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::Arg
@@ -49591,13 +49715,13 @@ fn __action1396<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1059(
+    __action1062(
         __0,
         __temp0,
     )
 }
 
-fn __action1397<
+fn __action1403<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::Arg
@@ -49609,13 +49733,13 @@ fn __action1397<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action884(
+    __action887(
         __0,
         __temp0,
     )
 }
 
-fn __action1398<
+fn __action1404<
 >(
     __0: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -49630,7 +49754,7 @@ fn __action1398<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action885(
+    __action888(
         __0,
         __1,
         __2,
@@ -49639,67 +49763,9 @@ fn __action1398<
     )
 }
 
-fn __action1399<
+fn __action1405<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action886(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1400<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action887(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1401<
->(
-    __0: (TextSize, Vec<ast::Expr>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action888(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1402<
->(
-    __0: (TextSize, Vec<ast::Expr>, TextSize),
 ) -> ast::Expr
 {
     let __start0 = __0.2.clone();
@@ -49715,15 +49781,14 @@ fn __action1402<
     )
 }
 
-fn __action1403<
+fn __action1406<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
 {
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -49732,20 +49797,18 @@ fn __action1403<
     __action890(
         __0,
         __1,
-        __2,
         __temp0,
     )
 }
 
-fn __action1404<
+fn __action1407<
 >(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
+    __0: (TextSize, Vec<ast::Expr>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
 {
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -49754,22 +49817,17 @@ fn __action1404<
     __action891(
         __0,
         __1,
-        __2,
         __temp0,
     )
 }
 
-fn __action1405<
+fn __action1408<
 >(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::Expr, TextSize),
+    __0: (TextSize, Vec<ast::Expr>, TextSize),
 ) -> ast::Expr
 {
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -49777,25 +49835,19 @@ fn __action1405<
     let __temp0 = (__start0, __temp0, __end0);
     __action892(
         __0,
-        __1,
-        __2,
-        __3,
-        __4,
         __temp0,
     )
 }
 
-fn __action1406<
+fn __action1409<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Operator, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
 {
-    let __start0 = __4.2.clone();
-    let __end0 = __4.2.clone();
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -49805,20 +49857,19 @@ fn __action1406<
         __0,
         __1,
         __2,
-        __3,
-        __4,
         __temp0,
     )
 }
 
-fn __action1407<
+fn __action1410<
 >(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Suite, TextSize),
-) -> ast::Mod
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, ast::Operator, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
 {
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -49827,11 +49878,64 @@ fn __action1407<
     __action894(
         __0,
         __1,
+        __2,
         __temp0,
     )
 }
 
-fn __action1408<
+fn __action1411<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action895(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1412<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __4.2.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action896(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __temp0,
+    )
+}
+
+fn __action1413<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Suite, TextSize),
@@ -49844,14 +49948,34 @@ fn __action1408<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action895(
+    __action897(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1409<
+fn __action1414<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::Suite, TextSize),
+) -> ast::Mod
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action898(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1415<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -49864,14 +49988,14 @@ fn __action1409<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1062(
+    __action1065(
         __0,
         __1,
         __temp0,
     )
 }
 
-fn __action1410<
+fn __action1416<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -49885,7 +50009,7 @@ fn __action1410<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1063(
+    __action1066(
         __0,
         __1,
         __2,
@@ -49893,7 +50017,7 @@ fn __action1410<
     )
 }
 
-fn __action1411<
+fn __action1417<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -49914,7 +50038,7 @@ fn __action1411<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1084(
+    __action1087(
         __0,
         __1,
         __2,
@@ -49929,7 +50053,7 @@ fn __action1411<
     )
 }
 
-fn __action1412<
+fn __action1418<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -49942,93 +50066,6 @@ fn __action1412<
 {
     let __start0 = __6.2.clone();
     let __end0 = __6.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1085(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-        __temp0,
-    )
-}
-
-fn __action1413<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Suite, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __6.2.clone();
-    let __end0 = __6.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1086(
-        __0,
-        __1,
-        __2,
-        __3,
-        __4,
-        __5,
-        __6,
-        __temp0,
-    )
-}
-
-fn __action1414<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __3.2.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1087(
-        __0,
-        __1,
-        __2,
-        __3,
-        __temp0,
-    )
-}
-
-fn __action1415<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Suite, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Suite, TextSize),
-    __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, token::Tok, TextSize),
-    __9: (TextSize, ast::Suite, TextSize),
-) -> ast::Stmt
-{
-    let __start0 = __9.2.clone();
-    let __end0 = __9.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -50042,14 +50079,11 @@ fn __action1415<
         __4,
         __5,
         __6,
-        __7,
-        __8,
-        __9,
         __temp0,
     )
 }
 
-fn __action1416<
+fn __action1419<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50079,7 +50113,67 @@ fn __action1416<
     )
 }
 
-fn __action1417<
+fn __action1420<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __3.2.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1090(
+        __0,
+        __1,
+        __2,
+        __3,
+        __temp0,
+    )
+}
+
+fn __action1421<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, ast::Suite, TextSize),
+    __7: (TextSize, token::Tok, TextSize),
+    __8: (TextSize, token::Tok, TextSize),
+    __9: (TextSize, ast::Suite, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __9.2.clone();
+    let __end0 = __9.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1091(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __6,
+        __7,
+        __8,
+        __9,
+        __temp0,
+    )
+}
+
+fn __action1422<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50097,7 +50191,7 @@ fn __action1417<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1090(
+    __action1092(
         __0,
         __1,
         __2,
@@ -50109,7 +50203,37 @@ fn __action1417<
     )
 }
 
-fn __action1418<
+fn __action1423<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Suite, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ExceptHandler>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, ast::Suite, TextSize),
+) -> ast::Stmt
+{
+    let __start0 = __6.2.clone();
+    let __end0 = __6.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1093(
+        __0,
+        __1,
+        __2,
+        __3,
+        __4,
+        __5,
+        __6,
+        __temp0,
+    )
+}
+
+fn __action1424<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50124,7 +50248,7 @@ fn __action1418<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1091(
+    __action1094(
         __0,
         __1,
         __2,
@@ -50133,7 +50257,7 @@ fn __action1418<
     )
 }
 
-fn __action1419<
+fn __action1425<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50147,7 +50271,7 @@ fn __action1419<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1055(
+    __action1058(
         __0,
         __1,
         __2,
@@ -50155,7 +50279,7 @@ fn __action1419<
     )
 }
 
-fn __action1420<
+fn __action1426<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::ArgWithDefault
@@ -50167,52 +50291,16 @@ fn __action1420<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1056(
+    __action1059(
         __0,
         __temp0,
     )
 }
 
-fn __action1421<
+fn __action1427<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> ast::ArgWithDefault
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action901(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1422<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-) -> ast::Pattern
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action902(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1423<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-) -> ast::WithItem
 {
     let __start0 = __0.2.clone();
     let __end0 = __0.2.clone();
@@ -50227,15 +50315,13 @@ fn __action1423<
     )
 }
 
-fn __action1424<
+fn __action1428<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> ast::WithItem
+) -> ast::Pattern
 {
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
     let __temp0 = __action372(
         &__start0,
         &__end0,
@@ -50243,35 +50329,11 @@ fn __action1424<
     let __temp0 = (__start0, __temp0, __end0);
     __action905(
         __0,
-        __1,
-        __2,
         __temp0,
     )
 }
 
-fn __action1425<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> ast::WithItem
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action906(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1426<
+fn __action1429<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> ast::WithItem
@@ -50289,7 +50351,7 @@ fn __action1426<
     )
 }
 
-fn __action1427<
+fn __action1430<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50311,7 +50373,69 @@ fn __action1427<
     )
 }
 
-fn __action1428<
+fn __action1431<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::WithItem
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action909(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1432<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+) -> ast::WithItem
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action910(
+        __0,
+        __temp0,
+    )
+}
+
+fn __action1433<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::WithItem
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action911(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1434<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
 ) -> Vec<ast::WithItem>
@@ -50323,79 +50447,15 @@ fn __action1428<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action909(
-        __0,
-        __temp0,
-    )
-}
-
-fn __action1429<
->(
-    __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
     __action912(
         __0,
-        __1,
-        __2,
         __temp0,
     )
 }
 
-fn __action1430<
+fn __action1435<
 >(
     __0: (TextSize, ast::Expr, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __2.2.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action913(
-        __0,
-        __1,
-        __2,
-        __temp0,
-    )
-}
-
-fn __action1431<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
-) -> ast::Expr
-{
-    let __start0 = __1.2.clone();
-    let __end0 = __1.2.clone();
-    let __temp0 = __action372(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action914(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1432<
->(
-    __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
@@ -50415,7 +50475,71 @@ fn __action1432<
     )
 }
 
-fn __action1433<
+fn __action1436<
+>(
+    __0: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action916(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1437<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __1.2.clone();
+    let __end0 = __1.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action917(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1438<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Expr, TextSize),
+) -> ast::Expr
+{
+    let __start0 = __2.2.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action372(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action918(
+        __0,
+        __1,
+        __2,
+        __temp0,
+    )
+}
+
+fn __action1439<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50423,7 +50547,7 @@ fn __action1433<
 {
     let __start0 = __0.0.clone();
     let __end0 = __0.2.clone();
-    let __temp0 = __action1428(
+    let __temp0 = __action1434(
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -50433,7 +50557,7 @@ fn __action1433<
     )
 }
 
-fn __action1434<
+fn __action1440<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -50443,7 +50567,7 @@ fn __action1434<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1428(
+    let __temp0 = __action1434(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -50455,7 +50579,7 @@ fn __action1434<
     )
 }
 
-fn __action1435<
+fn __action1441<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -50464,7 +50588,7 @@ fn __action1435<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1428(
+    let __temp0 = __action1434(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -50475,7 +50599,7 @@ fn __action1435<
     )
 }
 
-fn __action1436<
+fn __action1442<
 >(
     __0: (TextSize, Vec<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50483,7 +50607,7 @@ fn __action1436<
 {
     let __start0 = __0.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1433(
+    let __temp0 = __action1439(
         __0,
         __1,
     );
@@ -50493,169 +50617,19 @@ fn __action1436<
     )
 }
 
-fn __action1437<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Expr>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::WithItem, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::WithItem>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1436(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1041(
-        __0,
-        __temp0,
-        __3,
-        __4,
-        __5,
-    )
-}
-
-fn __action1438<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::WithItem, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::WithItem>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action288(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1041(
-        __0,
-        __temp0,
-        __1,
-        __2,
-        __3,
-    )
-}
-
-fn __action1439<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Expr>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::WithItem, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::WithItem>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1436(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1042(
-        __0,
-        __temp0,
-        __3,
-        __4,
-        __5,
-        __6,
-    )
-}
-
-fn __action1440<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::WithItem, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::WithItem>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action288(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1042(
-        __0,
-        __temp0,
-        __1,
-        __2,
-        __3,
-        __4,
-    )
-}
-
-fn __action1441<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::Expr>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::WithItem, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::WithItem>
-{
-    let __start0 = __1.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1436(
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1043(
-        __0,
-        __temp0,
-        __3,
-        __4,
-    )
-}
-
-fn __action1442<
->(
-    __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::WithItem, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::WithItem>
-{
-    let __start0 = __0.2.clone();
-    let __end0 = __1.0.clone();
-    let __temp0 = __action288(
-        &__start0,
-        &__end0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1043(
-        __0,
-        __temp0,
-        __1,
-        __2,
-    )
-}
-
 fn __action1443<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::WithItem, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
 ) -> Vec<ast::WithItem>
 {
     let __start0 = __1.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1436(
+    let __temp0 = __action1442(
         __1,
         __2,
     );
@@ -50673,7 +50647,7 @@ fn __action1444<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::WithItem, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> Vec<ast::WithItem>
 {
@@ -50695,12 +50669,162 @@ fn __action1444<
 
 fn __action1445<
 >(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::WithItem, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::WithItem>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1442(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1045(
+        __0,
+        __temp0,
+        __3,
+        __4,
+        __5,
+        __6,
+    )
+}
+
+fn __action1446<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::WithItem, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::WithItem>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action288(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1045(
+        __0,
+        __temp0,
+        __1,
+        __2,
+        __3,
+        __4,
+    )
+}
+
+fn __action1447<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::WithItem, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::WithItem>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1442(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1046(
+        __0,
+        __temp0,
+        __3,
+        __4,
+    )
+}
+
+fn __action1448<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::WithItem, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::WithItem>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action288(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1046(
+        __0,
+        __temp0,
+        __1,
+        __2,
+    )
+}
+
+fn __action1449<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, Vec<ast::Expr>, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, ast::WithItem, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::WithItem>
+{
+    let __start0 = __1.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1442(
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1047(
+        __0,
+        __temp0,
+        __3,
+        __4,
+        __5,
+    )
+}
+
+fn __action1450<
+>(
+    __0: (TextSize, token::Tok, TextSize),
+    __1: (TextSize, ast::WithItem, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+) -> Vec<ast::WithItem>
+{
+    let __start0 = __0.2.clone();
+    let __end0 = __1.0.clone();
+    let __temp0 = __action288(
+        &__start0,
+        &__end0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1047(
+        __0,
+        __temp0,
+        __1,
+        __2,
+        __3,
+    )
+}
+
+fn __action1451<
+>(
     __0: (TextSize, (String, StringKind, bool), TextSize),
 ) -> alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>
 {
     let __start0 = __0.0.clone();
     let __end0 = __0.2.clone();
-    let __temp0 = __action1150(
+    let __temp0 = __action1153(
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -50709,7 +50833,7 @@ fn __action1445<
     )
 }
 
-fn __action1446<
+fn __action1452<
 >(
     __0: (TextSize, alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>, TextSize),
     __1: (TextSize, (String, StringKind, bool), TextSize),
@@ -50717,7 +50841,7 @@ fn __action1446<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1150(
+    let __temp0 = __action1153(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -50727,7 +50851,7 @@ fn __action1446<
     )
 }
 
-fn __action1447<
+fn __action1453<
 >(
     __0: (TextSize, ast::CmpOp, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -50745,7 +50869,7 @@ fn __action1447<
     )
 }
 
-fn __action1448<
+fn __action1454<
 >(
     __0: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::Expr)>, TextSize),
     __1: (TextSize, ast::CmpOp, TextSize),
@@ -50765,7 +50889,7 @@ fn __action1448<
     )
 }
 
-fn __action1449<
+fn __action1455<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> core::option::Option<ast::Expr>
@@ -50781,7 +50905,7 @@ fn __action1449<
     )
 }
 
-fn __action1450<
+fn __action1456<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -50792,11 +50916,11 @@ fn __action1450<
 {
     let __start0 = __2.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1449(
+    let __temp0 = __action1455(
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action818(
+    __action821(
         __0,
         __1,
         __temp0,
@@ -50805,7 +50929,7 @@ fn __action1450<
     )
 }
 
-fn __action1451<
+fn __action1457<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -50820,7 +50944,7 @@ fn __action1451<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action818(
+    __action821(
         __0,
         __1,
         __temp0,
@@ -50829,7 +50953,7 @@ fn __action1451<
     )
 }
 
-fn __action1452<
+fn __action1458<
 >(
     __0: (TextSize, ast::Arguments, TextSize),
 ) -> core::option::Option<ast::Arguments>
@@ -50845,7 +50969,7 @@ fn __action1452<
     )
 }
 
-fn __action1453<
+fn __action1459<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arguments, TextSize),
@@ -50854,18 +50978,18 @@ fn __action1453<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1452(
+    let __temp0 = __action1458(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1373(
+    __action1379(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1454<
+fn __action1460<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50878,14 +51002,14 @@ fn __action1454<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1373(
+    __action1379(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1455<
+fn __action1461<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> ast::Stmt
@@ -50897,13 +51021,13 @@ fn __action1455<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1242(
+    __action1247(
         __0,
         __temp0,
     )
 }
 
-fn __action1456<
+fn __action1462<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
@@ -50915,13 +51039,13 @@ fn __action1456<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1242(
+    __action1247(
         __0,
         __temp0,
     )
 }
 
-fn __action1457<
+fn __action1463<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50935,7 +51059,7 @@ fn __action1457<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1244(
+    __action1249(
         __0,
         __1,
         __2,
@@ -50943,7 +51067,7 @@ fn __action1457<
     )
 }
 
-fn __action1458<
+fn __action1464<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -50957,7 +51081,7 @@ fn __action1458<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1244(
+    __action1249(
         __0,
         __1,
         __2,
@@ -50965,7 +51089,7 @@ fn __action1458<
     )
 }
 
-fn __action1459<
+fn __action1465<
 >(
     __0: (TextSize, (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr), TextSize),
 ) -> Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>
@@ -50976,12 +51100,12 @@ fn __action1459<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1105(
+    __action1108(
         __temp0,
     )
 }
 
-fn __action1460<
+fn __action1466<
 >(
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
@@ -50994,12 +51118,12 @@ fn __action1460<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1105(
+    __action1108(
         __temp0,
     )
 }
 
-fn __action1461<
+fn __action1467<
 >(
     __0: (TextSize, alloc::vec::Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
     __1: (TextSize, (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr), TextSize),
@@ -51011,13 +51135,13 @@ fn __action1461<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1106(
+    __action1109(
         __0,
         __temp0,
     )
 }
 
-fn __action1462<
+fn __action1468<
 >(
     __0: (TextSize, alloc::vec::Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
 ) -> Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>
@@ -51029,20 +51153,20 @@ fn __action1462<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1106(
+    __action1109(
         __0,
         __temp0,
     )
 }
 
-fn __action1463<
+fn __action1469<
 >(
     __0: (TextSize, (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr), TextSize),
 ) -> Result<ArgumentList,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
     let __end0 = __0.2.clone();
-    let __temp0 = __action1459(
+    let __temp0 = __action1465(
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -51051,7 +51175,7 @@ fn __action1463<
     )
 }
 
-fn __action1464<
+fn __action1470<
 >(
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
@@ -51059,7 +51183,7 @@ fn __action1464<
 {
     let __start0 = __lookbehind.clone();
     let __end0 = __lookahead.clone();
-    let __temp0 = __action1460(
+    let __temp0 = __action1466(
         &__start0,
         &__end0,
     );
@@ -51069,7 +51193,7 @@ fn __action1464<
     )
 }
 
-fn __action1465<
+fn __action1471<
 >(
     __0: (TextSize, alloc::vec::Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
     __1: (TextSize, (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr), TextSize),
@@ -51077,7 +51201,7 @@ fn __action1465<
 {
     let __start0 = __0.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1461(
+    let __temp0 = __action1467(
         __0,
         __1,
     );
@@ -51087,14 +51211,14 @@ fn __action1465<
     )
 }
 
-fn __action1466<
+fn __action1472<
 >(
     __0: (TextSize, alloc::vec::Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize),
 ) -> Result<ArgumentList,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0.clone();
     let __end0 = __0.2.clone();
-    let __temp0 = __action1462(
+    let __temp0 = __action1468(
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -51103,7 +51227,7 @@ fn __action1466<
     )
 }
 
-fn __action1467<
+fn __action1473<
 >(
     __0: (TextSize, ast::Pattern, TextSize),
 ) -> Vec<ast::Pattern>
@@ -51114,12 +51238,12 @@ fn __action1467<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1128(
+    __action1131(
         __temp0,
     )
 }
 
-fn __action1468<
+fn __action1474<
 >(
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
@@ -51132,12 +51256,12 @@ fn __action1468<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1128(
+    __action1131(
         __temp0,
     )
 }
 
-fn __action1469<
+fn __action1475<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -51149,13 +51273,13 @@ fn __action1469<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1129(
+    __action1132(
         __0,
         __temp0,
     )
 }
 
-fn __action1470<
+fn __action1476<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
 ) -> Vec<ast::Pattern>
@@ -51167,13 +51291,13 @@ fn __action1470<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1129(
+    __action1132(
         __0,
         __temp0,
     )
 }
 
-fn __action1471<
+fn __action1477<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Pattern, TextSize),
@@ -51182,18 +51306,18 @@ fn __action1471<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1467(
+    let __temp0 = __action1473(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1388(
+    __action1394(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1472<
+fn __action1478<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51201,19 +51325,19 @@ fn __action1472<
 {
     let __start0 = __0.2.clone();
     let __end0 = __1.0.clone();
-    let __temp0 = __action1468(
+    let __temp0 = __action1474(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1388(
+    __action1394(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1473<
+fn __action1479<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
@@ -51223,19 +51347,19 @@ fn __action1473<
 {
     let __start0 = __1.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1469(
+    let __temp0 = __action1475(
         __1,
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1388(
+    __action1394(
         __0,
         __temp0,
         __3,
     )
 }
 
-fn __action1474<
+fn __action1480<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Pattern>, TextSize),
@@ -51244,18 +51368,18 @@ fn __action1474<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1470(
+    let __temp0 = __action1476(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1388(
+    __action1394(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1475<
+fn __action1481<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, Vec<ast::Comprehension>, TextSize),
@@ -51267,13 +51391,13 @@ fn __action1475<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1251(
+    __action1256(
         __0,
         __temp0,
     )
 }
 
-fn __action1476<
+fn __action1482<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
@@ -51285,13 +51409,13 @@ fn __action1476<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1251(
+    __action1256(
         __0,
         __temp0,
     )
 }
 
-fn __action1477<
+fn __action1483<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51307,7 +51431,7 @@ fn __action1477<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1391(
+    __action1397(
         __0,
         __1,
         __2,
@@ -51317,7 +51441,7 @@ fn __action1477<
     )
 }
 
-fn __action1478<
+fn __action1484<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51333,7 +51457,7 @@ fn __action1478<
         __5,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1391(
+    __action1397(
         __0,
         __1,
         __2,
@@ -51343,7 +51467,7 @@ fn __action1478<
     )
 }
 
-fn __action1479<
+fn __action1485<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -51358,7 +51482,7 @@ fn __action1479<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1392(
+    __action1398(
         __0,
         __1,
         __2,
@@ -51367,7 +51491,7 @@ fn __action1479<
     )
 }
 
-fn __action1480<
+fn __action1486<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -51382,7 +51506,7 @@ fn __action1480<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1392(
+    __action1398(
         __0,
         __1,
         __2,
@@ -51391,7 +51515,7 @@ fn __action1480<
     )
 }
 
-fn __action1481<
+fn __action1487<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -51421,7 +51545,7 @@ fn __action1481<
     )
 }
 
-fn __action1482<
+fn __action1488<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51451,7 +51575,7 @@ fn __action1482<
     )
 }
 
-fn __action1483<
+fn __action1489<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -51475,7 +51599,7 @@ fn __action1483<
     )
 }
 
-fn __action1484<
+fn __action1490<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51499,7 +51623,7 @@ fn __action1484<
     )
 }
 
-fn __action1485<
+fn __action1491<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51518,7 +51642,7 @@ fn __action1485<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1046(
+    __action1049(
         __temp0,
         __0,
         __1,
@@ -51531,7 +51655,7 @@ fn __action1485<
     )
 }
 
-fn __action1486<
+fn __action1492<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51550,7 +51674,7 @@ fn __action1486<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1046(
+    __action1049(
         __temp0,
         __1,
         __2,
@@ -51563,7 +51687,7 @@ fn __action1486<
     )
 }
 
-fn __action1487<
+fn __action1493<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51580,7 +51704,7 @@ fn __action1487<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1047(
+    __action1050(
         __temp0,
         __0,
         __1,
@@ -51591,7 +51715,7 @@ fn __action1487<
     )
 }
 
-fn __action1488<
+fn __action1494<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51608,7 +51732,7 @@ fn __action1488<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1047(
+    __action1050(
         __temp0,
         __1,
         __2,
@@ -51619,7 +51743,7 @@ fn __action1488<
     )
 }
 
-fn __action1489<
+fn __action1495<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -51637,7 +51761,7 @@ fn __action1489<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1048(
+    __action1051(
         __temp0,
         __0,
         __1,
@@ -51649,7 +51773,7 @@ fn __action1489<
     )
 }
 
-fn __action1490<
+fn __action1496<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51667,7 +51791,7 @@ fn __action1490<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1048(
+    __action1051(
         __temp0,
         __1,
         __2,
@@ -51679,7 +51803,7 @@ fn __action1490<
     )
 }
 
-fn __action1491<
+fn __action1497<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -51695,7 +51819,7 @@ fn __action1491<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1049(
+    __action1052(
         __temp0,
         __0,
         __1,
@@ -51705,7 +51829,7 @@ fn __action1491<
     )
 }
 
-fn __action1492<
+fn __action1498<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51721,7 +51845,7 @@ fn __action1492<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1049(
+    __action1052(
         __temp0,
         __1,
         __2,
@@ -51731,7 +51855,7 @@ fn __action1492<
     )
 }
 
-fn __action1493<
+fn __action1499<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(Option<Box<ast::Expr>>, ast::Expr)>, TextSize),
@@ -51744,14 +51868,14 @@ fn __action1493<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1178(
+    __action1181(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1494<
+fn __action1500<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51764,14 +51888,14 @@ fn __action1494<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1178(
+    __action1181(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1495<
+fn __action1501<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<(Option<Box<ast::Expr>>, ast::Expr)>, TextSize),
@@ -51784,14 +51908,14 @@ fn __action1495<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1201(
+    __action1204(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1496<
+fn __action1502<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -51804,14 +51928,14 @@ fn __action1496<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1201(
+    __action1204(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1497<
+fn __action1503<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arg, TextSize),
@@ -51829,7 +51953,7 @@ fn __action1497<
     )
 }
 
-fn __action1498<
+fn __action1504<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> Option<Box<ast::Arg>>
@@ -51847,148 +51971,68 @@ fn __action1498<
     )
 }
 
-fn __action1499<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1260(
-        __0,
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action349(
-        __temp0,
-    )
-}
-
-fn __action1500<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action1261(
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action349(
-        __temp0,
-    )
-}
-
-fn __action1501<
->(
-    __0: (TextSize, Vec<ast::Alias>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __2.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action1260(
-        __2,
-        __3,
-        __4,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action350(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1502<
->(
-    __0: (TextSize, Vec<ast::Alias>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __2.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1261(
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action350(
-        __0,
-        __1,
-        __temp0,
-    )
-}
-
-fn __action1503<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action1262(
-        __0,
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action342(
-        __temp0,
-    )
-}
-
-fn __action1504<
->(
-    __0: (TextSize, ast::Identifier, TextSize),
-) -> Vec<ast::Alias>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action1263(
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action342(
-        __temp0,
-    )
-}
-
 fn __action1505<
 >(
-    __0: (TextSize, Vec<ast::Alias>, TextSize),
+    __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::Identifier, TextSize),
 ) -> Vec<ast::Alias>
 {
-    let __start0 = __2.0.clone();
-    let __end0 = __4.2.clone();
-    let __temp0 = __action1262(
-        __2,
-        __3,
-        __4,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action343(
+    let __start0 = __0.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1266(
         __0,
         __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action349(
         __temp0,
     )
 }
 
 fn __action1506<
 >(
+    __0: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action1267(
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action349(
+        __temp0,
+    )
+}
+
+fn __action1507<
+>(
+    __0: (TextSize, Vec<ast::Alias>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __2.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action1266(
+        __2,
+        __3,
+        __4,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action350(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1508<
+>(
     __0: (TextSize, Vec<ast::Alias>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
@@ -51996,7 +52040,87 @@ fn __action1506<
 {
     let __start0 = __2.0.clone();
     let __end0 = __2.2.clone();
-    let __temp0 = __action1263(
+    let __temp0 = __action1267(
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action350(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1509<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1268(
+        __0,
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action342(
+        __temp0,
+    )
+}
+
+fn __action1510<
+>(
+    __0: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action1269(
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action342(
+        __temp0,
+    )
+}
+
+fn __action1511<
+>(
+    __0: (TextSize, Vec<ast::Alias>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __2.0.clone();
+    let __end0 = __4.2.clone();
+    let __temp0 = __action1268(
+        __2,
+        __3,
+        __4,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action343(
+        __0,
+        __1,
+        __temp0,
+    )
+}
+
+fn __action1512<
+>(
+    __0: (TextSize, Vec<ast::Alias>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, ast::Identifier, TextSize),
+) -> Vec<ast::Alias>
+{
+    let __start0 = __2.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action1269(
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
@@ -52007,7 +52131,7 @@ fn __action1506<
     )
 }
 
-fn __action1507<
+fn __action1513<
 >(
     __0: (TextSize, ast::Identifier, TextSize),
 ) -> (Option<ast::Int>, Option<ast::Identifier>)
@@ -52025,7 +52149,7 @@ fn __action1507<
     )
 }
 
-fn __action1508<
+fn __action1514<
 >(
     __0: (TextSize, alloc::vec::Vec<ast::Int>, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
@@ -52043,7 +52167,7 @@ fn __action1508<
     )
 }
 
-fn __action1509<
+fn __action1515<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -52056,14 +52180,14 @@ fn __action1509<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1163(
+    __action1166(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1510<
+fn __action1516<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52076,14 +52200,14 @@ fn __action1510<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1163(
+    __action1166(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1511<
+fn __action1517<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::Expr>, TextSize),
@@ -52096,14 +52220,14 @@ fn __action1511<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1188(
+    __action1191(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1512<
+fn __action1518<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52116,14 +52240,14 @@ fn __action1512<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1188(
+    __action1191(
         __0,
         __temp0,
         __1,
     )
 }
 
-fn __action1513<
+fn __action1519<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52140,7 +52264,7 @@ fn __action1513<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1297(
+    __action1303(
         __temp0,
         __1,
         __2,
@@ -52151,7 +52275,7 @@ fn __action1513<
     )
 }
 
-fn __action1514<
+fn __action1520<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52172,7 +52296,7 @@ fn __action1514<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1297(
+    __action1303(
         __temp0,
         __3,
         __4,
@@ -52183,7 +52307,7 @@ fn __action1514<
     )
 }
 
-fn __action1515<
+fn __action1521<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52206,7 +52330,7 @@ fn __action1515<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1297(
+    __action1303(
         __temp0,
         __4,
         __5,
@@ -52217,7 +52341,7 @@ fn __action1515<
     )
 }
 
-fn __action1516<
+fn __action1522<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52233,7 +52357,7 @@ fn __action1516<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1298(
+    __action1304(
         __temp0,
         __1,
         __2,
@@ -52243,7 +52367,7 @@ fn __action1516<
     )
 }
 
-fn __action1517<
+fn __action1523<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52263,7 +52387,7 @@ fn __action1517<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1298(
+    __action1304(
         __temp0,
         __3,
         __4,
@@ -52273,7 +52397,7 @@ fn __action1517<
     )
 }
 
-fn __action1518<
+fn __action1524<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52295,7 +52419,7 @@ fn __action1518<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1298(
+    __action1304(
         __temp0,
         __4,
         __5,
@@ -52305,7 +52429,7 @@ fn __action1518<
     )
 }
 
-fn __action1519<
+fn __action1525<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52323,7 +52447,7 @@ fn __action1519<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1299(
+    __action1305(
         __temp0,
         __1,
         __2,
@@ -52335,7 +52459,7 @@ fn __action1519<
     )
 }
 
-fn __action1520<
+fn __action1526<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52357,7 +52481,7 @@ fn __action1520<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1299(
+    __action1305(
         __temp0,
         __3,
         __4,
@@ -52369,7 +52493,7 @@ fn __action1520<
     )
 }
 
-fn __action1521<
+fn __action1527<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52393,7 +52517,7 @@ fn __action1521<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1299(
+    __action1305(
         __temp0,
         __4,
         __5,
@@ -52405,7 +52529,7 @@ fn __action1521<
     )
 }
 
-fn __action1522<
+fn __action1528<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52422,7 +52546,7 @@ fn __action1522<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1300(
+    __action1306(
         __temp0,
         __1,
         __2,
@@ -52433,7 +52557,7 @@ fn __action1522<
     )
 }
 
-fn __action1523<
+fn __action1529<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52454,7 +52578,7 @@ fn __action1523<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1300(
+    __action1306(
         __temp0,
         __3,
         __4,
@@ -52465,7 +52589,7 @@ fn __action1523<
     )
 }
 
-fn __action1524<
+fn __action1530<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52488,7 +52612,7 @@ fn __action1524<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1300(
+    __action1306(
         __temp0,
         __4,
         __5,
@@ -52499,7 +52623,7 @@ fn __action1524<
     )
 }
 
-fn __action1525<
+fn __action1531<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52514,7 +52638,7 @@ fn __action1525<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1301(
+    __action1307(
         __temp0,
         __1,
         __2,
@@ -52523,7 +52647,7 @@ fn __action1525<
     )
 }
 
-fn __action1526<
+fn __action1532<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52542,7 +52666,7 @@ fn __action1526<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1301(
+    __action1307(
         __temp0,
         __3,
         __4,
@@ -52551,7 +52675,7 @@ fn __action1526<
     )
 }
 
-fn __action1527<
+fn __action1533<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52572,7 +52696,7 @@ fn __action1527<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1301(
+    __action1307(
         __temp0,
         __4,
         __5,
@@ -52581,7 +52705,7 @@ fn __action1527<
     )
 }
 
-fn __action1528<
+fn __action1534<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52595,7 +52719,7 @@ fn __action1528<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1302(
+    __action1308(
         __temp0,
         __1,
         __2,
@@ -52603,7 +52727,7 @@ fn __action1528<
     )
 }
 
-fn __action1529<
+fn __action1535<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52621,7 +52745,7 @@ fn __action1529<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1302(
+    __action1308(
         __temp0,
         __3,
         __4,
@@ -52629,7 +52753,7 @@ fn __action1529<
     )
 }
 
-fn __action1530<
+fn __action1536<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52649,7 +52773,7 @@ fn __action1530<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1302(
+    __action1308(
         __temp0,
         __4,
         __5,
@@ -52657,7 +52781,7 @@ fn __action1530<
     )
 }
 
-fn __action1531<
+fn __action1537<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52673,7 +52797,7 @@ fn __action1531<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1303(
+    __action1309(
         __temp0,
         __1,
         __2,
@@ -52683,7 +52807,7 @@ fn __action1531<
     )
 }
 
-fn __action1532<
+fn __action1538<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52703,7 +52827,7 @@ fn __action1532<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1303(
+    __action1309(
         __temp0,
         __3,
         __4,
@@ -52713,7 +52837,7 @@ fn __action1532<
     )
 }
 
-fn __action1533<
+fn __action1539<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52735,7 +52859,7 @@ fn __action1533<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1303(
+    __action1309(
         __temp0,
         __4,
         __5,
@@ -52745,7 +52869,7 @@ fn __action1533<
     )
 }
 
-fn __action1534<
+fn __action1540<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52760,7 +52884,7 @@ fn __action1534<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1304(
+    __action1310(
         __temp0,
         __1,
         __2,
@@ -52769,7 +52893,7 @@ fn __action1534<
     )
 }
 
-fn __action1535<
+fn __action1541<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52788,7 +52912,7 @@ fn __action1535<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1304(
+    __action1310(
         __temp0,
         __3,
         __4,
@@ -52797,7 +52921,7 @@ fn __action1535<
     )
 }
 
-fn __action1536<
+fn __action1542<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52818,7 +52942,7 @@ fn __action1536<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1304(
+    __action1310(
         __temp0,
         __4,
         __5,
@@ -52827,7 +52951,7 @@ fn __action1536<
     )
 }
 
-fn __action1537<
+fn __action1543<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52839,13 +52963,13 @@ fn __action1537<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1305(
+    __action1311(
         __temp0,
         __1,
     )
 }
 
-fn __action1538<
+fn __action1544<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52861,13 +52985,13 @@ fn __action1538<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1305(
+    __action1311(
         __temp0,
         __3,
     )
 }
 
-fn __action1539<
+fn __action1545<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52885,13 +53009,13 @@ fn __action1539<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1305(
+    __action1311(
         __temp0,
         __4,
     )
 }
 
-fn __action1540<
+fn __action1546<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52907,7 +53031,7 @@ fn __action1540<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1306(
+    __action1312(
         __temp0,
         __1,
         __2,
@@ -52917,7 +53041,7 @@ fn __action1540<
     )
 }
 
-fn __action1541<
+fn __action1547<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52937,7 +53061,7 @@ fn __action1541<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1306(
+    __action1312(
         __temp0,
         __3,
         __4,
@@ -52947,7 +53071,7 @@ fn __action1541<
     )
 }
 
-fn __action1542<
+fn __action1548<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52969,7 +53093,7 @@ fn __action1542<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1306(
+    __action1312(
         __temp0,
         __4,
         __5,
@@ -52979,7 +53103,7 @@ fn __action1542<
     )
 }
 
-fn __action1543<
+fn __action1549<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -52994,7 +53118,7 @@ fn __action1543<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1307(
+    __action1313(
         __temp0,
         __1,
         __2,
@@ -53003,7 +53127,7 @@ fn __action1543<
     )
 }
 
-fn __action1544<
+fn __action1550<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53022,7 +53146,7 @@ fn __action1544<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1307(
+    __action1313(
         __temp0,
         __3,
         __4,
@@ -53031,7 +53155,7 @@ fn __action1544<
     )
 }
 
-fn __action1545<
+fn __action1551<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53052,7 +53176,7 @@ fn __action1545<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1307(
+    __action1313(
         __temp0,
         __4,
         __5,
@@ -53061,7 +53185,7 @@ fn __action1545<
     )
 }
 
-fn __action1546<
+fn __action1552<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53078,7 +53202,7 @@ fn __action1546<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1308(
+    __action1314(
         __temp0,
         __1,
         __2,
@@ -53089,7 +53213,7 @@ fn __action1546<
     )
 }
 
-fn __action1547<
+fn __action1553<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53110,7 +53234,7 @@ fn __action1547<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1308(
+    __action1314(
         __temp0,
         __3,
         __4,
@@ -53121,7 +53245,7 @@ fn __action1547<
     )
 }
 
-fn __action1548<
+fn __action1554<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53144,7 +53268,7 @@ fn __action1548<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1308(
+    __action1314(
         __temp0,
         __4,
         __5,
@@ -53155,7 +53279,7 @@ fn __action1548<
     )
 }
 
-fn __action1549<
+fn __action1555<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53171,7 +53295,7 @@ fn __action1549<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1309(
+    __action1315(
         __temp0,
         __1,
         __2,
@@ -53181,7 +53305,7 @@ fn __action1549<
     )
 }
 
-fn __action1550<
+fn __action1556<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53201,7 +53325,7 @@ fn __action1550<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1309(
+    __action1315(
         __temp0,
         __3,
         __4,
@@ -53211,7 +53335,7 @@ fn __action1550<
     )
 }
 
-fn __action1551<
+fn __action1557<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53233,7 +53357,7 @@ fn __action1551<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1309(
+    __action1315(
         __temp0,
         __4,
         __5,
@@ -53243,7 +53367,7 @@ fn __action1551<
     )
 }
 
-fn __action1552<
+fn __action1558<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53257,7 +53381,7 @@ fn __action1552<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1310(
+    __action1316(
         __temp0,
         __1,
         __2,
@@ -53265,7 +53389,7 @@ fn __action1552<
     )
 }
 
-fn __action1553<
+fn __action1559<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53283,7 +53407,7 @@ fn __action1553<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1310(
+    __action1316(
         __temp0,
         __3,
         __4,
@@ -53291,7 +53415,7 @@ fn __action1553<
     )
 }
 
-fn __action1554<
+fn __action1560<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53311,7 +53435,7 @@ fn __action1554<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1310(
+    __action1316(
         __temp0,
         __4,
         __5,
@@ -53319,7 +53443,7 @@ fn __action1554<
     )
 }
 
-fn __action1555<
+fn __action1561<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53332,14 +53456,14 @@ fn __action1555<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1311(
+    __action1317(
         __temp0,
         __1,
         __2,
     )
 }
 
-fn __action1556<
+fn __action1562<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53356,14 +53480,14 @@ fn __action1556<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1311(
+    __action1317(
         __temp0,
         __3,
         __4,
     )
 }
 
-fn __action1557<
+fn __action1563<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53382,14 +53506,14 @@ fn __action1557<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1311(
+    __action1317(
         __temp0,
         __4,
         __5,
     )
 }
 
-fn __action1558<
+fn __action1564<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53404,7 +53528,7 @@ fn __action1558<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1312(
+    __action1318(
         __temp0,
         __1,
         __2,
@@ -53413,7 +53537,7 @@ fn __action1558<
     )
 }
 
-fn __action1559<
+fn __action1565<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53432,7 +53556,7 @@ fn __action1559<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1312(
+    __action1318(
         __temp0,
         __3,
         __4,
@@ -53441,7 +53565,7 @@ fn __action1559<
     )
 }
 
-fn __action1560<
+fn __action1566<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53462,7 +53586,7 @@ fn __action1560<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1312(
+    __action1318(
         __temp0,
         __4,
         __5,
@@ -53471,7 +53595,7 @@ fn __action1560<
     )
 }
 
-fn __action1561<
+fn __action1567<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53485,7 +53609,7 @@ fn __action1561<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1313(
+    __action1319(
         __temp0,
         __1,
         __2,
@@ -53493,7 +53617,7 @@ fn __action1561<
     )
 }
 
-fn __action1562<
+fn __action1568<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53511,141 +53635,7 @@ fn __action1562<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1313(
-        __temp0,
-        __3,
-        __4,
-        __5,
-    )
-}
-
-fn __action1563<
->(
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action661(
-        __0,
-        __1,
-        __2,
-        __3,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1313(
-        __temp0,
-        __4,
-        __5,
-        __6,
-    )
-}
-
-fn __action1564<
->(
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action400(
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1314(
-        __temp0,
-    )
-}
-
-fn __action1565<
->(
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action660(
-        __0,
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1314(
-        __temp0,
-    )
-}
-
-fn __action1566<
->(
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __3.2.clone();
-    let __temp0 = __action661(
-        __0,
-        __1,
-        __2,
-        __3,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1314(
-        __temp0,
-    )
-}
-
-fn __action1567<
->(
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __0.2.clone();
-    let __temp0 = __action400(
-        __0,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1315(
-        __temp0,
-        __1,
-        __2,
-        __3,
-    )
-}
-
-fn __action1568<
->(
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-    __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-    __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
-{
-    let __start0 = __0.0.clone();
-    let __end0 = __2.2.clone();
-    let __temp0 = __action660(
-        __0,
-        __1,
-        __2,
-    );
-    let __temp0 = (__start0, __temp0, __end0);
-    __action1315(
+    __action1319(
         __temp0,
         __3,
         __4,
@@ -53660,6 +53650,140 @@ fn __action1569<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action661(
+        __0,
+        __1,
+        __2,
+        __3,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1319(
+        __temp0,
+        __4,
+        __5,
+        __6,
+    )
+}
+
+fn __action1570<
+>(
+    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action400(
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1320(
+        __temp0,
+    )
+}
+
+fn __action1571<
+>(
+    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action660(
+        __0,
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1320(
+        __temp0,
+    )
+}
+
+fn __action1572<
+>(
+    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __3.2.clone();
+    let __temp0 = __action661(
+        __0,
+        __1,
+        __2,
+        __3,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1320(
+        __temp0,
+    )
+}
+
+fn __action1573<
+>(
+    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __0.2.clone();
+    let __temp0 = __action400(
+        __0,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1321(
+        __temp0,
+        __1,
+        __2,
+        __3,
+    )
+}
+
+fn __action1574<
+>(
+    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, token::Tok, TextSize),
+) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+{
+    let __start0 = __0.0.clone();
+    let __end0 = __2.2.clone();
+    let __temp0 = __action660(
+        __0,
+        __1,
+        __2,
+    );
+    let __temp0 = (__start0, __temp0, __end0);
+    __action1321(
+        __temp0,
+        __3,
+        __4,
+        __5,
+    )
+}
+
+fn __action1575<
+>(
+    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, token::Tok, TextSize),
+    __2: (TextSize, token::Tok, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -53673,7 +53797,7 @@ fn __action1569<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1315(
+    __action1321(
         __temp0,
         __4,
         __5,
@@ -53681,7 +53805,7 @@ fn __action1569<
     )
 }
 
-fn __action1570<
+fn __action1576<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53694,14 +53818,14 @@ fn __action1570<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1316(
+    __action1322(
         __temp0,
         __1,
         __2,
     )
 }
 
-fn __action1571<
+fn __action1577<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53718,14 +53842,14 @@ fn __action1571<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1316(
+    __action1322(
         __temp0,
         __3,
         __4,
     )
 }
 
-fn __action1572<
+fn __action1578<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53744,14 +53868,14 @@ fn __action1572<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1316(
+    __action1322(
         __temp0,
         __4,
         __5,
     )
 }
 
-fn __action1573<
+fn __action1579<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53768,7 +53892,7 @@ fn __action1573<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1335(
+    __action1341(
         __temp0,
         __1,
         __2,
@@ -53779,7 +53903,7 @@ fn __action1573<
     )
 }
 
-fn __action1574<
+fn __action1580<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53800,7 +53924,7 @@ fn __action1574<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1335(
+    __action1341(
         __temp0,
         __3,
         __4,
@@ -53811,7 +53935,7 @@ fn __action1574<
     )
 }
 
-fn __action1575<
+fn __action1581<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53834,7 +53958,7 @@ fn __action1575<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1335(
+    __action1341(
         __temp0,
         __4,
         __5,
@@ -53845,7 +53969,7 @@ fn __action1575<
     )
 }
 
-fn __action1576<
+fn __action1582<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53861,7 +53985,7 @@ fn __action1576<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1336(
+    __action1342(
         __temp0,
         __1,
         __2,
@@ -53871,7 +53995,7 @@ fn __action1576<
     )
 }
 
-fn __action1577<
+fn __action1583<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53891,7 +54015,7 @@ fn __action1577<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1336(
+    __action1342(
         __temp0,
         __3,
         __4,
@@ -53901,7 +54025,7 @@ fn __action1577<
     )
 }
 
-fn __action1578<
+fn __action1584<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53923,7 +54047,7 @@ fn __action1578<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1336(
+    __action1342(
         __temp0,
         __4,
         __5,
@@ -53933,7 +54057,7 @@ fn __action1578<
     )
 }
 
-fn __action1579<
+fn __action1585<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53951,7 +54075,7 @@ fn __action1579<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1337(
+    __action1343(
         __temp0,
         __1,
         __2,
@@ -53963,7 +54087,7 @@ fn __action1579<
     )
 }
 
-fn __action1580<
+fn __action1586<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -53985,7 +54109,7 @@ fn __action1580<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1337(
+    __action1343(
         __temp0,
         __3,
         __4,
@@ -53997,7 +54121,7 @@ fn __action1580<
     )
 }
 
-fn __action1581<
+fn __action1587<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54021,7 +54145,7 @@ fn __action1581<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1337(
+    __action1343(
         __temp0,
         __4,
         __5,
@@ -54033,7 +54157,7 @@ fn __action1581<
     )
 }
 
-fn __action1582<
+fn __action1588<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54050,7 +54174,7 @@ fn __action1582<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1338(
+    __action1344(
         __temp0,
         __1,
         __2,
@@ -54061,7 +54185,7 @@ fn __action1582<
     )
 }
 
-fn __action1583<
+fn __action1589<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54082,7 +54206,7 @@ fn __action1583<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1338(
+    __action1344(
         __temp0,
         __3,
         __4,
@@ -54093,7 +54217,7 @@ fn __action1583<
     )
 }
 
-fn __action1584<
+fn __action1590<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54116,7 +54240,7 @@ fn __action1584<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1338(
+    __action1344(
         __temp0,
         __4,
         __5,
@@ -54127,7 +54251,7 @@ fn __action1584<
     )
 }
 
-fn __action1585<
+fn __action1591<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54142,7 +54266,7 @@ fn __action1585<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1339(
+    __action1345(
         __temp0,
         __1,
         __2,
@@ -54151,7 +54275,7 @@ fn __action1585<
     )
 }
 
-fn __action1586<
+fn __action1592<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54170,7 +54294,7 @@ fn __action1586<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1339(
+    __action1345(
         __temp0,
         __3,
         __4,
@@ -54179,7 +54303,7 @@ fn __action1586<
     )
 }
 
-fn __action1587<
+fn __action1593<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54200,7 +54324,7 @@ fn __action1587<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1339(
+    __action1345(
         __temp0,
         __4,
         __5,
@@ -54209,7 +54333,7 @@ fn __action1587<
     )
 }
 
-fn __action1588<
+fn __action1594<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54223,7 +54347,7 @@ fn __action1588<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1340(
+    __action1346(
         __temp0,
         __1,
         __2,
@@ -54231,7 +54355,7 @@ fn __action1588<
     )
 }
 
-fn __action1589<
+fn __action1595<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54249,7 +54373,7 @@ fn __action1589<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1340(
+    __action1346(
         __temp0,
         __3,
         __4,
@@ -54257,7 +54381,7 @@ fn __action1589<
     )
 }
 
-fn __action1590<
+fn __action1596<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54277,7 +54401,7 @@ fn __action1590<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1340(
+    __action1346(
         __temp0,
         __4,
         __5,
@@ -54285,7 +54409,7 @@ fn __action1590<
     )
 }
 
-fn __action1591<
+fn __action1597<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54301,7 +54425,7 @@ fn __action1591<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1341(
+    __action1347(
         __temp0,
         __1,
         __2,
@@ -54311,7 +54435,7 @@ fn __action1591<
     )
 }
 
-fn __action1592<
+fn __action1598<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54331,7 +54455,7 @@ fn __action1592<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1341(
+    __action1347(
         __temp0,
         __3,
         __4,
@@ -54341,7 +54465,7 @@ fn __action1592<
     )
 }
 
-fn __action1593<
+fn __action1599<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54363,7 +54487,7 @@ fn __action1593<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1341(
+    __action1347(
         __temp0,
         __4,
         __5,
@@ -54373,7 +54497,7 @@ fn __action1593<
     )
 }
 
-fn __action1594<
+fn __action1600<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54388,7 +54512,7 @@ fn __action1594<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1342(
+    __action1348(
         __temp0,
         __1,
         __2,
@@ -54397,7 +54521,7 @@ fn __action1594<
     )
 }
 
-fn __action1595<
+fn __action1601<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54416,7 +54540,7 @@ fn __action1595<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1342(
+    __action1348(
         __temp0,
         __3,
         __4,
@@ -54425,7 +54549,7 @@ fn __action1595<
     )
 }
 
-fn __action1596<
+fn __action1602<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54446,7 +54570,7 @@ fn __action1596<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1342(
+    __action1348(
         __temp0,
         __4,
         __5,
@@ -54455,7 +54579,7 @@ fn __action1596<
     )
 }
 
-fn __action1597<
+fn __action1603<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54467,13 +54591,13 @@ fn __action1597<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1343(
+    __action1349(
         __temp0,
         __1,
     )
 }
 
-fn __action1598<
+fn __action1604<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54489,13 +54613,13 @@ fn __action1598<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1343(
+    __action1349(
         __temp0,
         __3,
     )
 }
 
-fn __action1599<
+fn __action1605<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54513,13 +54637,13 @@ fn __action1599<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1343(
+    __action1349(
         __temp0,
         __4,
     )
 }
 
-fn __action1600<
+fn __action1606<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54535,7 +54659,7 @@ fn __action1600<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1344(
+    __action1350(
         __temp0,
         __1,
         __2,
@@ -54545,7 +54669,7 @@ fn __action1600<
     )
 }
 
-fn __action1601<
+fn __action1607<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54565,7 +54689,7 @@ fn __action1601<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1344(
+    __action1350(
         __temp0,
         __3,
         __4,
@@ -54575,7 +54699,7 @@ fn __action1601<
     )
 }
 
-fn __action1602<
+fn __action1608<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54597,7 +54721,7 @@ fn __action1602<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1344(
+    __action1350(
         __temp0,
         __4,
         __5,
@@ -54607,7 +54731,7 @@ fn __action1602<
     )
 }
 
-fn __action1603<
+fn __action1609<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54622,7 +54746,7 @@ fn __action1603<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1345(
+    __action1351(
         __temp0,
         __1,
         __2,
@@ -54631,7 +54755,7 @@ fn __action1603<
     )
 }
 
-fn __action1604<
+fn __action1610<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54650,7 +54774,7 @@ fn __action1604<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1345(
+    __action1351(
         __temp0,
         __3,
         __4,
@@ -54659,7 +54783,7 @@ fn __action1604<
     )
 }
 
-fn __action1605<
+fn __action1611<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54680,7 +54804,7 @@ fn __action1605<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1345(
+    __action1351(
         __temp0,
         __4,
         __5,
@@ -54689,7 +54813,7 @@ fn __action1605<
     )
 }
 
-fn __action1606<
+fn __action1612<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54706,7 +54830,7 @@ fn __action1606<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1346(
+    __action1352(
         __temp0,
         __1,
         __2,
@@ -54717,7 +54841,7 @@ fn __action1606<
     )
 }
 
-fn __action1607<
+fn __action1613<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54738,7 +54862,7 @@ fn __action1607<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1346(
+    __action1352(
         __temp0,
         __3,
         __4,
@@ -54749,7 +54873,7 @@ fn __action1607<
     )
 }
 
-fn __action1608<
+fn __action1614<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54772,7 +54896,7 @@ fn __action1608<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1346(
+    __action1352(
         __temp0,
         __4,
         __5,
@@ -54783,7 +54907,7 @@ fn __action1608<
     )
 }
 
-fn __action1609<
+fn __action1615<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54799,7 +54923,7 @@ fn __action1609<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1347(
+    __action1353(
         __temp0,
         __1,
         __2,
@@ -54809,7 +54933,7 @@ fn __action1609<
     )
 }
 
-fn __action1610<
+fn __action1616<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54829,7 +54953,7 @@ fn __action1610<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1347(
+    __action1353(
         __temp0,
         __3,
         __4,
@@ -54839,7 +54963,7 @@ fn __action1610<
     )
 }
 
-fn __action1611<
+fn __action1617<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54861,7 +54985,7 @@ fn __action1611<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1347(
+    __action1353(
         __temp0,
         __4,
         __5,
@@ -54871,7 +54995,7 @@ fn __action1611<
     )
 }
 
-fn __action1612<
+fn __action1618<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54885,7 +55009,7 @@ fn __action1612<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1348(
+    __action1354(
         __temp0,
         __1,
         __2,
@@ -54893,7 +55017,7 @@ fn __action1612<
     )
 }
 
-fn __action1613<
+fn __action1619<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54911,7 +55035,7 @@ fn __action1613<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1348(
+    __action1354(
         __temp0,
         __3,
         __4,
@@ -54919,7 +55043,7 @@ fn __action1613<
     )
 }
 
-fn __action1614<
+fn __action1620<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54939,7 +55063,7 @@ fn __action1614<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1348(
+    __action1354(
         __temp0,
         __4,
         __5,
@@ -54947,7 +55071,7 @@ fn __action1614<
     )
 }
 
-fn __action1615<
+fn __action1621<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54960,14 +55084,14 @@ fn __action1615<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1349(
+    __action1355(
         __temp0,
         __1,
         __2,
     )
 }
 
-fn __action1616<
+fn __action1622<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -54984,14 +55108,14 @@ fn __action1616<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1349(
+    __action1355(
         __temp0,
         __3,
         __4,
     )
 }
 
-fn __action1617<
+fn __action1623<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55010,14 +55134,14 @@ fn __action1617<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1349(
+    __action1355(
         __temp0,
         __4,
         __5,
     )
 }
 
-fn __action1618<
+fn __action1624<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55032,7 +55156,7 @@ fn __action1618<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1350(
+    __action1356(
         __temp0,
         __1,
         __2,
@@ -55041,7 +55165,7 @@ fn __action1618<
     )
 }
 
-fn __action1619<
+fn __action1625<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55060,7 +55184,7 @@ fn __action1619<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1350(
+    __action1356(
         __temp0,
         __3,
         __4,
@@ -55069,7 +55193,7 @@ fn __action1619<
     )
 }
 
-fn __action1620<
+fn __action1626<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55090,7 +55214,7 @@ fn __action1620<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1350(
+    __action1356(
         __temp0,
         __4,
         __5,
@@ -55099,7 +55223,7 @@ fn __action1620<
     )
 }
 
-fn __action1621<
+fn __action1627<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55113,7 +55237,7 @@ fn __action1621<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1351(
+    __action1357(
         __temp0,
         __1,
         __2,
@@ -55121,7 +55245,7 @@ fn __action1621<
     )
 }
 
-fn __action1622<
+fn __action1628<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55139,7 +55263,7 @@ fn __action1622<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1351(
+    __action1357(
         __temp0,
         __3,
         __4,
@@ -55147,7 +55271,7 @@ fn __action1622<
     )
 }
 
-fn __action1623<
+fn __action1629<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55167,7 +55291,7 @@ fn __action1623<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1351(
+    __action1357(
         __temp0,
         __4,
         __5,
@@ -55175,7 +55299,7 @@ fn __action1623<
     )
 }
 
-fn __action1624<
+fn __action1630<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
 ) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -55186,12 +55310,12 @@ fn __action1624<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1352(
+    __action1358(
         __temp0,
     )
 }
 
-fn __action1625<
+fn __action1631<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55206,12 +55330,12 @@ fn __action1625<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1352(
+    __action1358(
         __temp0,
     )
 }
 
-fn __action1626<
+fn __action1632<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55228,12 +55352,12 @@ fn __action1626<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1352(
+    __action1358(
         __temp0,
     )
 }
 
-fn __action1627<
+fn __action1633<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55247,7 +55371,7 @@ fn __action1627<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1353(
+    __action1359(
         __temp0,
         __1,
         __2,
@@ -55255,7 +55379,7 @@ fn __action1627<
     )
 }
 
-fn __action1628<
+fn __action1634<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55273,7 +55397,7 @@ fn __action1628<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1353(
+    __action1359(
         __temp0,
         __3,
         __4,
@@ -55281,7 +55405,7 @@ fn __action1628<
     )
 }
 
-fn __action1629<
+fn __action1635<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55301,7 +55425,7 @@ fn __action1629<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1353(
+    __action1359(
         __temp0,
         __4,
         __5,
@@ -55309,7 +55433,7 @@ fn __action1629<
     )
 }
 
-fn __action1630<
+fn __action1636<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55322,14 +55446,14 @@ fn __action1630<
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1354(
+    __action1360(
         __temp0,
         __1,
         __2,
     )
 }
 
-fn __action1631<
+fn __action1637<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55346,14 +55470,14 @@ fn __action1631<
         __2,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1354(
+    __action1360(
         __temp0,
         __3,
         __4,
     )
 }
 
-fn __action1632<
+fn __action1638<
 >(
     __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55372,14 +55496,14 @@ fn __action1632<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1354(
+    __action1360(
         __temp0,
         __4,
         __5,
     )
 }
 
-fn __action1633<
+fn __action1639<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Arguments, TextSize),
@@ -55393,7 +55517,7 @@ fn __action1633<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1270(
+    __action1276(
         __0,
         __temp0,
         __2,
@@ -55401,7 +55525,7 @@ fn __action1633<
     )
 }
 
-fn __action1634<
+fn __action1640<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55415,7 +55539,7 @@ fn __action1634<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1270(
+    __action1276(
         __0,
         __temp0,
         __1,
@@ -55423,7 +55547,7 @@ fn __action1634<
     )
 }
 
-fn __action1635<
+fn __action1641<
 >(
     __0: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55437,7 +55561,7 @@ fn __action1635<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1398(
+    __action1404(
         __0,
         __1,
         __2,
@@ -55445,7 +55569,7 @@ fn __action1635<
     )
 }
 
-fn __action1636<
+fn __action1642<
 >(
     __0: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55459,7 +55583,7 @@ fn __action1636<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1398(
+    __action1404(
         __0,
         __1,
         __2,
@@ -55467,7 +55591,7 @@ fn __action1636<
     )
 }
 
-fn __action1637<
+fn __action1643<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55481,7 +55605,7 @@ fn __action1637<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action763(
+    __action765(
         __0,
         __temp0,
         __2,
@@ -55489,7 +55613,7 @@ fn __action1637<
     )
 }
 
-fn __action1638<
+fn __action1644<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55503,7 +55627,7 @@ fn __action1638<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action763(
+    __action765(
         __0,
         __temp0,
         __1,
@@ -55511,7 +55635,7 @@ fn __action1638<
     )
 }
 
-fn __action1639<
+fn __action1645<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55523,13 +55647,13 @@ fn __action1639<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action880(
+    __action883(
         __0,
         __temp0,
     )
 }
 
-fn __action1640<
+fn __action1646<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> Option<ast::Expr>
@@ -55541,13 +55665,13 @@ fn __action1640<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action880(
+    __action883(
         __0,
         __temp0,
     )
 }
 
-fn __action1641<
+fn __action1647<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55567,7 +55691,7 @@ fn __action1641<
         __2,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1635(
+    __action1641(
         __temp0,
         __1,
         __temp1,
@@ -55575,7 +55699,7 @@ fn __action1641<
     )
 }
 
-fn __action1642<
+fn __action1648<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55595,7 +55719,7 @@ fn __action1642<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1635(
+    __action1641(
         __temp0,
         __1,
         __temp1,
@@ -55603,7 +55727,7 @@ fn __action1642<
     )
 }
 
-fn __action1643<
+fn __action1649<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55623,7 +55747,7 @@ fn __action1643<
         __1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1635(
+    __action1641(
         __temp0,
         __0,
         __temp1,
@@ -55631,7 +55755,7 @@ fn __action1643<
     )
 }
 
-fn __action1644<
+fn __action1650<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Option<ast::Expr>, TextSize),
@@ -55651,7 +55775,7 @@ fn __action1644<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1635(
+    __action1641(
         __temp0,
         __0,
         __temp1,
@@ -55659,7 +55783,7 @@ fn __action1644<
     )
 }
 
-fn __action1645<
+fn __action1651<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55678,14 +55802,14 @@ fn __action1645<
         __2,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1636(
+    __action1642(
         __temp0,
         __1,
         __temp1,
     )
 }
 
-fn __action1646<
+fn __action1652<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55704,14 +55828,14 @@ fn __action1646<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1636(
+    __action1642(
         __temp0,
         __1,
         __temp1,
     )
 }
 
-fn __action1647<
+fn __action1653<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55730,14 +55854,14 @@ fn __action1647<
         __1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1636(
+    __action1642(
         __temp0,
         __0,
         __temp1,
     )
 }
 
-fn __action1648<
+fn __action1654<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -55756,14 +55880,14 @@ fn __action1648<
         &__end1,
     );
     let __temp1 = (__start1, __temp1, __end1);
-    __action1636(
+    __action1642(
         __temp0,
         __0,
         __temp1,
     )
 }
 
-fn __action1649<
+fn __action1655<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55783,7 +55907,7 @@ fn __action1649<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1070(
+    __action1073(
         __0,
         __1,
         __2,
@@ -55797,7 +55921,7 @@ fn __action1649<
     )
 }
 
-fn __action1650<
+fn __action1656<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
@@ -55814,7 +55938,7 @@ fn __action1650<
         __4,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1071(
+    __action1074(
         __0,
         __1,
         __2,
@@ -55825,7 +55949,7 @@ fn __action1650<
     )
 }
 
-fn __action1651<
+fn __action1657<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55844,7 +55968,7 @@ fn __action1651<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1072(
+    __action1075(
         __0,
         __1,
         __2,
@@ -55857,7 +55981,7 @@ fn __action1651<
     )
 }
 
-fn __action1652<
+fn __action1658<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55873,7 +55997,7 @@ fn __action1652<
         __3,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1073(
+    __action1076(
         __0,
         __1,
         __2,
@@ -55883,7 +56007,7 @@ fn __action1652<
     )
 }
 
-fn __action1653<
+fn __action1659<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> core::option::Option<ast::Expr>
@@ -55899,7 +56023,7 @@ fn __action1653<
     )
 }
 
-fn __action1654<
+fn __action1660<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
@@ -55915,7 +56039,7 @@ fn __action1654<
     )
 }
 
-fn __action1655<
+fn __action1661<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> ast::Expr
@@ -55931,7 +56055,7 @@ fn __action1655<
     )
 }
 
-fn __action1656<
+fn __action1662<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55943,13 +56067,13 @@ fn __action1656<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1409(
+    __action1415(
         __0,
         __temp0,
     )
 }
 
-fn __action1657<
+fn __action1663<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55962,14 +56086,14 @@ fn __action1657<
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1410(
+    __action1416(
         __0,
         __temp0,
         __2,
     )
 }
 
-fn __action1658<
+fn __action1664<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -55977,17 +56101,17 @@ fn __action1658<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1653(
+    let __temp0 = __action1659(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1249(
+    __action1254(
         __0,
         __temp0,
     )
 }
 
-fn __action1659<
+fn __action1665<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Stmt
@@ -55999,13 +56123,13 @@ fn __action1659<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1249(
+    __action1254(
         __0,
         __temp0,
     )
 }
 
-fn __action1660<
+fn __action1666<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
@@ -56013,17 +56137,17 @@ fn __action1660<
 {
     let __start0 = __1.0.clone();
     let __end0 = __1.2.clone();
-    let __temp0 = __action1653(
+    let __temp0 = __action1659(
         __1,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1431(
+    __action1437(
         __0,
         __temp0,
     )
 }
 
-fn __action1661<
+fn __action1667<
 >(
     __0: (TextSize, token::Tok, TextSize),
 ) -> ast::Expr
@@ -56035,29 +56159,29 @@ fn __action1661<
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1431(
+    __action1437(
         __0,
         __temp0,
     )
 }
 
-fn __action1662<
+fn __action1668<
 >(
     __0: (TextSize, ast::Expr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __0.0.clone();
     let __end0 = __0.2.clone();
-    let __temp0 = __action1655(
+    let __temp0 = __action1661(
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1455(
+    __action1461(
         __temp0,
     )
 }
 
-fn __action1663<
+fn __action1669<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
@@ -56065,17 +56189,17 @@ fn __action1663<
 {
     let __start0 = __0.0.clone();
     let __end0 = __0.2.clone();
-    let __temp0 = __action1655(
+    let __temp0 = __action1661(
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1456(
+    __action1462(
         __temp0,
         __1,
     )
 }
 
-fn __action1664<
+fn __action1670<
 >(
     __0: (TextSize, ast::Expr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
@@ -56084,11 +56208,11 @@ fn __action1664<
 {
     let __start0 = __0.0.clone();
     let __end0 = __0.2.clone();
-    let __temp0 = __action1655(
+    let __temp0 = __action1661(
         __0,
     );
     let __temp0 = (__start0, __temp0, __end0);
-    __action1243(
+    __action1248(
         __temp0,
         __1,
         __2,

@@ -13,18 +13,14 @@ expression: parse_ast
                         value: Name(
                             ExprName {
                                 range: 0..1,
-                                id: Identifier(
-                                    "x",
-                                ),
+                                id: "x",
                                 ctx: Load,
                             },
                         ),
                         slice: Name(
                             ExprName {
                                 range: 2..3,
-                                id: Identifier(
-                                    "y",
-                                ),
+                                id: "y",
                                 ctx: Load,
                             },
                         ),

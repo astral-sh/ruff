@@ -7,9 +7,10 @@ Ok(
         FunctionDef(
             StmtFunctionDef {
                 range: 0..32,
-                name: Identifier(
-                    "f",
-                ),
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
                 args: Arguments {
                     range: 5..26,
                     posonlyargs: [],
@@ -18,9 +19,10 @@ Ok(
                             range: 6..7,
                             def: Arg {
                                 range: 6..7,
-                                arg: Identifier(
-                                    "a",
-                                ),
+                                arg: Identifier {
+                                    id: "a",
+                                    range: 6..7,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -30,9 +32,10 @@ Ok(
                             range: 9..10,
                             def: Arg {
                                 range: 9..10,
-                                arg: Identifier(
-                                    "b",
-                                ),
+                                arg: Identifier {
+                                    id: "b",
+                                    range: 9..10,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -42,9 +45,10 @@ Ok(
                             range: 12..13,
                             def: Arg {
                                 range: 12..13,
-                                arg: Identifier(
-                                    "c",
-                                ),
+                                arg: Identifier {
+                                    id: "c",
+                                    range: 12..13,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -57,9 +61,10 @@ Ok(
                             range: 18..19,
                             def: Arg {
                                 range: 18..19,
-                                arg: Identifier(
-                                    "d",
-                                ),
+                                arg: Identifier {
+                                    id: "d",
+                                    range: 18..19,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -69,9 +74,10 @@ Ok(
                             range: 21..22,
                             def: Arg {
                                 range: 21..22,
-                                arg: Identifier(
-                                    "e",
-                                ),
+                                arg: Identifier {
+                                    id: "e",
+                                    range: 21..22,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -81,9 +87,10 @@ Ok(
                             range: 24..25,
                             def: Arg {
                                 range: 24..25,
-                                arg: Identifier(
-                                    "f",
-                                ),
+                                arg: Identifier {
+                                    id: "f",
+                                    range: 24..25,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },

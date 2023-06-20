@@ -12,9 +12,7 @@ expression: parse_ast
                     func: Name(
                         ExprName {
                             range: 0..7,
-                            id: Identifier(
-                                "my_func",
-                            ),
+                            id: "my_func",
                             ctx: Load,
                         },
                     ),
@@ -33,9 +31,10 @@ expression: parse_ast
                         Keyword {
                             range: 22..31,
                             arg: Some(
-                                Identifier(
-                                    "keyword",
-                                ),
+                                Identifier {
+                                    id: "keyword",
+                                    range: 22..31,
+                                },
                             ),
                             value: Constant(
                                 ExprConstant {

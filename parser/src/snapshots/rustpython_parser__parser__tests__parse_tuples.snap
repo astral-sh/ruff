@@ -1,6 +1,6 @@
 ---
 source: parser/src/parser.rs
-expression: "parse_program(source, \"<test>\").unwrap()"
+expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
 ---
 [
     Assign(
@@ -14,18 +14,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             Name(
                                 ExprName {
                                     range: 0..1,
-                                    id: Identifier(
-                                        "a",
-                                    ),
+                                    id: "a",
                                     ctx: Store,
                                 },
                             ),
                             Name(
                                 ExprName {
                                     range: 3..4,
-                                    id: Identifier(
-                                        "b",
-                                    ),
+                                    id: "b",
                                     ctx: Store,
                                 },
                             ),

@@ -18,9 +18,10 @@ Ok(
                                     range: 7..8,
                                     def: Arg {
                                         range: 7..8,
-                                        arg: Identifier(
-                                            "a",
-                                        ),
+                                        arg: Identifier {
+                                            id: "a",
+                                            range: 7..8,
+                                        },
                                         annotation: None,
                                         type_comment: None,
                                     },
@@ -30,9 +31,10 @@ Ok(
                                     range: 10..11,
                                     def: Arg {
                                         range: 10..11,
-                                        arg: Identifier(
-                                            "b",
-                                        ),
+                                        arg: Identifier {
+                                            id: "b",
+                                            range: 10..11,
+                                        },
                                         annotation: None,
                                         type_comment: None,
                                     },
@@ -42,9 +44,10 @@ Ok(
                                     range: 13..14,
                                     def: Arg {
                                         range: 13..14,
-                                        arg: Identifier(
-                                            "c",
-                                        ),
+                                        arg: Identifier {
+                                            id: "c",
+                                            range: 13..14,
+                                        },
                                         annotation: None,
                                         type_comment: None,
                                     },

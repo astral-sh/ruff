@@ -10,18 +10,14 @@ BoolOp(
             Name(
                 ExprName {
                     range: 0..1,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
             Name(
                 ExprName {
                     range: 5..6,
-                    id: Identifier(
-                        "y",
-                    ),
+                    id: "y",
                     ctx: Load,
                 },
             ),

@@ -14,9 +14,7 @@ expression: parse_ast
                             Name(
                                 ExprName {
                                     range: 1..2,
-                                    id: Identifier(
-                                        "x",
-                                    ),
+                                    id: "x",
                                     ctx: Store,
                                 },
                             ),
@@ -26,9 +24,7 @@ expression: parse_ast
                                     value: Name(
                                         ExprName {
                                             range: 5..6,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),

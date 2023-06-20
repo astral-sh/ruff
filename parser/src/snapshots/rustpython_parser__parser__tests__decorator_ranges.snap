@@ -6,9 +6,10 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 0..34,
-            name: Identifier(
-                "test",
-            ),
+            name: Identifier {
+                id: "test",
+                range: 18..22,
+            },
             args: Arguments {
                 range: 22..24,
                 posonlyargs: [],
@@ -30,9 +31,7 @@ expression: parse_ast
                     expression: Name(
                         ExprName {
                             range: 1..13,
-                            id: Identifier(
-                                "my_decorator",
-                            ),
+                            id: "my_decorator",
                             ctx: Load,
                         },
                     ),
@@ -45,9 +44,10 @@ expression: parse_ast
     ClassDef(
         StmtClassDef {
             range: 36..73,
-            name: Identifier(
-                "Abcd",
-            ),
+            name: Identifier {
+                id: "Abcd",
+                range: 59..63,
+            },
             bases: [],
             keywords: [],
             body: [
@@ -63,9 +63,7 @@ expression: parse_ast
                     expression: Name(
                         ExprName {
                             range: 37..52,
-                            id: Identifier(
-                                "class_decorator",
-                            ),
+                            id: "class_decorator",
                             ctx: Load,
                         },
                     ),

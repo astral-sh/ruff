@@ -8,18 +8,14 @@ DictComp(
         key: Name(
             ExprName {
                 range: 1..3,
-                id: Identifier(
-                    "x1",
-                ),
+                id: "x1",
                 ctx: Load,
             },
         ),
         value: Name(
             ExprName {
                 range: 5..7,
-                id: Identifier(
-                    "x2",
-                ),
+                id: "x2",
                 ctx: Load,
             },
         ),
@@ -29,18 +25,14 @@ DictComp(
                 target: Name(
                     ExprName {
                         range: 12..13,
-                        id: Identifier(
-                            "y",
-                        ),
+                        id: "y",
                         ctx: Store,
                     },
                 ),
                 iter: Name(
                     ExprName {
                         range: 17..18,
-                        id: Identifier(
-                            "z",
-                        ),
+                        id: "z",
                         ctx: Load,
                     },
                 ),

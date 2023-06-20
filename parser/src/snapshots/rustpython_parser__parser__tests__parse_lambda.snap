@@ -17,9 +17,10 @@ expression: parse_ast
                                 range: 7..8,
                                 def: Arg {
                                     range: 7..8,
-                                    arg: Identifier(
-                                        "x",
-                                    ),
+                                    arg: Identifier {
+                                        id: "x",
+                                        range: 7..8,
+                                    },
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -29,9 +30,10 @@ expression: parse_ast
                                 range: 10..11,
                                 def: Arg {
                                     range: 10..11,
-                                    arg: Identifier(
-                                        "y",
-                                    ),
+                                    arg: Identifier {
+                                        id: "y",
+                                        range: 10..11,
+                                    },
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -48,9 +50,7 @@ expression: parse_ast
                             left: Name(
                                 ExprName {
                                     range: 13..14,
-                                    id: Identifier(
-                                        "x",
-                                    ),
+                                    id: "x",
                                     ctx: Load,
                                 },
                             ),
@@ -58,9 +58,7 @@ expression: parse_ast
                             right: Name(
                                 ExprName {
                                     range: 17..18,
-                                    id: Identifier(
-                                        "y",
-                                    ),
+                                    id: "y",
                                     ctx: Load,
                                 },
                             ),

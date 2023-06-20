@@ -213,7 +213,10 @@ impl Parse for ast::Identifier {
     ) -> Result<Self, ParseError> {
         let expr = ast::Expr::parse_tokens(lxr, source_path)?;
         match expr {
-            ast::Expr::Name(name) => Ok(name.id),
+            ast::Expr::Name(name) => {
+                let range = name.range();
+                Ok(ast::Identifier::new(name.id, range))
+            }
             expr => Err(ParseError {
                 error: ParseErrorType::InvalidToken,
                 offset: expr.range().start(),

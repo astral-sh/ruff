@@ -11,9 +11,7 @@ GeneratorExp(
                 target: Name(
                     ExprName {
                         range: 1..2,
-                        id: Identifier(
-                            "x",
-                        ),
+                        id: "x",
                         ctx: Store,
                     },
                 ),
@@ -23,9 +21,7 @@ GeneratorExp(
                         left: Name(
                             ExprName {
                                 range: 6..7,
-                                id: Identifier(
-                                    "y",
-                                ),
+                                id: "y",
                                 ctx: Load,
                             },
                         ),
@@ -49,18 +45,14 @@ GeneratorExp(
                 target: Name(
                     ExprName {
                         range: 16..17,
-                        id: Identifier(
-                            "y",
-                        ),
+                        id: "y",
                         ctx: Store,
                     },
                 ),
                 iter: Name(
                     ExprName {
                         range: 21..22,
-                        id: Identifier(
-                            "z",
-                        ),
+                        id: "z",
                         ctx: Load,
                     },
                 ),

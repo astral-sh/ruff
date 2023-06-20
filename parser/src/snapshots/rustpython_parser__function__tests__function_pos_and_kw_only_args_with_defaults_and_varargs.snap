@@ -7,9 +7,10 @@ Ok(
         FunctionDef(
             StmtFunctionDef {
                 range: 0..42,
-                name: Identifier(
-                    "f",
-                ),
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
                 args: Arguments {
                     range: 5..36,
                     posonlyargs: [],
@@ -18,9 +19,10 @@ Ok(
                             range: 6..7,
                             def: Arg {
                                 range: 6..7,
-                                arg: Identifier(
-                                    "a",
-                                ),
+                                arg: Identifier {
+                                    id: "a",
+                                    range: 6..7,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -30,9 +32,10 @@ Ok(
                             range: 9..10,
                             def: Arg {
                                 range: 9..10,
-                                arg: Identifier(
-                                    "b",
-                                ),
+                                arg: Identifier {
+                                    id: "b",
+                                    range: 9..10,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -42,9 +45,10 @@ Ok(
                             range: 12..13,
                             def: Arg {
                                 range: 12..13,
-                                arg: Identifier(
-                                    "c",
-                                ),
+                                arg: Identifier {
+                                    id: "c",
+                                    range: 12..13,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -54,9 +58,10 @@ Ok(
                     vararg: Some(
                         Arg {
                             range: 16..20,
-                            arg: Identifier(
-                                "args",
-                            ),
+                            arg: Identifier {
+                                id: "args",
+                                range: 16..20,
+                            },
                             annotation: None,
                             type_comment: None,
                         },
@@ -66,9 +71,10 @@ Ok(
                             range: 22..23,
                             def: Arg {
                                 range: 22..23,
-                                arg: Identifier(
-                                    "d",
-                                ),
+                                arg: Identifier {
+                                    id: "d",
+                                    range: 22..23,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -78,9 +84,10 @@ Ok(
                             range: 25..26,
                             def: Arg {
                                 range: 25..26,
-                                arg: Identifier(
-                                    "e",
-                                ),
+                                arg: Identifier {
+                                    id: "e",
+                                    range: 25..26,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },
@@ -100,9 +107,10 @@ Ok(
                             range: 31..32,
                             def: Arg {
                                 range: 31..32,
-                                arg: Identifier(
-                                    "f",
-                                ),
+                                arg: Identifier {
+                                    id: "f",
+                                    range: 31..32,
+                                },
                                 annotation: None,
                                 type_comment: None,
                             },

@@ -27,9 +27,7 @@ expression: parse_ast
             value: Name(
                 ExprName {
                     range: 3..4,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),

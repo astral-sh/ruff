@@ -8,9 +8,7 @@ ListComp(
         elt: Name(
             ExprName {
                 range: 1..2,
-                id: Identifier(
-                    "x",
-                ),
+                id: "x",
                 ctx: Load,
             },
         ),
@@ -24,18 +22,14 @@ ListComp(
                             Name(
                                 ExprName {
                                     range: 7..8,
-                                    id: Identifier(
-                                        "y",
-                                    ),
+                                    id: "y",
                                     ctx: Store,
                                 },
                             ),
                             Name(
                                 ExprName {
                                     range: 10..12,
-                                    id: Identifier(
-                                        "y2",
-                                    ),
+                                    id: "y2",
                                     ctx: Store,
                                 },
                             ),
@@ -46,9 +40,7 @@ ListComp(
                 iter: Name(
                     ExprName {
                         range: 16..17,
-                        id: Identifier(
-                            "z",
-                        ),
+                        id: "z",
                         ctx: Load,
                     },
                 ),
@@ -60,18 +52,14 @@ ListComp(
                 target: Name(
                     ExprName {
                         range: 22..23,
-                        id: Identifier(
-                            "a",
-                        ),
+                        id: "a",
                         ctx: Store,
                     },
                 ),
                 iter: Name(
                     ExprName {
                         range: 27..28,
-                        id: Identifier(
-                            "b",
-                        ),
+                        id: "b",
                         ctx: Load,
                     },
                 ),
@@ -82,9 +70,7 @@ ListComp(
                             left: Name(
                                 ExprName {
                                     range: 32..33,
-                                    id: Identifier(
-                                        "a",
-                                    ),
+                                    id: "a",
                                     ctx: Load,
                                 },
                             ),
@@ -110,9 +96,7 @@ ListComp(
                             left: Name(
                                 ExprName {
                                     range: 41..42,
-                                    id: Identifier(
-                                        "a",
-                                    ),
+                                    id: "a",
                                     ctx: Load,
                                 },
                             ),

@@ -1563,7 +1563,7 @@ impl<R> From<ExprStarred<R>> for Ast<R> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName<R = TextRange> {
     pub range: R,
-    pub id: Identifier,
+    pub id: String,
     pub ctx: ExprContext,
 }
 

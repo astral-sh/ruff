@@ -7,9 +7,10 @@ Ok(
         FunctionDef(
             StmtFunctionDef {
                 range: 0..13,
-                name: Identifier(
-                    "f",
-                ),
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
                 args: Arguments {
                     range: 5..7,
                     posonlyargs: [],

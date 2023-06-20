@@ -22,9 +22,7 @@ expression: parse_ast
                         Name(
                             ExprName {
                                 range: 10..11,
-                                id: Identifier(
-                                    "x",
-                                ),
+                                id: "x",
                                 ctx: Store,
                             },
                         ),

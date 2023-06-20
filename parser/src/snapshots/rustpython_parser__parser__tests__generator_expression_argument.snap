@@ -17,9 +17,10 @@ Call(
                         kind: None,
                     },
                 ),
-                attr: Identifier(
-                    "join",
-                ),
+                attr: Identifier {
+                    id: "join",
+                    range: 4..8,
+                },
                 ctx: Load,
             },
         ),
@@ -30,9 +31,7 @@ Call(
                     elt: Name(
                         ExprName {
                             range: 14..17,
-                            id: Identifier(
-                                "sql",
-                            ),
+                            id: "sql",
                             ctx: Load,
                         },
                     ),
@@ -42,9 +41,7 @@ Call(
                             target: Name(
                                 ExprName {
                                     range: 26..29,
-                                    id: Identifier(
-                                        "sql",
-                                    ),
+                                    id: "sql",
                                     ctx: Store,
                                 },
                             ),
@@ -58,9 +55,7 @@ Call(
                                                 test: Name(
                                                     ExprName {
                                                         range: 65..70,
-                                                        id: Identifier(
-                                                            "limit",
-                                                        ),
+                                                        id: "limit",
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -80,9 +75,7 @@ Call(
                                                         right: Name(
                                                             ExprName {
                                                                 range: 56..61,
-                                                                id: Identifier(
-                                                                    "limit",
-                                                                ),
+                                                                id: "limit",
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -103,9 +96,7 @@ Call(
                                                 test: Name(
                                                     ExprName {
                                                         range: 116..122,
-                                                        id: Identifier(
-                                                            "offset",
-                                                        ),
+                                                        id: "offset",
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -125,9 +116,7 @@ Call(
                                                         right: Name(
                                                             ExprName {
                                                                 range: 105..111,
-                                                                id: Identifier(
-                                                                    "offset",
-                                                                ),
+                                                                id: "offset",
                                                                 ctx: Load,
                                                             },
                                                         ),

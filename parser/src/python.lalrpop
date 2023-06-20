@@ -266,7 +266,7 @@ ImportAsNames: Vec<ast::Alias> = {
     <location:@L> "(" <i:OneOrMore<ImportAsAlias<Identifier>>> ","? ")" <end_location:@R> => i,
     <location:@L> "*" <end_location:@R> => {
         // Star import all
-        vec![ast::Alias { name: ast::Identifier::new("*"), asname: None, range: (location..end_location).into() }]
+        vec![ast::Alias { name: ast::Identifier::new("*", (location..end_location).into()), asname: None, range: (location..end_location).into() }]
     },
 };
 
@@ -278,14 +278,14 @@ ImportAsAlias<I>: ast::Alias = {
 
 // A name like abc or abc.def.ghi
 DottedName: ast::Identifier = {
-    <n:name> => ast::Identifier::new(n),
-    <n:name> <n2: ("." Identifier)+>  => {
+    <location:@L> <n:name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
+    <location:@L> <n:name> <n2: ("." Identifier)+> <end_location:@R> => {
         let mut r = n.to_string();
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
         }
-        ast::Identifier::new(r)
+        ast::Identifier::new(r, (location..end_location).into())
     },
 };
 
@@ -563,8 +563,8 @@ CapturePattern: ast::Pattern = {
 }
 
 MatchName: ast::Expr = {
-    <location:@L> <name:Identifier> <end_location:@R> => ast::Expr::Name(
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load, range: (location..end_location).into() },
+    <location:@L> <id:Identifier> <end_location:@R> => ast::Expr::Name(
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() },
     ),
 }
 
@@ -1189,7 +1189,7 @@ NamedExpression: ast::Expr = {
         ast::Expr::NamedExpr(
             ast::ExprNamedExpr {
                 target: Box::new(ast::Expr::Name(
-                    ast::ExprName { id, ctx: ast::ExprContext::Store, range: (location..end_location).into() },
+                    ast::ExprName { id: id.into(), ctx: ast::ExprContext::Store, range: (location..end_location).into() },
                 )),
                 range: (location..value.end()).into(),
                 value: Box::new(value),
@@ -1405,8 +1405,8 @@ Atom<Goal>: ast::Expr = {
     <location:@L> <value:Constant> <end_location:@R> => ast::Expr::Constant(
         ast::ExprConstant { value, kind: None, range: (location..end_location).into() }
     ),
-    <location:@L> <name:Identifier> <end_location:@R> => ast::Expr::Name(
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load, range: (location..end_location).into() }
+    <location:@L> <id:Identifier> <end_location:@R> => ast::Expr::Name(
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() }
     ),
     <location:@L> "[" <e:ListLiteralValues?> "]"<end_location:@R>  => {
         let elts = e.unwrap_or_default();
@@ -1641,7 +1641,7 @@ Constant: ast::Constant = {
 };
 
 Identifier: ast::Identifier = {
-    <s:name> => ast::Identifier::new(s)
+    <location:@L> <s:name> <end_location:@R> => ast::Identifier::new(s, (location..end_location).into())
 };
 
 // Hook external lexer:

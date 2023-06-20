@@ -8,9 +8,7 @@ ListComp(
         elt: Name(
             ExprName {
                 range: 1..2,
-                id: Identifier(
-                    "x",
-                ),
+                id: "x",
                 ctx: Load,
             },
         ),
@@ -20,18 +18,14 @@ ListComp(
                 target: Name(
                     ExprName {
                         range: 7..8,
-                        id: Identifier(
-                            "y",
-                        ),
+                        id: "y",
                         ctx: Store,
                     },
                 ),
                 iter: Name(
                     ExprName {
                         range: 12..13,
-                        id: Identifier(
-                            "z",
-                        ),
+                        id: "z",
                         ctx: Load,
                     },
                 ),

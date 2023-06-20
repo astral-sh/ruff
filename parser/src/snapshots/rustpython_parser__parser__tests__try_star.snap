@@ -17,9 +17,7 @@ expression: parse_ast
                                     func: Name(
                                         ExprName {
                                             range: 15..29,
-                                            id: Identifier(
-                                                "ExceptionGroup",
-                                            ),
+                                            id: "ExceptionGroup",
                                             ctx: Load,
                                         },
                                     ),
@@ -43,9 +41,7 @@ expression: parse_ast
                                                             func: Name(
                                                                 ExprName {
                                                                     range: 45..55,
-                                                                    id: Identifier(
-                                                                        "ValueError",
-                                                                    ),
+                                                                    id: "ValueError",
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -69,9 +65,7 @@ expression: parse_ast
                                                             func: Name(
                                                                 ExprName {
                                                                     range: 60..69,
-                                                                    id: Identifier(
-                                                                        "TypeError",
-                                                                    ),
+                                                                    id: "TypeError",
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -95,9 +89,7 @@ expression: parse_ast
                                                             func: Name(
                                                                 ExprName {
                                                                     range: 74..81,
-                                                                    id: Identifier(
-                                                                        "OSError",
-                                                                    ),
+                                                                    id: "OSError",
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -121,9 +113,7 @@ expression: parse_ast
                                                             func: Name(
                                                                 ExprName {
                                                                     range: 86..93,
-                                                                    id: Identifier(
-                                                                        "OSError",
-                                                                    ),
+                                                                    id: "OSError",
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -162,17 +152,16 @@ expression: parse_ast
                             Name(
                                 ExprName {
                                     range: 107..116,
-                                    id: Identifier(
-                                        "TypeError",
-                                    ),
+                                    id: "TypeError",
                                     ctx: Load,
                                 },
                             ),
                         ),
                         name: Some(
-                            Identifier(
-                                "e",
-                            ),
+                            Identifier {
+                                id: "e",
+                                range: 120..121,
+                            },
                         ),
                         body: [
                             Expr(
@@ -184,9 +173,7 @@ expression: parse_ast
                                             func: Name(
                                                 ExprName {
                                                     range: 127..132,
-                                                    id: Identifier(
-                                                        "print",
-                                                    ),
+                                                    id: "print",
                                                     ctx: Load,
                                                 },
                                             ),
@@ -213,9 +200,7 @@ expression: parse_ast
                                                                             func: Name(
                                                                                 ExprName {
                                                                                     range: 143..147,
-                                                                                    id: Identifier(
-                                                                                        "type",
-                                                                                    ),
+                                                                                    id: "type",
                                                                                     ctx: Load,
                                                                                 },
                                                                             ),
@@ -223,9 +208,7 @@ expression: parse_ast
                                                                                 Name(
                                                                                     ExprName {
                                                                                         range: 148..149,
-                                                                                        id: Identifier(
-                                                                                            "e",
-                                                                                        ),
+                                                                                        id: "e",
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
@@ -255,15 +238,14 @@ expression: parse_ast
                                                                             value: Name(
                                                                                 ExprName {
                                                                                     range: 165..166,
-                                                                                    id: Identifier(
-                                                                                        "e",
-                                                                                    ),
+                                                                                    id: "e",
                                                                                     ctx: Load,
                                                                                 },
                                                                             ),
-                                                                            attr: Identifier(
-                                                                                "exceptions",
-                                                                            ),
+                                                                            attr: Identifier {
+                                                                                id: "exceptions",
+                                                                                range: 167..177,
+                                                                            },
                                                                             ctx: Load,
                                                                         },
                                                                     ),
@@ -290,17 +272,16 @@ expression: parse_ast
                             Name(
                                 ExprName {
                                     range: 189..196,
-                                    id: Identifier(
-                                        "OSError",
-                                    ),
+                                    id: "OSError",
                                     ctx: Load,
                                 },
                             ),
                         ),
                         name: Some(
-                            Identifier(
-                                "e",
-                            ),
+                            Identifier {
+                                id: "e",
+                                range: 200..201,
+                            },
                         ),
                         body: [
                             Expr(
@@ -312,9 +293,7 @@ expression: parse_ast
                                             func: Name(
                                                 ExprName {
                                                     range: 207..212,
-                                                    id: Identifier(
-                                                        "print",
-                                                    ),
+                                                    id: "print",
                                                     ctx: Load,
                                                 },
                                             ),
@@ -341,9 +320,7 @@ expression: parse_ast
                                                                             func: Name(
                                                                                 ExprName {
                                                                                     range: 223..227,
-                                                                                    id: Identifier(
-                                                                                        "type",
-                                                                                    ),
+                                                                                    id: "type",
                                                                                     ctx: Load,
                                                                                 },
                                                                             ),
@@ -351,9 +328,7 @@ expression: parse_ast
                                                                                 Name(
                                                                                     ExprName {
                                                                                         range: 228..229,
-                                                                                        id: Identifier(
-                                                                                            "e",
-                                                                                        ),
+                                                                                        id: "e",
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
@@ -383,15 +358,14 @@ expression: parse_ast
                                                                             value: Name(
                                                                                 ExprName {
                                                                                     range: 245..246,
-                                                                                    id: Identifier(
-                                                                                        "e",
-                                                                                    ),
+                                                                                    id: "e",
                                                                                     ctx: Load,
                                                                                 },
                                                                             ),
-                                                                            attr: Identifier(
-                                                                                "exceptions",
-                                                                            ),
+                                                                            attr: Identifier {
+                                                                                id: "exceptions",
+                                                                                range: 247..257,
+                                                                            },
                                                                             ctx: Load,
                                                                         },
                                                                     ),

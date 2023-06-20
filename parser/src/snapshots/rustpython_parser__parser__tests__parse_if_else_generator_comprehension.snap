@@ -11,27 +11,21 @@ GeneratorExp(
                 test: Name(
                     ExprName {
                         range: 6..7,
-                        id: Identifier(
-                            "y",
-                        ),
+                        id: "y",
                         ctx: Load,
                     },
                 ),
                 body: Name(
                     ExprName {
                         range: 1..2,
-                        id: Identifier(
-                            "x",
-                        ),
+                        id: "x",
                         ctx: Load,
                     },
                 ),
                 orelse: Name(
                     ExprName {
                         range: 13..14,
-                        id: Identifier(
-                            "y",
-                        ),
+                        id: "y",
                         ctx: Load,
                     },
                 ),
@@ -43,18 +37,14 @@ GeneratorExp(
                 target: Name(
                     ExprName {
                         range: 19..20,
-                        id: Identifier(
-                            "y",
-                        ),
+                        id: "y",
                         ctx: Store,
                     },
                 ),
                 iter: Name(
                     ExprName {
                         range: 24..25,
-                        id: Identifier(
-                            "z",
-                        ),
+                        id: "z",
                         ctx: Load,
                     },
                 ),

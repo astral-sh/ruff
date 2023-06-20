@@ -8,9 +8,7 @@ Subscript(
         value: Name(
             ExprName {
                 range: 0..1,
-                id: Identifier(
-                    "x",
-                ),
+                id: "x",
                 ctx: Load,
             },
         ),

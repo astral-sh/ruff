@@ -6,9 +6,10 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 1..49,
-            name: Identifier(
-                "args_to_tuple",
-            ),
+            name: Identifier {
+                id: "args_to_tuple",
+                range: 5..18,
+            },
             args: Arguments {
                 range: 18..30,
                 posonlyargs: [],
@@ -16,9 +17,10 @@ expression: parse_ast
                 vararg: Some(
                     Arg {
                         range: 20..29,
-                        arg: Identifier(
-                            "args",
-                        ),
+                        arg: Identifier {
+                            id: "args",
+                            range: 20..24,
+                        },
                         annotation: Some(
                             Starred(
                                 ExprStarred {
@@ -26,9 +28,7 @@ expression: parse_ast
                                     value: Name(
                                         ExprName {
                                             range: 27..29,
-                                            id: Identifier(
-                                                "Ts",
-                                            ),
+                                            id: "Ts",
                                             ctx: Load,
                                         },
                                     ),
@@ -64,9 +64,7 @@ expression: parse_ast
                         value: Name(
                             ExprName {
                                 range: 34..39,
-                                id: Identifier(
-                                    "Tuple",
-                                ),
+                                id: "Tuple",
                                 ctx: Load,
                             },
                         ),
@@ -76,9 +74,7 @@ expression: parse_ast
                                 value: Name(
                                     ExprName {
                                         range: 41..43,
-                                        id: Identifier(
-                                            "Ts",
-                                        ),
+                                        id: "Ts",
                                         ctx: Load,
                                     },
                                 ),

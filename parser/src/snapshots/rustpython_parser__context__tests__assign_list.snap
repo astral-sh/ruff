@@ -14,18 +14,14 @@ expression: parse_ast
                             Name(
                                 ExprName {
                                     range: 1..2,
-                                    id: Identifier(
-                                        "x",
-                                    ),
+                                    id: "x",
                                     ctx: Store,
                                 },
                             ),
                             Name(
                                 ExprName {
                                     range: 4..5,
-                                    id: Identifier(
-                                        "y",
-                                    ),
+                                    id: "y",
                                     ctx: Store,
                                 },
                             ),

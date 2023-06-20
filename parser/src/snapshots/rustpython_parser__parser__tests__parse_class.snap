@@ -6,25 +6,22 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     ClassDef(
         StmtClassDef {
             range: 0..98,
-            name: Identifier(
-                "Foo",
-            ),
+            name: Identifier {
+                id: "Foo",
+                range: 6..9,
+            },
             bases: [
                 Name(
                     ExprName {
                         range: 10..11,
-                        id: Identifier(
-                            "A",
-                        ),
+                        id: "A",
                         ctx: Load,
                     },
                 ),
                 Name(
                     ExprName {
                         range: 13..14,
-                        id: Identifier(
-                            "B",
-                        ),
+                        id: "B",
                         ctx: Load,
                     },
                 ),
@@ -34,9 +31,10 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 FunctionDef(
                     StmtFunctionDef {
                         range: 18..44,
-                        name: Identifier(
-                            "__init__",
-                        ),
+                        name: Identifier {
+                            id: "__init__",
+                            range: 22..30,
+                        },
                         args: Arguments {
                             range: 30..36,
                             posonlyargs: [],
@@ -45,9 +43,10 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     range: 31..35,
                                     def: Arg {
                                         range: 31..35,
-                                        arg: Identifier(
-                                            "self",
-                                        ),
+                                        arg: Identifier {
+                                            id: "self",
+                                            range: 31..35,
+                                        },
                                         annotation: None,
                                         type_comment: None,
                                     },
@@ -73,9 +72,10 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 FunctionDef(
                     StmtFunctionDef {
                         range: 46..98,
-                        name: Identifier(
-                            "method_with_default",
-                        ),
+                        name: Identifier {
+                            id: "method_with_default",
+                            range: 50..69,
+                        },
                         args: Arguments {
                             range: 69..90,
                             posonlyargs: [],
@@ -84,9 +84,10 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     range: 70..74,
                                     def: Arg {
                                         range: 70..74,
-                                        arg: Identifier(
-                                            "self",
-                                        ),
+                                        arg: Identifier {
+                                            id: "self",
+                                            range: 70..74,
+                                        },
                                         annotation: None,
                                         type_comment: None,
                                     },
@@ -96,9 +97,10 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     range: 76..79,
                                     def: Arg {
                                         range: 76..79,
-                                        arg: Identifier(
-                                            "arg",
-                                        ),
+                                        arg: Identifier {
+                                            id: "arg",
+                                            range: 76..79,
+                                        },
                                         annotation: None,
                                         type_comment: None,
                                     },

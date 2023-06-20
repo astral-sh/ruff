@@ -9,9 +9,7 @@ expression: parse_ast
             value: Name(
                 ExprName {
                     range: 3..4,
-                    id: Identifier(
-                        "a",
-                    ),
+                    id: "a",
                     ctx: Load,
                 },
             ),
@@ -25,9 +23,7 @@ expression: parse_ast
             value: Name(
                 ExprName {
                     range: 7..8,
-                    id: Identifier(
-                        "b",
-                    ),
+                    id: "b",
                     ctx: Load,
                 },
             ),

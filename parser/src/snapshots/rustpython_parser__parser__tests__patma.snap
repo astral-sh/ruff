@@ -9,9 +9,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 73..74,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -48,9 +46,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 98..99,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -78,9 +74,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 132..133,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -93,9 +87,7 @@ expression: parse_ast
                             cls: Name(
                                 ExprName {
                                     range: 144..149,
-                                    id: Identifier(
-                                        "bytes",
-                                    ),
+                                    id: "bytes",
                                     ctx: Load,
                                 },
                             ),
@@ -105,9 +97,10 @@ expression: parse_ast
                                         range: 150..151,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "z",
-                                            ),
+                                            Identifier {
+                                                id: "z",
+                                                range: 150..151,
+                                            },
                                         ),
                                     },
                                 ),
@@ -125,9 +118,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 162..163,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -155,9 +146,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 196..197,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -197,9 +186,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 224..225,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -253,9 +240,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 255..256,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -364,9 +349,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 324..325,
-                                            id: Identifier(
-                                                "x",
-                                            ),
+                                            id: "x",
                                             ctx: Store,
                                         },
                                     ),
@@ -394,9 +377,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 361..362,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -489,9 +470,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 398..399,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -519,9 +498,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 451..452,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -600,9 +577,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 552..553,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -680,9 +655,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 589..590,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -918,9 +891,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 682..683,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -956,9 +927,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 709..710,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -986,9 +955,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 743..744,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -1034,9 +1001,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 777..778,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1064,9 +1029,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 811..812,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -1103,9 +1066,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 836..837,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1214,9 +1175,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 905..906,
-                                            id: Identifier(
-                                                "x",
-                                            ),
+                                            id: "x",
                                             ctx: Store,
                                         },
                                     ),
@@ -1244,9 +1203,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 942..943,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -1271,9 +1228,7 @@ expression: parse_ast
                         Name(
                             ExprName {
                                 range: 959..960,
-                                id: Identifier(
-                                    "x",
-                                ),
+                                id: "x",
                                 ctx: Load,
                             },
                         ),
@@ -1286,9 +1241,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 970..971,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1316,9 +1269,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1004..1005,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -1367,9 +1318,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1032..1033,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1432,9 +1381,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1063..1064,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1461,9 +1408,10 @@ expression: parse_ast
                             keys: [],
                             patterns: [],
                             rest: Some(
-                                Identifier(
-                                    "z",
-                                ),
+                                Identifier {
+                                    id: "z",
+                                    range: 1081..1082,
+                                },
                             ),
                         },
                     ),
@@ -1476,9 +1424,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1093..1094,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1509,9 +1455,7 @@ expression: parse_ast
                     func: Name(
                         ExprName {
                             range: 1127..1130,
-                            id: Identifier(
-                                "Seq",
-                            ),
+                            id: "Seq",
                             ctx: Load,
                         },
                     ),
@@ -1544,9 +1488,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1157..1158,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1574,9 +1516,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1191..1192,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -1606,9 +1546,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1214..1215,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1652,9 +1590,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1240..1241,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1682,9 +1618,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1274..1275,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -1711,9 +1645,10 @@ expression: parse_ast
                                         range: 1294..1297,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "bar",
-                                            ),
+                                            Identifier {
+                                                id: "bar",
+                                                range: 1294..1297,
+                                            },
                                         ),
                                     },
                                 ),
@@ -1730,9 +1665,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1308..1309,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1740,9 +1673,7 @@ expression: parse_ast
                                 value: Name(
                                     ExprName {
                                         range: 1312..1315,
-                                        id: Identifier(
-                                            "bar",
-                                        ),
+                                        id: "bar",
                                         ctx: Load,
                                     },
                                 ),
@@ -1831,9 +1762,10 @@ expression: parse_ast
                                     PatternMatchStar {
                                         range: 1371..1373,
                                         name: Some(
-                                            Identifier(
-                                                "x",
-                                            ),
+                                            Identifier {
+                                                id: "x",
+                                                range: 1372..1373,
+                                            },
                                         ),
                                     },
                                 ),
@@ -1863,9 +1795,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1387..1388,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1893,9 +1823,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1421..1422,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -1932,9 +1860,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1446..1447,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -1997,9 +1923,7 @@ expression: parse_ast
                                 target: Name(
                                     ExprName {
                                         range: 1472..1473,
-                                        id: Identifier(
-                                            "x",
-                                        ),
+                                        id: "x",
                                         ctx: Store,
                                     },
                                 ),
@@ -2009,9 +1933,7 @@ expression: parse_ast
                                         value: Name(
                                             ExprName {
                                                 range: 1477..1478,
-                                                id: Identifier(
-                                                    "x",
-                                                ),
+                                                id: "x",
                                                 ctx: Load,
                                             },
                                         ),
@@ -2047,9 +1969,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1493..1494,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2114,9 +2034,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1524..1525,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2144,9 +2062,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1558..1559,
-                    id: Identifier(
-                        "w",
-                    ),
+                    id: "w",
                     ctx: Load,
                 },
             ),
@@ -2162,9 +2078,10 @@ expression: parse_ast
                                         range: 1571..1572,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "x",
-                                            ),
+                                            Identifier {
+                                                id: "x",
+                                                range: 1571..1572,
+                                            },
                                         ),
                                     },
                                 ),
@@ -2173,9 +2090,10 @@ expression: parse_ast
                                         range: 1574..1575,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "y",
-                                            ),
+                                            Identifier {
+                                                id: "y",
+                                                range: 1574..1575,
+                                            },
                                         ),
                                     },
                                 ),
@@ -2197,9 +2115,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1590..1591,
-                                            id: Identifier(
-                                                "z",
-                                            ),
+                                            id: "z",
                                             ctx: Store,
                                         },
                                     ),
@@ -2227,9 +2143,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1624..1625,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2281,9 +2195,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1659..1660,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2315,9 +2227,7 @@ expression: parse_ast
                         Name(
                             ExprName {
                                 range: 1694..1695,
-                                id: Identifier(
-                                    "x",
-                                ),
+                                id: "x",
                                 ctx: Load,
                             },
                         ),
@@ -2337,9 +2247,10 @@ expression: parse_ast
                                         range: 1709..1710,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "y",
-                                            ),
+                                            Identifier {
+                                                id: "y",
+                                                range: 1709..1710,
+                                            },
                                         ),
                                     },
                                 ),
@@ -2355,9 +2266,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1721..1722,
-                                            id: Identifier(
-                                                "z",
-                                            ),
+                                            id: "z",
                                             ctx: Store,
                                         },
                                     ),
@@ -2385,9 +2294,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1755..1756,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2409,27 +2316,28 @@ expression: parse_ast
                                                     value: Name(
                                                         ExprName {
                                                             range: 1767..1768,
-                                                            id: Identifier(
-                                                                "A",
-                                                            ),
+                                                            id: "A",
                                                             ctx: Load,
                                                         },
                                                     ),
-                                                    attr: Identifier(
-                                                        "B",
-                                                    ),
+                                                    attr: Identifier {
+                                                        id: "B",
+                                                        range: 1769..1770,
+                                                    },
                                                     ctx: Load,
                                                 },
                                             ),
-                                            attr: Identifier(
-                                                "C",
-                                            ),
+                                            attr: Identifier {
+                                                id: "C",
+                                                range: 1771..1772,
+                                            },
                                             ctx: Load,
                                         },
                                     ),
-                                    attr: Identifier(
-                                        "D",
-                                    ),
+                                    attr: Identifier {
+                                        id: "D",
+                                        range: 1773..1774,
+                                    },
                                     ctx: Load,
                                 },
                             ),
@@ -2444,9 +2352,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1784..1785,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2474,9 +2380,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1818..1819,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2498,9 +2402,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1844..1845,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2528,9 +2430,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1878..1879,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2560,9 +2460,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1901..1902,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2590,9 +2488,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1935..1936,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2616,9 +2512,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 1962..1963,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2646,9 +2540,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 1996..1997,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2670,9 +2562,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2020..2021,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2723,9 +2613,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2049..2050,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2769,9 +2657,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2076..2077,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2799,9 +2685,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 2110..2111,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2813,9 +2697,10 @@ expression: parse_ast
                             range: 2122..2123,
                             pattern: None,
                             name: Some(
-                                Identifier(
-                                    "z",
-                                ),
+                                Identifier {
+                                    id: "z",
+                                    range: 2122..2123,
+                                },
                             ),
                         },
                     ),
@@ -2828,9 +2713,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2133..2134,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -2858,9 +2741,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 2167..2168,
-                    id: Identifier(
-                        "w",
-                    ),
+                    id: "w",
                     ctx: Load,
                 },
             ),
@@ -2876,9 +2757,10 @@ expression: parse_ast
                                         range: 2180..2181,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "x",
-                                            ),
+                                            Identifier {
+                                                id: "x",
+                                                range: 2180..2181,
+                                            },
                                         ),
                                     },
                                 ),
@@ -2887,9 +2769,10 @@ expression: parse_ast
                                         range: 2183..2184,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "y",
-                                            ),
+                                            Identifier {
+                                                id: "y",
+                                                range: 2183..2184,
+                                            },
                                         ),
                                     },
                                 ),
@@ -2897,9 +2780,10 @@ expression: parse_ast
                                     PatternMatchStar {
                                         range: 2186..2191,
                                         name: Some(
-                                            Identifier(
-                                                "rest",
-                                            ),
+                                            Identifier {
+                                                id: "rest",
+                                                range: 2187..2191,
+                                            },
                                         ),
                                     },
                                 ),
@@ -2915,9 +2799,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2202..2203,
-                                            id: Identifier(
-                                                "z",
-                                            ),
+                                            id: "z",
                                             ctx: Store,
                                         },
                                     ),
@@ -2945,9 +2827,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 2236..2237,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -2978,9 +2858,10 @@ expression: parse_ast
                                             ),
                                         ),
                                         name: Some(
-                                            Identifier(
-                                                "z",
-                                            ),
+                                            Identifier {
+                                                id: "z",
+                                                range: 2254..2255,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3004,9 +2885,10 @@ expression: parse_ast
                                             ),
                                         ),
                                         name: Some(
-                                            Identifier(
-                                                "z",
-                                            ),
+                                            Identifier {
+                                                id: "z",
+                                                range: 2265..2266,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3030,9 +2912,10 @@ expression: parse_ast
                                             ),
                                         ),
                                         name: Some(
-                                            Identifier(
-                                                "z",
-                                            ),
+                                            Identifier {
+                                                id: "z",
+                                                range: 2276..2277,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3046,9 +2929,7 @@ expression: parse_ast
                                 left: Name(
                                     ExprName {
                                         range: 2282..2283,
-                                        id: Identifier(
-                                            "z",
-                                        ),
+                                        id: "z",
                                         ctx: Load,
                                     },
                                 ),
@@ -3062,9 +2943,7 @@ expression: parse_ast
                                             left: Name(
                                                 ExprName {
                                                     range: 2287..2288,
-                                                    id: Identifier(
-                                                        "x",
-                                                    ),
+                                                    id: "x",
                                                     ctx: Load,
                                                 },
                                             ),
@@ -3092,9 +2971,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2302..2303,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -3122,9 +2999,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 2336..2337,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -3202,9 +3077,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2373..2374,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -3440,9 +3313,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2467..2468,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -3478,9 +3349,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2494..2495,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -3565,9 +3434,10 @@ expression: parse_ast
                                     PatternMatchStar {
                                         range: 2551..2553,
                                         name: Some(
-                                            Identifier(
-                                                "x",
-                                            ),
+                                            Identifier {
+                                                id: "x",
+                                                range: 2552..2553,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3583,9 +3453,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2563..2564,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -3656,9 +3524,10 @@ expression: parse_ast
                                     PatternMatchStar {
                                         range: 2617..2619,
                                         name: Some(
-                                            Identifier(
-                                                "x",
-                                            ),
+                                            Identifier {
+                                                id: "x",
+                                                range: 2618..2619,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3688,9 +3557,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2633..2634,
-                                            id: Identifier(
-                                                "y",
-                                            ),
+                                            id: "y",
                                             ctx: Store,
                                         },
                                     ),
@@ -3718,9 +3585,7 @@ expression: parse_ast
             subject: Name(
                 ExprName {
                     range: 2667..2668,
-                    id: Identifier(
-                        "x",
-                    ),
+                    id: "x",
                     ctx: Load,
                 },
             ),
@@ -3736,9 +3601,10 @@ expression: parse_ast
                                         range: 2680..2681,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "y",
-                                            ),
+                                            Identifier {
+                                                id: "y",
+                                                range: 2680..2681,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3754,9 +3620,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2692..2693,
-                                            id: Identifier(
-                                                "z",
-                                            ),
+                                            id: "z",
                                             ctx: Store,
                                         },
                                     ),
@@ -3788,18 +3652,14 @@ expression: parse_ast
                         Name(
                             ExprName {
                                 range: 2726..2727,
-                                id: Identifier(
-                                    "w",
-                                ),
+                                id: "w",
                                 ctx: Load,
                             },
                         ),
                         Name(
                             ExprName {
                                 range: 2729..2730,
-                                id: Identifier(
-                                    "x",
-                                ),
+                                id: "x",
                                 ctx: Load,
                             },
                         ),
@@ -3819,9 +3679,10 @@ expression: parse_ast
                                         range: 2741..2742,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "y",
-                                            ),
+                                            Identifier {
+                                                id: "y",
+                                                range: 2741..2742,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3830,9 +3691,10 @@ expression: parse_ast
                                         range: 2744..2745,
                                         pattern: None,
                                         name: Some(
-                                            Identifier(
-                                                "z",
-                                            ),
+                                            Identifier {
+                                                id: "z",
+                                                range: 2744..2745,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3848,9 +3710,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2755..2756,
-                                            id: Identifier(
-                                                "v",
-                                            ),
+                                            id: "v",
                                             ctx: Store,
                                         },
                                     ),
@@ -3881,18 +3741,14 @@ expression: parse_ast
                     target: Name(
                         ExprName {
                             range: 2789..2790,
-                            id: Identifier(
-                                "w",
-                            ),
+                            id: "w",
                             ctx: Store,
                         },
                     ),
                     value: Name(
                         ExprName {
                             range: 2794..2795,
-                            id: Identifier(
-                                "x",
-                            ),
+                            id: "x",
                             ctx: Load,
                         },
                     ),
@@ -3914,17 +3770,19 @@ expression: parse_ast
                                                     range: 2807..2808,
                                                     pattern: None,
                                                     name: Some(
-                                                        Identifier(
-                                                            "y",
-                                                        ),
+                                                        Identifier {
+                                                            id: "y",
+                                                            range: 2807..2808,
+                                                        },
                                                     ),
                                                 },
                                             ),
                                         ),
                                         name: Some(
-                                            Identifier(
-                                                "v",
-                                            ),
+                                            Identifier {
+                                                id: "v",
+                                                range: 2812..2813,
+                                            },
                                         ),
                                     },
                                 ),
@@ -3940,9 +3798,7 @@ expression: parse_ast
                                     Name(
                                         ExprName {
                                             range: 2824..2825,
-                                            id: Identifier(
-                                                "z",
-                                            ),
+                                            id: "z",
                                             ctx: Store,
                                         },
                                     ),
