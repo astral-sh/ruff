@@ -34,9 +34,9 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     })?;
     let code = notebook.content().to_string();
     notebook.update_cell_content(&code);
-    let mut buffer = BufWriter::new(Vec::new());
-    notebook.write_inner(&mut buffer)?;
-    Ok(String::from_utf8(buffer.into_inner()?)?)
+    let mut writer = Vec::new();
+    notebook.write_inner(&mut writer)?;
+    Ok(String::from_utf8(writer)?)
 }
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
@@ -446,7 +446,6 @@ impl Notebook {
 
 #[cfg(test)]
 mod test {
-    use std::io::BufWriter;
     use std::path::Path;
 
     use anyhow::Result;
@@ -600,9 +599,9 @@ print("after empty cells")
             Path::new("after_fix.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        let mut writer = BufWriter::new(Vec::new());
+        let mut writer = Vec::new();
         source_kind.expect_jupyter().write_inner(&mut writer)?;
-        let actual = String::from_utf8(writer.into_inner()?)?;
+        let actual = String::from_utf8(writer)?;
         let expected =
             std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;
         assert_eq!(actual, expected);
@@ -615,9 +614,9 @@ print("after empty cells")
         let notebook = read_jupyter_notebook(path)?;
         assert_eq!(notebook.trailing_newline, trailing_newline);
 
-        let mut writer = BufWriter::new(Vec::new());
+        let mut writer = Vec::new();
         notebook.write_inner(&mut writer)?;
-        let string = String::from_utf8(writer.into_inner()?)?;
+        let string = String::from_utf8(writer)?;
         assert_eq!(string.ends_with('\n'), trailing_newline);
 
         Ok(())
