@@ -1,6 +1,5 @@
-use rustpython_parser::ast::ArgWithDefault;
-
 use ruff_formatter::write;
+use rustpython_parser::ast::ArgWithDefault;
 
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -20,7 +19,7 @@ impl FormatNodeRule<ArgWithDefault> for FormatArgWithDefault {
 
         if let Some(default) = default {
             let space = def.annotation.is_some().then_some(space());
-            write!(f, [space, text("="), space, default.format()])?;
+            write!(f, [space, text("="), space, group(&default.format())])?;
         }
 
         Ok(())

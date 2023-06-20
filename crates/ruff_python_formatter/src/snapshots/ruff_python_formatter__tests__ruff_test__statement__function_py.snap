@@ -96,6 +96,13 @@ else:
 # Regression test for https://github.com/python/cpython/blob/7199584ac8632eab57612f595a7162ab8d2ebbc0/Lib/warnings.py#L513
 def f(arg1=1, *, kwonlyarg1, kwonlyarg2=2):
     pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5176#issuecomment-1598171989
+def foo(
+    b=3 + 2  # comment
+):
+    ...
 ```
 
 
@@ -223,6 +230,13 @@ else:
 # Regression test for https://github.com/python/cpython/blob/7199584ac8632eab57612f595a7162ab8d2ebbc0/Lib/warnings.py#L513
 def f(arg1=1, *, kwonlyarg1, kwonlyarg2=2):
     pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5176#issuecomment-1598171989
+def foo(
+    b=3 + 2,  # comment
+):
+    ...
 ```
 
 

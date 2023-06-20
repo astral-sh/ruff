@@ -411,10 +411,12 @@ Formatted twice:
     #[test]
     fn quick_test() {
         let src = r#"
-def test(): ...
 
-# Comment
-def with_leading_comment(): ...
+def foo(
+    b=3
+    + 2  # comment
+):
+    ...
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -437,10 +439,10 @@ def with_leading_comment(): ...
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
         // use ruff_formatter::FormatContext;
-        // formatted
+        // dbg!(formatted
         //     .document()
-        //     .display(formatted.context().source_code());
-
+        //     .display(formatted.context().source_code()));
+        //
         // dbg!(formatted
         //     .context()
         //     .comments()

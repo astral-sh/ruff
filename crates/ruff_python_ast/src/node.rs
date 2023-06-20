@@ -3680,7 +3680,7 @@ impl AnyNodeRef<'_> {
 
     /// Compares two any node refs by their pointers (referential equality).
     pub fn ptr_eq(self, other: AnyNodeRef) -> bool {
-        self.as_ptr().eq(&other.as_ptr())
+        self.as_ptr().eq(&other.as_ptr()) && self.kind() == other.kind()
     }
 
     /// Returns the node's [`kind`](NodeKind) that has no data associated and is [`Copy`].
