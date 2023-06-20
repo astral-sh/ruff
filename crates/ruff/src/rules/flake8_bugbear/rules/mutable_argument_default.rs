@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Ranged};
+use rustpython_parser::ast::{ArgWithDefault, Arguments, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -59,22 +59,22 @@ impl Violation for MutableArgumentDefault {
 /// B006
 pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Scan in reverse order to right-align zip().
-    for (arg, default) in arguments
-        .kwonlyargs
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
         .iter()
-        .rev()
-        .zip(arguments.kw_defaults.iter().rev())
-        .chain(
-            arguments
-                .args
-                .iter()
-                .rev()
-                .chain(arguments.posonlyargs.iter().rev())
-                .zip(arguments.defaults.iter().rev()),
-        )
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
     {
+        let Some(default)= default else {
+            continue;
+        };
+
         if is_mutable_expr(default, checker.semantic())
-            && !arg.annotation.as_ref().map_or(false, |expr| {
+            && !def.annotation.as_ref().map_or(false, |expr| {
                 is_immutable_annotation(expr, checker.semantic())
             })
         {

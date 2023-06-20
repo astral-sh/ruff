@@ -347,6 +347,13 @@ impl Rule {
             _ => LintSource::Ast,
         }
     }
+
+    /// Return the URL for the rule documentation, if it exists.
+    pub fn url(&self) -> Option<String> {
+        self.explanation()
+            .is_some()
+            .then(|| format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.as_ref()))
+    }
 }
 
 /// Pairs of checks that shouldn't be enabled together.

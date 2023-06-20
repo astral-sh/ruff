@@ -4,7 +4,7 @@ pub(crate) use collection_literal_concatenation::*;
 pub(crate) use explicit_f_string_type_conversion::*;
 pub(crate) use function_call_in_dataclass_default::*;
 pub(crate) use implicit_optional::*;
-pub(crate) use invalid_pyproject_toml::InvalidPyprojectToml;
+pub(crate) use invalid_pyproject_toml::*;
 pub(crate) use mutable_class_default::*;
 pub(crate) use mutable_dataclass_default::*;
 pub(crate) use pairwise_over_zipped::*;

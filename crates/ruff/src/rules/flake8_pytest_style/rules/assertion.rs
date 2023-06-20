@@ -3,11 +3,11 @@ use std::borrow::Cow;
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
-    Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace, ParenthesizedNode,
-    SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace, UnaryOp,
-    UnaryOperation,
+    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace,
+    ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
+    TrailingWhitespace, UnaryOperation,
 };
-use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
+use rustpython_parser::ast::{self, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -227,11 +227,11 @@ pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
+pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Diagnostic> {
     handlers
         .iter()
         .flat_map(|handler| match handler {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 name, body, ..
             }) => {
                 if let Some(name) = name {
@@ -262,17 +262,17 @@ enum CompositionKind {
 fn is_composite_condition(test: &Expr) -> CompositionKind {
     match test {
         Expr::BoolOp(ast::ExprBoolOp {
-            op: Boolop::And, ..
+            op: BoolOp::And, ..
         }) => {
             return CompositionKind::Simple;
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::Not,
+            op: UnaryOp::Not,
             operand,
             range: _,
         }) => {
             if let Expr::BoolOp(ast::ExprBoolOp {
-                op: Boolop::Or,
+                op: BoolOp::Or,
                 values,
                 range: _,
             }) = operand.as_ref()
@@ -282,7 +282,7 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
                     !matches!(
                         expr,
                         Expr::BoolOp(ast::ExprBoolOp {
-                            op: Boolop::And,
+                            op: BoolOp::And,
                             ..
                         })
                     )
@@ -301,12 +301,12 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
 /// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
 fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
     if let Expression::UnaryOperation(ref expression) = expression {
-        if matches!(expression.operator, UnaryOp::Not { .. }) {
+        if matches!(expression.operator, libcst_native::UnaryOp::Not { .. }) {
             return *expression.expression.clone();
         }
     }
     Expression::UnaryOperation(Box::new(UnaryOperation {
-        operator: UnaryOp::Not {
+        operator: libcst_native::UnaryOp::Not {
             whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
         },
         expression: Box::new(expression.clone()),
@@ -371,7 +371,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     let mut conditions: Vec<Expression> = Vec::with_capacity(2);
     match &assert_statement.test {
         Expression::UnaryOperation(op) => {
-            if matches!(op.operator, UnaryOp::Not { .. }) {
+            if matches!(op.operator, libcst_native::UnaryOp::Not { .. }) {
                 if let Expression::BooleanOperation(op) = &*op.expression {
                     if matches!(op.operator, BooleanOp::Or { .. }) {
                         conditions.push(negate(&op.left));

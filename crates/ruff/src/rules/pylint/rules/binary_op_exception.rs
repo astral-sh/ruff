@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -6,16 +6,16 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-enum Boolop {
+enum BoolOp {
     And,
     Or,
 }
 
-impl From<&ast::Boolop> for Boolop {
-    fn from(op: &ast::Boolop) -> Self {
+impl From<&ast::BoolOp> for BoolOp {
+    fn from(op: &ast::BoolOp) -> Self {
         match op {
-            ast::Boolop::And => Boolop::And,
-            ast::Boolop::Or => Boolop::Or,
+            ast::BoolOp::And => BoolOp::And,
+            ast::BoolOp::Or => BoolOp::Or,
         }
     }
 }
@@ -47,7 +47,7 @@ impl From<&ast::Boolop> for Boolop {
 /// ```
 #[violation]
 pub struct BinaryOpException {
-    op: Boolop,
+    op: BoolOp,
 }
 
 impl Violation for BinaryOpException {
@@ -55,15 +55,16 @@ impl Violation for BinaryOpException {
     fn message(&self) -> String {
         let BinaryOpException { op } = self;
         match op {
-            Boolop::And => format!("Exception to catch is the result of a binary `and` operation"),
-            Boolop::Or => format!("Exception to catch is the result of a binary `or` operation"),
+            BoolOp::And => format!("Exception to catch is the result of a binary `and` operation"),
+            BoolOp::Or => format!("Exception to catch is the result of a binary `or` operation"),
         }
     }
 }
 
 /// PLW0711
-pub(crate) fn binary_op_exception(checker: &mut Checker, excepthandler: &Excepthandler) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
+pub(crate) fn binary_op_exception(checker: &mut Checker, except_handler: &ExceptHandler) {
+    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
+        except_handler;
 
     let Some(type_) = type_ else {
         return;

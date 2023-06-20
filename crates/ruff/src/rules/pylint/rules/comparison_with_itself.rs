@@ -1,11 +1,11 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Cmpop, Expr, Ranged};
+use rustpython_parser::ast::{CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::CmpopExt;
+use crate::rules::pylint::helpers::CmpOpExt;
 
 /// ## What it does
 /// Checks for operations that compare a name to itself.
@@ -24,7 +24,7 @@ use crate::rules::pylint::helpers::CmpopExt;
 #[violation]
 pub struct ComparisonWithItself {
     left: String,
-    op: Cmpop,
+    op: CmpOp,
     right: String,
 }
 
@@ -34,7 +34,7 @@ impl Violation for ComparisonWithItself {
         let ComparisonWithItself { left, op, right } = self;
         format!(
             "Name compared with itself, consider replacing `{left} {} {right}`",
-            CmpopExt::from(op)
+            CmpOpExt::from(op)
         )
     }
 }
@@ -43,7 +43,7 @@ impl Violation for ComparisonWithItself {
 pub(crate) fn comparison_with_itself(
     checker: &mut Checker,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     for ((left, right), op) in std::iter::once(left)

@@ -7,9 +7,7 @@ use ruff_python_semantic::{Binding, BindingKind, ScopeKind, SemanticModel};
 pub(crate) fn is_valid_runtime_import(binding: &Binding, semantic: &SemanticModel) -> bool {
     if matches!(
         binding.kind,
-        BindingKind::Importation(..)
-            | BindingKind::FromImportation(..)
-            | BindingKind::SubmoduleImportation(..)
+        BindingKind::Import(..) | BindingKind::FromImport(..) | BindingKind::SubmoduleImport(..)
     ) {
         binding.context.is_runtime()
             && binding

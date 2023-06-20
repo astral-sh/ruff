@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Identifier, Keyword, Ranged, Stmt, Withitem};
+use rustpython_parser::ast::{self, Expr, Identifier, Keyword, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -94,7 +94,7 @@ pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], key
 pub(crate) fn complex_raises(
     checker: &mut Checker,
     stmt: &Stmt,
-    items: &[Withitem],
+    items: &[WithItem],
     body: &[Stmt],
 ) {
     let mut is_too_complex = false;

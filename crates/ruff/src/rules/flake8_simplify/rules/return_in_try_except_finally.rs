@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,12 +57,12 @@ fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
 pub(crate) fn return_in_try_except_finally(
     checker: &mut Checker,
     body: &[Stmt],
-    handlers: &[Excepthandler],
+    handlers: &[ExceptHandler],
     finalbody: &[Stmt],
 ) {
     let try_has_return = find_return(body).is_some();
     let except_has_return = handlers.iter().any(|handler| {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
         find_return(body).is_some()
     });
 

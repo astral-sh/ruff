@@ -24,7 +24,7 @@ mod commands;
 mod diagnostics;
 mod panic;
 mod printer;
-mod resolve;
+pub mod resolve;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -159,7 +159,7 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
     Ok(ExitStatus::Success)
 }
 
-fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`

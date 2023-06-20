@@ -1,6 +1,6 @@
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Ranged, Stmt, Withitem};
+use rustpython_parser::ast::{self, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
@@ -62,7 +62,7 @@ impl Violation for MultipleWithStatements {
 
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
-fn next_with(body: &[Stmt]) -> Option<(bool, &[Withitem], &[Stmt])> {
+fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
     match body {
         [Stmt::With(ast::StmtWith { items, body, .. })] => Some((false, items, body)),
         [Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. })] => Some((true, items, body)),

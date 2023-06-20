@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,9 +70,10 @@ fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
 /// B030
 pub(crate) fn except_with_non_exception_classes(
     checker: &mut Checker,
-    excepthandler: &Excepthandler,
+    except_handler: &ExceptHandler,
 ) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
+    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
+        except_handler;
     let Some(type_) = type_ else {
         return;
     };

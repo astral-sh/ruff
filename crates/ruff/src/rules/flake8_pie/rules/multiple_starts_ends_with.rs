@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 
 use ruff_text_size::TextRange;
 
-use rustpython_parser::ast::{self, Boolop, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, BoolOp, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -60,7 +60,7 @@ impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
 
 /// PIE810
 pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ }) = expr else {
         return;
     };
 
@@ -155,7 +155,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 // Generate the combined `BoolOp`.
                 let mut call = Some(call);
                 let node = Expr::BoolOp(ast::ExprBoolOp {
-                    op: Boolop::Or,
+                    op: BoolOp::Or,
                     values: values
                         .iter()
                         .enumerate()

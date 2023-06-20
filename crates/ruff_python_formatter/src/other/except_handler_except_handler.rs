@@ -1,14 +1,14 @@
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ExcepthandlerExceptHandler;
+use rustpython_parser::ast::ExceptHandlerExceptHandler;
 
 #[derive(Default)]
-pub struct FormatExcepthandlerExceptHandler;
+pub struct FormatExceptHandlerExceptHandler;
 
-impl FormatNodeRule<ExcepthandlerExceptHandler> for FormatExcepthandlerExceptHandler {
+impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHandler {
     fn fmt_fields(
         &self,
-        item: &ExcepthandlerExceptHandler,
+        item: &ExceptHandlerExceptHandler,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
         write!(f, [not_yet_implemented(item)])

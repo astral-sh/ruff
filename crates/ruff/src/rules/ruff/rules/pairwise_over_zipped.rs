@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -69,7 +69,7 @@ fn to_bound(expr: &Expr) -> Option<i64> {
             ..
         }) => value.to_i64(),
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::USub | Unaryop::Invert,
+            op: UnaryOp::USub | UnaryOp::Invert,
             operand,
             range: _,
         }) => {

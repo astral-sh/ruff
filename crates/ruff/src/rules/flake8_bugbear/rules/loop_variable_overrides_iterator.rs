@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, ArgWithDefault, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -76,8 +76,17 @@ where
                 range: _,
             }) => {
                 visitor::walk_expr(self, body);
-                for arg in &args.args {
-                    self.names.remove(arg.arg.as_str());
+                for ArgWithDefault {
+                    def,
+                    default: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    self.names.remove(def.arg.as_str());
                 }
             }
             _ => visitor::walk_expr(self, expr),

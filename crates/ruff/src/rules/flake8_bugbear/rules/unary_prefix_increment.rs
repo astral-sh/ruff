@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,16 +39,16 @@ impl Violation for UnaryPrefixIncrement {
 pub(crate) fn unary_prefix_increment(
     checker: &mut Checker,
     expr: &Expr,
-    op: Unaryop,
+    op: UnaryOp,
     operand: &Expr,
 ) {
-    if !matches!(op, Unaryop::UAdd) {
+    if !matches!(op, UnaryOp::UAdd) {
         return;
     }
     let Expr::UnaryOp(ast::ExprUnaryOp { op, .. })= operand else {
             return;
         };
-    if !matches!(op, Unaryop::UAdd) {
+    if !matches!(op, UnaryOp::UAdd) {
         return;
     }
     checker

@@ -1,6 +1,6 @@
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
-    self, Cmpop, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt, Unaryop,
+    self, CmpOp, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt, UnaryOp,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -117,7 +117,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                 // Invert the condition.
                 let test = {
                     if let Expr::UnaryOp(ast::ExprUnaryOp {
-                        op: Unaryop::Not,
+                        op: UnaryOp::Not,
                         operand,
                         range: _,
                     }) = &loop_info.test
@@ -132,16 +132,16 @@ pub(crate) fn convert_for_loop_to_any_all(
                     {
                         if let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) {
                             let op = match op {
-                                Cmpop::Eq => Cmpop::NotEq,
-                                Cmpop::NotEq => Cmpop::Eq,
-                                Cmpop::Lt => Cmpop::GtE,
-                                Cmpop::LtE => Cmpop::Gt,
-                                Cmpop::Gt => Cmpop::LtE,
-                                Cmpop::GtE => Cmpop::Lt,
-                                Cmpop::Is => Cmpop::IsNot,
-                                Cmpop::IsNot => Cmpop::Is,
-                                Cmpop::In => Cmpop::NotIn,
-                                Cmpop::NotIn => Cmpop::In,
+                                CmpOp::Eq => CmpOp::NotEq,
+                                CmpOp::NotEq => CmpOp::Eq,
+                                CmpOp::Lt => CmpOp::GtE,
+                                CmpOp::LtE => CmpOp::Gt,
+                                CmpOp::Gt => CmpOp::LtE,
+                                CmpOp::GtE => CmpOp::Lt,
+                                CmpOp::Is => CmpOp::IsNot,
+                                CmpOp::IsNot => CmpOp::Is,
+                                CmpOp::In => CmpOp::NotIn,
+                                CmpOp::NotIn => CmpOp::In,
                             };
                             let node = ast::ExprCompare {
                                 left: left.clone(),
@@ -152,7 +152,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                             node.into()
                         } else {
                             let node = ast::ExprUnaryOp {
-                                op: Unaryop::Not,
+                                op: UnaryOp::Not,
                                 operand: Box::new(loop_info.test.clone()),
                                 range: TextRange::default(),
                             };
@@ -160,7 +160,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                         }
                     } else {
                         let node = ast::ExprUnaryOp {
-                            op: Unaryop::Not,
+                            op: UnaryOp::Not,
                             operand: Box::new(loop_info.test.clone()),
                             range: TextRange::default(),
                         };

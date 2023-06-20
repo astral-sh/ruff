@@ -67,6 +67,8 @@ E70.py:65:4: E702 Multiple statements on one line (semicolon)
 64 | while 1:
 65 |   1;...
    |    ^ E702
+66 | #: E703:2:1
+67 | 0\
    |
 
 

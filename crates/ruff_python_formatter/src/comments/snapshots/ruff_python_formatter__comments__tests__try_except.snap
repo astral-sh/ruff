@@ -34,7 +34,7 @@ expression: comments.debug(test_case.source_code)
         ],
     },
     Node {
-        kind: ExcepthandlerExceptHandler,
+        kind: ExceptHandlerExceptHandler,
         range: 100..136,
         source: `except Exception as ex:⏎`,
     }: {

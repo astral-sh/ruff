@@ -1,7 +1,7 @@
 use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
 
-use ruff_python_semantic::{BindingKind, Importation, SemanticModel};
+use ruff_python_semantic::{BindingKind, Import, SemanticModel};
 
 pub(super) enum Resolution {
     /// The expression resolves to an irrelevant expression type (e.g., a constant).
@@ -39,7 +39,7 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                         | BindingKind::LoopVar
                         | BindingKind::Global
                         | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
-                        BindingKind::Importation(Importation {
+                        BindingKind::Import(Import {
                             qualified_name: module,
                         }) if module == "pandas" => Resolution::PandasModule,
                         _ => Resolution::IrrelevantBinding,

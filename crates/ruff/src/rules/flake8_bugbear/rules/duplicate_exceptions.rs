@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -162,11 +162,11 @@ fn duplicate_handler_exceptions<'a>(
     seen
 }
 
-pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
     let mut seen: FxHashSet<CallPath> = FxHashSet::default();
     let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = handler else {
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_: Some(type_), .. }) = handler else {
             continue;
         };
         match type_.as_ref() {

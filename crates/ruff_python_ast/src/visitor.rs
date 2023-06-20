@@ -2,10 +2,10 @@
 
 pub mod preorder;
 
-use rustpython_ast::Decorator;
+use rustpython_ast::{ArgWithDefault, Decorator};
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler, Expr,
-    ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, Unaryop, Withitem,
+    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr,
+    ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -34,23 +34,23 @@ pub trait Visitor<'a> {
     fn visit_expr_context(&mut self, expr_context: &'a ExprContext) {
         walk_expr_context(self, expr_context);
     }
-    fn visit_boolop(&mut self, boolop: &'a Boolop) {
-        walk_boolop(self, boolop);
+    fn visit_bool_op(&mut self, bool_op: &'a BoolOp) {
+        walk_bool_op(self, bool_op);
     }
     fn visit_operator(&mut self, operator: &'a Operator) {
         walk_operator(self, operator);
     }
-    fn visit_unaryop(&mut self, unaryop: &'a Unaryop) {
-        walk_unaryop(self, unaryop);
+    fn visit_unary_op(&mut self, unary_op: &'a UnaryOp) {
+        walk_unary_op(self, unary_op);
     }
-    fn visit_cmpop(&mut self, cmpop: &'a Cmpop) {
-        walk_cmpop(self, cmpop);
+    fn visit_cmp_op(&mut self, cmp_op: &'a CmpOp) {
+        walk_cmp_op(self, cmp_op);
     }
     fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
         walk_comprehension(self, comprehension);
     }
-    fn visit_excepthandler(&mut self, excepthandler: &'a Excepthandler) {
-        walk_excepthandler(self, excepthandler);
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+        walk_except_handler(self, except_handler);
     }
     fn visit_format_spec(&mut self, format_spec: &'a Expr) {
         walk_expr(self, format_spec);
@@ -61,14 +61,17 @@ pub trait Visitor<'a> {
     fn visit_arg(&mut self, arg: &'a Arg) {
         walk_arg(self, arg);
     }
+    fn visit_arg_with_default(&mut self, arg_with_default: &'a ArgWithDefault) {
+        walk_arg_with_default(self, arg_with_default);
+    }
     fn visit_keyword(&mut self, keyword: &'a Keyword) {
         walk_keyword(self, keyword);
     }
     fn visit_alias(&mut self, alias: &'a Alias) {
         walk_alias(self, alias);
     }
-    fn visit_withitem(&mut self, withitem: &'a Withitem) {
-        walk_withitem(self, withitem);
+    fn visit_with_item(&mut self, with_item: &'a WithItem) {
+        walk_with_item(self, with_item);
     }
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
@@ -228,14 +231,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(orelse);
         }
         Stmt::With(ast::StmtWith { items, body, .. }) => {
-            for withitem in items {
-                visitor.visit_withitem(withitem);
+            for with_item in items {
+                visitor.visit_with_item(with_item);
             }
             visitor.visit_body(body);
         }
         Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
-            for withitem in items {
-                visitor.visit_withitem(withitem);
+            for with_item in items {
+                visitor.visit_with_item(with_item);
             }
             visitor.visit_body(body);
         }
@@ -269,8 +272,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             range: _range,
         }) => {
             visitor.visit_body(body);
-            for excepthandler in handlers {
-                visitor.visit_excepthandler(excepthandler);
+            for except_handler in handlers {
+                visitor.visit_except_handler(except_handler);
             }
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);
@@ -283,8 +286,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             range: _range,
         }) => {
             visitor.visit_body(body);
-            for excepthandler in handlers {
-                visitor.visit_excepthandler(excepthandler);
+            for except_handler in handlers {
+                visitor.visit_except_handler(except_handler);
             }
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);
@@ -333,7 +336,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             values,
             range: _range,
         }) => {
-            visitor.visit_boolop(op);
+            visitor.visit_bool_op(op);
             for expr in values {
                 visitor.visit_expr(expr);
             }
@@ -361,7 +364,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             operand,
             range: _range,
         }) => {
-            visitor.visit_unaryop(op);
+            visitor.visit_unary_op(op);
             visitor.visit_expr(operand);
         }
         Expr::Lambda(ast::ExprLambda {
@@ -467,8 +470,8 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             range: _range,
         }) => {
             visitor.visit_expr(left);
-            for cmpop in ops {
-                visitor.visit_cmpop(cmpop);
+            for cmp_op in ops {
+                visitor.visit_cmp_op(cmp_op);
             }
             for expr in comparators {
                 visitor.visit_expr(expr);
@@ -588,12 +591,12 @@ pub fn walk_comprehension<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
+pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
-    excepthandler: &'a Excepthandler,
+    except_handler: &'a ExceptHandler,
 ) {
-    match excepthandler {
-        Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, body, .. }) => {
+    match except_handler {
+        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, body, .. }) => {
             if let Some(expr) = type_ {
                 visitor.visit_expr(expr);
             }
@@ -604,25 +607,19 @@ pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
     for arg in &arguments.posonlyargs {
-        visitor.visit_arg(arg);
+        visitor.visit_arg_with_default(arg);
     }
     for arg in &arguments.args {
-        visitor.visit_arg(arg);
+        visitor.visit_arg_with_default(arg);
     }
     if let Some(arg) = &arguments.vararg {
         visitor.visit_arg(arg);
     }
     for arg in &arguments.kwonlyargs {
-        visitor.visit_arg(arg);
-    }
-    for expr in &arguments.kw_defaults {
-        visitor.visit_expr(expr);
+        visitor.visit_arg_with_default(arg);
     }
     if let Some(arg) = &arguments.kwarg {
         visitor.visit_arg(arg);
-    }
-    for expr in &arguments.defaults {
-        visitor.visit_expr(expr);
     }
 }
 
@@ -632,13 +629,23 @@ pub fn walk_arg<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arg: &'a Arg) {
     }
 }
 
+pub fn walk_arg_with_default<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    arg_with_default: &'a ArgWithDefault,
+) {
+    visitor.visit_arg(&arg_with_default.def);
+    if let Some(expr) = &arg_with_default.default {
+        visitor.visit_expr(expr);
+    }
+}
+
 pub fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a Keyword) {
     visitor.visit_expr(&keyword.value);
 }
 
-pub fn walk_withitem<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, withitem: &'a Withitem) {
-    visitor.visit_expr(&withitem.context_expr);
-    if let Some(expr) = &withitem.optional_vars {
+pub fn walk_with_item<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, with_item: &'a WithItem) {
+    visitor.visit_expr(&with_item.context_expr);
+    if let Some(expr) = &with_item.optional_vars {
         visitor.visit_expr(expr);
     }
 }
@@ -719,16 +726,16 @@ pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
 }
 
 #[allow(unused_variables)]
-pub fn walk_boolop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, boolop: &'a Boolop) {}
+pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a BoolOp) {}
 
 #[allow(unused_variables)]
 pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a Operator) {}
 
 #[allow(unused_variables)]
-pub fn walk_unaryop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unaryop: &'a Unaryop) {}
+pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unary_op: &'a UnaryOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_cmpop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmpop: &'a Cmpop) {}
+pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a CmpOp) {}
 
 #[allow(unused_variables)]
 pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a Alias) {}

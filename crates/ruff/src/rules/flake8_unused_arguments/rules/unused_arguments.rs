@@ -225,8 +225,9 @@ fn function(
     let args = args
         .posonlyargs
         .iter()
-        .chain(args.args.iter())
-        .chain(args.kwonlyargs.iter())
+        .chain(&args.args)
+        .chain(&args.kwonlyargs)
+        .map(|arg_with_default| &arg_with_default.def)
         .chain(
             iter::once::<Option<&Arg>>(args.vararg.as_deref())
                 .flatten()
@@ -252,9 +253,10 @@ fn method(
     let args = args
         .posonlyargs
         .iter()
-        .chain(args.args.iter())
+        .chain(&args.args)
+        .chain(&args.kwonlyargs)
         .skip(1)
-        .chain(args.kwonlyargs.iter())
+        .map(|arg_with_default| &arg_with_default.def)
         .chain(
             iter::once::<Option<&Arg>>(args.vararg.as_deref())
                 .flatten()

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Decorator, Ranged};
+use rustpython_parser::ast::{ArgWithDefault, Arguments, Decorator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -74,8 +74,13 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
     ) {
         return None;
     }
-    if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
-        if &arg.arg != "cls" {
+    if let Some(ArgWithDefault {
+        def,
+        default: _,
+        range: _,
+    }) = args.posonlyargs.first().or_else(|| args.args.first())
+    {
+        if &def.arg != "cls" {
             if checker
                 .settings
                 .pep8_naming
@@ -87,7 +92,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
             }
             return Some(Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod,
-                arg.range(),
+                def.range(),
             ));
         }
     }

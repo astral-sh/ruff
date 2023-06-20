@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Cursor, Write};
+use std::io::{BufReader, BufWriter, Write};
 use std::iter;
 use std::path::Path;
 
@@ -10,12 +10,12 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_whitespace::NewlineWithTrailingNewline;
+use ruff_python_whitespace::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
 use crate::jupyter::index::JupyterIndex;
-use crate::jupyter::{Cell, CellType, RawNotebook, SourceValue};
+use crate::jupyter::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
 use crate::IOError;
 
@@ -34,9 +34,9 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     })?;
     let code = notebook.content().to_string();
     notebook.update_cell_content(&code);
-    let mut buffer = Cursor::new(Vec::new());
+    let mut buffer = BufWriter::new(Vec::new());
     notebook.write_inner(&mut buffer)?;
-    Ok(String::from_utf8(buffer.into_inner())?)
+    Ok(String::from_utf8(buffer.into_inner()?)?)
 }
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
@@ -49,18 +49,37 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
 }
 
 impl Cell {
+    /// Return the [`SourceValue`] of the cell.
+    fn source(&self) -> &SourceValue {
+        match self {
+            Cell::Code(cell) => &cell.source,
+            Cell::Markdown(cell) => &cell.source,
+            Cell::Raw(cell) => &cell.source,
+        }
+    }
+
+    /// Update the [`SourceValue`] of the cell.
+    fn set_source(&mut self, source: SourceValue) {
+        match self {
+            Cell::Code(cell) => cell.source = source,
+            Cell::Markdown(cell) => cell.source = source,
+            Cell::Raw(cell) => cell.source = source,
+        }
+    }
+
     /// Return `true` if it's a valid code cell.
     ///
-    /// A valid code cell is a cell where the type is [`CellType::Code`] and the
+    /// A valid code cell is a cell where the cell type is [`Cell::Code`] and the
     /// source doesn't contain a magic, shell or help command.
     fn is_valid_code_cell(&self) -> bool {
-        if self.cell_type != CellType::Code {
-            return false;
-        }
+        let source = match self {
+            Cell::Code(cell) => &cell.source,
+            _ => return false,
+        };
         // Ignore a cell if it contains a magic command. There could be valid
         // Python code as well, but we'll ignore that for now.
         // TODO(dhruvmanila): https://github.com/psf/black/blob/main/src/black/handle_ipynb_magics.py
-        !match &self.source {
+        !match source {
             SourceValue::String(string) => string.lines().any(|line| {
                 MAGIC_PREFIX
                     .iter()
@@ -92,7 +111,7 @@ pub struct Notebook {
     /// The offsets of each cell in the concatenated source code. This includes
     /// the first and last character offsets as well.
     cell_offsets: Vec<TextSize>,
-    /// The cell numbers of all valid code cells in the notebook.
+    /// The cell index of all valid code cells in the notebook.
     valid_code_cells: Vec<u32>,
 }
 
@@ -108,7 +127,7 @@ impl Notebook {
                 TextRange::default(),
             )
         })?);
-        let notebook: RawNotebook = match serde_json::from_reader(reader) {
+        let raw_notebook: RawNotebook = match serde_json::from_reader(reader) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
@@ -176,34 +195,34 @@ impl Notebook {
         };
 
         // v4 is what everybody uses
-        if notebook.nbformat != 4 {
+        if raw_notebook.nbformat != 4 {
             // bail because we should have already failed at the json schema stage
             return Err(Box::new(Diagnostic::new(
                 SyntaxError {
                     message: format!(
                         "Expected Jupyter Notebook format 4, found {}",
-                        notebook.nbformat
+                        raw_notebook.nbformat
                     ),
                 },
                 TextRange::default(),
             )));
         }
 
-        let valid_code_cells = notebook
+        let valid_code_cells = raw_notebook
             .cells
             .iter()
             .enumerate()
             .filter(|(_, cell)| cell.is_valid_code_cell())
-            .map(|(pos, _)| u32::try_from(pos).unwrap())
+            .map(|(idx, _)| u32::try_from(idx).unwrap())
             .collect::<Vec<_>>();
 
         let mut contents = Vec::with_capacity(valid_code_cells.len());
         let mut current_offset = TextSize::from(0);
-        let mut cell_offsets = Vec::with_capacity(notebook.cells.len());
+        let mut cell_offsets = Vec::with_capacity(valid_code_cells.len());
         cell_offsets.push(TextSize::from(0));
 
-        for &pos in &valid_code_cells {
-            let cell_contents = match &notebook.cells[pos as usize].source {
+        for &idx in &valid_code_cells {
+            let cell_contents = match &raw_notebook.cells[idx as usize].source() {
                 SourceValue::String(string) => string.clone(),
                 SourceValue::StringArray(string_array) => string_array.join(""),
             };
@@ -213,7 +232,7 @@ impl Notebook {
         }
 
         Ok(Self {
-            raw: notebook,
+            raw: raw_notebook,
             index: OnceCell::new(),
             // The additional newline at the end is to maintain consistency for
             // all cells. These newlines will be removed before updating the
@@ -267,7 +286,7 @@ impl Notebook {
     /// can happen only if the cell offsets were not updated before calling
     /// this method or the offsets were updated incorrectly.
     fn update_cell_content(&mut self, transformed: &str) {
-        for (&pos, (start, end)) in self
+        for (&idx, (start, end)) in self
             .valid_code_cells
             .iter()
             .zip(self.cell_offsets.iter().tuple_windows::<(_, _)>())
@@ -275,22 +294,25 @@ impl Notebook {
             let cell_content = transformed
                 .get(start.to_usize()..end.to_usize())
                 .unwrap_or_else(|| {
-                    panic!("Transformed content out of bounds ({start:?}..{end:?}) for cell {pos}");
+                    panic!(
+                        "Transformed content out of bounds ({start:?}..{end:?}) for cell at {idx:?}"
+                    );
                 });
-            self.raw.cells[pos as usize].source = SourceValue::String(
-                cell_content
+            self.raw.cells[idx as usize].set_source(SourceValue::StringArray(
+                UniversalNewlineIterator::from(
                     // We only need to strip the trailing newline which we added
                     // while concatenating the cell contents.
-                    .strip_suffix('\n')
-                    .unwrap_or(cell_content)
-                    .to_string(),
-            );
+                    cell_content.strip_suffix('\n').unwrap_or(cell_content),
+                )
+                .map(|line| line.as_full_str().to_string())
+                .collect::<Vec<_>>(),
+            ));
         }
     }
 
     /// Build and return the [`JupyterIndex`].
     ///
-    /// # Notes
+    /// ## Notes
     ///
     /// Empty cells don't have any newlines, but there's a single visible line
     /// in the UI. That single line needs to be accounted for.
@@ -317,8 +339,8 @@ impl Notebook {
         let mut row_to_cell = vec![0];
         let mut row_to_row_in_cell = vec![0];
 
-        for &pos in &self.valid_code_cells {
-            let line_count = match &self.raw.cells[pos as usize].source {
+        for &idx in &self.valid_code_cells {
+            let line_count = match &self.raw.cells[idx as usize].source() {
                 SourceValue::String(string) => {
                     if string.is_empty() {
                         1
@@ -336,7 +358,7 @@ impl Notebook {
                     }
                 }
             };
-            row_to_cell.extend(iter::repeat(pos + 1).take(line_count as usize));
+            row_to_cell.extend(iter::repeat(idx + 1).take(line_count as usize));
             row_to_row_in_cell.extend(1..=line_count);
         }
 
@@ -390,7 +412,7 @@ impl Notebook {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
         let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
-        self.raw.serialize(&mut ser)?;
+        SortAlphabetically(&self.raw).serialize(&mut ser)?;
         Ok(())
     }
 
@@ -404,6 +426,7 @@ impl Notebook {
 
 #[cfg(test)]
 mod test {
+    use std::io::BufWriter;
     use std::path::Path;
 
     use anyhow::Result;
@@ -534,6 +557,23 @@ print("after empty cells")
             &settings::Settings::for_rule(Rule::UnsortedImports),
         )?;
         assert_messages!(diagnostics, path, source_kind);
+        Ok(())
+    }
+
+    #[test]
+    fn test_json_consistency() -> Result<()> {
+        let path = "before_fix.ipynb".to_string();
+        let (_, source_kind) = test_notebook_path(
+            path,
+            Path::new("after_fix.ipynb"),
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        let mut writer = BufWriter::new(Vec::new());
+        source_kind.expect_jupyter().write_inner(&mut writer)?;
+        let actual = String::from_utf8(writer.into_inner()?)?;
+        let expected =
+            std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;
+        assert_eq!(actual, expected);
         Ok(())
     }
 }
