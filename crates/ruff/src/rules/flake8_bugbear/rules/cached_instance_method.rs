@@ -23,8 +23,10 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from functools import lru_cache
 ///
+///
 /// def square(x: int) -> int:
 ///    return x * x
+///
 ///
 /// class Number:
 ///     value: int
@@ -38,9 +40,11 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from functools import lru_cache
 ///
+///
 /// @lru_cache
 /// def square(x: int) -> int:
 ///    return x * x
+///
 ///
 /// class Number:
 ///     value: int
