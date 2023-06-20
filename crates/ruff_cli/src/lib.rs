@@ -15,7 +15,7 @@ use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
 use ruff_python_formatter::format_module;
 
-use crate::args::{Args, Arguments, CheckArgs, Command};
+use crate::args::{Args, CheckArgs, Command};
 use crate::commands::run_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -51,38 +51,6 @@ impl From<ExitStatus> for ExitCode {
 enum ChangeKind {
     Configuration,
     SourceFile,
-}
-
-enum OutputWriter {
-    Stdout(BufWriter<io::Stdout>),
-    File(BufWriter<File>),
-}
-
-impl TryFrom<&Arguments> for OutputWriter {
-    type Error = anyhow::Error;
-
-    fn try_from(args: &Arguments) -> Result<Self> {
-        Ok(match args.output_file.as_ref() {
-            Some(path) if !args.watch => OutputWriter::File(BufWriter::new(File::create(path)?)),
-            _ => OutputWriter::Stdout(BufWriter::new(io::stdout())),
-        })
-    }
-}
-
-impl Write for OutputWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            OutputWriter::Stdout(stdout) => stdout.write(buf),
-            OutputWriter::File(file) => file.write(buf),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self {
-            OutputWriter::Stdout(stdout) => stdout.flush(),
-            OutputWriter::File(file) => file.flush(),
-        }
-    }
 }
 
 /// Return the [`ChangeKind`] based on the list of modified file paths.
@@ -204,10 +172,14 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         cli.stdin_filename.as_deref(),
     )?;
 
-    let mut writer = OutputWriter::try_from(&cli)?;
-    if matches!(writer, OutputWriter::File(_)) {
-        colored::control::set_override(false);
-    }
+    let mut writer: Box<dyn Write> = match cli.output_file {
+        Some(path) if !cli.watch => {
+            colored::control::set_override(false);
+            let file = File::create(path)?;
+            Box::new(BufWriter::new(file))
+        }
+        _ => Box::new(BufWriter::new(io::stdout())),
+    };
 
     if cli.show_settings {
         commands::show_settings::show_settings(

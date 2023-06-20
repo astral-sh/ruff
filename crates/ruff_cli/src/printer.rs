@@ -97,7 +97,7 @@ impl Printer {
         }
     }
 
-    fn write_summary_text(&self, writer: &mut impl Write, diagnostics: &Diagnostics) -> Result<()> {
+    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
         if self.log_level >= LogLevel::Default {
             if self.flags.contains(Flags::SHOW_VIOLATIONS) {
                 let fixed = diagnostics
@@ -154,7 +154,7 @@ impl Printer {
     pub(crate) fn write_once(
         &self,
         diagnostics: &Diagnostics,
-        writer: &mut impl Write,
+        writer: &mut dyn Write,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -243,7 +243,7 @@ impl Printer {
     pub(crate) fn write_statistics(
         &self,
         diagnostics: &Diagnostics,
-        writer: &mut impl Write,
+        writer: &mut dyn Write,
     ) -> Result<()> {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
@@ -340,7 +340,7 @@ impl Printer {
 
     pub(crate) fn write_continuously(
         &self,
-        writer: &mut impl Write,
+        writer: &mut dyn Write,
         diagnostics: &Diagnostics,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
@@ -399,7 +399,7 @@ const fn show_fix_status(autofix_level: flags::FixMode) -> bool {
     !autofix_level.is_apply()
 }
 
-fn print_fix_summary<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
+fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.values().sum::<usize>())
@@ -415,14 +415,14 @@ fn print_fix_summary<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTabl
 
     let s = if total == 1 { "" } else { "s" };
     let label = format!("Fixed {total} error{s}:");
-    writeln!(stdout, "{}", label.bold().green())?;
+    writeln!(writer, "{}", label.bold().green())?;
 
     for (filename, table) in fixed
         .iter()
         .sorted_by_key(|(filename, ..)| filename.as_str())
     {
         writeln!(
-            stdout,
+            writer,
             "{} {}{}",
             "-".cyan(),
             relativize_path(filename).bold(),
@@ -430,7 +430,7 @@ fn print_fix_summary<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTabl
         )?;
         for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
             writeln!(
-                stdout,
+                writer,
                 "    {count:>num_digits$} × {} ({})",
                 rule.noqa_code().to_string().red().bold(),
                 rule.as_ref(),
