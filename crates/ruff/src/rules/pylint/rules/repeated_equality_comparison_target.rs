@@ -1,9 +1,11 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
-use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprCompare, ExprName, Identifier};
-use std::collections::HashSet;
-
 use crate::checkers::ast::Checker;
+use itertools::any;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::hashable::HashableExpr;
+use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprCompare, Ranged};
+use std::ops::Deref;
 
 /// ## What it does
 /// Checks for equality comparisons that can rewritten as a membership test.
@@ -29,54 +31,19 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[violation]
-pub struct RepeatedEqualityComparisonTarget;
+pub struct RepeatedEqualityComparisonTarget {
+    membership_test: String,
+}
 
 impl Violation for RepeatedEqualityComparisonTarget {
     #[derive_message_formats]
     fn message(&self) -> String {
+        let RepeatedEqualityComparisonTarget { membership_test } = self;
         format!(
-            // TODO: Improve the message.
-            "Consider merging multiple comparisons with ???. \
+            "Consider merging multiple comparisons with `{membership_test}`. \
             Use a `set` if the elements are hashable."
         )
     }
-}
-
-fn is_allowed_op(op: BoolOp) -> bool {
-    match op {
-        BoolOp::Or => true,
-        BoolOp::And => true,
-    }
-}
-
-/// Return true if the given comparison operator is allowed with the given
-/// boolean operator.
-///
-/// For example,
-/// ```python
-/// foo == "bar" or foo == "baz" or foo == "qux"
-/// ```
-/// can be rewritten as
-/// ```python
-/// foo in {"bar", "baz", "qux"}
-/// ```
-/// and
-/// ```python
-/// foo != "bar" or foo != "baz" or foo != "qux"
-/// ```
-/// can be rewritten as
-/// ```python
-/// foo not in {"bar", "baz", "qux"}
-/// ```
-fn is_allowed_compare_op(bool_op: BoolOp, cmp_op: CmpOp) -> bool {
-    match bool_op {
-        BoolOp::Or => matches!(cmp_op, CmpOp::Eq),
-        BoolOp::And => matches!(cmp_op, CmpOp::NotEq),
-    }
-}
-
-fn is_call(expr: &Expr) -> bool {
-    matches!(expr, Expr::Call(_))
 }
 
 fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
@@ -87,17 +54,18 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
             comparators,
             ..
         }) => {
-            for op in ops {
-                if !is_allowed_compare_op(bool_op, *op) {
+            for cmp_op in ops {
+                if match bool_op {
+                    BoolOp::Or => !matches!(cmp_op, CmpOp::Eq),
+                    BoolOp::And => !matches!(cmp_op, CmpOp::NotEq),
+                } {
                     return false;
                 }
-                if is_call(left) {
+                if left.is_call_expr() {
                     return false;
                 }
-                for comparator in comparators {
-                    if is_call(comparator) {
-                        return false;
-                    }
+                if any(comparators.iter(), Expr::is_call_expr) {
+                    return false;
                 }
             }
             true
@@ -108,26 +76,69 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
 
 /// PLR0124
 pub(crate) fn repeated_equality_comparison_target(
-    _checker: &mut Checker,
+    checker: &mut Checker,
+    expr: &Expr,
     op: BoolOp,
     values: &[Expr],
 ) {
-    if !is_allowed_op(op) {
+    if !op.is_or() && !op.is_and() {
         return;
     }
-    for value in values {
-        if !is_allowed_value(op, value) {
-            return;
-        }
+    if any(values.iter(), |v| !is_allowed_value(op, v)) {
+        return;
     }
-    let mut names: HashSet<Identifier> = HashSet::new();
-    // TODO: Create a collection of ExprConstants.
+    let mut left_to_comparators: FxHashMap<HashableExpr, (usize, FxHashSet<HashableExpr>)> =
+        FxHashMap::default();
     for value in values {
-        if let Expr::Compare(ExprCompare { left, .. }) = value {
-            // There is probably a better way to do this.
-            if let Expr::Name(ExprName { id, .. }) = &**left {
-                names.insert(id.clone());
+        match value {
+            Expr::Compare(ExprCompare {
+                left, comparators, ..
+            }) => {
+                let (count, comparators) = left_to_comparators
+                    .entry(left.deref().into())
+                    .or_insert_with(|| (0, FxHashSet::default()));
+                *count += 1;
             }
+            _ => continue,
         }
     }
+    for (left, (count, comparators)) in left_to_comparators {
+        if count < 2 {
+            continue;
+        }
+        let msg = merged_membership_test(
+            &checker.generator().expr(left.as_expr()),
+            comparators
+                .iter()
+                .map(|c| checker.generator().expr(c.as_expr()))
+                .collect::<Vec<String>>(),
+            op,
+        );
+
+        checker.diagnostics.push(Diagnostic::new(
+            RepeatedEqualityComparisonTarget {
+                membership_test: msg,
+            },
+            expr.range(),
+        ));
+    }
+}
+fn merged_membership_test(
+    obj: &str,
+    collection_items: impl IntoIterator<Item = String>,
+    op: BoolOp,
+) -> String {
+    let membership_op = match op {
+        BoolOp::Or => "in",
+        BoolOp::And => "not in",
+    };
+    format!(
+        "{} {} ({})",
+        obj,
+        membership_op,
+        collection_items
+            .into_iter()
+            .collect::<Vec<String>>()
+            .join(", ")
+    )
 }
