@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// def square(x: int) -> int:
-///    return x * x
+///     return x * x
 ///
 ///
 /// class Number:
@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 ///
 /// @lru_cache
 /// def square(x: int) -> int:
-///    return x * x
+///     return x * x
 ///
 ///
 /// class Number:
