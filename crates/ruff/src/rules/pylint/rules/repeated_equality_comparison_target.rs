@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Boolop, Expr, ExprBoolOp};
+use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprCompare};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -43,7 +43,31 @@ impl Violation for RepeatedEqualityComparisonTarget {
 }
 
 fn is_allowed_op(op: Boolop) -> bool {
-    op == Boolop::Or || op == Boolop::And
+    match op {
+        Boolop::Or => true,
+        Boolop::And => true,
+    }
+}
+
+fn is_allowed_compare_op(bool_op: Boolop, cmp_op: Cmpop) -> bool {
+    match bool_op {
+        Boolop::Or => matches!(cmp_op, Cmpop::Eq),
+        Boolop::And => matches!(cmp_op, Cmpop::NotEq),
+    }
+}
+
+fn is_allowed_value(bool_op: Boolop, value: &Expr) -> bool {
+    match value {
+        Expr::Compare(ExprCompare { ops, .. }) => {
+            for op in ops {
+                if !is_allowed_compare_op(bool_op, *op) {
+                    return false;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
 }
 
 /// PLR0124
@@ -56,12 +80,12 @@ pub(crate) fn repeated_equality_comparison_target(
     if !is_allowed_op(op) {
         return;
     }
+    println!("Allowed op");
     for value in values {
-        if let Expr::BoolOp(ExprBoolOp { op, .. }) = value {
-            if !is_allowed_op(*op) {
-                return;
-            }
+        if !is_allowed_value(op, value) {
+            return;
         }
     }
+    println!("Allowed values");
     // TODO: Check if the expression can be rewritten as a membership test.
 }
