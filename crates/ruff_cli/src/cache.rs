@@ -376,8 +376,10 @@ mod test {
         let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
         assert!(!cache.package.files.is_empty());
 
+        parse_errors.sort();
+
         for path in &paths {
-            if parse_errors.contains(path) {
+            if parse_errors.binary_search(path).is_ok() {
                 continue; // We don't cache parsing errors.
             }
 
@@ -385,7 +387,7 @@ mod test {
 
             assert!(
                 cache.package.files.contains_key(relative_path),
-                "missing: {}",
+                "missing file from cache: '{}'",
                 relative_path.display()
             );
         }
