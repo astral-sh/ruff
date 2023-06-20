@@ -222,7 +222,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,109 +16,112 @@
+@@ -18,30 +16,51 @@
  
  # fmt: off
  def func_no_args():
@@ -284,7 +284,7 @@ d={'a':1,
 +    a=1,
 +    b=(),
 +    c=[],
-+    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
++    d={},
 +    e=True,
 +    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
@@ -296,11 +296,9 @@ d={'a':1,
  
  
  def spaces_types(
-     a: int = 1,
-     b: tuple = (),
+@@ -50,77 +69,62 @@
      c: list = [],
--    d: dict = {},
-+    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+     d: dict = {},
      e: bool = True,
 -    f: int = -1,
 -    g: int = 1 if False else 2,
@@ -319,11 +317,11 @@ d={'a':1,
      ...
  
  
--something = {
--    # fmt: off
+ something = {
+     # fmt: off
 -    key: 'value',
--}
-+something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++    key: "NOT_YET_IMPLEMENTED_STRING",
+ }
  
  
  def subscriptlist():
@@ -394,7 +392,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
-@@ -130,13 +131,15 @@
+@@ -130,13 +134,15 @@
  
  
  def on_and_off_broken():
@@ -415,7 +413,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,80 +148,21 @@
+@@ -145,80 +151,21 @@
  
  def long_lines():
      if True:
@@ -427,11 +425,13 @@ d={'a':1,
 -                implicit_default=True,
 -            )
 -        )
--        # fmt: off
++        NOT_IMPLEMENTED_call()
+         # fmt: off
 -        a = (
 -            unnecessary_bracket()
 -        )
--        # fmt: on
++        a = NOT_IMPLEMENTED_call()
+         # fmt: on
 -    _type_comment_re = re.compile(
 -        r"""
 -        ^
@@ -452,11 +452,9 @@ d={'a':1,
 -        )
 -        $
 -        """,
-+        NOT_IMPLEMENTED_call()
-         # fmt: off
+-        # fmt: off
 -        re.MULTILINE|re.VERBOSE
-+        a = NOT_IMPLEMENTED_call()
-         # fmt: on
+-        # fmt: on
 -    )
 +    _type_comment_re = NOT_IMPLEMENTED_call()
  
@@ -503,7 +501,7 @@ d={'a':1,
 -d={'a':1,
 -   'b':2}
 +l = [1, 2, 3]
-+d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++d = {"NOT_YET_IMPLEMENTED_STRING": 1, "NOT_YET_IMPLEMENTED_STRING": 2}
 ```
 
 ## Ruff Output
@@ -563,7 +561,7 @@ def spaces(
     a=1,
     b=(),
     c=[],
-    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    d={},
     e=True,
     f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
@@ -578,7 +576,7 @@ def spaces_types(
     a: int = 1,
     b: tuple = (),
     c: list = [],
-    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    d: dict = {},
     e: bool = True,
     f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
@@ -592,7 +590,10 @@ def spaces2(result=NOT_IMPLEMENTED_call()):
     ...
 
 
-something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+something = {
+    # fmt: off
+    key: "NOT_YET_IMPLEMENTED_STRING",
+}
 
 
 def subscriptlist():
@@ -676,7 +677,7 @@ NOT_IMPLEMENTED_call()
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file
 l = [1, 2, 3]
-d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+d = {"NOT_YET_IMPLEMENTED_STRING": 1, "NOT_YET_IMPLEMENTED_STRING": 2}
 ```
 
 ## Black Output

@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,99 +1,52 @@
+@@ -1,99 +1,56 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -143,24 +143,24 @@ if True:
 -    "dddddddddddddddddddddddddddddddddddddddd",
 +    "NOT_YET_IMPLEMENTED_STRING",
  ]
--{
+ {
 -    "oneple": (1,),
--}
++    "NOT_YET_IMPLEMENTED_STRING": (1,),
+ }
 -{"oneple": (1,)}
 -["ls", "lsoneple/%s" % (foo,)]
 -x = {"oneple": (1,)}
--y = {
++{"NOT_YET_IMPLEMENTED_STRING": (1,)}
++["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
++x = {"NOT_YET_IMPLEMENTED_STRING": (1,)}
+ y = {
 -    "oneple": (1,),
--}
++    "NOT_YET_IMPLEMENTED_STRING": (1,),
+ }
 -assert False, (
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
 -    % bar
 -)
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
-+x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +NOT_YET_IMPLEMENTED_StmtAssert
  
  # looping over a 1-tuple should also not get wrapped
@@ -245,11 +245,15 @@ nested_long_lines = [
     (1, 2, 3),
     "NOT_YET_IMPLEMENTED_STRING",
 ]
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    "NOT_YET_IMPLEMENTED_STRING": (1,),
+}
+{"NOT_YET_IMPLEMENTED_STRING": (1,)}
 ["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
-x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+x = {"NOT_YET_IMPLEMENTED_STRING": (1,)}
+y = {
+    "NOT_YET_IMPLEMENTED_STRING": (1,),
+}
 NOT_YET_IMPLEMENTED_StmtAssert
 
 # looping over a 1-tuple should also not get wrapped

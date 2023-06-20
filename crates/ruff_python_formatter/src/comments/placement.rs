@@ -1,6 +1,6 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::comments::CommentTextPosition;
-use crate::trivia::{SimpleTokenizer, TokenKind};
+use crate::trivia::{SimpleTokenizer, Token, TokenKind};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
@@ -29,6 +29,7 @@ pub(super) fn place_comment<'a>(
     .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
     .or_else(|comment| handle_trailing_binary_expression_left_or_operator_comment(comment, locator))
     .or_else(handle_leading_function_with_decorators_comment)
+    .or_else(|comment| handle_dict_unpacking_comment(comment, locator))
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -883,6 +884,76 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
     } else {
         CommentPlacement::Default(comment)
     }
+}
+
+/// Handles comments between `**` and the variable name in dict unpacking
+/// It attaches these to the appropriate value node
+///
+/// ```python
+/// {
+///     **  # comment between `**` and the variable name
+///     value
+///     ...
+/// }
+/// ```
+fn handle_dict_unpacking_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    match comment.enclosing_node() {
+        // TODO: can maybe also add AnyNodeRef::Arguments here, but tricky to test due to
+        // https://github.com/astral-sh/ruff/issues/5176
+        AnyNodeRef::ExprDict(_) => {}
+        _ => {
+            return CommentPlacement::Default(comment);
+        }
+    };
+
+    // no node after our comment so we can't be between `**` and the name (node)
+    let Some(following) = comment.following_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // we look at tokens between the previous node (or the start of the dict)
+    // and the comment
+    let preceding_end = match comment.preceding_node() {
+        Some(preceding) => preceding.end(),
+        None => comment.enclosing_node().start(),
+    };
+    if preceding_end > comment.slice().start() {
+        return CommentPlacement::Default(comment);
+    }
+    let mut tokens = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(preceding_end, comment.slice().start()),
+    )
+    .skip_trivia();
+
+    // we start from the preceding node but we skip its token
+    if let Some(first) = tokens.next() {
+        debug_assert!(matches!(
+            first,
+            Token {
+                kind: TokenKind::LBrace | TokenKind::Comma | TokenKind::Colon,
+                ..
+            }
+        ));
+    }
+
+    // if the remaining tokens from the previous node is exactly `**`,
+    // re-assign the comment to the one that follows the stars
+    let mut count = 0;
+    for token in tokens {
+        if token.kind != TokenKind::Star {
+            return CommentPlacement::Default(comment);
+        }
+        count += 1;
+    }
+    if count == 2 {
+        return CommentPlacement::trailing(following, comment);
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
