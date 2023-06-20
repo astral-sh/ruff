@@ -825,7 +825,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname == &alias.name)
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -1110,7 +1110,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname == &alias.name)
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }

@@ -1,7 +1,9 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -120,7 +122,7 @@ fn create_class_def_stmt(
         None => vec![],
     };
     ast::StmtClassDef {
-        name: class_name.into(),
+        name: Identifier::new(class_name.to_string(), TextRange::default()),
         bases: vec![base_class.clone()],
         keywords,
         body,

@@ -129,7 +129,7 @@ pub(crate) fn super_call_with_parameters(
         return;
     };
 
-    if !(first_arg_id == parent_name && second_arg_id == parent_arg) {
+    if !(first_arg_id == parent_name.as_str() && second_arg_id == parent_arg.as_str()) {
         return;
     }
 

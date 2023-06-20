@@ -289,7 +289,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {
-                    id: binding.into(),
+                    id: binding,
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
                 })),

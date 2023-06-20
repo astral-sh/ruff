@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -30,7 +30,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
     let stmt = Stmt::Assign(ast::StmtAssign {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
             value: Box::new(obj.clone()),
-            attr: name.into(),
+            attr: Identifier::new(name.to_string(), TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
         })],

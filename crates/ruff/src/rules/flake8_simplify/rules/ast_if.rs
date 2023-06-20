@@ -1,7 +1,7 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -941,7 +941,7 @@ pub(crate) fn use_dict_get_with_default(
     let node1 = *test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
-        attr: "get".into(),
+        attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };
