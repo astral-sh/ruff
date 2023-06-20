@@ -16,14 +16,22 @@ pub(crate) fn clean(cache_dir_overwrite: Option<PathBuf>, level: LogLevel) -> Re
     let mut stderr = BufWriter::new(io::stderr().lock());
     let pwd = std::env::current_dir()?;
     let path = cache_dir(cache_dir_overwrite, &pwd);
-    if level >= LogLevel::Default {
+    if cachedir::is_tagged(&path)? {
+        if level >= LogLevel::Default {
+            writeln!(
+                stderr,
+                "Removing cache at: {}",
+                fs::relativize_path(&path).bold()
+            )?;
+        }
+        remove_dir_all(path)?;
+    } else if level >= LogLevel::Default {
         writeln!(
             stderr,
-            "Removing cache at: {}",
+            "Not removing cache at: {}, not a cache directory created by Ruff",
             fs::relativize_path(&path).bold()
         )?;
     }
-    remove_dir_all(path)?;
 
     // This code removes the old caches that are not based on the global caches.
     //
