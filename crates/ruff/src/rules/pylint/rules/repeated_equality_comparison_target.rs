@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprCompare};
+use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprCompare};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -42,10 +42,10 @@ impl Violation for RepeatedEqualityComparisonTarget {
     }
 }
 
-fn is_allowed_op(op: Boolop) -> bool {
+fn is_allowed_op(op: BoolOp) -> bool {
     match op {
-        Boolop::Or => true,
-        Boolop::And => true,
+        BoolOp::Or => true,
+        BoolOp::And => true,
     }
 }
 
@@ -68,10 +68,10 @@ fn is_allowed_op(op: Boolop) -> bool {
 /// ```python
 /// foo not in {"bar", "baz", "qux"}
 /// ```
-fn is_allowed_compare_op(bool_op: Boolop, cmp_op: Cmpop) -> bool {
+fn is_allowed_compare_op(bool_op: BoolOp, cmp_op: CmpOp) -> bool {
     match bool_op {
-        Boolop::Or => matches!(cmp_op, Cmpop::Eq),
-        Boolop::And => matches!(cmp_op, Cmpop::NotEq),
+        BoolOp::Or => matches!(cmp_op, CmpOp::Eq),
+        BoolOp::And => matches!(cmp_op, CmpOp::NotEq),
     }
 }
 
@@ -79,7 +79,7 @@ fn is_call(expr: &Expr) -> bool {
     matches!(expr, Expr::Call(_))
 }
 
-fn is_allowed_value(bool_op: Boolop, value: &Expr) -> bool {
+fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     match value {
         Expr::Compare(ExprCompare {
             left,
@@ -109,7 +109,7 @@ fn is_allowed_value(bool_op: Boolop, value: &Expr) -> bool {
 /// PLR0124
 pub(crate) fn repeated_equality_comparison_target(
     _checker: &mut Checker,
-    op: Boolop,
+    op: BoolOp,
     values: &[Expr],
 ) {
     if !is_allowed_op(op) {
