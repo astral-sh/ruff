@@ -78,8 +78,8 @@ pub(crate) fn lambda_assignment(
             // See https://github.com/astral-sh/ruff/issues/3046
             if checker.patch(diagnostic.kind.rule())
                 && !checker.semantic().scope().kind.is_class()
-                && !has_leading_content(stmt, checker.locator)
-                && !has_trailing_content(stmt, checker.locator)
+                && !has_leading_content(stmt.start(), checker.locator)
+                && !has_trailing_content(stmt.end(), checker.locator)
             {
                 let first_line = checker.locator.line(stmt.start());
                 let indentation = leading_indentation(first_line);

@@ -226,7 +226,6 @@ fn fix_py2_block(
             if matches!(block.leading_token.tok, StartTok::If) { parent } else { None },
             checker.locator,
             checker.indexer,
-            checker.stylist,
         );
         return Some(Fix::suggested(edit));
     };
