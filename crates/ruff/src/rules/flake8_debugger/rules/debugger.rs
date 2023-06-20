@@ -7,6 +7,37 @@ use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPa
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
+/// ## What it does
+/// Checks for the presence of debugger calls and imports.
+///
+/// ## Why is this bad?
+/// Debugger calls and imports should be used for debugging purposes only. The
+/// presence of a debugger call or import in production code is likely a
+/// mistake and may cause unintended behavior, such as exposing sensitive
+/// information or causing the program to hang.
+///
+/// Instead, consider using a logging library to log information about the
+/// program's state, and writing tests to verify that the program behaves
+/// as expected.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     breakpoint()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+///
+/// def foo():
+///     logging.debug("foo called")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `pdb`](https://docs.python.org/3/library/pdb.html)
+/// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
 #[violation]
 pub struct Debugger {
     using_type: DebuggerUsingType,
