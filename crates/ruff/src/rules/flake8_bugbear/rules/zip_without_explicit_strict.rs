@@ -7,6 +7,29 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `zip` calls without an explicit `strict` parameter.
+///
+/// ## Why is this bad?
+/// By default, if the iterables passed to `zip` are of different lengths, the
+/// resulting iterator will be silently truncated to the length of the shortest
+/// iterable. This can lead to subtle bugs.
+///
+/// Use the `strict` parameter to raise a `ValueError` if the iterables are of
+/// non-uniform length.
+///
+/// ## Example
+/// ```python
+/// zip(a, b)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// zip(a, b, strict=True)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
 #[violation]
 pub struct ZipWithoutExplicitStrict;
 

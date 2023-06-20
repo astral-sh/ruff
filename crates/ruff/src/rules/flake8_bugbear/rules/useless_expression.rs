@@ -6,12 +6,23 @@ use ruff_python_ast::helpers::contains_effect;
 
 use crate::checkers::ast::Checker;
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum Kind {
-    Expression,
-    Attribute,
-}
-
+/// ## What it does
+/// Checks for useless expressions.
+///
+/// ## Why is this bad?
+/// Useless expressions have no effect on the program, and are often included
+/// by mistake. Assign a useless expression to a variable, or remove it
+/// entirely.
+///
+/// ## Example
+/// ```python
+/// 1 + 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = 1 + 1
+/// ```
 #[violation]
 pub struct UselessExpression {
     kind: Kind,
@@ -73,4 +84,10 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
         },
         value.range(),
     ));
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum Kind {
+    Expression,
+    Attribute,
 }

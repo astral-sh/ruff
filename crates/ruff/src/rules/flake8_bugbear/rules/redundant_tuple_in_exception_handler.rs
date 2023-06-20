@@ -6,6 +6,32 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for single-element tuples in exception handlers (e.g.,
+/// `except (ValueError,):`).
+///
+/// ## Why is this bad?
+/// A tuple with a single element can be more concisely and idiomatically
+/// expressed as a single value.
+///
+/// ## Example
+/// ```python
+/// try:
+///     ...
+/// except (ValueError,):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     ...
+/// except ValueError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[violation]
 pub struct RedundantTupleInExceptionHandler {
     name: String,
