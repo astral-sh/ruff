@@ -13,8 +13,11 @@ use std::ops::Deref;
 /// ## Why is this bad?
 /// Instead, to check if a variable is equal to one of many values, combine the
 /// values into a collection and use the `in` operator. This is faster and less
-/// verbose. If the items are hashable, use a `set` instead of a `list`, as
-/// membership tests are faster for sets.
+/// verbose.
+///
+/// If the items are hashable, use a `set` instead of a `list`. Membership
+/// using the `in` operator is more efficient for sets than for non-hashable
+/// collections like lists and tuples.
 ///
 /// ## Example
 /// ```python
@@ -32,15 +35,15 @@ use std::ops::Deref;
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[violation]
 pub struct RepeatedEqualityComparisonTarget {
-    membership_test: String,
+    expr: String,
 }
 
 impl Violation for RepeatedEqualityComparisonTarget {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedEqualityComparisonTarget { membership_test } = self;
+        let RepeatedEqualityComparisonTarget { expr } = self;
         format!(
-            "Consider merging multiple comparisons with `{membership_test}`. \
+            "Consider merging multiple comparisons: `{expr}`. \
             Use a `set` if the elements are hashable."
         )
     }
@@ -107,7 +110,7 @@ pub(crate) fn repeated_equality_comparison_target(
         if count < 2 {
             continue;
         }
-        let msg = merged_membership_test(
+        let membership_expr = merged_membership_test(
             &checker.generator().expr(left.as_expr()),
             comparators
                 .iter()
@@ -115,10 +118,9 @@ pub(crate) fn repeated_equality_comparison_target(
                 .collect::<Vec<String>>(),
             op,
         );
-
         checker.diagnostics.push(Diagnostic::new(
             RepeatedEqualityComparisonTarget {
-                membership_test: msg,
+                expr: membership_expr,
             },
             expr.range(),
         ));
