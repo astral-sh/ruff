@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator};
+use ruff_python_whitespace::{is_python_whitespace, PythonWhitespace, UniversalNewlineIterator};
 
 use crate::call_path::CallPath;
 use crate::source_code::{Indexer, Locator};
@@ -717,19 +717,19 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.
-pub fn has_comments<T>(located: &T, locator: &Locator) -> bool
+pub fn has_comments<T>(node: &T, locator: &Locator) -> bool
 where
     T: Ranged,
 {
-    let start = if has_leading_content(located, locator) {
-        located.start()
+    let start = if has_leading_content(node.start(), locator) {
+        node.start()
     } else {
-        locator.line_start(located.start())
+        locator.line_start(node.start())
     };
-    let end = if has_trailing_content(located, locator) {
-        located.end()
+    let end = if has_trailing_content(node.end(), locator) {
+        node.end()
     } else {
-        locator.line_end(located.end())
+        locator.line_end(node.end())
     };
 
     has_comments_in(TextRange::new(start, end), locator)
@@ -927,7 +927,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
@@ -982,29 +982,23 @@ where
     }
 }
 
-/// Return `true` if a [`Ranged`] has leading content.
-pub fn has_leading_content<T>(located: &T, locator: &Locator) -> bool
-where
-    T: Ranged,
-{
-    let line_start = locator.line_start(located.start());
-    let leading = &locator.contents()[TextRange::new(line_start, located.start())];
-    leading.chars().any(|char| !char.is_whitespace())
+/// Return `true` if the node starting the given [`TextSize`] has leading content.
+pub fn has_leading_content(offset: TextSize, locator: &Locator) -> bool {
+    let line_start = locator.line_start(offset);
+    let leading = &locator.contents()[TextRange::new(line_start, offset)];
+    leading.chars().any(|char| !is_python_whitespace(char))
 }
 
-/// Return `true` if a [`Ranged`] has trailing content.
-pub fn has_trailing_content<T>(located: &T, locator: &Locator) -> bool
-where
-    T: Ranged,
-{
-    let line_end = locator.line_end(located.end());
-    let trailing = &locator.contents()[TextRange::new(located.end(), line_end)];
+/// Return `true` if the node ending at the given [`TextSize`] has trailing content.
+pub fn has_trailing_content(offset: TextSize, locator: &Locator) -> bool {
+    let line_end = locator.line_end(offset);
+    let trailing = &locator.contents()[TextRange::new(offset, line_end)];
 
     for char in trailing.chars() {
         if char == '#' {
             return false;
         }
-        if !char.is_whitespace() {
+        if !is_python_whitespace(char) {
             return true;
         }
     }
@@ -1020,11 +1014,11 @@ where
 
     let trailing = &locator.contents()[TextRange::new(located.end(), line_end)];
 
-    for (i, char) in trailing.chars().enumerate() {
+    for (index, char) in trailing.char_indices() {
         if char == '#' {
-            return TextSize::try_from(i).ok();
+            return TextSize::try_from(index).ok();
         }
-        if !char.is_whitespace() {
+        if !is_python_whitespace(char) {
             return None;
         }
     }
@@ -1040,7 +1034,7 @@ pub fn trailing_lines_end(stmt: &Stmt, locator: &Locator) -> TextSize {
     UniversalNewlineIterator::with_offset(rest, line_end)
         .take_while(|line| line.trim_whitespace().is_empty())
         .last()
-        .map_or(line_end, |l| l.full_end())
+        .map_or(line_end, |line| line.full_end())
 }
 
 /// Return the range of the first parenthesis pair after a given [`TextSize`].
@@ -1081,7 +1075,7 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
     let contents = &locator.contents()[range];
     let range = lexer::lex_starts_at(contents, Mode::Module, range.start())
         .flatten()
-        .find(|(kind, _)| matches!(kind, Tok::Colon))
+        .find(|(tok, _)| tok.is_colon())
         .map(|(_, range)| range);
     range
 }
@@ -1105,13 +1099,12 @@ pub fn elif_else_range(stmt: &ast::StmtIf, locator: &Locator) -> Option<TextRang
         .map(|(_, range)| range)
 }
 
-/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-/// other statements preceding it.
-pub fn preceded_by_continuation(stmt: &Stmt, indexer: &Indexer, locator: &Locator) -> bool {
-    let previous_line_end = locator.line_start(stmt.start());
-    let newline_pos = usize::from(previous_line_end).saturating_sub(1);
+/// Given an offset at the end of a line (including newlines), return the offset of the
+/// continuation at the end of that line.
+fn find_continuation(offset: TextSize, locator: &Locator, indexer: &Indexer) -> Option<TextSize> {
+    let newline_pos = usize::from(offset).saturating_sub(1);
 
-    // Compute start of preceding line
+    // Skip the newline.
     let newline_len = match locator.contents().as_bytes()[newline_pos] {
         b'\n' => {
             if locator
@@ -1126,24 +1119,77 @@ pub fn preceded_by_continuation(stmt: &Stmt, indexer: &Indexer, locator: &Locato
             }
         }
         b'\r' => 1,
-        // No preceding line
-        _ => return false,
+        // No preceding line.
+        _ => return None,
     };
 
-    // See if the position is in the continuation line starts
-    indexer.is_continuation(previous_line_end - TextSize::from(newline_len), locator)
+    indexer
+        .is_continuation(offset - TextSize::from(newline_len), locator)
+        .then(|| offset - TextSize::from(newline_len) - TextSize::from(1))
+}
+
+/// If the node starting at the given [`TextSize`] is preceded by at least one continuation line
+/// (i.e., a line ending in a backslash), return the starting offset of the first such continuation
+/// character.
+///
+/// For example, given:
+/// ```python
+/// x = 1; \
+///    y = 2
+/// ```
+///
+/// When passed the offset of `y`, this function will return the offset of the backslash at the end
+/// of the first line.
+///
+/// Similarly, given:
+/// ```python
+/// x = 1; \
+///        \
+///   y = 2;
+/// ```
+///
+/// When passed the offset of `y`, this function will again return the offset of the backslash at
+/// the end of the first line.
+pub fn preceded_by_continuations(
+    offset: TextSize,
+    locator: &Locator,
+    indexer: &Indexer,
+) -> Option<TextSize> {
+    // Find the first preceding continuation.
+    let mut continuation = find_continuation(locator.line_start(offset), locator, indexer)?;
+
+    // Continue searching for continuations, in the unlikely event that we have multiple
+    // continuations in a row.
+    loop {
+        let previous_line_end = locator.line_start(continuation);
+        if locator
+            .slice(TextRange::new(previous_line_end, continuation))
+            .chars()
+            .all(is_python_whitespace)
+        {
+            if let Some(next_continuation) = find_continuation(previous_line_end, locator, indexer)
+            {
+                continuation = next_continuation;
+                continue;
+            }
+        }
+        break;
+    }
+
+    Some(continuation)
 }
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements preceding it.
 pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator, indexer: &Indexer) -> bool {
-    has_leading_content(stmt, locator) || preceded_by_continuation(stmt, indexer, locator)
+    has_leading_content(stmt.start(), locator)
+        || preceded_by_continuations(stmt.start(), locator, indexer).is_some()
 }
 
 /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
 /// other statements following it.
 pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
-    has_trailing_content(stmt, locator)
+    has_trailing_content(stmt.end(), locator)
 }
 
 /// Return `true` if a `Stmt` is a docstring.
@@ -1165,11 +1211,11 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     }
 }
 
-#[derive(Default)]
 /// A simple representation of a call's positional and keyword arguments.
+#[derive(Default)]
 pub struct SimpleCallArgs<'a> {
-    pub args: Vec<&'a Expr>,
-    pub kwargs: FxHashMap<&'a str, &'a Expr>,
+    args: Vec<&'a Expr>,
+    kwargs: FxHashMap<&'a str, &'a Expr>,
 }
 
 impl<'a> SimpleCallArgs<'a> {
@@ -1211,6 +1257,16 @@ impl<'a> SimpleCallArgs<'a> {
     /// Return the number of positional and keyword arguments.
     pub fn len(&self) -> usize {
         self.args.len() + self.kwargs.len()
+    }
+
+    /// Return the number of positional arguments.
+    pub fn num_args(&self) -> usize {
+        self.args.len()
+    }
+
+    /// Return the number of keyword arguments.
+    pub fn num_kwargs(&self) -> usize {
+        self.kwargs.len()
     }
 
     /// Return `true` if there are no positional or keyword arguments.
@@ -1507,7 +1563,7 @@ mod tests {
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_ast::{CmpOp, Expr, Stmt};
+    use rustpython_ast::{CmpOp, Expr, Ranged, Stmt};
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
@@ -1523,25 +1579,25 @@ mod tests {
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt, &locator));
+        assert!(!has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1; y = 2";
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert!(has_trailing_content(stmt, &locator));
+        assert!(has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1  ";
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt, &locator));
+        assert!(!has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1  # Comment";
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt, &locator));
+        assert!(!has_trailing_content(stmt.end(), &locator));
 
         let contents = r#"
 x = 1
@@ -1551,7 +1607,7 @@ y = 2
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt, &locator));
+        assert!(!has_trailing_content(stmt.end(), &locator));
 
         Ok(())
     }

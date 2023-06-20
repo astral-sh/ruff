@@ -1,4 +1,3 @@
-
 if True:
     import foo1; x = 1
     import foo2;     x = 1
@@ -11,7 +10,6 @@ if True:
     import foo4 \
         ; x = 1
 
-
 if True:
     x = 1; import foo5
 
@@ -20,11 +18,9 @@ if True:
     x = 1; \
          import foo6
 
-
 if True:
     x = 1 \
         ; import foo7
-
 
 if True:
     x = 1; import foo8; x = 1
@@ -40,12 +36,27 @@ if True:
         ;import foo11 \
         ;x = 1
 
+if True:
+    x = 1; \
+        \
+        import foo12
+
+if True:
+    x = 1; \
+\
+    import foo13
+
+
+if True:
+    x = 1; \
+    #    \
+    import foo14
 
 # Continuation, but not as the last content in the file.
 x = 1; \
-import foo12
+import foo15
 
 # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
 # error.)
 x = 1; \
-import foo13
+import foo16

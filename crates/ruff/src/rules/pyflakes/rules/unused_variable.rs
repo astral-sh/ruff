@@ -210,13 +210,7 @@ fn remove_unused_variable(
                     Some(Fix::suggested(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let edit = delete_stmt(
-                        stmt,
-                        parent,
-                        checker.locator,
-                        checker.indexer,
-                        checker.stylist,
-                    );
+                    let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
                     Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
                 };
             }
@@ -241,13 +235,7 @@ fn remove_unused_variable(
                 Some(Fix::suggested(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                let edit = delete_stmt(
-                    stmt,
-                    parent,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                );
+                let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
                 Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
             };
         }

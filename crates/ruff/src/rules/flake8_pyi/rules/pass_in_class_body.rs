@@ -39,13 +39,8 @@ pub(crate) fn pass_in_class_body<'a>(
 
         let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            let edit = autofix::edits::delete_stmt(
-                stmt,
-                Some(parent),
-                checker.locator,
-                checker.indexer,
-                checker.stylist,
-            );
+            let edit =
+                autofix::edits::delete_stmt(stmt, Some(parent), checker.locator, checker.indexer);
             diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
         }
         checker.diagnostics.push(diagnostic);
