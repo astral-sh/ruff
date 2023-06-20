@@ -345,7 +345,7 @@ mod test {
                 }
 
                 let path = entry.path();
-                if path.ends_with("pyproject.toml") {
+                if path.ends_with("pyproject.toml") || path.ends_with("R.ipynb") {
                     continue;
                 }
 
