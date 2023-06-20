@@ -2,17 +2,8 @@ name: "[ruff] Release"
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run skipping uploading artifact."
-        type: string
-      sha:
-        description: "Optionally, the full sha of the commit to be released"
-        type: string
-  push:
-    paths:
-      # When we change pyproject.toml, we want to ensure that the maturin builds still work
-      - pyproject.toml
+  release:
+    types: [ published ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -57,6 +50,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -95,6 +90,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -141,6 +138,8 @@ jobs:
             arch: x64
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -187,6 +186,8 @@ jobs:
           - i686-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -244,6 +245,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -297,6 +300,8 @@ jobs:
           - i686-unknown-linux-musl
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -351,6 +356,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: "v0.0.273"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -403,8 +410,7 @@ jobs:
       - linux-cross
       - musllinux
       - musllinux-cross
-    # If you don't set an input it's a dry run skipping uploading artifact
-    if: ${{ inputs.tag }}
+#    if: "startsWith(github.ref, 'refs/tags/')"
     environment:
       name: release
     permissions:
@@ -413,34 +419,11 @@ jobs:
       # For GitHub release publishing
       contents: write
     steps:
-      - name: Consistency check tag
-        run: |
-          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${{ inputs.tag }}" != "${version}" ]; then
-            echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${{ inputs.tag }}" >&2
-            echo "${version}" >&2
-            exit 1
-          else
-            echo "Releasing ${version}"
-          fi
-      - name: Consistency check sha
-        if: ${{ inputs.sha }}
-        run: |
-          git_sha=$(git rev-parse HEAD)
-          if [ "${{ inputs.sha }}" != "${git_sha}" ]; then
-            echo "The specified sha does not match the git checkout" >&2
-            echo "${{ inputs.sha }}" >&2
-            echo "${git_sha}" >&2
-            exit 1
-          else
-            echo "Releasing ${git_sha}"
-          fi
       - uses: actions/download-artifact@v3
         with:
           name: wheels
           path: wheels
-      - name: Publish to PyPi
+      - name: "Publish to PyPi"
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
@@ -450,20 +433,10 @@ jobs:
         with:
           name: binaries
           path: binaries
-      - name: git tag
-        run: |
-          git config user.email "hey@astral.sh"
-          git config user.name "Ruff Release CI"
-          git tag -m "v${{ inputs.tag }}" "v${{ inputs.tag }}"
-          # If there is duplicate tag, this will fail. The publish to pypi action will have been a noop (due to skip
-          # existing), so we make a non-destructive exit here
-          git push --tags
-      - name: "Publish to GitHub"
-        uses: softprops/action-gh-release@v1
-        with:
-          draft: true
-          files: binaries/*
-          tag_name: v${{ inputs.tag }}
+#      - name: "Publish to GitHub"
+#        uses: softprops/action-gh-release@v1
+#        with:
+#          files: binaries/*
 
   # After the release has been published, we update downstream repositories
   # This is separate because if this fails the release is still fine, we just need to do some manual workflow triggers
