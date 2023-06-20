@@ -1,6 +1,6 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::comments::CommentTextPosition;
-use crate::trivia::{SimpleTokenizer, TokenKind};
+use crate::trivia::{SimpleTokenizer, Token, TokenKind};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
@@ -909,10 +909,13 @@ fn handle_dict_unpacking_comment<'a>(
         }
     };
 
+    // no node after our comment so we can't be between `**` and the name (node)
     let Some(following) = comment.following_node() else {
         return CommentPlacement::Default(comment);
     };
 
+    // we look at tokens between the previous node (or the start of the dict)
+    // and the comment
     let preceding_end = match comment.preceding_node() {
         Some(preceding) => preceding.end(),
         None => comment.enclosing_node().start(),
@@ -920,14 +923,27 @@ fn handle_dict_unpacking_comment<'a>(
     if preceding_end > comment.slice().start() {
         return CommentPlacement::Default(comment);
     }
-    let tokens = SimpleTokenizer::new(
+    let mut tokens = SimpleTokenizer::new(
         locator.contents(),
         TextRange::new(preceding_end, comment.slice().start()),
     )
     .skip_trivia();
 
+    // we start from the preceding node but we skip its token
+    if let Some(first) = tokens.next() {
+        debug_assert!(matches!(
+            first,
+            Token {
+                kind: TokenKind::LBrace | TokenKind::Comma | TokenKind::Colon,
+                ..
+            }
+        ));
+    }
+
+    // if the remaining tokens from the previous node is exactly `**`,
+    // re-assign the comment to the one that follows the stars
     let mut count = 0;
-    for token in tokens.skip(1) {
+    for token in tokens {
         if token.kind != TokenKind::Star {
             return CommentPlacement::Default(comment);
         }
