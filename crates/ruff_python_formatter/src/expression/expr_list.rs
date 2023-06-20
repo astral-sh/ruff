@@ -19,7 +19,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item.into());
+        let dangling = comments.dangling_comments(item);
 
         // The empty list is special because there can be dangling comments, and they can be in two
         // positions:
