@@ -633,10 +633,10 @@ pub fn walk_arg_with_default<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     arg_with_default: &'a ArgWithDefault,
 ) {
-    visitor.visit_arg(&arg_with_default.def);
     if let Some(expr) = &arg_with_default.default {
         visitor.visit_expr(expr);
     }
+    visitor.visit_arg(&arg_with_default.def);
 }
 
 pub fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a Keyword) {
