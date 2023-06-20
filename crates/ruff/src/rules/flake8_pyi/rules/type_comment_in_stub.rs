@@ -34,7 +34,7 @@ impl Violation for TypeCommentInStub {
 }
 
 /// PYI033
-pub(crate) fn type_comment_in_stub(indexer: &Indexer, locator: &Locator) -> Vec<Diagnostic> {
+pub(crate) fn type_comment_in_stub(locator: &Locator, indexer: &Indexer) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     for range in indexer.comment_ranges() {

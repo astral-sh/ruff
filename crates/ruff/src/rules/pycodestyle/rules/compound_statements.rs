@@ -101,8 +101,8 @@ impl AlwaysAutofixableViolation for UselessSemicolon {
 /// E701, E702, E703
 pub(crate) fn compound_statements(
     lxr: &[LexResult],
-    indexer: &Indexer,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];

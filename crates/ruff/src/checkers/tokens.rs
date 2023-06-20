@@ -109,7 +109,7 @@ pub(crate) fn check_tokens(
     // ERA001
     if enforce_commented_out_code {
         diagnostics.extend(eradicate::rules::commented_out_code(
-            indexer, locator, settings,
+            locator, indexer, settings,
         ));
     }
 
@@ -141,7 +141,7 @@ pub(crate) fn check_tokens(
     // E701, E702, E703
     if enforce_compound_statements {
         diagnostics.extend(
-            pycodestyle::rules::compound_statements(tokens, indexer, locator, settings)
+            pycodestyle::rules::compound_statements(tokens, locator, indexer, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
@@ -187,7 +187,7 @@ pub(crate) fn check_tokens(
 
     // PYI033
     if enforce_type_comment_in_stub && is_stub {
-        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(indexer, locator));
+        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(locator, indexer));
     }
 
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007
@@ -204,7 +204,7 @@ pub(crate) fn check_tokens(
             .collect();
 
         diagnostics.extend(
-            flake8_todos::rules::todos(&todo_comments, indexer, locator, settings)
+            flake8_todos::rules::todos(&todo_comments, locator, indexer, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
