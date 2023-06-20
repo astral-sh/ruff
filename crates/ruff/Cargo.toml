@@ -32,7 +32,7 @@ bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
-dirs = { version = "5.0.0" }
+dirs = { workspace = true }
 fern = { version = "0.6.1" }
 glob = { workspace = true }
 globset = { workspace = true }

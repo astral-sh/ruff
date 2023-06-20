@@ -16,7 +16,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 regex = { workspace = true }
 filetime = { workspace = true }
-dirs = { version = "5.0.0" }
+dirs = { workspace = true }
 
 [dev-dependencies]
 ruff_macros = { path = "../ruff_macros" }
