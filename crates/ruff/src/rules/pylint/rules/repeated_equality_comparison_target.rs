@@ -94,10 +94,11 @@ pub(crate) fn repeated_equality_comparison_target(
             Expr::Compare(ExprCompare {
                 left, comparators, ..
             }) => {
-                let (count, comparators) = left_to_comparators
+                let (count, matches) = left_to_comparators
                     .entry(left.deref().into())
                     .or_insert_with(|| (0, FxHashSet::default()));
                 *count += 1;
+                matches.extend(comparators.iter().map(std::convert::Into::into));
             }
             _ => continue,
         }

@@ -8,6 +8,8 @@ foo == "a" or foo == "b" or foo == "c"
 
 foo != "a" and foo != "b" and foo != "c"
 
+foo == a or foo == "b" or foo == 3  # Mixed types.
+
 # False negatives.
 
 # The current implementation doesn't support yoda conditions, but PyLint does!
