@@ -9,7 +9,7 @@ use ruff_python_ast::whitespace;
 use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-use crate::comments::CommentTextPosition;
+use crate::comments::CommentLinePosition;
 use crate::trivia::{SimpleTokenizer, Token, TokenKind};
 
 /// Implements the custom comment placement logic.
@@ -49,7 +49,7 @@ fn handle_match_comment<'a>(
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     // Must be an own line comment after the last statement in a match case
-    if comment.text_position().is_end_of_line() || comment.following_node().is_some() {
+    if comment.line_position().is_end_of_line() || comment.following_node().is_some() {
         return CommentPlacement::Default(comment);
     }
 
@@ -147,7 +147,7 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.text_position().is_end_of_line() || comment.following_node().is_none() {
+    if comment.line_position().is_end_of_line() || comment.following_node().is_none() {
         return CommentPlacement::Default(comment);
     }
 
@@ -201,7 +201,7 @@ fn handle_in_between_bodies_own_line_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if !comment.text_position().is_own_line() {
+    if !comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
     }
 
@@ -310,7 +310,7 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if !comment.text_position().is_end_of_line() {
+    if !comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
     }
 
@@ -393,7 +393,7 @@ fn handle_trailing_body_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.text_position().is_end_of_line() {
+    if comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
     }
 
@@ -485,7 +485,7 @@ fn handle_trailing_body_comment<'a>(
 /// ```
 fn handle_trailing_end_of_line_body_comment(comment: DecoratedComment<'_>) -> CommentPlacement<'_> {
     // Must be an end of line comment
-    if comment.text_position().is_own_line() {
+    if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
     }
 
@@ -526,7 +526,7 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     use ruff_python_ast::prelude::*;
 
     // Must be an end of line comment
-    if comment.text_position().is_own_line() {
+    if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
     }
 
@@ -650,15 +650,15 @@ fn handle_positional_only_arguments_separator_comment<'a>(
 
     if let Some(slash_offset) = find_pos_only_slash_offset(trivia_range, locator) {
         let comment_start = comment.slice().range().start();
-        let is_slash_comment = match comment.text_position() {
-            CommentTextPosition::EndOfLine => {
+        let is_slash_comment = match comment.line_position() {
+            CommentLinePosition::EndOfLine => {
                 let preceding_end_line = locator.line_end(last_argument_or_default.end());
                 let slash_comments_start = preceding_end_line.min(slash_offset);
 
                 comment_start >= slash_comments_start
                     && locator.line_end(slash_offset) > comment_start
             }
-            CommentTextPosition::OwnLine => comment_start < slash_offset,
+            CommentLinePosition::OwnLine => comment_start < slash_offset,
         };
 
         if is_slash_comment {
@@ -721,7 +721,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         // )
         // ```
         CommentPlacement::trailing(AnyNodeRef::from(binary_expression.left.as_ref()), comment)
-    } else if comment.text_position().is_end_of_line() {
+    } else if comment.line_position().is_end_of_line() {
         // Is the operator on its own line.
         if locator.contains_line_break(TextRange::new(
             binary_expression.left.end(),
@@ -810,7 +810,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     // Only applies for own line comments on the module level...
-    if !comment.text_position().is_own_line() || !comment.enclosing_node().is_module() {
+    if !comment.line_position().is_own_line() || !comment.enclosing_node().is_module() {
         return CommentPlacement::Default(comment);
     }
 
@@ -887,7 +887,7 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
         .following_node()
         .map_or(false, |node| node.is_arguments());
 
-    if comment.text_position().is_own_line() && is_preceding_decorator && is_following_arguments {
+    if comment.line_position().is_own_line() && is_preceding_decorator && is_following_arguments {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::Default(comment)

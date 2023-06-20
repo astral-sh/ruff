@@ -73,7 +73,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         if !orelse.is_empty() {
             // Leading comments are always own line comments
             let leading_else_comments_end =
-                else_comments.partition_point(|comment| comment.position().is_own_line());
+                else_comments.partition_point(|comment| comment.line_position().is_own_line());
             let (else_leading, else_trailing) = else_comments.split_at(leading_else_comments_end);
 
             write!(

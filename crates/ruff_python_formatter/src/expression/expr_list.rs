@@ -1,4 +1,4 @@
-use crate::comments::{dangling_comments, CommentTextPosition, Comments};
+use crate::comments::{dangling_comments, CommentLinePosition, Comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -30,11 +30,12 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         // ```
         // In all other cases comments get assigned to a list element
         if elts.is_empty() {
-            let end_of_line_split = dangling
-                .partition_point(|comment| comment.position() == CommentTextPosition::EndOfLine);
+            let end_of_line_split = dangling.partition_point(|comment| {
+                comment.line_position() == CommentLinePosition::EndOfLine
+            });
             debug_assert!(dangling[end_of_line_split..]
                 .iter()
-                .all(|comment| comment.position() == CommentTextPosition::OwnLine));
+                .all(|comment| comment.line_position() == CommentLinePosition::OwnLine));
             return write!(
                 f,
                 [group(&format_args![
