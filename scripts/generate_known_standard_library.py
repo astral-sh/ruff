@@ -43,7 +43,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<(u32, u32), FxHashSet<&'static str>>> =
     Lazy::new(|| {
         FxHashMap::from_iter([
-""",  # noqa: E501
+""",  # noqa: E501  # Ignore line limit when writing to a file.
     )
     for major, minor in VERSIONS:
         version = f"{major}.{minor}"
