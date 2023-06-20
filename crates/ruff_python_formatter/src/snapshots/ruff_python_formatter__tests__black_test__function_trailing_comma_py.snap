@@ -74,30 +74,27 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,7 @@
- def f(
+@@ -2,7 +2,7 @@
      a,
  ):
--    d = {
+     d = {
 -        "key": "value",
--    }
-+    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+     }
      tup = (1,)
  
- 
-@@ -11,10 +9,7 @@
-     a,
+@@ -12,8 +12,8 @@
      b,
  ):
--    d = {
+     d = {
 -        "key": "value",
 -        "key2": "value2",
--    }
-+    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
++        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+     }
      tup = (
          1,
-         2,
-@@ -24,46 +19,15 @@
+@@ -24,45 +24,18 @@
  def f(
      a: int = 1,
  ):
@@ -136,7 +133,8 @@ some_module.some_function(
 -def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
 -    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
 -):
--    json = {
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+     json = {
 -        "k": {
 -            "k2": {
 -                "k3": [
@@ -144,13 +142,13 @@ some_module.some_function(
 -                ]
 -            }
 -        }
--    }
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
-+    json = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++        "NOT_YET_IMPLEMENTED_STRING": {
++            "NOT_YET_IMPLEMENTED_STRING": {"NOT_YET_IMPLEMENTED_STRING": [1]},
++        },
+     }
  
  
- # The type annotation shouldn't get a trailing comma since that would change its type.
-@@ -80,35 +44,16 @@
+@@ -80,35 +53,16 @@
      pass
  
  
@@ -198,7 +196,9 @@ some_module.some_function(
 def f(
     a,
 ):
-    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    d = {
+        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+    }
     tup = (1,)
 
 
@@ -206,7 +206,10 @@ def f2(
     a,
     b,
 ):
-    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    d = {
+        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+    }
     tup = (
         1,
         2,
@@ -224,7 +227,11 @@ def f(
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
-    json = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    json = {
+        "NOT_YET_IMPLEMENTED_STRING": {
+            "NOT_YET_IMPLEMENTED_STRING": {"NOT_YET_IMPLEMENTED_STRING": [1]},
+        },
+    }
 
 
 # The type annotation shouldn't get a trailing comma since that would change its type.

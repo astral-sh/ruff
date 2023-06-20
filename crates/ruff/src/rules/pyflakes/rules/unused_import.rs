@@ -103,7 +103,11 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        if binding.is_used() || binding.is_explicit_export() {
+        if binding.is_used()
+            || binding.is_explicit_export()
+            || binding.is_nonlocal()
+            || binding.is_global()
+        {
             continue;
         }
 
@@ -230,8 +234,8 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         stmt,
         parent,
         checker.locator,
-        checker.indexer,
         checker.stylist,
+        checker.indexer,
     )?;
     Ok(Fix::automatic(edit).isolate(checker.isolation(parent)))
 }

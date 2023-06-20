@@ -63,6 +63,7 @@ pub(crate) fn message_to_json_value(message: &Message) -> Value {
 
     json!({
         "code": message.kind.rule().noqa_code().to_string(),
+        "url": message.kind.rule().url(),
         "message": message.kind.body,
         "fix": fix,
         "location": start_location,

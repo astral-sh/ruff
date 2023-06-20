@@ -10,6 +10,7 @@ use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::node::NodeId;
 use crate::reference::ReferenceId;
+use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
@@ -44,6 +45,31 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
     }
 
+    /// Return `true` if this [`Binding`] represents an external symbol
+    /// (e.g., `FastAPI` in `from fastapi import FastAPI`).
+    pub const fn is_external(&self) -> bool {
+        self.flags.contains(BindingFlags::EXTERNAL)
+    }
+
+    /// Return `true` if this [`Binding`] represents an aliased symbol
+    /// (e.g., `app` in `from fastapi import FastAPI as app`).
+    pub const fn is_alias(&self) -> bool {
+        self.flags.contains(BindingFlags::ALIAS)
+    }
+
+    /// Return `true` if this [`Binding`] represents a `nonlocal`. A [`Binding`] is a `nonlocal`
+    /// if it's declared by a `nonlocal` statement, or shadows a [`Binding`] declared by a
+    /// `nonlocal` statement.
+    pub const fn is_nonlocal(&self) -> bool {
+        self.flags.contains(BindingFlags::NONLOCAL)
+    }
+
+    /// Return `true` if this [`Binding`] represents a `global`. A [`Binding`] is a `global` if it's
+    /// declared by a `global` statement, or shadows a [`Binding`] declared by a `global` statement.
+    pub const fn is_global(&self) -> bool {
+        self.flags.contains(BindingFlags::GLOBAL)
+    }
+
     /// Return `true` if this [`Binding`] represents an unbound variable
     /// (e.g., `x` in `x = 1; del x`).
     pub const fn is_unbound(&self) -> bool {
@@ -56,33 +82,33 @@ impl<'a> Binding<'a> {
     /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Importation(Importation { qualified_name }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
+            BindingKind::Import(Import { qualified_name }) => {
+                if let BindingKind::SubmoduleImport(SubmoduleImport {
                     qualified_name: existing,
                 }) = &existing.kind
                 {
                     return qualified_name == existing;
                 }
             }
-            BindingKind::FromImportation(FromImportation { qualified_name }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
+            BindingKind::FromImport(FromImport { qualified_name }) => {
+                if let BindingKind::SubmoduleImport(SubmoduleImport {
                     qualified_name: existing,
                 }) = &existing.kind
                 {
                     return qualified_name == existing;
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
                 match &existing.kind {
-                    BindingKind::Importation(Importation {
+                    BindingKind::Import(Import {
                         qualified_name: existing,
                     })
-                    | BindingKind::SubmoduleImportation(SubmoduleImportation {
+                    | BindingKind::SubmoduleImport(SubmoduleImport {
                         qualified_name: existing,
                     }) => {
                         return qualified_name == existing;
                     }
-                    BindingKind::FromImportation(FromImportation {
+                    BindingKind::FromImport(FromImport {
                         qualified_name: existing,
                     }) => {
                         return qualified_name == existing;
@@ -92,7 +118,7 @@ impl<'a> Binding<'a> {
             }
             BindingKind::Deletion
             | BindingKind::Annotation
-            | BindingKind::FutureImportation
+            | BindingKind::FutureImport
             | BindingKind::Builtin => {
                 return false;
             }
@@ -102,20 +128,18 @@ impl<'a> Binding<'a> {
             existing.kind,
             BindingKind::ClassDefinition
                 | BindingKind::FunctionDefinition
-                | BindingKind::Importation(..)
-                | BindingKind::FromImportation(..)
-                | BindingKind::SubmoduleImportation(..)
+                | BindingKind::Import(..)
+                | BindingKind::FromImport(..)
+                | BindingKind::SubmoduleImport(..)
         )
     }
 
     /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
     pub fn qualified_name(&self) -> Option<&str> {
         match &self.kind {
-            BindingKind::Importation(Importation { qualified_name }) => Some(qualified_name),
-            BindingKind::FromImportation(FromImportation { qualified_name }) => {
-                Some(qualified_name)
-            }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+            BindingKind::Import(Import { qualified_name }) => Some(qualified_name),
+            BindingKind::FromImport(FromImport { qualified_name }) => Some(qualified_name),
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
                 Some(qualified_name)
             }
             _ => None,
@@ -126,11 +150,11 @@ impl<'a> Binding<'a> {
     /// symbol was imported from another module.
     pub fn module_name(&self) -> Option<&str> {
         match &self.kind {
-            BindingKind::Importation(Importation { qualified_name })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+            BindingKind::Import(Import { qualified_name })
+            | BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
                 Some(qualified_name.split('.').next().unwrap_or(qualified_name))
             }
-            BindingKind::FromImportation(FromImportation { qualified_name }) => Some(
+            BindingKind::FromImport(FromImport { qualified_name }) => Some(
                 qualified_name
                     .rsplit_once('.')
                     .map_or(qualified_name, |(module, _)| module),
@@ -161,9 +185,47 @@ bitflags! {
         ///
         /// For example, the binding could be `FastAPI` in:
         /// ```python
-        /// import FastAPI as FastAPI
+        /// from fastapi import FastAPI as FastAPI
         /// ```
         const EXPLICIT_EXPORT = 1 << 0;
+
+        /// The binding represents an external symbol, like an import or a builtin.
+        ///
+        /// For example, the binding could be `FastAPI` in:
+        /// ```python
+        /// from fastapi import FastAPI
+        /// ```
+        const EXTERNAL = 1 << 1;
+
+        /// The binding is an aliased symbol.
+        ///
+        /// For example, the binding could be `app` in:
+        /// ```python
+        /// from fastapi import FastAPI as app
+        /// ```
+        const ALIAS = 1 << 2;
+
+        /// The binding is `nonlocal` to the declaring scope. This could be a binding created by
+        /// a `nonlocal` statement, or a binding that shadows such a binding.
+        ///
+        /// For example, both of the bindings in the following function are `nonlocal`:
+        /// ```python
+        /// def f():
+        ///     nonlocal x
+        ///     x = 1
+        /// ```
+        const NONLOCAL = 1 << 3;
+
+        /// The binding is `global`. This could be a binding created by a `global` statement, or a
+        /// binding that shadows such a binding.
+        ///
+        /// For example, both of the bindings in the following function are `global`:
+        /// ```python
+        /// def f():
+        ///     global x
+        ///     x = 1
+        /// ```
+        const GLOBAL = 1 << 4;
     }
 }
 
@@ -211,7 +273,7 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StarImportation<'a> {
+pub struct StarImport<'a> {
     /// The level of the import. `None` or `Some(0)` indicate an absolute import.
     pub level: Option<u32>,
     /// The module being imported. `None` indicates a wildcard import.
@@ -228,7 +290,7 @@ pub struct Export<'a> {
 /// Ex) `import foo` would be keyed on "foo".
 /// Ex) `import foo as bar` would be keyed on "bar".
 #[derive(Debug, Clone)]
-pub struct Importation<'a> {
+pub struct Import<'a> {
     /// The full name of the module being imported.
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
     /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
@@ -239,7 +301,7 @@ pub struct Importation<'a> {
 /// Ex) `from foo import bar` would be keyed on "bar".
 /// Ex) `from foo import bar as baz` would be keyed on "baz".
 #[derive(Debug, Clone)]
-pub struct FromImportation {
+pub struct FromImport {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
     /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
@@ -249,7 +311,7 @@ pub struct FromImportation {
 /// A binding for a submodule imported from a module, keyed on the name of the parent module.
 /// Ex) `import foo.bar` would be keyed on "foo".
 #[derive(Debug, Clone)]
-pub struct SubmoduleImportation<'a> {
+pub struct SubmoduleImport<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
     pub qualified_name: &'a str,
@@ -308,7 +370,7 @@ pub enum BindingKind<'a> {
     /// def foo():
     ///     nonlocal x
     /// ```
-    Nonlocal,
+    Nonlocal(ScopeId),
 
     /// A binding for a builtin, like `print` or `bool`.
     Builtin,
@@ -337,25 +399,25 @@ pub enum BindingKind<'a> {
     /// ```python
     /// from __future__ import annotations
     /// ```
-    FutureImportation,
+    FutureImport,
 
     /// A binding for a straight `import`, like `foo` in:
     /// ```python
     /// import foo
     /// ```
-    Importation(Importation<'a>),
+    Import(Import<'a>),
 
     /// A binding for a member imported from a module, like `bar` in:
     /// ```python
     /// from foo import bar
     /// ```
-    FromImportation(FromImportation),
+    FromImport(FromImport),
 
     /// A binding for a submodule imported from a module, like `bar` in:
     /// ```python
     /// import foo.bar
     /// ```
-    SubmoduleImportation(SubmoduleImportation<'a>),
+    SubmoduleImport(SubmoduleImport<'a>),
 
     /// A binding for a deletion, like `x` in:
     /// ```python

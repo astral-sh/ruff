@@ -1,21 +1,108 @@
-use crate::comments::Comments;
+use crate::comments::{dangling_node_comments, leading_comments, Comments};
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
+use crate::prelude::*;
+use crate::trivia::Token;
+use crate::trivia::{first_non_trivia_token, TokenKind};
+use crate::USE_MAGIC_TRAILING_COMMA;
+use crate::{FormatNodeRule, PyFormatter};
+use ruff_formatter::format_args;
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ExprDict;
+use ruff_python_ast::prelude::Ranged;
+use rustpython_parser::ast::{Expr, ExprDict};
 
 #[derive(Default)]
 pub struct FormatExprDict;
 
+struct KeyValuePair<'a> {
+    key: &'a Option<Expr>,
+    value: &'a Expr,
+}
+
+impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if let Some(key) = self.key {
+            write!(
+                f,
+                [group(&format_args![
+                    key.format(),
+                    text(":"),
+                    space(),
+                    self.value.format()
+                ])]
+            )
+        } else {
+            let comments = f.context().comments().clone();
+            let leading_value_comments = comments.leading_comments(self.value.into());
+            write!(
+                f,
+                [
+                    // make sure the leading comments are hoisted past the `**`
+                    leading_comments(leading_value_comments),
+                    group(&format_args![text("**"), self.value.format()])
+                ]
+            )
+        }
+    }
+}
+
 impl FormatNodeRule<ExprDict> for FormatExprDict {
-    fn fmt_fields(&self, _item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprDict {
+            range: _,
+            keys,
+            values,
+        } = item;
+
+        let last = match &values[..] {
+            [] => {
+                return write!(
+                    f,
+                    [
+                        &text("{"),
+                        block_indent(&dangling_node_comments(item)),
+                        &text("}"),
+                    ]
+                );
+            }
+            [.., last] => last,
+        };
+        let magic_trailing_comma = USE_MAGIC_TRAILING_COMMA
+            && matches!(
+                first_non_trivia_token(last.range().end(), f.context().contents()),
+                Some(Token {
+                    kind: TokenKind::Comma,
+                    ..
+                })
+            );
+
+        debug_assert_eq!(keys.len(), values.len());
+
+        let joined = format_with(|f| {
+            f.join_with(format_args!(text(","), soft_line_break_or_space()))
+                .entries(
+                    keys.iter()
+                        .zip(values)
+                        .map(|(key, value)| KeyValuePair { key, value }),
+                )
+                .finish()
+        });
+
+        let block = if magic_trailing_comma {
+            block_indent
+        } else {
+            soft_block_indent
+        };
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}"
-            )]
+            [group(&format_args![
+                text("{"),
+                block(&format_args![joined, if_group_breaks(&text(",")),]),
+                text("}")
+            ])]
         )
     }
 

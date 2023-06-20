@@ -1,5 +1,5 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{self, Cmpop, Expr};
+use rustpython_parser::ast::{self, CmpOp, Expr};
 use unicode_width::UnicodeWidthStr;
 
 use ruff_python_ast::source_code::Generator;
@@ -13,7 +13,7 @@ pub(crate) fn is_ambiguous_name(name: &str) -> bool {
 
 pub(crate) fn compare(
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
     generator: Generator,
 ) -> String {

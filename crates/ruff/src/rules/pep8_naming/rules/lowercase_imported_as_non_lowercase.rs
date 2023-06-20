@@ -58,7 +58,8 @@ pub(crate) fn lowercase_imported_as_non_lowercase(
         return None;
     }
 
-    if !str::is_upper(name) && str::is_lower(name) && asname.to_lowercase() != asname {
+    if !str::is_cased_uppercase(name) && str::is_cased_lowercase(name) && !str::is_lowercase(asname)
+    {
         let mut diagnostic = Diagnostic::new(
             LowercaseImportedAsNonLowercase {
                 name: name.to_string(),

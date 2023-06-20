@@ -1,4 +1,7 @@
-//! Add and modify import statements to make module members available during fix execution.
+//! Code modification struct to add and modify import statements.
+//!
+//! Enables rules to make module members available (that may be not yet be imported) during fix
+//! execution.
 
 use std::error::Error;
 

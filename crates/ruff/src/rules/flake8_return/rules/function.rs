@@ -370,34 +370,17 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
-const NORETURN_FUNCS: &[&[&str]] = &[
-    // builtins
-    &["", "exit"],
-    &["", "quit"],
-    // stdlib
-    &["builtins", "exit"],
-    &["builtins", "quit"],
-    &["os", "_exit"],
-    &["os", "abort"],
-    &["posix", "_exit"],
-    &["posix", "abort"],
-    &["sys", "exit"],
-    &["_thread", "exit"],
-    &["_winapi", "ExitProcess"],
-    // third-party modules
-    &["pytest", "exit"],
-    &["pytest", "fail"],
-    &["pytest", "skip"],
-    &["pytest", "xfail"],
-];
-
 /// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
-        NORETURN_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-            || semantic.match_typing_call_path(&call_path, "assert_never")
+        matches!(
+            call_path.as_slice(),
+            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
+                | ["" | "builtins", "quit"]
+                | ["os" | "posix", "_exit" | "abort"]
+                | ["_winapi", "ExitProcess"]
+                | ["pytest", "fail" | "skip" | "xfail"]
+        ) || semantic.match_typing_call_path(&call_path, "assert_never")
     })
 }
 
@@ -534,13 +517,8 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                 // Delete the `return` statement. There's no need to treat this as an isolated
                 // edit, since we're editing the preceding statement, so no conflicting edit would
                 // be allowed to remove that preceding statement.
-                let delete_return = edits::delete_stmt(
-                    stmt,
-                    None,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                );
+                let delete_return =
+                    edits::delete_stmt(stmt, None, checker.locator, checker.indexer);
 
                 // Replace the `x = 1` statement with `return 1`.
                 let content = checker.locator.slice(assign.range());

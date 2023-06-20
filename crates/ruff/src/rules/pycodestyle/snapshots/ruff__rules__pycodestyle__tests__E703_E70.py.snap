@@ -12,7 +12,7 @@ E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
    |
    = help: Remove unnecessary semicolon
 
-ℹ Suggested fix
+ℹ Fix
 7  7  | #: E702:1:17
 8  8  | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
 9  9  | #: E703:1:13
@@ -33,7 +33,7 @@ E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
    |
    = help: Remove unnecessary semicolon
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | #: E703:1:13
 10 10 | import shlex;
 11 11 | #: E702:1:9 E703:1:23
@@ -54,7 +54,7 @@ E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
    |
    = help: Remove unnecessary semicolon
 
-ℹ Suggested fix
+ℹ Fix
 22 22 | while all is round:
 23 23 |     def f(x): return 2*x
 24 24 | #: E704:1:8 E702:1:11 E703:1:14
@@ -63,5 +63,22 @@ E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
 26 26 | #: E701:1:8
 27 27 | if True: lambda a: b
 28 28 | #: E701:1:10
+
+E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
+   |
+66 | #: E703:2:1
+67 | 0\
+68 | ;
+   | ^ E703
+   |
+   = help: Remove unnecessary semicolon
+
+ℹ Fix
+64 64 | while 1:
+65 65 |   1;...
+66 66 | #: E703:2:1
+67    |-0\
+68    |-;
+   67 |+0
 
 

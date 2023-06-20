@@ -137,8 +137,8 @@ pub(crate) fn unnecessary_builtin_import(
                 stmt,
                 parent,
                 checker.locator,
-                checker.indexer,
                 checker.stylist,
+                checker.indexer,
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });

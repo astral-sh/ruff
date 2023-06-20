@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arguments, Expr, Ranged};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -7,11 +7,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPath};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_semantic::analyze::typing::is_immutable_func;
+use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_func};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -115,12 +114,19 @@ pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &
         .collect();
     let diagnostics = {
         let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), extend_immutable_calls);
-        for expr in arguments
-            .defaults
+        for ArgWithDefault {
+            default,
+            def: _,
+            range: _,
+        } in arguments
+            .posonlyargs
             .iter()
-            .chain(arguments.kw_defaults.iter())
+            .chain(&arguments.args)
+            .chain(&arguments.kwonlyargs)
         {
-            visitor.visit_expr(expr);
+            if let Some(expr) = &default {
+                visitor.visit_expr(expr);
+            }
         }
         visitor.diagnostics
     };

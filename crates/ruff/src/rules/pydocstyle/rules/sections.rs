@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Stmt};
+use rustpython_parser::ast::{self, ArgWithDefault, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -713,11 +713,15 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
-    for arg in arguments
+    for ArgWithDefault {
+        def,
+        default: _,
+        range: _,
+    } in arguments
         .posonlyargs
         .iter()
-        .chain(arguments.args.iter())
-        .chain(arguments.kwonlyargs.iter())
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
@@ -726,7 +730,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             ),
         )
     {
-        let arg_name = arg.arg.as_str();
+        let arg_name = def.arg.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }

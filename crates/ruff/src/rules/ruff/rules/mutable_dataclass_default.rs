@@ -2,10 +2,10 @@ use rustpython_parser::ast::{self, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::analyze::typing::is_immutable_annotation;
+use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass, is_mutable_expr};
+use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.
@@ -74,7 +74,7 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::
             ..
         }) = statement
         {
-            if is_mutable_expr(value)
+            if is_mutable_expr(value, checker.semantic())
                 && !is_class_var_annotation(annotation, checker.semantic())
                 && !is_immutable_annotation(annotation, checker.semantic())
             {

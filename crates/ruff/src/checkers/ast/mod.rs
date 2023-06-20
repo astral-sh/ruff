@@ -5,8 +5,8 @@ use log::error;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    self, Arg, Arguments, Comprehension, Constant, Excepthandler, Expr, ExprContext, Keyword,
-    Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
+    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ExceptHandler, Expr,
+    ExprContext, Keyword, Operator, Pattern, Ranged, Stmt, Suite, UnaryOp,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
@@ -17,14 +17,13 @@ use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, identifier, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
-    ExecutionContext, Export, FromImportation, Globals, Importation, Module, ModuleKind,
-    ResolvedRead, Scope, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImportation,
-    SubmoduleImportation,
+    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ResolvedRead, Scope,
+    ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -254,16 +253,23 @@ where
                 let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
+                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                            // Mark the binding in the global scope as "rebound" in the current scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+                        }
+
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
                             *range,
                             BindingKind::Global,
-                            BindingFlags::empty(),
+                            BindingFlags::GLOBAL,
                         );
                         let scope = self.semantic.scope_mut();
                         scope.add(name, binding_id);
                     }
                 }
+
                 if self.enabled(Rule::AmbiguousVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
@@ -275,33 +281,27 @@ where
                 let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        // Add a binding to the current scope.
-                        let binding_id = self.semantic.push_binding(
-                            *range,
-                            BindingKind::Nonlocal,
-                            BindingFlags::empty(),
-                        );
-                        let scope = self.semantic.scope_mut();
-                        scope.add(name, binding_id);
-                    }
-
-                    // Mark the binding in the defining scopes as used too. (Skip the global scope
-                    // and the current scope, and, per standard resolution rules, any class scopes.)
-                    for (name, range) in names.iter().zip(ranges.iter()) {
-                        let binding_id = self
-                            .semantic
-                            .scopes
-                            .ancestors(self.semantic.scope_id)
-                            .skip(1)
-                            .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
-                            .find_map(|scope| scope.get(name.as_str()));
-
-                        if let Some(binding_id) = binding_id {
+                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
+                            // Mark the binding as "used".
                             self.semantic.add_local_reference(
                                 binding_id,
-                                stmt.range(),
+                                *range,
                                 ExecutionContext::Runtime,
                             );
+
+                            // Mark the binding in the enclosing scope as "rebound" in the current
+                            // scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+
+                            // Add a binding to the current scope.
+                            let binding_id = self.semantic.push_binding(
+                                *range,
+                                BindingKind::Nonlocal(scope_id),
+                                BindingFlags::NONLOCAL,
+                            );
+                            let scope = self.semantic.scope_mut();
+                            scope.add(name, binding_id);
                         } else {
                             if self.enabled(Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
@@ -814,27 +814,29 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::SubmoduleImportation(SubmoduleImportation {
-                                qualified_name,
-                            }),
-                            BindingFlags::empty(),
+                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
+                            BindingFlags::EXTERNAL,
                         );
                     } else {
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.name)
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::Importation(Importation { qualified_name }),
-                            if alias
-                                .asname
-                                .as_ref()
-                                .map_or(false, |asname| asname == &alias.name)
-                            {
-                                BindingFlags::EXPLICIT_EXPORT
-                            } else {
-                                BindingFlags::empty()
-                            },
+                            BindingKind::Import(Import { qualified_name }),
+                            flags,
                         );
 
                         if let Some(asname) = &alias.asname {
@@ -945,18 +947,6 @@ where
                             }
                         }
                     }
-                    if self.enabled(Rule::UnconventionalImportAlias) {
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::conventional_import_alias(
-                                stmt,
-                                &alias.name,
-                                alias.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
                             if let Some(diagnostic) =
@@ -1052,9 +1042,6 @@ where
                 }
 
                 if self.is_stub {
-                    if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
-                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
-                    }
                     if self.enabled(Rule::FutureAnnotationsInStub) {
                         flake8_pyi::rules::from_future_import(self, import_from);
                     }
@@ -1066,7 +1053,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::FutureImportation,
+                            BindingKind::FutureImport,
                             BindingFlags::empty(),
                         );
 
@@ -1084,7 +1071,7 @@ where
                     } else if &alias.name == "*" {
                         self.semantic
                             .scope_mut()
-                            .add_star_import(StarImportation { level, module });
+                            .add_star_import(StarImport { level, module });
 
                         if self.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
                             let scope = self.semantic.scope();
@@ -1116,6 +1103,18 @@ where
                             }
                         }
 
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.name)
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
                         // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
@@ -1125,16 +1124,8 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(self.locator),
-                            BindingKind::FromImportation(FromImportation { qualified_name }),
-                            if alias
-                                .asname
-                                .as_ref()
-                                .map_or(false, |asname| asname == &alias.name)
-                            {
-                                BindingFlags::EXPLICIT_EXPORT
-                            } else {
-                                BindingFlags::empty()
-                            },
+                            BindingKind::FromImport(FromImport { qualified_name }),
+                            flags,
                         );
                     }
                     if self.enabled(Rule::RelativeImports) {
@@ -1156,20 +1147,6 @@ where
                             self.diagnostics.push(diagnostic);
                         }
                     }
-                    if self.enabled(Rule::UnconventionalImportAlias) {
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::conventional_import_alias(
-                                stmt,
-                                &qualified_name,
-                                alias.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
                             let qualified_name =
@@ -1186,7 +1163,6 @@ where
                             }
                         }
                     }
-
                     if let Some(asname) = &alias.asname {
                         if self.enabled(Rule::ConstantImportedAsNonConstant) {
                             if let Some(diagnostic) =
@@ -1253,8 +1229,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
-                        // pylint
                         if !self.is_stub {
                             if self.enabled(Rule::UselessImportAlias) {
                                 pylint::rules::useless_import_alias(self, alias);
@@ -1785,34 +1759,24 @@ where
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
 
-                for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.annotation {
+                for arg_with_default in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &arg_with_default.def.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
                     }
-                }
-                for arg in &args.args {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_type_definition(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
+                    if let Some(expr) = &arg_with_default.default {
+                        self.visit_expr(expr);
                     }
                 }
                 if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_type_definition(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                for arg in &args.kwonlyargs {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
@@ -1836,12 +1800,6 @@ where
                     } else {
                         self.visit_annotation(expr);
                     };
-                }
-                for expr in &args.kw_defaults {
-                    self.visit_expr(expr);
-                }
-                for expr in &args.defaults {
-                    self.visit_expr(expr);
                 }
 
                 self.add_binding(
@@ -1955,8 +1913,8 @@ where
                 self.semantic.handled_exceptions.pop();
 
                 self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
-                for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler);
+                for except_handler in handlers {
+                    self.visit_except_handler(except_handler);
                 }
 
                 self.visit_body(orelse);
@@ -2061,10 +2019,12 @@ where
         // Post-visit.
         match stmt {
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
             }
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
                 self.add_binding(
@@ -2124,7 +2084,7 @@ where
             expr,
             Expr::BoolOp(_)
                 | Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: Unaryop::Not,
+                    op: UnaryOp::Not,
                     ..
                 })
         ) {
@@ -3325,12 +3285,21 @@ where
                 }
 
                 // Visit the default arguments, but avoid the body, which will be deferred.
-                for expr in &args.kw_defaults {
-                    self.visit_expr(expr);
+                for ArgWithDefault {
+                    default,
+                    def: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &default {
+                        self.visit_expr(expr);
+                    }
                 }
-                for expr in &args.defaults {
-                    self.visit_expr(expr);
-                }
+
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
@@ -3811,6 +3780,7 @@ where
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
             }
             _ => {}
@@ -3820,9 +3790,9 @@ where
         self.semantic.pop_expr();
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
-        match excepthandler {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+    fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
+        match except_handler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
                 name,
                 body,
@@ -3833,7 +3803,7 @@ where
                     if let Some(diagnostic) = pycodestyle::rules::bare_except(
                         type_.as_deref(),
                         body,
-                        excepthandler,
+                        except_handler,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -3848,7 +3818,7 @@ where
                 if self.enabled(Rule::TryExceptPass) {
                     flake8_bandit::rules::try_except_pass(
                         self,
-                        excepthandler,
+                        except_handler,
                         type_.as_deref(),
                         name,
                         body,
@@ -3858,7 +3828,7 @@ where
                 if self.enabled(Rule::TryExceptContinue) {
                     flake8_bandit::rules::try_except_continue(
                         self,
-                        excepthandler,
+                        except_handler,
                         type_.as_deref(),
                         name,
                         body,
@@ -3866,20 +3836,20 @@ where
                     );
                 }
                 if self.enabled(Rule::ExceptWithEmptyTuple) {
-                    flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
+                    flake8_bugbear::rules::except_with_empty_tuple(self, except_handler);
                 }
                 if self.enabled(Rule::ExceptWithNonExceptionClasses) {
-                    flake8_bugbear::rules::except_with_non_exception_classes(self, excepthandler);
+                    flake8_bugbear::rules::except_with_non_exception_classes(self, except_handler);
                 }
                 if self.enabled(Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
                 if self.enabled(Rule::BinaryOpException) {
-                    pylint::rules::binary_op_exception(self, excepthandler);
+                    pylint::rules::binary_op_exception(self, except_handler);
                 }
                 match name {
                     Some(name) => {
-                        let range = excepthandler.try_identifier(self.locator).unwrap();
+                        let range = except_handler.try_identifier(self.locator).unwrap();
 
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
@@ -3892,7 +3862,7 @@ where
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 self,
                                 name,
-                                AnyShadowing::from(excepthandler),
+                                AnyShadowing::from(except_handler),
                             );
                         }
 
@@ -3904,7 +3874,7 @@ where
                             BindingFlags::empty(),
                         );
 
-                        walk_excepthandler(self, excepthandler);
+                        walk_except_handler(self, except_handler);
 
                         // Remove it from the scope immediately after.
                         self.add_binding(
@@ -3924,7 +3894,7 @@ where
                                 if self.patch(Rule::UnusedVariable) {
                                     diagnostic.try_set_fix(|| {
                                         pyflakes::fixes::remove_exception_handler_assignment(
-                                            excepthandler,
+                                            except_handler,
                                             self.locator,
                                         )
                                         .map(Fix::automatic)
@@ -3934,7 +3904,7 @@ where
                             }
                         }
                     }
-                    None => walk_excepthandler(self, excepthandler),
+                    None => walk_except_handler(self, except_handler),
                 }
             }
         }
@@ -3972,17 +3942,17 @@ where
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for arg in &arguments.posonlyargs {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.posonlyargs {
+            self.visit_arg(&arg_with_default.def);
         }
-        for arg in &arguments.args {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.args {
+            self.visit_arg(&arg_with_default.def);
         }
         if let Some(arg) = &arguments.vararg {
             self.visit_arg(arg);
         }
-        for arg in &arguments.kwonlyargs {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.kwonlyargs {
+            self.visit_arg(&arg_with_default.def);
         }
         if let Some(arg) = &arguments.kwarg {
             self.visit_arg(arg);
@@ -4213,10 +4183,10 @@ impl<'a> Checker<'a> {
             {
                 let shadows_import = matches!(
                     shadowed.kind,
-                    BindingKind::Importation(..)
-                        | BindingKind::FromImportation(..)
-                        | BindingKind::SubmoduleImportation(..)
-                        | BindingKind::FutureImportation
+                    BindingKind::Import(..)
+                        | BindingKind::FromImport(..)
+                        | BindingKind::SubmoduleImport(..)
+                        | BindingKind::FutureImport
                 );
                 if binding.kind.is_loop_var() && shadows_import {
                     if self.enabled(Rule::ImportShadowedByLoopVar) {
@@ -4276,22 +4246,27 @@ impl<'a> Checker<'a> {
                 return binding_id;
             }
 
+            // Avoid shadowing builtins.
             let shadowed = &self.semantic.bindings[shadowed_id];
-            match &shadowed.kind {
-                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException => {
-                    // Avoid overriding builtins.
+            if !matches!(
+                shadowed.kind,
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException,
+            ) {
+                let references = shadowed.references.clone();
+                let is_global = shadowed.is_global();
+                let is_nonlocal = shadowed.is_nonlocal();
+
+                // If the shadowed binding was global, then this one is too.
+                if is_global {
+                    self.semantic.bindings[binding_id].flags |= BindingFlags::GLOBAL;
                 }
-                kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
-                    // If the original binding was a global or nonlocal, then the new binding is
-                    // too.
-                    let references = shadowed.references.clone();
-                    self.semantic.bindings[binding_id].kind = kind.clone();
-                    self.semantic.bindings[binding_id].references = references;
+
+                // If the shadowed binding was non-local, then this one is too.
+                if is_nonlocal {
+                    self.semantic.bindings[binding_id].flags |= BindingFlags::NONLOCAL;
                 }
-                _ => {
-                    let references = shadowed.references.clone();
-                    self.semantic.bindings[binding_id].references = references;
-                }
+
+                self.semantic.bindings[binding_id].references = references;
             }
         }
 
@@ -4332,7 +4307,7 @@ impl<'a> Checker<'a> {
                         .scopes
                         .iter()
                         .flat_map(Scope::star_imports)
-                        .map(|StarImportation { level, module }| {
+                        .map(|StarImport { level, module }| {
                             helpers::format_import_from(*level, *module)
                         })
                         .sorted()
@@ -4386,7 +4361,7 @@ impl<'a> Checker<'a> {
             if self.semantic.scope().kind.is_any_function() {
                 // Ignore globals.
                 if !self.semantic.scope().get(id).map_or(false, |binding_id| {
-                    self.semantic.binding(binding_id).kind.is_global()
+                    self.semantic.binding(binding_id).is_global()
                 }) {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4713,24 +4688,20 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_dead_scopes(&mut self) {
-        let enforce_typing_imports = !self.is_stub
-            && self.any_enabled(&[
-                Rule::GlobalVariableNotAssigned,
-                Rule::RuntimeImportInTypeCheckingBlock,
-                Rule::TypingOnlyFirstPartyImport,
-                Rule::TypingOnlyThirdPartyImport,
-                Rule::TypingOnlyStandardLibraryImport,
-            ]);
-
-        if !(enforce_typing_imports
-            || self.any_enabled(&[
-                Rule::UnusedImport,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::RedefinedWhileUnused,
-                Rule::UndefinedExport,
-            ]))
-        {
+    fn check_deferred_scopes(&mut self) {
+        if !self.any_enabled(&[
+            Rule::UnusedImport,
+            Rule::GlobalVariableNotAssigned,
+            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::RedefinedWhileUnused,
+            Rule::RuntimeImportInTypeCheckingBlock,
+            Rule::TypingOnlyFirstPartyImport,
+            Rule::TypingOnlyThirdPartyImport,
+            Rule::TypingOnlyStandardLibraryImport,
+            Rule::UndefinedExport,
+            Rule::UnaliasedCollectionsAbcSetImport,
+            Rule::UnconventionalImportAlias,
+        ]) {
             return;
         }
 
@@ -4760,6 +4731,16 @@ impl<'a> Checker<'a> {
         // Identify any valid runtime imports. If a module is imported at runtime, and
         // used at runtime, then by default, we avoid flagging any other
         // imports from that model as typing-only.
+        let enforce_typing_imports = if self.is_stub {
+            false
+        } else {
+            self.any_enabled(&[
+                Rule::RuntimeImportInTypeCheckingBlock,
+                Rule::TypingOnlyFirstPartyImport,
+                Rule::TypingOnlyThirdPartyImport,
+                Rule::TypingOnlyStandardLibraryImport,
+            ])
+        };
         let runtime_imports: Vec<Vec<&Binding>> = if enforce_typing_imports {
             if self.settings.flake8_type_checking.strict {
                 vec![]
@@ -4786,7 +4767,7 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope_id in self.semantic.dead_scopes.iter().rev() {
+        for scope_id in self.deferred.scopes.iter().rev() {
             let scope = &self.semantic.scopes[*scope_id];
 
             if scope.kind.is_module() {
@@ -4804,7 +4785,7 @@ impl<'a> Checker<'a> {
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = scope
                         .star_imports()
-                        .map(|StarImportation { level, module }| {
+                        .map(|StarImport { level, module }| {
                             helpers::format_import_from(*level, *module)
                         })
                         .sorted()
@@ -4831,17 +4812,12 @@ impl<'a> Checker<'a> {
                 for (name, binding_id) in scope.bindings() {
                     let binding = self.semantic.binding(binding_id);
                     if binding.kind.is_global() {
-                        if let Some(source) = binding.source {
-                            let stmt = &self.semantic.stmts[source];
-                            if stmt.is_global_stmt() {
-                                diagnostics.push(Diagnostic::new(
-                                    pylint::rules::GlobalVariableNotAssigned {
-                                        name: (*name).to_string(),
-                                    },
-                                    binding.range,
-                                ));
-                            }
-                        }
+                        diagnostics.push(Diagnostic::new(
+                            pylint::rules::GlobalVariableNotAssigned {
+                                name: (*name).to_string(),
+                            },
+                            binding.range,
+                        ));
                     }
                 }
             }
@@ -4909,6 +4885,23 @@ impl<'a> Checker<'a> {
 
             if self.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(self, scope, &mut diagnostics);
+            }
+            if self.enabled(Rule::UnconventionalImportAlias) {
+                flake8_import_conventions::rules::unconventional_import_alias(
+                    self,
+                    scope,
+                    &mut diagnostics,
+                    &self.settings.flake8_import_conventions.aliases,
+                );
+            }
+            if self.is_stub {
+                if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+                    flake8_pyi::rules::unaliased_collections_abc_set_import(
+                        self,
+                        scope,
+                        &mut diagnostics,
+                    );
+                }
             }
         }
         self.diagnostics.extend(diagnostics);
@@ -5259,8 +5252,8 @@ pub(crate) fn check_ast(
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
-    checker.semantic.dead_scopes.push(ScopeId::global());
-    checker.check_dead_scopes();
+    checker.deferred.scopes.push(ScopeId::global());
+    checker.check_deferred_scopes();
 
     checker.diagnostics
 }

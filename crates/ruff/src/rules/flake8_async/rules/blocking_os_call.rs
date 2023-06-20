@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
 
@@ -39,35 +40,41 @@ impl Violation for BlockingOsCallInAsyncFunction {
     }
 }
 
-const UNSAFE_OS_METHODS: &[&[&str]] = &[
-    &["os", "popen"],
-    &["os", "posix_spawn"],
-    &["os", "posix_spawnp"],
-    &["os", "spawnl"],
-    &["os", "spawnle"],
-    &["os", "spawnlp"],
-    &["os", "spawnlpe"],
-    &["os", "spawnv"],
-    &["os", "spawnve"],
-    &["os", "spawnvp"],
-    &["os", "spawnvpe"],
-    &["os", "system"],
-];
-
 /// ASYNC102
 pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
     if checker.semantic().in_async_context() {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            let is_unsafe_os_method = checker
+            if checker
                 .semantic()
                 .resolve_call_path(func)
-                .map_or(false, |path| UNSAFE_OS_METHODS.contains(&path.as_slice()));
-
-            if is_unsafe_os_method {
+                .as_ref()
+                .map_or(false, is_unsafe_os_method)
+            {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(BlockingOsCallInAsyncFunction, func.range()));
             }
         }
     }
+}
+
+fn is_unsafe_os_method(call_path: &CallPath) -> bool {
+    matches!(
+        call_path.as_slice(),
+        [
+            "os",
+            "popen"
+                | "posix_spawn"
+                | "posix_spawnp"
+                | "spawnl"
+                | "spawnle"
+                | "spawnlp"
+                | "spawnlpe"
+                | "spawnv"
+                | "spawnve"
+                | "spawnvp"
+                | "spawnvpe"
+                | "system"
+        ]
+    )
 }

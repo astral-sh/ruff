@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Decorator};
+use rustpython_parser::ast::{ArgWithDefault, Arguments, Decorator};
 
 use ruff_diagnostics::Violation;
 
@@ -75,7 +75,19 @@ pub(crate) fn check_boolean_default_value_in_function_definition(
         return;
     }
 
-    for arg in &arguments.defaults {
-        add_if_boolean(checker, arg, BooleanDefaultValueInFunctionDefinition.into());
+    for ArgWithDefault {
+        def: _,
+        default,
+        range: _,
+    } in arguments.args.iter().chain(&arguments.posonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        add_if_boolean(
+            checker,
+            default,
+            BooleanDefaultValueInFunctionDefinition.into(),
+        );
     }
 }

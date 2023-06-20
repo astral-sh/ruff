@@ -60,8 +60,8 @@ pub(crate) fn camelcase_imported_as_constant(
     }
 
     if helpers::is_camelcase(name)
-        && !str::is_lower(asname)
-        && str::is_upper(asname)
+        && !str::is_cased_lowercase(asname)
+        && str::is_cased_uppercase(asname)
         && !helpers::is_acronym(name, asname)
     {
         let mut diagnostic = Diagnostic::new(

@@ -10,11 +10,11 @@ use smallvec::smallvec;
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_stdlib::path::is_python_stub_file;
-use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
+use ruff_python_stdlib::typing::is_typing_extension;
 
 use crate::binding::{
-    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImportation,
-    Importation, SubmoduleImportation,
+    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
+    SubmoduleImport,
 };
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
@@ -40,7 +40,6 @@ pub struct SemanticModel<'a> {
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
-    pub dead_scopes: Vec<ScopeId>,
 
     /// Stack of all definitions created in any scope, at any point in execution.
     pub definitions: Definitions<'a>,
@@ -73,7 +72,7 @@ pub struct SemanticModel<'a> {
 
     /// Map from binding index to indexes of bindings that annotate it (in the same scope).
     ///
-    /// For example:
+    /// For example, given:
     /// ```python
     /// x = 1
     /// x: int
@@ -93,6 +92,21 @@ pub struct SemanticModel<'a> {
     /// as a delayed annotation. Annotations are thus treated as bindings only when they are the
     /// first binding in a scope; any annotations that follow are treated as "delayed" annotations.
     delayed_annotations: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
+
+    /// Map from binding ID to the IDs of all scopes in which it is declared a `global` or
+    /// `nonlocal`.
+    ///
+    /// For example, given:
+    /// ```python
+    /// x = 1
+    ///
+    /// def f():
+    ///    global x
+    /// ```
+    ///
+    /// In this case, the binding created by `x = 1` is rebound within the scope created by `f`
+    /// by way of the `global x` statement.
+    rebinding_scopes: HashMap<BindingId, Vec<ScopeId>, BuildNoHashHasher<BindingId>>,
 
     /// Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
@@ -115,7 +129,6 @@ impl<'a> SemanticModel<'a> {
             exprs: Vec::default(),
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
-            dead_scopes: Vec::default(),
             definitions: Definitions::for_module(module),
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
@@ -123,6 +136,7 @@ impl<'a> SemanticModel<'a> {
             globals: GlobalsArena::default(),
             shadowed_bindings: IntMap::default(),
             delayed_annotations: IntMap::default(),
+            rebinding_scopes: IntMap::default(),
             body: &[],
             body_index: 0,
             flags: SemanticModelFlags::new(path),
@@ -159,7 +173,7 @@ impl<'a> SemanticModel<'a> {
             return true;
         }
 
-        if TYPING_EXTENSIONS.contains(target) {
+        if is_typing_extension(target) {
             if call_path.as_slice() == ["typing_extensions", target] {
                 return true;
             }
@@ -403,7 +417,7 @@ impl<'a> SemanticModel<'a> {
         let head = call_path.first()?;
         let binding = self.find_binding(head)?;
         match &binding.kind {
-            BindingKind::Importation(Importation {
+            BindingKind::Import(Import {
                 qualified_name: name,
             }) => {
                 if name.starts_with('.') {
@@ -420,7 +434,7 @@ impl<'a> SemanticModel<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation {
+            BindingKind::SubmoduleImport(SubmoduleImport {
                 qualified_name: name,
             }) => {
                 let name = name.split('.').next().unwrap_or(name);
@@ -428,7 +442,7 @@ impl<'a> SemanticModel<'a> {
                 source_path.extend(call_path.into_iter().skip(1));
                 Some(source_path)
             }
-            BindingKind::FromImportation(FromImportation {
+            BindingKind::FromImport(FromImport {
                 qualified_name: name,
             }) => {
                 if name.starts_with('.') {
@@ -479,7 +493,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { qualified_name }) => {
+                    BindingKind::Import(Import { qualified_name }) => {
                         if qualified_name == &module {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
@@ -500,7 +514,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { qualified_name }) => {
+                    BindingKind::FromImport(FromImport { qualified_name }) => {
                         if let Some((target_module, target_member)) = qualified_name.split_once('.')
                         {
                             if target_module == module && target_member == member {
@@ -523,7 +537,7 @@ impl<'a> SemanticModel<'a> {
                     }
                     // Ex) Given `module="os"` and `object="name"`:
                     // `import os.path ` -> `os.name`
-                    BindingKind::SubmoduleImportation(SubmoduleImportation { .. }) => {
+                    BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
                         if name == module {
                             if let Some(source) = binding.source {
                                 // Verify that `os` isn't bound in an inner scope.
@@ -580,7 +594,6 @@ impl<'a> SemanticModel<'a> {
 
     /// Pop the current [`Scope`] off the stack.
     pub fn pop_scope(&mut self) {
-        self.dead_scopes.push(self.scope_id);
         self.scope_id = self.scopes[self.scope_id]
             .parent
             .expect("Attempted to pop without scope");
@@ -699,6 +712,26 @@ impl<'a> SemanticModel<'a> {
         self.globals[global_id].get(name).copied()
     }
 
+    /// Given a `name` that has been declared `nonlocal`, return the [`ScopeId`] and [`BindingId`]
+    /// to which it refers.
+    ///
+    /// Unlike `global` declarations, for which the scope is unambiguous, Python requires that
+    /// `nonlocal` declarations refer to the closest enclosing scope that contains a binding for
+    /// the given name.
+    pub fn nonlocal(&self, name: &str) -> Option<(ScopeId, BindingId)> {
+        self.scopes
+            .ancestor_ids(self.scope_id)
+            .skip(1)
+            .find_map(|scope_id| {
+                let scope = &self.scopes[scope_id];
+                if scope.kind.is_module() || scope.kind.is_class() {
+                    None
+                } else {
+                    scope.get(name).map(|binding_id| (scope_id, binding_id))
+                }
+            })
+    }
+
     /// Return `true` if the given [`ScopeId`] matches that of the current scope.
     pub fn is_current_scope(&self, scope_id: ScopeId) -> bool {
         self.scope_id == scope_id
@@ -764,6 +797,21 @@ impl<'a> SemanticModel<'a> {
     /// Return the list of delayed annotations for the given [`BindingId`].
     pub fn delayed_annotations(&self, binding_id: BindingId) -> Option<&[BindingId]> {
         self.delayed_annotations.get(&binding_id).map(Vec::as_slice)
+    }
+
+    /// Mark the given [`BindingId`] as rebound in the given [`ScopeId`] (i.e., declared as
+    /// `global` or `nonlocal`).
+    pub fn add_rebinding_scope(&mut self, binding_id: BindingId, scope_id: ScopeId) {
+        self.rebinding_scopes
+            .entry(binding_id)
+            .or_insert_with(Vec::new)
+            .push(scope_id);
+    }
+
+    /// Return the list of [`ScopeId`]s in which the given [`BindingId`] is rebound (i.e., declared
+    /// as `global` or `nonlocal`).
+    pub fn rebinding_scopes(&self, binding_id: BindingId) -> Option<&[ScopeId]> {
+        self.rebinding_scopes.get(&binding_id).map(Vec::as_slice)
     }
 
     /// Return the [`ExecutionContext`] of the current scope.

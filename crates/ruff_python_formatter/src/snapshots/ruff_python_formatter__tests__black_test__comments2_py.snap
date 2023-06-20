@@ -303,7 +303,7 @@ instruction()#comment with bad spacing
          pass
      # no newline before or after
      short = [
-@@ -91,75 +88,29 @@
+@@ -91,48 +88,14 @@
      ]
  
      # no newline after
@@ -356,10 +356,8 @@ instruction()#comment with bad spacing
 +    lcomp3 = [i for i in []]
      while True:
          if False:
--            continue
-+            NOT_YET_IMPLEMENTED_StmtContinue
- 
-             # and round and round we go
+             continue
+@@ -141,25 +104,13 @@
          # and round and round we go
  
      # let's return
@@ -502,7 +500,7 @@ def inline_comments_in_brackets_ruin_everything():
     lcomp3 = [i for i in []]
     while True:
         if False:
-            NOT_YET_IMPLEMENTED_StmtContinue
+            continue
 
             # and round and round we go
         # and round and round we go

@@ -7,6 +7,36 @@ use ruff_python_semantic::analyze::logging;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `except` clauses that catch all exceptions.
+///
+/// ## Why is this bad?
+/// Overly broad `except` clauses can lead to unexpected behavior, such as
+/// catching `KeyboardInterrupt` or `SystemExit` exceptions that prevent the
+/// user from exiting the program.
+///
+/// Instead of catching all exceptions, catch only those that are expected to
+/// be raised in the `try` block.
+///
+/// ## Example
+/// ```python
+/// try:
+///     foo()
+/// except BaseException:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     foo()
+/// except FileNotFoundError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
+/// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[violation]
 pub struct BlindExcept {
     name: String,

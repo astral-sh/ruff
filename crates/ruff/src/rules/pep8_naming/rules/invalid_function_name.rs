@@ -6,6 +6,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_stdlib::str;
 
 use crate::settings::types::IdentifierPattern;
 
@@ -67,7 +68,7 @@ pub(crate) fn invalid_function_name(
     }
 
     // Ignore any function names that are already lowercase.
-    if name.to_lowercase() == name {
+    if str::is_lowercase(name) {
         return None;
     }
 

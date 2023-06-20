@@ -88,8 +88,7 @@ pub(crate) fn use_pep604_annotation(
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                     checker.generator().expr(&optional(slice)),
                     expr.range(),
                 )));
@@ -104,16 +103,14 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                             checker.generator().expr(&union(elts)),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                             checker.generator().expr(slice),
                             expr.range(),
                         )));

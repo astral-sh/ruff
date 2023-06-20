@@ -221,4 +221,32 @@ TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
 49 52 |     x = dict["pd.DataFrame", "pd.DataFrame"]
 50 53 | 
 
+TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type-checking block
+    |
+170 |     global Member
+171 | 
+172 |     from module import Member
+    |                        ^^^^^^ TCH002
+173 | 
+174 |     x: Member = 1
+    |
+    = help: Move into type-checking block
+
+ℹ Suggested fix
+1   1   | """Tests to determine accurate detection of typing-only imports."""
+    2   |+from typing import TYPE_CHECKING
+    3   |+
+    4   |+if TYPE_CHECKING:
+    5   |+    from module import Member
+2   6   | 
+3   7   | 
+4   8   | def f():
+--------------------------------------------------------------------------------
+169 173 | def f():
+170 174 |     global Member
+171 175 | 
+172     |-    from module import Member
+173 176 | 
+174 177 |     x: Member = 1
+
 

@@ -59,7 +59,7 @@ pub(crate) fn constant_imported_as_non_constant(
         return None;
     }
 
-    if str::is_upper(name) && !str::is_upper(asname) {
+    if str::is_cased_uppercase(name) && !str::is_cased_uppercase(asname) {
         let mut diagnostic = Diagnostic::new(
             ConstantImportedAsNonConstant {
                 name: name.to_string(),

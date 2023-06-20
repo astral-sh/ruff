@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, MatchCase, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -79,7 +79,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
                 || loop_exits_early(orelse)
                 || loop_exits_early(finalbody)
                 || handlers.iter().any(|handler| match handler {
-                    Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) => loop_exits_early(body),
                 })

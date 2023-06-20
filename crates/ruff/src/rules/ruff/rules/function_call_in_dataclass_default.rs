@@ -8,7 +8,7 @@ use ruff_python_semantic::analyze::typing::is_immutable_func;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
-    is_allowed_dataclass_function, is_class_var_annotation, is_dataclass,
+    is_class_var_annotation, is_dataclass, is_dataclass_field,
 };
 
 /// ## What it does
@@ -97,7 +97,7 @@ pub(crate) fn function_call_in_dataclass_default(
             if let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() {
                 if !is_class_var_annotation(annotation, checker.semantic())
                     && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
-                    && !is_allowed_dataclass_function(func, checker.semantic())
+                    && !is_dataclass_field(func, checker.semantic())
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {

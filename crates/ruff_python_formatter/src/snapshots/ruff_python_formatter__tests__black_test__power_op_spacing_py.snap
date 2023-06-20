@@ -76,12 +76,8 @@ return np.divide(
 ```diff
 --- Black
 +++ Ruff
-@@ -8,56 +8,49 @@
- 
- 
- def function_dont_replace_spaces():
--    {**a, **b, **c}
-+    {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+@@ -11,53 +11,46 @@
+     {**a, **b, **c}
  
  
 -a = 5**~4
@@ -184,7 +180,7 @@ def function_replace_spaces(**kwargs):
 
 
 def function_dont_replace_spaces():
-    {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    {**a, **b, **c}
 
 
 a = 5**NOT_YET_IMPLEMENTED_ExprUnaryOp

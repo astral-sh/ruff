@@ -376,7 +376,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "910") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::DictGetWithNoneDefault),
 
         // copyright
-        (Copyright, "001") => (RuleGroup::Unspecified, rules::copyright::rules::MissingCopyrightNotice),
+        (Copyright, "001") => (RuleGroup::Nursery, rules::copyright::rules::MissingCopyrightNotice),
 
         // pyupgrade
         (Pyupgrade, "001") => (RuleGroup::Unspecified, rules::pyupgrade::rules::UselessMetaclassType),

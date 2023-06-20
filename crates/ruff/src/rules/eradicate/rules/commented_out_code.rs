@@ -48,8 +48,8 @@ fn is_standalone_comment(line: &str) -> bool {
 
 /// ERA001
 pub(crate) fn commented_out_code(
-    indexer: &Indexer,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];

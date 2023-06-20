@@ -138,3 +138,12 @@ def f(provided: int) -> int:
     match provided:
         case {**x}:
             pass
+
+
+global CONSTANT
+
+
+def f() -> None:
+    global CONSTANT
+    CONSTANT = 1
+    CONSTANT = 2

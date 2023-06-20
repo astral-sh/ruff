@@ -2,6 +2,7 @@ use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::str;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
@@ -65,7 +66,7 @@ pub(crate) fn non_lowercase_variable_in_function(
         return;
     }
 
-    if name.to_lowercase() != name
+    if !str::is_lowercase(name)
         && !helpers::is_named_tuple_assignment(stmt, checker.semantic())
         && !helpers::is_typed_dict_assignment(stmt, checker.semantic())
         && !helpers::is_type_var_assignment(stmt, checker.semantic())

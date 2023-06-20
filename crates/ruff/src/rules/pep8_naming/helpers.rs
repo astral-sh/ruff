@@ -2,14 +2,14 @@ use itertools::Itertools;
 use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_python_semantic::SemanticModel;
-use ruff_python_stdlib::str::{is_lower, is_upper};
+use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
 
 pub(super) fn is_camelcase(name: &str) -> bool {
-    !is_lower(name) && !is_upper(name) && !name.contains('_')
+    !is_cased_lowercase(name) && !is_cased_uppercase(name) && !name.contains('_')
 }
 
 pub(super) fn is_mixed_case(name: &str) -> bool {
-    !is_lower(name)
+    !is_cased_lowercase(name)
         && name
             .strip_prefix('_')
             .unwrap_or(name)

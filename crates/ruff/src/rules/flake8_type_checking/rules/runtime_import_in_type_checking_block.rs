@@ -211,8 +211,8 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         stmt,
         parent,
         checker.locator,
-        checker.indexer,
         checker.stylist,
+        checker.indexer,
     )?;
 
     // Step 2) Add the import to the top-level.

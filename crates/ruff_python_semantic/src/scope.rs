@@ -8,7 +8,7 @@ use rustpython_parser::ast;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
-use crate::binding::{BindingId, StarImportation};
+use crate::binding::{BindingId, StarImport};
 use crate::globals::GlobalsId;
 
 #[derive(Debug)]
@@ -21,7 +21,7 @@ pub struct Scope<'a> {
 
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
-    star_imports: Vec<StarImportation<'a>>,
+    star_imports: Vec<StarImport<'a>>,
 
     /// A map from bound name to binding ID.
     bindings: FxHashMap<&'a str, BindingId>,
@@ -126,7 +126,7 @@ impl<'a> Scope<'a> {
     }
 
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.
-    pub fn add_star_import(&mut self, import: StarImportation<'a>) {
+    pub fn add_star_import(&mut self, import: StarImport<'a>) {
         self.star_imports.push(import);
     }
 
@@ -136,7 +136,7 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns an iterator over all star imports (e.g., `from sys import *`) in this scope.
-    pub fn star_imports(&self) -> impl Iterator<Item = &StarImportation<'a>> {
+    pub fn star_imports(&self) -> impl Iterator<Item = &StarImport<'a>> {
         self.star_imports.iter()
     }
 

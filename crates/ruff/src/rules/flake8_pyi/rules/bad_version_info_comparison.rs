@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Cmpop, Expr, Ranged};
+use rustpython_parser::ast::{CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -61,7 +61,7 @@ pub(crate) fn bad_version_info_comparison(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     let ([op], [_right]) = (ops, comparators) else {
@@ -78,7 +78,7 @@ pub(crate) fn bad_version_info_comparison(
         return;
     }
 
-    if !matches!(op, Cmpop::Lt | Cmpop::GtE) {
+    if !matches!(op, CmpOp::Lt | CmpOp::GtE) {
         let diagnostic = Diagnostic::new(BadVersionInfoComparison, expr.range());
         checker.diagnostics.push(diagnostic);
     }
