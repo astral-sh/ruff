@@ -14,7 +14,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use ruff::message::Message;
 use ruff::registry::Rule;
-use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+use ruff::resolver::PyprojectConfig;
 use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
@@ -48,21 +48,9 @@ pub(crate) fn run(
 
     // Initialize the cache.
     if cache.into() {
-        fn init_cache(path: &Path) {
-            if let Err(e) = cache::init(path) {
-                error!("Failed to initialize cache at {}: {e:?}", path.display());
-            }
-        }
-
-        match pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cli.cache_dir);
-            }
-            PyprojectDiscoveryStrategy::Hierarchical => {
-                for settings in std::iter::once(&pyproject_config.settings).chain(resolver.iter()) {
-                    init_cache(&settings.cli.cache_dir);
-                }
-            }
+        let path = &pyproject_config.settings.cli.cache_dir;
+        if let Err(e) = cache::init(path) {
+            error!("Failed to initialize cache at {}: {e:?}", path.display());
         }
     };
 
