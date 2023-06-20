@@ -274,8 +274,8 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 ### Creating a new release
 
 1. Update the version with `rg 0.0.269 --files-with-matches | xargs sed -i 's/0.0.269/0.0.270/g'`
-1. Update [BREAKING_CHANGES.md](BREAKING_CHANGES.md)
-1. Create a PR with the version and BREAKING_CHANGES.md updated
+1. Update `BREAKING_CHANGES.md`
+1. Create a PR with the version and `BREAKING_CHANGES.md` updated
 1. Merge the PR
 1. Run the release workflow with the version number (without starting `v`) as input. Make sure
    main has your merged PR as last commit
