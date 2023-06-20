@@ -36,7 +36,7 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `pdb`](https://docs.python.org/3/library/pdb.html)
+/// - [Python documentation: `pdb` — The Python Debugger](https://docs.python.org/3/library/pdb.html)
 /// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
 #[violation]
 pub struct Debugger {
