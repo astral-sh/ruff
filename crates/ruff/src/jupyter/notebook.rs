@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::iter;
 use std::path::Path;
 
@@ -34,9 +34,9 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     })?;
     let code = notebook.content().to_string();
     notebook.update_cell_content(&code);
-    let mut buffer = BufWriter::new(Vec::new());
-    notebook.write_inner(&mut buffer)?;
-    Ok(String::from_utf8(buffer.into_inner()?)?)
+    let mut writer = Vec::new();
+    notebook.write_inner(&mut writer)?;
+    Ok(String::from_utf8(writer)?)
 }
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
@@ -113,13 +113,17 @@ pub struct Notebook {
     cell_offsets: Vec<TextSize>,
     /// The cell index of all valid code cells in the notebook.
     valid_code_cells: Vec<u32>,
+    /// Flag to indicate if the JSON string of the notebook has a trailing newline.
+    trailing_newline: bool,
 }
 
 impl Notebook {
+    /// Read the Jupyter Notebook from the given [`Path`].
+    ///
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
     pub fn read(path: &Path) -> Result<Self, Box<Diagnostic>> {
-        let reader = BufReader::new(File::open(path).map_err(|err| {
+        let mut reader = BufReader::new(File::open(path).map_err(|err| {
             Diagnostic::new(
                 IOError {
                     message: format!("{err}"),
@@ -127,6 +131,18 @@ impl Notebook {
                 TextRange::default(),
             )
         })?);
+        let trailing_newline = reader.seek(SeekFrom::End(-1)).is_ok_and(|_| {
+            let mut buf = [0; 1];
+            reader.read_exact(&mut buf).is_ok_and(|_| buf[0] == b'\n')
+        });
+        reader.rewind().map_err(|err| {
+            Diagnostic::new(
+                IOError {
+                    message: format!("{err}"),
+                },
+                TextRange::default(),
+            )
+        })?;
         let raw_notebook: RawNotebook = match serde_json::from_reader(reader) {
             Ok(notebook) => notebook,
             Err(err) => {
@@ -240,6 +256,7 @@ impl Notebook {
             content: contents.join("\n") + "\n",
             cell_offsets,
             valid_code_cells,
+            trailing_newline,
         })
     }
 
@@ -411,8 +428,11 @@ impl Notebook {
     fn write_inner(&self, writer: &mut impl Write) -> anyhow::Result<()> {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
-        let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
-        SortAlphabetically(&self.raw).serialize(&mut ser)?;
+        let mut serializer = serde_json::Serializer::with_formatter(writer, formatter);
+        SortAlphabetically(&self.raw).serialize(&mut serializer)?;
+        if self.trailing_newline {
+            writeln!(serializer.into_inner())?;
+        }
         Ok(())
     }
 
@@ -426,7 +446,6 @@ impl Notebook {
 
 #[cfg(test)]
 mod test {
-    use std::io::BufWriter;
     use std::path::Path;
 
     use anyhow::Result;
@@ -438,7 +457,7 @@ mod test {
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
-    use crate::test::{test_notebook_path, test_resource_path};
+    use crate::test::{read_jupyter_notebook, test_notebook_path, test_resource_path};
     use crate::{assert_messages, settings};
 
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
@@ -450,15 +469,13 @@ mod test {
 
     #[test]
     fn test_valid() {
-        let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        assert!(Notebook::read(path).is_ok());
+        assert!(read_jupyter_notebook(Path::new("valid.ipynb")).is_ok());
     }
 
     #[test]
     fn test_r() {
         // We can load this, it will be filtered out later
-        let path = Path::new("resources/test/fixtures/jupyter/R.ipynb");
-        assert!(Notebook::read(path).is_ok());
+        assert!(read_jupyter_notebook(Path::new("R.ipynb")).is_ok());
     }
 
     #[test]
@@ -506,9 +523,8 @@ mod test {
     }
 
     #[test]
-    fn test_concat_notebook() {
-        let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        let notebook = Notebook::read(path).unwrap();
+    fn test_concat_notebook() -> Result<()> {
+        let notebook = read_jupyter_notebook(Path::new("valid.ipynb"))?;
         assert_eq!(
             notebook.content,
             r#"def unused_variable():
@@ -546,6 +562,7 @@ print("after empty cells")
                 198.into()
             ]
         );
+        Ok(())
     }
 
     #[test]
@@ -568,12 +585,26 @@ print("after empty cells")
             Path::new("after_fix.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        let mut writer = BufWriter::new(Vec::new());
+        let mut writer = Vec::new();
         source_kind.expect_jupyter().write_inner(&mut writer)?;
-        let actual = String::from_utf8(writer.into_inner()?)?;
+        let actual = String::from_utf8(writer)?;
         let expected =
             std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;
         assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
+    #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
+    fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
+        let notebook = read_jupyter_notebook(path)?;
+        assert_eq!(notebook.trailing_newline, trailing_newline);
+
+        let mut writer = Vec::new();
+        notebook.write_inner(&mut writer)?;
+        let string = String::from_utf8(writer)?;
+        assert_eq!(string.ends_with('\n'), trailing_newline);
+
         Ok(())
     }
 }
