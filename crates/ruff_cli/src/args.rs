@@ -59,6 +59,10 @@ pub enum Command {
         /// Path to the cache directory.
         #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
         cache_dir: Option<PathBuf>,
+        /// Only remove cache files older than `days_old` days old (by default
+        /// all cache files will be removed).
+        #[arg(long)]
+        days_old: Option<usize>,
     },
     /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
