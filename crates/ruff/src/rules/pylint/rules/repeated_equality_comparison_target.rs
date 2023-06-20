@@ -49,6 +49,25 @@ fn is_allowed_op(op: Boolop) -> bool {
     }
 }
 
+/// Return true if the given comparison operator is allowed with the given
+/// boolean operator.
+///
+/// For example,
+/// ```python
+/// foo == "bar" or foo == "baz" or foo == "qux"
+/// ```
+/// can be rewritten as
+/// ```python
+/// foo in {"bar", "baz", "qux"}
+/// ```
+/// and
+/// ```python
+/// foo != "bar" or foo != "baz" or foo != "qux"
+/// ```
+/// can be rewritten as
+/// ```python
+/// foo not in {"bar", "baz", "qux"}
+/// ```
 fn is_allowed_compare_op(bool_op: Boolop, cmp_op: Cmpop) -> bool {
     match bool_op {
         Boolop::Or => matches!(cmp_op, Cmpop::Eq),
@@ -56,12 +75,29 @@ fn is_allowed_compare_op(bool_op: Boolop, cmp_op: Cmpop) -> bool {
     }
 }
 
+fn is_call(expr: &Expr) -> bool {
+    matches!(expr, Expr::Call(_))
+}
+
 fn is_allowed_value(bool_op: Boolop, value: &Expr) -> bool {
     match value {
-        Expr::Compare(ExprCompare { ops, .. }) => {
+        Expr::Compare(ExprCompare {
+            left,
+            ops,
+            comparators,
+            ..
+        }) => {
             for op in ops {
                 if !is_allowed_compare_op(bool_op, *op) {
                     return false;
+                }
+                if is_call(left) {
+                    return false;
+                }
+                for comparator in comparators {
+                    if is_call(comparator) {
+                        return false;
+                    }
                 }
             }
             true
@@ -76,16 +112,13 @@ pub(crate) fn repeated_equality_comparison_target(
     op: Boolop,
     values: &[Expr],
 ) {
-    // Ignore if not all `or`, these cannot be rewritten as an `in` expression.
     if !is_allowed_op(op) {
         return;
     }
-    println!("Allowed op");
     for value in values {
         if !is_allowed_value(op, value) {
             return;
         }
     }
-    println!("Allowed values");
     // TODO: Check if the expression can be rewritten as a membership test.
 }
