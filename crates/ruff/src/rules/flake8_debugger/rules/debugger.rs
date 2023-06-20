@@ -26,15 +26,6 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 ///     breakpoint()
 /// ```
 ///
-/// Use instead:
-/// ```python
-/// import logging
-///
-///
-/// def foo():
-///     logging.debug("foo called")
-/// ```
-///
 /// ## References
 /// - [Python documentation: `pdb` — The Python Debugger](https://docs.python.org/3/library/pdb.html)
 /// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
