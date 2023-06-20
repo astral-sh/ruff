@@ -411,11 +411,10 @@ Formatted twice:
     #[test]
     fn quick_test() {
         let src = r#"
-
-def foo(
-    b=3
-    + 2  # comment
-):
+if [
+    aaaaaa,
+    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
+] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
     ...
 "#;
         // Tokenize once

@@ -276,7 +276,7 @@ last_call()
  Name
  None
  True
-@@ -7,226 +8,225 @@
+@@ -7,18 +8,18 @@
  1
  1.0
  1j
@@ -307,12 +307,10 @@ last_call()
  v1 << 2
  1 >> v2
  1 % finished
- 1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
- ((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
--not great
--~great
--+value
---1
+@@ -28,205 +29,204 @@
+ ~great
+ +value
+ -1
 -~int and not v1 ^ 123 + v2 | True
 -(~int) and (not ((v1 ^ (123 + v2)) | True))
 -+(really ** -(confusing ** ~(operator**-precedence)))
@@ -339,13 +337,9 @@ last_call()
 -)
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 +NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
+++really ** -confusing ** ~operator**-precedence
 +NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 +lambda x: True
 +lambda x: True
@@ -402,11 +396,6 @@ last_call()
 -    *a,
      4,
      5,
--]
--[
--    4,
--    *a,
--    5,
 +    6,
 +    7,
 +    8,
@@ -415,6 +404,11 @@ last_call()
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
  ]
+-[
+-    4,
+-    *a,
+-    5,
+-]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
@@ -644,17 +638,6 @@ last_call()
 -g = 1, *"ten"
 -what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
 -    vars_to_remove
--)
--what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
--    vars_to_remove
--)
--result = (
--    session.query(models.Customer.id)
--    .filter(
--        models.Customer.account_id == account_id, models.Customer.email == email_address
--    )
--    .order_by(models.Customer.id.asc())
--    .all()
 +e = NOT_IMPLEMENTED_call()
 +f = 1, NOT_YET_IMPLEMENTED_ExprStarred
 +g = 1, NOT_YET_IMPLEMENTED_ExprStarred
@@ -662,6 +645,20 @@ last_call()
 +    (coord_names + NOT_IMPLEMENTED_call())
 +    + NOT_IMPLEMENTED_call()
  )
+-what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
+-    vars_to_remove
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_IMPLEMENTED_call())
++    - NOT_IMPLEMENTED_call()
+ )
+-result = (
+-    session.query(models.Customer.id)
+-    .filter(
+-        models.Customer.account_id == account_id, models.Customer.email == email_address
+-    )
+-    .order_by(models.Customer.id.asc())
+-    .all()
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -671,10 +668,7 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call())
-+    - NOT_IMPLEMENTED_call()
- )
+-)
 -Ø = set()
 -authors.łukasz.say_thanks()
 +result = NOT_IMPLEMENTED_call()
@@ -714,6 +708,14 @@ last_call()
 -for (x,) in (1,), (2,), (3,):
 -    ...
 -for y in ():
+-    ...
+-for z in (i for i in (1, 2, 3)):
+-    ...
+-for i in call():
+-    ...
+-for j in 1 + (2 + 3):
+-    ...
+-while this and that:
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
@@ -727,14 +729,6 @@ last_call()
 +NOT_YET_IMPLEMENTED_StmtFor
 +while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
      ...
--for z in (i for i in (1, 2, 3)):
--    ...
--for i in call():
--    ...
--for j in 1 + (2 + 3):
--    ...
--while this and that:
--    ...
 -for (
 -    addr_family,
 -    addr_type,
@@ -779,7 +773,7 @@ last_call()
  if (
 -    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
 -    | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
-+    NOT_YET_IMPLEMENTED_ExprUnaryOp
++    ~aaaa.NOT_IMPLEMENTED_attr
 +    + aaaa.NOT_IMPLEMENTED_attr
 +    - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
 +    | aaaa.NOT_IMPLEMENTED_attr
@@ -793,7 +787,7 @@ last_call()
 -    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
 -    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
 -    ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
-+    NOT_YET_IMPLEMENTED_ExprUnaryOp
++    ~aaaaaaaa.NOT_IMPLEMENTED_attr
 +    + aaaaaaaa.NOT_IMPLEMENTED_attr
 +    - aaaaaaaa.NOT_IMPLEMENTED_attr
 +    @ aaaaaaaa.NOT_IMPLEMENTED_attr
@@ -815,7 +809,7 @@ last_call()
 -    ^ aaaaaaaaaaaaaaaa.i
 -    << aaaaaaaaaaaaaaaa.k
 -    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
-+    NOT_YET_IMPLEMENTED_ExprUnaryOp
++    ~aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
 +    + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
 +    - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
 +    * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
@@ -874,13 +868,13 @@ v1 << 2
 1 % finished
 1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
 ((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprUnaryOp
+not great
+~great
++value
+-1
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_YET_IMPLEMENTED_ExprUnaryOp
++really ** -confusing ** ~operator**-precedence
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 lambda x: True
 lambda x: True
@@ -1146,7 +1140,7 @@ if (
 ):
     return True
 if (
-    NOT_YET_IMPLEMENTED_ExprUnaryOp
+    ~aaaa.NOT_IMPLEMENTED_attr
     + aaaa.NOT_IMPLEMENTED_attr
     - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
     | aaaa.NOT_IMPLEMENTED_attr
@@ -1157,7 +1151,7 @@ if (
 ):
     return True
 if (
-    NOT_YET_IMPLEMENTED_ExprUnaryOp
+    ~aaaaaaaa.NOT_IMPLEMENTED_attr
     + aaaaaaaa.NOT_IMPLEMENTED_attr
     - aaaaaaaa.NOT_IMPLEMENTED_attr
     @ aaaaaaaa.NOT_IMPLEMENTED_attr
@@ -1172,7 +1166,7 @@ if (
 ):
     return True
 if (
-    NOT_YET_IMPLEMENTED_ExprUnaryOp
+    ~aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
     + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
     - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
     * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
