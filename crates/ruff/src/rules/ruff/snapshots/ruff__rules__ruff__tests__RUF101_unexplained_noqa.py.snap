@@ -1,0 +1,14 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+unexplained_noqa.py:10:8: RUF101 Unexplained `noqa` directive
+   |
+ 8 | something_evil()  # noqa
+ 9 | 
+10 | I = 1  # noqa: E741, F841
+   |        ^^^^^^^^^^^^^^^^^^ RUF101
+11 | 
+12 | # Non-errors.
+   |
+
+
