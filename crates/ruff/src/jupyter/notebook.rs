@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::iter;
 use std::path::Path;
 
@@ -113,13 +113,15 @@ pub struct Notebook {
     cell_offsets: Vec<TextSize>,
     /// The cell index of all valid code cells in the notebook.
     valid_code_cells: Vec<u32>,
+    /// Flag to indicate if the JSON string of the notebook has a trailing newline.
+    trailing_newline: bool,
 }
 
 impl Notebook {
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
     pub fn read(path: &Path) -> Result<Self, Box<Diagnostic>> {
-        let reader = BufReader::new(File::open(path).map_err(|err| {
+        let mut reader = BufReader::new(File::open(path).map_err(|err| {
             Diagnostic::new(
                 IOError {
                     message: format!("{err}"),
@@ -127,6 +129,18 @@ impl Notebook {
                 TextRange::default(),
             )
         })?);
+        let trailing_newline = reader.seek(SeekFrom::End(-1)).is_ok_and(|_| {
+            let mut buf = [0; 1];
+            reader.read_exact(&mut buf).is_ok_and(|_| buf[0] == b'\n')
+        });
+        reader.rewind().map_err(|err| {
+            Diagnostic::new(
+                IOError {
+                    message: format!("{err}"),
+                },
+                TextRange::default(),
+            )
+        })?;
         let raw_notebook: RawNotebook = match serde_json::from_reader(reader) {
             Ok(notebook) => notebook,
             Err(err) => {
@@ -240,6 +254,7 @@ impl Notebook {
             content: contents.join("\n") + "\n",
             cell_offsets,
             valid_code_cells,
+            trailing_newline,
         })
     }
 
@@ -411,8 +426,11 @@ impl Notebook {
     fn write_inner(&self, writer: &mut impl Write) -> anyhow::Result<()> {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
-        let mut ser = serde_json::Serializer::with_formatter(writer, formatter);
-        SortAlphabetically(&self.raw).serialize(&mut ser)?;
+        let mut serializer = serde_json::Serializer::with_formatter(writer, formatter);
+        SortAlphabetically(&self.raw).serialize(&mut serializer)?;
+        if self.trailing_newline {
+            writeln!(serializer.into_inner())?;
+        }
         Ok(())
     }
 
