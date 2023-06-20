@@ -369,12 +369,12 @@ mod test {
                 expected_diagnostics += diagnostics;
             }
         }
-        assert!(!paths.is_empty(), "no files checked");
+        assert_ne!(paths, &[] as &[std::path::PathBuf], "no files checked");
 
         cache.store().unwrap();
 
         let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
-        assert!(!cache.package.files.is_empty());
+        assert_ne!(cache.package.files.len(), 0);
 
         parse_errors.sort();
 
@@ -436,7 +436,7 @@ mod test {
             flags::FixMode::Generate,
         )
         .unwrap();
-        assert!(cache.new_files.lock().unwrap().len() == 1);
+        assert_eq!(cache.new_files.lock().unwrap().len(), 1);
 
         cache.store().unwrap();
 
