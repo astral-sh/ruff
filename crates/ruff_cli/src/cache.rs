@@ -3,8 +3,9 @@ use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,9 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::diagnostics::Diagnostics;
 
+/// Maximum duration for which we keep a file in cache that hasn't been seen.
+const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
+
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
@@ -33,6 +37,7 @@ pub(crate) type RelativePathBuf = PathBuf;
 ///
 /// This type manages the cache file, reading it from disk and writing it back
 /// to disk (if required).
+#[derive(Debug)]
 pub(crate) struct Cache {
     /// Location of the cache.
     path: PathBuf,
@@ -44,6 +49,9 @@ pub(crate) struct Cache {
     /// `package.files` but are outdated. This gets merged with `package.files`
     /// when the cache is written back to disk in [`Cache::store`].
     new_files: Mutex<HashMap<RelativePathBuf, FileCache>>,
+    /// The "current" timestamp used as cache for the updates of
+    /// [`FileCache::last_seen`]
+    last_seen_cache: u64,
 }
 
 impl Cache {
@@ -58,6 +66,7 @@ impl Cache {
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings.
+    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn open(cache_dir: &Path, package_root: PathBuf, settings: &Settings) -> Cache {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
@@ -98,10 +107,12 @@ impl Cache {
             path,
             package,
             new_files: Mutex::new(HashMap::new()),
+            last_seen_cache: SystemTime::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         }
     }
 
     /// Create an empty `Cache`.
+    #[allow(clippy::cast_possible_truncation)]
     fn empty(path: PathBuf, package_root: PathBuf) -> Cache {
         Cache {
             path,
@@ -110,10 +121,12 @@ impl Cache {
                 files: HashMap::new(),
             },
             new_files: Mutex::new(HashMap::new()),
+            last_seen_cache: SystemTime::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         }
     }
 
     /// Store the cache to disk, if it has been changed.
+    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn store(mut self) -> Result<()> {
         let new_files = self.new_files.into_inner().unwrap();
         if new_files.is_empty() {
@@ -122,7 +135,13 @@ impl Cache {
             return Ok(());
         }
 
-        // Add/overwrite the changes made.
+        // Remove cached files that we haven't seen in a while.
+        let now = self.last_seen_cache;
+        self.package.files.retain(|_, file| {
+            (now - *file.last_seen.get_mut()) >= MAX_LAST_SEEN.as_millis() as u64
+        });
+
+        // Apply any changes made and keep track of when we last saw files.
         self.package.files.extend(new_files);
 
         let file = File::create(&self.path)
@@ -161,51 +180,20 @@ impl Cache {
             return None;
         }
 
+        file.last_seen
+            .store(self.last_seen_cache, Ordering::Release);
+
         Some(file)
     }
 
     /// Add or update a file cache at `path` relative to the package root.
-    pub(crate) fn update(&self, path: RelativePathBuf, file: FileCache) {
-        self.new_files.lock().unwrap().insert(path, file);
-    }
-}
-
-/// On disk representation of a cache of a package.
-#[derive(Deserialize, Debug, Serialize)]
-struct PackageCache {
-    /// Path to the root of the package.
-    ///
-    /// Usually this is a directory, but it can also be a single file in case of
-    /// single file "packages", e.g. scripts.
-    package_root: PathBuf,
-    /// Mapping of source file path to it's cached data.
-    files: HashMap<RelativePathBuf, FileCache>,
-}
-
-/// On disk representation of the cache per source file.
-#[derive(Clone, Deserialize, Debug, Serialize)]
-pub(crate) struct FileCache {
-    /// Timestamp when the file was last modified before the (cached) check.
-    last_modified: SystemTime,
-    /// Imports made.
-    imports: ImportMap,
-    /// Diagnostic messages.
-    messages: Vec<CacheMessage>,
-    /// Source code of the file.
-    ///
-    /// # Notes
-    ///
-    /// This will be empty if `messages` is empty.
-    source: String,
-}
-
-impl FileCache {
-    /// Create a new source file cache.
-    pub(crate) fn new(
+    pub(crate) fn update(
+        &self,
+        path: RelativePathBuf,
         last_modified: SystemTime,
         messages: &[Message],
         imports: &ImportMap,
-    ) -> FileCache {
+    ) {
         let source = if let Some(msg) = messages.first() {
             msg.file.source_text().to_owned()
         } else {
@@ -229,14 +217,52 @@ impl FileCache {
             })
             .collect();
 
-        FileCache {
+        let file = FileCache {
             last_modified,
+            last_seen: AtomicU64::new(self.last_seen_cache),
             imports: imports.clone(),
             messages,
             source,
-        }
+        };
+        self.new_files.lock().unwrap().insert(path, file);
     }
+}
 
+/// On disk representation of a cache of a package.
+#[derive(Deserialize, Debug, Serialize)]
+struct PackageCache {
+    /// Path to the root of the package.
+    ///
+    /// Usually this is a directory, but it can also be a single file in case of
+    /// single file "packages", e.g. scripts.
+    package_root: PathBuf,
+    /// Mapping of source file path to it's cached data.
+    files: HashMap<RelativePathBuf, FileCache>,
+}
+
+/// On disk representation of the cache per source file.
+#[derive(Deserialize, Debug, Serialize)]
+pub(crate) struct FileCache {
+    /// Timestamp when the file was last modified before the (cached) check.
+    last_modified: SystemTime,
+    /// Timestamp when we last linted this file.
+    ///
+    /// Represented as the number of milliseconds since Unix epoch. This will
+    /// break in 1970 + ~584 years.
+    last_seen: AtomicU64,
+    /// Imports made.
+    imports: ImportMap,
+    /// Diagnostic messages.
+    messages: Vec<CacheMessage>,
+    /// Source code of the file.
+    ///
+    /// # Notes
+    ///
+    /// This will be empty if `messages` is empty.
+    source: String,
+}
+
+impl FileCache {
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
     pub(crate) fn as_diagnostics(&self, path: &Path) -> Diagnostics {
         let messages = if self.messages.is_empty() {
@@ -259,7 +285,7 @@ impl FileCache {
 }
 
 /// On disk representation of a diagnostic message.
-#[derive(Clone, Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug, Serialize)]
 struct CacheMessage {
     kind: DiagnosticKind,
     /// Range into the message's [`FileCache::source`].

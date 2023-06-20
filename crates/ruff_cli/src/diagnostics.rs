@@ -25,7 +25,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_python_stdlib::path::is_project_toml;
 
-use crate::cache::{Cache, FileCache};
+use crate::cache::Cache;
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -208,10 +208,14 @@ pub(crate) fn lint_path(
     let imports = imports.unwrap_or_default();
 
     if let Some((cache, relative_path, file_last_modified)) = caching {
+        // We don't cache parsing errors.
         if parse_error.is_none() {
-            // We don't cache parsing error.
-            let file_cache = FileCache::new(file_last_modified, &messages, &imports);
-            cache.update(relative_path.to_owned(), file_cache);
+            cache.update(
+                relative_path.to_owned(),
+                file_last_modified,
+                &messages,
+                &imports,
+            );
         }
     }
 
