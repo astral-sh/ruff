@@ -57,8 +57,6 @@ pub(crate) fn check_physical_lines(
     let mut commented_lines_iter = indexer.comment_ranges().iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
 
-    let mut prev_line: Option<Line> = None;
-
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
             .next_if(|comment_range| line.range().contains_range(**comment_range))
@@ -147,7 +145,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, &prev_line, settings) {
+            if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -157,8 +155,6 @@ pub(crate) fn check_physical_lines(
                 diagnostics.push(diagnostic);
             }
         }
-
-        prev_line = Some(line);
     }
 
     if enforce_no_newline_at_end_of_file {

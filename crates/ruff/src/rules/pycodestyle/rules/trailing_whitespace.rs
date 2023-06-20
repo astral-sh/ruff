@@ -2,6 +2,8 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::source_code::{Indexer, Locator};
 use ruff_python_whitespace::Line;
 
 use crate::registry::Rule;
@@ -74,7 +76,8 @@ impl AlwaysAutofixableViolation for BlankLineWithWhitespace {
 /// W291, W293
 pub(crate) fn trailing_whitespace(
     line: &Line,
-    prev_line: &Option<Line>,
+    locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
 ) -> Option<Diagnostic> {
     let whitespace_len: TextSize = line
@@ -91,20 +94,18 @@ pub(crate) fn trailing_whitespace(
                 let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
 
                 if settings.rules.should_fix(Rule::BlankLineWithWhitespace) {
-                    // If this line is blank with whitespace, we have to ensure that the previous line
-                    // doesn't end with a backslash. If it did, the file would end with a backslash
-                    // and therefore have an "unexpected EOF" SyntaxError, so we have to remove it.
-                    if let Some(prev) = prev_line {
-                        let trimmed = prev.trim_end();
-                        if trimmed.ends_with('\\') {
-                            // Shift the diagnostic to remove the continuation as well.
-                            diagnostic.range = range.sub_start(
-                                (prev.text_len() - trimmed.text_len()) + TextSize::from(2),
-                            );
-                        }
+                    // Remove any preceding continuations, to avoid introducing a potential
+                    // syntax error.
+                    if let Some(continuation) =
+                        helpers::preceded_by_continuations(line.start(), locator, indexer)
+                    {
+                        diagnostic.set_fix(Fix::suggested(Edit::range_deletion(TextRange::new(
+                            continuation,
+                            range.end(),
+                        ))));
+                    } else {
+                        diagnostic.set_fix(Fix::suggested(Edit::range_deletion(range)));
                     }
-
-                    diagnostic.set_fix(Fix::suggested(Edit::range_deletion(diagnostic.range)));
                 }
 
                 return Some(diagnostic);
