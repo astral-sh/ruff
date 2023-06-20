@@ -35,7 +35,7 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
             )
         } else {
             let comments = f.context().comments().clone();
-            let leading_value_comments = comments.leading_comments(self.value.into());
+            let leading_value_comments = comments.leading_comments(self.value);
             write!(
                 f,
                 [

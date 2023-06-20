@@ -260,76 +260,109 @@ impl<'a> Comments<'a> {
     }
 
     #[inline]
-    pub(crate) fn has_comments(&self, node: AnyNodeRef) -> bool {
-        self.data.comments.has(&NodeRefEqualityKey::from_ref(node))
+    pub(crate) fn has_comments<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
+        self.data
+            .comments
+            .has(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn has_leading_comments(&self, node: AnyNodeRef) -> bool {
+    pub(crate) fn has_leading_comments<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         !self.leading_comments(node).is_empty()
     }
 
     /// Returns the `node`'s [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn leading_comments(&self, node: AnyNodeRef<'a>) -> &[SourceComment] {
+    pub(crate) fn leading_comments<T>(&self, node: T) -> &[SourceComment]
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         self.data
             .comments
-            .leading(&NodeRefEqualityKey::from_ref(node))
+            .leading(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns `true` if node has any [dangling comments](self#dangling-comments).
-    pub(crate) fn has_dangling_comments(&self, node: AnyNodeRef<'a>) -> bool {
+    pub(crate) fn has_dangling_comments<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         !self.dangling_comments(node).is_empty()
     }
 
     /// Returns the [dangling comments](self#dangling-comments) of `node`
-    pub(crate) fn dangling_comments(&self, node: AnyNodeRef<'a>) -> &[SourceComment] {
+    pub(crate) fn dangling_comments<T>(&self, node: T) -> &[SourceComment]
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         self.data
             .comments
-            .dangling(&NodeRefEqualityKey::from_ref(node))
+            .dangling(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns the `node`'s [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn trailing_comments(&self, node: AnyNodeRef<'a>) -> &[SourceComment] {
+    pub(crate) fn trailing_comments<T>(&self, node: T) -> &[SourceComment]
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         self.data
             .comments
-            .trailing(&NodeRefEqualityKey::from_ref(node))
+            .trailing(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns `true` if the given `node` has any [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_comments(&self, node: AnyNodeRef) -> bool {
+    pub(crate) fn has_trailing_comments<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         !self.trailing_comments(node).is_empty()
     }
 
     /// Returns `true` if the given `node` has any [trailing own line comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_own_line_comments(&self, node: AnyNodeRef) -> bool {
+    pub(crate) fn has_trailing_own_line_comments<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         self.trailing_comments(node)
             .iter()
             .any(|comment| comment.position().is_own_line())
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
-    pub(crate) fn leading_trailing_comments(
+    pub(crate) fn leading_trailing_comments<T>(
         &self,
-        node: AnyNodeRef<'a>,
-    ) -> impl Iterator<Item = &SourceComment> {
+        node: T,
+    ) -> impl Iterator<Item = &SourceComment>
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
+        let node = node.into();
         self.leading_comments(node)
             .iter()
             .chain(self.trailing_comments(node).iter())
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing_comments(
+    pub(crate) fn leading_dangling_trailing_comments<T>(
         &self,
-        node: AnyNodeRef<'a>,
-    ) -> impl Iterator<Item = &SourceComment> {
+        node: T,
+    ) -> impl Iterator<Item = &SourceComment>
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
         self.data
             .comments
-            .parts(&NodeRefEqualityKey::from_ref(node))
+            .parts(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     #[inline(always)]

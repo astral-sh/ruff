@@ -91,7 +91,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
             )?;
 
             // Format the operator on its own line if the right side has any leading comments.
-            if comments.has_leading_comments(right.as_ref().into()) {
+            if comments.has_leading_comments(right.as_ref()) {
                 write!(f, [hard_line_break()])?;
             } else if needs_space {
                 write!(f, [space()])?;
