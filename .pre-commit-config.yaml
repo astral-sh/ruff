@@ -4,6 +4,7 @@ exclude: |
   (?x)^(
     crates/ruff/resources/.*|
     crates/ruff/src/rules/.*/snapshots/.*|
+    crates/ruff_cli/resources/.*|
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/src/snapshots/.*
   )$
