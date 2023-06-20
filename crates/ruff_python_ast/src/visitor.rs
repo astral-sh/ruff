@@ -99,10 +99,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             returns,
             ..
         }) => {
-            visitor.visit_arguments(args);
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
+            visitor.visit_arguments(args);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
@@ -115,10 +115,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             returns,
             ..
         }) => {
-            visitor.visit_arguments(args);
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
+            visitor.visit_arguments(args);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
@@ -131,14 +131,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             decorator_list,
             ..
         }) => {
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
+            }
             for expr in bases {
                 visitor.visit_expr(expr);
             }
             for keyword in keywords {
                 visitor.visit_keyword(keyword);
-            }
-            for decorator in decorator_list {
-                visitor.visit_decorator(decorator);
             }
             visitor.visit_body(body);
         }
