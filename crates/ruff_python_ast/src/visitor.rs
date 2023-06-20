@@ -183,8 +183,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
-            visitor.visit_expr(target);
             visitor.visit_annotation(annotation);
+            visitor.visit_expr(target);
         }
         Stmt::For(ast::StmtFor {
             target,
