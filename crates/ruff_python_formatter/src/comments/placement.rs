@@ -627,17 +627,7 @@ fn handle_positional_only_arguments_separator_comment<'a>(
     };
 
     let is_last_positional_argument =
-        // If the preceding node is the identifier for the last positional argument (`a`).
-        // ```python
-        // def test(a, /, b): pass
-        // ```
-        are_same_optional(last_argument_or_default, arguments.posonlyargs.last().map(|arg| &arg.def))
-            // If the preceding node is the default for the last positional argument (`10`).
-            // ```python
-            // def test(a=10, /, b): pass
-            // ```
-            || are_same_optional(last_argument_or_default, arguments
-                .posonlyargs.last().and_then(|arg| arg.default.as_deref()));
+        are_same_optional(last_argument_or_default, arguments.posonlyargs.last());
 
     if !is_last_positional_argument {
         return CommentPlacement::Default(comment);

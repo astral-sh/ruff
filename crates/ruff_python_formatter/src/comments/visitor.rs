@@ -236,6 +236,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(arg);
     }
 
+    fn visit_arg_with_default(&mut self, arg_with_default: &'ast ArgWithDefault) {
+        if self.start_node(arg_with_default).is_traverse() {
+            walk_arg_with_default(self, arg_with_default);
+        }
+        self.finish_node(arg_with_default);
+    }
+
     fn visit_keyword(&mut self, keyword: &'ast Keyword) {
         if self.start_node(keyword).is_traverse() {
             walk_keyword(self, keyword);
