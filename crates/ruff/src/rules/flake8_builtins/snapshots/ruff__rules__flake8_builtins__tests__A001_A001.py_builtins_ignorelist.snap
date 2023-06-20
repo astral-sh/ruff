@@ -102,15 +102,13 @@ A001.py:16:7: A001 Variable `slice` is shadowing a Python builtin
 17 |     pass
    |
 
-A001.py:21:1: A001 Variable `ValueError` is shadowing a Python builtin
+A001.py:21:23: A001 Variable `ValueError` is shadowing a Python builtin
    |
-19 |   try:
-20 |       ...
-21 | / except ImportError as ValueError:
-22 | |     ...
-   | |_______^ A001
-23 |   
-24 |   for memoryview, *bytearray in []:
+19 | try:
+20 |     ...
+21 | except ImportError as ValueError:
+   |                       ^^^^^^^^^^ A001
+22 |     ...
    |
 
 A001.py:24:5: A001 Variable `memoryview` is shadowing a Python builtin

@@ -148,7 +148,7 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -162,7 +162,7 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -177,7 +177,7 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -193,7 +193,7 @@ pub(crate) fn non_self_return_type(
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    stmt.identifier(checker.locator),
+                    stmt.identifier(),
                 ));
             }
         }
@@ -206,7 +206,7 @@ pub(crate) fn non_self_return_type(
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    stmt.identifier(checker.locator),
+                    stmt.identifier(),
                 ));
             }
         }

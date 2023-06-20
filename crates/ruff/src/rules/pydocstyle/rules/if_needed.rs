@@ -30,8 +30,7 @@ pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     if !is_overload(cast::decorator_list(stmt), checker.semantic()) {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        OverloadWithDocstring,
-        stmt.identifier(checker.locator),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(OverloadWithDocstring, stmt.identifier()));
 }

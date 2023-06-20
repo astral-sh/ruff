@@ -134,7 +134,7 @@ pub(crate) fn abstract_base_class(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
     }

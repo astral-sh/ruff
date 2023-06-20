@@ -366,9 +366,7 @@ where
                 }
                 if self.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_function_name(name, || {
-                            stmt.identifier(self.locator)
-                        })
+                        pycodestyle::rules::ambiguous_function_name(name, || stmt.identifier())
                     {
                         self.diagnostics.push(diagnostic);
                     }
@@ -383,7 +381,6 @@ where
                         decorator_list,
                         &self.settings.pep8_naming.ignore_names,
                         &self.semantic,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -452,7 +449,6 @@ where
                         stmt,
                         name,
                         &self.settings.pep8_naming.ignore_names,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -503,7 +499,6 @@ where
                         name,
                         body,
                         self.settings.mccabe.max_complexity,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -523,7 +518,6 @@ where
                         stmt,
                         body,
                         self.settings.pylint.max_returns,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -533,7 +527,6 @@ where
                         stmt,
                         body,
                         self.settings.pylint.max_branches,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -543,7 +536,6 @@ where
                         stmt,
                         body,
                         self.settings.pylint.max_statements,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -605,7 +597,6 @@ where
                         name,
                         decorator_list,
                         args,
-                        self.locator,
                     );
                 }
                 if self.enabled(Rule::FStringDocstring) {
@@ -693,9 +684,9 @@ where
                     pyupgrade::rules::unnecessary_class_parentheses(self, class_def, stmt);
                 }
                 if self.enabled(Rule::AmbiguousClassName) {
-                    if let Some(diagnostic) = pycodestyle::rules::ambiguous_class_name(name, || {
-                        stmt.identifier(self.locator)
-                    }) {
+                    if let Some(diagnostic) =
+                        pycodestyle::rules::ambiguous_class_name(name, || stmt.identifier())
+                    {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -704,7 +695,6 @@ where
                         stmt,
                         name,
                         &self.settings.pep8_naming.ignore_names,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -714,7 +704,6 @@ where
                         stmt,
                         bases,
                         name,
-                        self.locator,
                         &self.settings.pep8_naming.ignore_names,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -813,7 +802,7 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
+                            alias.identifier(),
                             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
                             BindingFlags::EXTERNAL,
                         );
@@ -834,7 +823,7 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
+                            alias.identifier(),
                             BindingKind::Import(Import { qualified_name }),
                             flags,
                         );
@@ -1052,7 +1041,7 @@ where
 
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
+                            alias.identifier(),
                             BindingKind::FutureImport,
                             BindingFlags::empty(),
                         );
@@ -1123,7 +1112,7 @@ where
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
+                            alias.identifier(),
                             BindingKind::FromImport(FromImport { qualified_name }),
                             flags,
                         );
@@ -1804,7 +1793,7 @@ where
 
                 self.add_binding(
                     name,
-                    stmt.identifier(self.locator),
+                    stmt.identifier(),
                     BindingKind::FunctionDefinition,
                     BindingFlags::empty(),
                 );
@@ -2029,7 +2018,7 @@ where
                 self.semantic.pop_definition();
                 self.add_binding(
                     name,
-                    stmt.identifier(self.locator),
+                    stmt.identifier(),
                     BindingKind::ClassDefinition,
                     BindingFlags::empty(),
                 );
@@ -3846,7 +3835,7 @@ where
                 }
                 match name {
                     Some(name) => {
-                        let range = except_handler.try_identifier(self.locator).unwrap();
+                        let range = except_handler.try_identifier().unwrap();
 
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
@@ -3961,7 +3950,7 @@ where
         // upstream.
         self.add_binding(
             &arg.arg,
-            arg.identifier(self.locator),
+            arg.identifier(),
             BindingKind::Argument,
             BindingFlags::empty(),
         );
@@ -4001,7 +3990,7 @@ where
         {
             self.add_binding(
                 name,
-                pattern.try_identifier(self.locator).unwrap(),
+                pattern.try_identifier().unwrap(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
             );

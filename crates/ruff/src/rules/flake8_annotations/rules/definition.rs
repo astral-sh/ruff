@@ -653,7 +653,7 @@ pub(crate) fn definition(
                     MissingReturnTypeClassMethod {
                         name: name.to_string(),
                     },
-                    stmt.identifier(checker.locator),
+                    stmt.identifier(),
                 ));
             }
         } else if is_method
@@ -664,7 +664,7 @@ pub(crate) fn definition(
                     MissingReturnTypeStaticMethod {
                         name: name.to_string(),
                     },
-                    stmt.identifier(checker.locator),
+                    stmt.identifier(),
                 ));
             }
         } else if is_method && visibility::is_init(name) {
@@ -676,7 +676,7 @@ pub(crate) fn definition(
                         MissingReturnTypeSpecialMethod {
                             name: name.to_string(),
                         },
-                        stmt.identifier(checker.locator),
+                        stmt.identifier(),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
@@ -693,7 +693,7 @@ pub(crate) fn definition(
                     MissingReturnTypeSpecialMethod {
                         name: name.to_string(),
                     },
-                    stmt.identifier(checker.locator),
+                    stmt.identifier(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
@@ -713,7 +713,7 @@ pub(crate) fn definition(
                             MissingReturnTypeUndocumentedPublicFunction {
                                 name: name.to_string(),
                             },
-                            stmt.identifier(checker.locator),
+                            stmt.identifier(),
                         ));
                     }
                 }
@@ -723,7 +723,7 @@ pub(crate) fn definition(
                             MissingReturnTypePrivateFunction {
                                 name: name.to_string(),
                             },
-                            stmt.identifier(checker.locator),
+                            stmt.identifier(),
                         ));
                     }
                 }

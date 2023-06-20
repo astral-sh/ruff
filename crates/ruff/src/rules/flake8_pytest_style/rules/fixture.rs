@@ -379,7 +379,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestIncorrectFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            stmt.identifier(checker.locator),
+            stmt.identifier(),
         ));
     } else if checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
         && !visitor.has_return_with_value
@@ -390,7 +390,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestMissingFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            stmt.identifier(checker.locator),
+            stmt.identifier(),
         ));
     }
 

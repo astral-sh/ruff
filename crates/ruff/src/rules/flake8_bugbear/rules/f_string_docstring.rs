@@ -29,8 +29,7 @@ pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let Expr::JoinedStr ( _) = value.as_ref() else {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
-        FStringDocstring,
-        stmt.identifier(checker.locator),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(FStringDocstring, stmt.identifier()));
 }

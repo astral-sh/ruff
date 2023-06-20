@@ -6,7 +6,7 @@ from_imports.py:3:8: ICN001 `xml.dom.minidom` should be imported as `md`
 1 | # Test absolute imports
 2 | # Violation cases
 3 | import xml.dom.minidom
-  |        ^^^ ICN001
+  |        ^^^^^^^^^^^^^^^ ICN001
 4 | import xml.dom.minidom as wrong
 5 | from xml.dom import minidom as wrong
   |
