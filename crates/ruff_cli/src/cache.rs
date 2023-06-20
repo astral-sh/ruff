@@ -28,7 +28,7 @@ pub(crate) type RelativePathBuf = PathBuf;
 /// Cache.
 ///
 /// `Cache` holds everything required to display the diagnostics for a single
-/// package. The on-disk representation is represented in `PackageCache` (and
+/// package. The on-disk representation is represented in [`PackageCache`] (and
 /// related) types.
 ///
 /// This type manages the cache file, reading it from disk and writing it back
@@ -38,10 +38,11 @@ pub(crate) struct Cache {
     path: PathBuf,
     /// Package cache read from disk.
     package: PackageCache,
-    /// Changes made compared to the (old) `package`.
+    /// Changes made compared to the (current) `package`.
     ///
-    /// Recreated [`PackageCache::files`] which only contains the cache for
-    /// source file that still exist.
+    /// Files that are linted, but are not in `package.files` or are in
+    /// `package.files` but are outdated. This gets merged with `package.files`
+    /// when the cache is written back to disk in [`Cache::store`].
     new_files: Mutex<HashMap<RelativePathBuf, FileCache>>,
 }
 
@@ -49,11 +50,11 @@ impl Cache {
     /// Open or create a new cache.
     ///
     /// `cache_dir` is considered the root directory of the cache, which can be
-    /// local the project, global or otherwise set by the user.
+    /// local to the project, global or otherwise set by the user.
     ///
     /// `package_root` is the path to root of the package that is contained
-    /// within this cache must be canonicalized (to avoid considering `./` and
-    /// `../project` being different).
+    /// within this cache and must be canonicalized (to avoid considering `./`
+    /// and `../project` being different).
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings.
@@ -319,7 +320,7 @@ mod test {
         let settings = AllSettings::default();
 
         let package_root = fs::canonicalize("../ruff/resources/test/fixtures").unwrap();
-        let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
+        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
@@ -349,12 +350,12 @@ mod test {
                 paths.push(path);
             }
         }
-        assert!(paths.len() >= 1, "no files checked");
+        assert!(!paths.is_empty(), "no files checked");
 
         cache.store().unwrap();
 
-        let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
-        assert!(cache.package.files.len() >= 1);
+        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        assert!(!cache.package.files.is_empty());
 
         let mut got_diagnostics = Diagnostics::default();
         for path in paths {
@@ -386,7 +387,7 @@ mod test {
 
         let settings = AllSettings::default();
         let package_root = fs::canonicalize(&cache_dir).unwrap();
-        let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
+        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
         let path = cache_dir.join("source.py");
@@ -433,7 +434,7 @@ mod test {
         for change_file in tests {
             change_file(&path).unwrap();
 
-            let cache = Cache::open(&cache_dir, package_root.to_owned(), &settings.lib);
+            let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
 
             let mut got_diagnostics = lint_path(
                 &path,
