@@ -60,8 +60,8 @@ pub(crate) fn remove_unused_imports<'a>(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     locator: &Locator,
-    indexer: &Indexer,
     stylist: &Stylist,
+    indexer: &Indexer,
 ) -> Result<Edit> {
     match codemods::remove_imports(unused_imports, stmt, locator, stylist)? {
         None => Ok(delete_stmt(stmt, parent, locator, indexer)),

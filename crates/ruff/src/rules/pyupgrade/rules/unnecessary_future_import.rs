@@ -122,8 +122,8 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
                 stmt,
                 parent,
                 checker.locator,
-                checker.indexer,
                 checker.stylist,
+                checker.indexer,
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });
