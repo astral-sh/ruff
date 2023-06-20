@@ -67,7 +67,7 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,20 +1,12 @@
+@@ -1,18 +1,14 @@
  x = 1
  x = 1.2
  
@@ -79,18 +79,16 @@ def example8():
  
  async def show_status():
      while True:
--        try:
--            if report_host:
+         try:
+             if report_host:
 -                data = (
 -                    f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -                ).encode()
--        except Exception as e:
--            pass
-+        NOT_YET_IMPLEMENTED_StmtTry
++                data = NOT_IMPLEMENTED_call()
+         except Exception as e:
+             pass
  
- 
- def example():
-@@ -30,15 +22,11 @@
+@@ -30,15 +26,11 @@
  
  
  def example2():
@@ -108,7 +106,7 @@ def example8():
  
  
  def example4():
-@@ -50,35 +38,11 @@
+@@ -50,35 +42,11 @@
  
  
  def example6():
@@ -159,7 +157,11 @@ data = NOT_IMPLEMENTED_call()
 
 async def show_status():
     while True:
-        NOT_YET_IMPLEMENTED_StmtTry
+        try:
+            if report_host:
+                data = NOT_IMPLEMENTED_call()
+        except Exception as e:
+            pass
 
 
 def example():

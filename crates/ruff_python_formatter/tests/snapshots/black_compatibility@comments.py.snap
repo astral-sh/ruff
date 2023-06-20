@@ -108,7 +108,7 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -9,16 +9,13 @@
+@@ -9,16 +9,16 @@
  Possibly also many, many lines.
  """
  
@@ -122,15 +122,16 @@ async def wat():
 +NOT_YET_IMPLEMENTED_StmtImport
 +NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
  
--try:
+ try:
 -    import fast
--except ImportError:
++    NOT_YET_IMPLEMENTED_StmtImport
+ except ImportError:
 -    import slow as fast
-+NOT_YET_IMPLEMENTED_StmtTry
++    NOT_YET_IMPLEMENTED_StmtImport
  
  
  # Some comment before a function.
-@@ -35,20 +32,24 @@
+@@ -35,20 +35,24 @@
      Possibly many lines.
      """
      # FIXME: Some comment about why this function is crap but still in production.
@@ -160,7 +161,7 @@ async def wat():
  
  
  # Another comment!
-@@ -78,19 +79,18 @@
+@@ -78,19 +82,18 @@
  #' <h1>This is pweave!</h1>
  
  
@@ -208,7 +209,10 @@ NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
 
-NOT_YET_IMPLEMENTED_StmtTry
+try:
+    NOT_YET_IMPLEMENTED_StmtImport
+except ImportError:
+    NOT_YET_IMPLEMENTED_StmtImport
 
 
 # Some comment before a function.

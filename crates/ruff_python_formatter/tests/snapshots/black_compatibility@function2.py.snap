@@ -87,7 +87,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
  
  
  def g():
-@@ -21,45 +15,31 @@
+@@ -21,45 +15,38 @@
      def inner():
          pass
  
@@ -111,17 +111,17 @@ with hmm_but_this_should_get_two_preceding_newlines():
          pass
 -
  elif os.name == "nt":
--    try:
+     try:
 -        import msvcrt
++        NOT_YET_IMPLEMENTED_StmtImport
+ 
+         def i_should_be_followed_by_only_one_newline():
+             pass
 -
--        def i_should_be_followed_by_only_one_newline():
--            pass
+     except ImportError:
 -
--    except ImportError:
--
--        def i_should_be_followed_by_only_one_newline():
--            pass
-+    NOT_YET_IMPLEMENTED_StmtTry
+         def i_should_be_followed_by_only_one_newline():
+             pass
  
  elif False:
 -
@@ -134,8 +134,8 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -
      def foo():
          pass
--
  
+-
 -with hmm_but_this_should_get_two_preceding_newlines():
 +with NOT_IMPLEMENTED_call():
      pass
@@ -177,7 +177,14 @@ if os.name == "posix":
     def i_should_be_followed_by_only_one_newline():
         pass
 elif os.name == "nt":
-    NOT_YET_IMPLEMENTED_StmtTry
+    try:
+        NOT_YET_IMPLEMENTED_StmtImport
+
+        def i_should_be_followed_by_only_one_newline():
+            pass
+    except ImportError:
+        def i_should_be_followed_by_only_one_newline():
+            pass
 
 elif False:
     class IHopeYouAreHavingALovelyDay:
