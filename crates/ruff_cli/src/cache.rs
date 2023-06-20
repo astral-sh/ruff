@@ -413,7 +413,8 @@ mod test {
 
     #[test]
     fn invalidation() {
-        const SOURCE: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        // NOTE: keep in sync with actual file.
+        const SOURCE: &[u8] = b"# NOTE: sync with cache::invalidation test\na = 1\n\n__all__ = list([\"a\", \"b\"])\n";
 
         let mut cache_dir = temp_dir();
         cache_dir.push("ruff_tests/cache_invalidation");
@@ -421,13 +422,11 @@ mod test {
         cache::init(&cache_dir).unwrap();
 
         let settings = AllSettings::default();
-        let package_root = fs::canonicalize(&cache_dir).unwrap();
+        let package_root = fs::canonicalize("resources/test/fixtures/cache_mutable").unwrap();
         let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
-        let path = cache_dir.join("source.py");
-        fs::write(&path, SOURCE).unwrap();
-
+        let path = package_root.join("source.py");
         let mut expected_diagnostics = lint_path(
             &path,
             Some(&package_root),
@@ -440,11 +439,6 @@ mod test {
         assert!(cache.new_files.lock().unwrap().len() == 1);
 
         cache.store().unwrap();
-        // On certain tmp filesystems (tmpfs) overwriting the file with the same
-        // content doesn't seem to update it's modified timestamp. Calling fsync
-        // doesn't mark a difference, but this small sleep seems to fix the
-        // issue.
-        std::thread::sleep(std::time::Duration::from_millis(10));
 
         let tests = [
             // File change.
@@ -454,20 +448,27 @@ mod test {
                     .truncate(true)
                     .open(path)?;
                 file.write_all(SOURCE)?;
-                file.sync_data()
-            }) as fn(&Path) -> io::Result<()>,
+                file.sync_data()?;
+                Ok(|_| Ok(()))
+            }) as fn(&Path) -> io::Result<fn(&Path) -> io::Result<()>>,
             // Regression for issue #3086.
             #[cfg(unix)]
             |path| {
-                use std::os::unix::fs::PermissionsExt;
-                let file = fs::OpenOptions::new().write(true).open(path)?;
-                let perms = file.metadata()?.permissions();
-                file.set_permissions(PermissionsExt::from_mode(perms.mode() ^ 0o111))
+                flip_execute_permission_bit(path)?;
+                Ok(flip_execute_permission_bit)
             },
         ];
 
+        #[cfg(unix)]
+        fn flip_execute_permission_bit(path: &Path) -> io::Result<()> {
+            use std::os::unix::fs::PermissionsExt;
+            let file = fs::OpenOptions::new().write(true).open(path)?;
+            let perms = file.metadata()?.permissions();
+            file.set_permissions(PermissionsExt::from_mode(perms.mode() ^ 0o111))
+        }
+
         for change_file in tests {
-            change_file(&path).unwrap();
+            let cleanup = change_file(&path).unwrap();
 
             let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
 
@@ -480,6 +481,9 @@ mod test {
                 flags::FixMode::Generate,
             )
             .unwrap();
+
+            cleanup(&path).unwrap();
+
             assert_eq!(
                 cache.new_files.lock().unwrap().len(),
                 1,
