@@ -41,11 +41,9 @@ pub(crate) fn check_noqa(
             if let Some(caps) = NOQA_LINE_EXPLANATION_REGEX.captures(text) {
                 match (caps.name("noqa"), caps.name("explanation")) {
                     (Some(_noqa), Some(explanation)) if explanation.as_str().is_empty() => {
-                        println!("Found unexplained `noqa` directive: {:?}", caps);
                         diagnostics.push(Diagnostic::new(UnexplainedNOQA, *comment_range));
                     }
                     (Some(_noqa), None) => {
-                        println!("Found unexplained `noqa` directive: {:?}", caps);
                         diagnostics.push(Diagnostic::new(UnexplainedNOQA, *comment_range));
                     }
                     _ => {}
