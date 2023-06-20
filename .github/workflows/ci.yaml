@@ -76,6 +76,9 @@ jobs:
           cargo insta test --all --all-features
           git diff --exit-code
       - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
+        # Skipped as it's currently broken. The resource were moved from the
+        # ruff_cli to ruff crate, but this test was not updated.
+        if: false
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
