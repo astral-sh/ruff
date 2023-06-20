@@ -42,6 +42,10 @@ impl Violation for RepeatedEqualityComparisonTarget {
     }
 }
 
+fn is_allowed_op(op: Boolop) -> bool {
+    op == Boolop::Or || op == Boolop::And
+}
+
 /// PLR0124
 pub(crate) fn repeated_equality_comparison_target(
     _checker: &mut Checker,
@@ -49,12 +53,12 @@ pub(crate) fn repeated_equality_comparison_target(
     values: &[Expr],
 ) {
     // Ignore if not all `or`, these cannot be rewritten as an `in` expression.
-    if op != Boolop::Or {
+    if !is_allowed_op(op) {
         return;
     }
     for value in values {
         if let Expr::BoolOp(ExprBoolOp { op, .. }) = value {
-            if *op != Boolop::Or {
+            if !is_allowed_op(*op) {
                 return;
             }
         }
