@@ -460,6 +460,7 @@ mod test {
         ];
 
         #[cfg(unix)]
+        #[allow(clippy::items_after_statements)]
         fn flip_execute_permission_bit(path: &Path) -> io::Result<()> {
             use std::os::unix::fs::PermissionsExt;
             let file = fs::OpenOptions::new().write(true).open(path)?;
