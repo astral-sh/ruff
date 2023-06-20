@@ -3439,6 +3439,7 @@ where
                 if self.enabled(Rule::ExprAndFalse) {
                     flake8_simplify::rules::expr_and_false(self, expr);
                 }
+                // FIXME: find an appropriate site to trigger this rule.
                 if self.enabled(Rule::RepeatedEqualityComparisonTarget) {
                     pylint::rules::repeated_equality_comparison_target(self, *op, values);
                 }

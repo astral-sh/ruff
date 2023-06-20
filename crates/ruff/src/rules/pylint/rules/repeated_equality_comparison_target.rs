@@ -1,7 +1,7 @@
-use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprCompare};
-
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprCompare, ExprName, Identifier};
+use std::collections::HashSet;
 
 use crate::checkers::ast::Checker;
 
@@ -120,5 +120,14 @@ pub(crate) fn repeated_equality_comparison_target(
             return;
         }
     }
-    // TODO: Check if the expression can be rewritten as a membership test.
+    let mut names: HashSet<Identifier> = HashSet::new();
+    // TODO: Create a collection of ExprConstants.
+    for value in values {
+        if let Expr::Compare(ExprCompare { left, .. }) = value {
+            // There is probably a better way to do this.
+            if let Expr::Name(ExprName { id, .. }) = &**left {
+                names.insert(id.clone());
+            }
+        }
+    }
 }
