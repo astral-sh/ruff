@@ -3,15 +3,23 @@
 use itertools::Itertools;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::source_code::Locator;
-
 use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule};
 use crate::rule_redirects::get_redirect_target;
-use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
+use crate::rules::ruff::rules::{UnexplainedNOQA, UnusedCodes, UnusedNOQA};
 use crate::settings::Settings;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_python_ast::source_code::Locator;
+
+static NOQA_LINE_EXPLANATION_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)(?P<explanation>(?i:#.*)?)",
+    )
+        .unwrap()
+});
 
 pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
@@ -26,6 +34,25 @@ pub(crate) fn check_noqa(
 
     // Extract all `noqa` directives.
     let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, locator);
+
+    if settings.rules.enabled(Rule::UnexplainedNOQA) {
+        for comment_range in comment_ranges {
+            let text: &str = &locator.contents()[*comment_range];
+            if let Some(caps) = NOQA_LINE_EXPLANATION_REGEX.captures(text) {
+                match (caps.name("noqa"), caps.name("explanation")) {
+                    (Some(_noqa), Some(explanation)) if explanation.as_str().is_empty() => {
+                        println!("Found unexplained `noqa` directive: {:?}", caps);
+                        diagnostics.push(Diagnostic::new(UnexplainedNOQA, *comment_range));
+                    }
+                    (Some(_noqa), None) => {
+                        println!("Found unexplained `noqa` directive: {:?}", caps);
+                        diagnostics.push(Diagnostic::new(UnexplainedNOQA, *comment_range));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];

@@ -257,7 +257,7 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::UnusedNOQA => LintSource::Noqa,
+            Rule::UnusedNOQA | Rule::UnexplainedNOQA => LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong
