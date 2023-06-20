@@ -118,6 +118,8 @@ pub struct Notebook {
 }
 
 impl Notebook {
+    /// Read the Jupyter Notebook from the given [`Path`].
+    ///
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
     pub fn read(path: &Path) -> Result<Self, Box<Diagnostic>> {
@@ -459,6 +461,18 @@ mod test {
     use crate::test::{test_notebook_path, test_resource_path};
     use crate::{assert_messages, settings};
 
+    /// Read a Jupyter notebook from the `resources/test/fixtures/jupyter` directory.
+    fn read_jupyter_notebook(path: impl AsRef<Path>) -> Result<Notebook> {
+        let path = test_resource_path("fixtures/jupyter").join(path);
+        Notebook::read(&path).map_err(|err| {
+            anyhow::anyhow!(
+                "Failed to read notebook file `{}`: {:?}",
+                path.display(),
+                err
+            )
+        })
+    }
+
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
     fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
         let path = test_resource_path("fixtures/jupyter/cell").join(path);
@@ -592,6 +606,20 @@ print("after empty cells")
         let expected =
             std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;
         assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
+    #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
+    fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
+        let notebook = read_jupyter_notebook(path)?;
+        assert_eq!(notebook.trailing_newline, trailing_newline);
+
+        let mut writer = BufWriter::new(Vec::new());
+        notebook.write_inner(&mut writer)?;
+        let string = String::from_utf8(writer.into_inner()?)?;
+        assert_eq!(string.ends_with('\n'), trailing_newline);
+
         Ok(())
     }
 }
