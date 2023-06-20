@@ -107,9 +107,7 @@ pub(crate) fn run(
 
                     let settings = resolver.resolve_all(path, pyproject_config);
                     let package_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
-                    let cache = caches
-                        .as_ref()
-                        .map(|caches| caches.get(&package_root).unwrap());
+                    let cache = caches.as_ref().and_then(|caches| caches.get(&package_root));
 
                     lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
