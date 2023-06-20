@@ -8,8 +8,9 @@ use rustpython_parser::ast;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
-use crate::binding::{BindingId, StarImport};
+use crate::binding::BindingId;
 use crate::globals::GlobalsId;
+use crate::star_import::StarImport;
 
 #[derive(Debug)]
 pub struct Scope<'a> {
