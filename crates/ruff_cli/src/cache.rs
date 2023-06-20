@@ -306,6 +306,7 @@ mod test {
     use std::path::Path;
 
     use ruff::settings::{flags, AllSettings};
+    use ruff_cache::CACHE_DIR_NAME;
 
     use crate::cache::{self, Cache};
     use crate::diagnostics::{lint_path, Diagnostics};
@@ -324,6 +325,7 @@ mod test {
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
+        let mut parse_errors = Vec::new();
         let mut expected_diagnostics = Diagnostics::default();
         for entry in fs::read_dir(&package_root).unwrap() {
             let entry = entry.unwrap();
@@ -331,14 +333,23 @@ mod test {
                 continue;
             }
 
-            for entry in fs::read_dir(entry.path()).unwrap() {
+            let dir_path = entry.path();
+            if dir_path.ends_with(CACHE_DIR_NAME) {
+                continue;
+            }
+
+            for entry in fs::read_dir(dir_path).unwrap() {
                 let entry = entry.unwrap();
                 if !entry.file_type().unwrap().is_file() {
                     continue;
                 }
 
                 let path = entry.path();
-                expected_diagnostics += lint_path(
+                if path.ends_with("pyproject.toml") {
+                    continue;
+                }
+
+                let diagnostics = lint_path(
                     &path,
                     Some(&package_root),
                     &settings,
@@ -347,7 +358,15 @@ mod test {
                     flags::FixMode::Generate,
                 )
                 .unwrap();
+                if diagnostics
+                    .messages
+                    .iter()
+                    .any(|m| m.kind.name == "SyntaxError")
+                {
+                    parse_errors.push(path.clone());
+                }
                 paths.push(path);
+                expected_diagnostics += diagnostics;
             }
         }
         assert!(!paths.is_empty(), "no files checked");
@@ -356,6 +375,20 @@ mod test {
 
         let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
         assert!(!cache.package.files.is_empty());
+
+        for path in &paths {
+            if parse_errors.contains(path) {
+                continue; // We don't cache parsing errors.
+            }
+
+            let relative_path = cache.relative_path(path).unwrap();
+
+            assert!(
+                cache.package.files.contains_key(relative_path),
+                "missing: {}",
+                relative_path.display()
+            );
+        }
 
         let mut got_diagnostics = Diagnostics::default();
         for path in paths {
