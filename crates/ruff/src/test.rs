@@ -25,8 +25,9 @@ use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
 
 #[cfg(not(fuzzing))]
-fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
-    Notebook::read(path).map_err(|err| {
+pub(crate) fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
+    let path = test_resource_path("fixtures/jupyter").join(path);
+    Notebook::read(&path).map_err(|err| {
         anyhow::anyhow!(
             "Failed to read notebook file `{}`: {:?}",
             path.display(),
@@ -58,11 +59,9 @@ pub(crate) fn test_notebook_path(
     expected: impl AsRef<Path>,
     settings: &Settings,
 ) -> Result<(Vec<Message>, SourceKind)> {
-    let path = test_resource_path("fixtures/jupyter").join(path);
-    let mut source_kind = SourceKind::Jupyter(read_jupyter_notebook(&path)?);
-    let messages = test_contents(&mut source_kind, &path, settings);
-    let expected_notebook =
-        read_jupyter_notebook(&test_resource_path("fixtures/jupyter").join(expected))?;
+    let mut source_kind = SourceKind::Jupyter(read_jupyter_notebook(path.as_ref())?);
+    let messages = test_contents(&mut source_kind, path.as_ref(), settings);
+    let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
     if let SourceKind::Jupyter(notebook) = &source_kind {
         assert_eq!(notebook.cell_offsets(), expected_notebook.cell_offsets());
         assert_eq!(notebook.index(), expected_notebook.index());

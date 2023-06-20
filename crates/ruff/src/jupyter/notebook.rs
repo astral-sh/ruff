@@ -457,20 +457,8 @@ mod test {
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
-    use crate::test::{test_notebook_path, test_resource_path};
+    use crate::test::{read_jupyter_notebook, test_notebook_path, test_resource_path};
     use crate::{assert_messages, settings};
-
-    /// Read a Jupyter notebook from the `resources/test/fixtures/jupyter` directory.
-    fn read_jupyter_notebook(path: impl AsRef<Path>) -> Result<Notebook> {
-        let path = test_resource_path("fixtures/jupyter").join(path);
-        Notebook::read(&path).map_err(|err| {
-            anyhow::anyhow!(
-                "Failed to read notebook file `{}`: {:?}",
-                path.display(),
-                err
-            )
-        })
-    }
 
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
     fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
@@ -481,15 +469,13 @@ mod test {
 
     #[test]
     fn test_valid() {
-        let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        assert!(Notebook::read(path).is_ok());
+        assert!(read_jupyter_notebook(Path::new("valid.ipynb")).is_ok());
     }
 
     #[test]
     fn test_r() {
         // We can load this, it will be filtered out later
-        let path = Path::new("resources/test/fixtures/jupyter/R.ipynb");
-        assert!(Notebook::read(path).is_ok());
+        assert!(read_jupyter_notebook(Path::new("R.ipynb")).is_ok());
     }
 
     #[test]
@@ -537,9 +523,8 @@ mod test {
     }
 
     #[test]
-    fn test_concat_notebook() {
-        let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        let notebook = Notebook::read(path).unwrap();
+    fn test_concat_notebook() -> Result<()> {
+        let notebook = read_jupyter_notebook(Path::new("valid.ipynb"))?;
         assert_eq!(
             notebook.content,
             r#"def unused_variable():
@@ -577,6 +562,7 @@ print("after empty cells")
                 198.into()
             ]
         );
+        Ok(())
     }
 
     #[test]
