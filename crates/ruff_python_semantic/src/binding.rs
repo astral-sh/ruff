@@ -273,14 +273,6 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StarImport<'a> {
-    /// The level of the import. `None` or `Some(0)` indicate an absolute import.
-    pub level: Option<u32>,
-    /// The module being imported. `None` indicates a wildcard import.
-    pub module: Option<&'a str>,
-}
-
-#[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
     pub names: Vec<&'a str>,
