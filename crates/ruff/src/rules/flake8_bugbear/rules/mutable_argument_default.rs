@@ -1,9 +1,11 @@
-use rustpython_parser::ast::{ArgWithDefault, Arguments, Ranged};
+use rustpython_parser::ast::{ArgWithDefault, Arguments, Ranged, Stmt};
 
 use crate::registry::AsRule;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::docstrings::leading_space;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -99,13 +101,13 @@ pub(crate) fn mutable_argument_default(
                     body[0].start(),
                 ));
                 let indentation = leading_space(indentation);
-                check_lines.push_str(format!("if {} is None:\n", arg.arg.as_str()).as_str());
+                check_lines.push_str(format!("if {} is None:\n", def.arg.as_str()).as_str());
                 check_lines.push_str(indentation);
                 check_lines.push_str(checker.stylist.indentation());
                 check_lines.push_str(
                     format!(
                         "{} = {}",
-                        arg.arg.as_str(),
+                        def.arg.as_str(),
                         checker.generator().expr(default),
                     )
                     .as_str(),
