@@ -1,6 +1,6 @@
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
-use crate::comments::{CommentTextPosition, CommentsMap, SourceComment};
+use crate::comments::{CommentLinePosition, CommentsMap, SourceComment};
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::*;
@@ -66,7 +66,7 @@ impl<'a> CommentsVisitor<'a> {
                 preceding: self.preceding_node,
                 following: Some(node),
                 parent: self.parents.iter().rev().nth(1).copied(),
-                text_position: text_position(*comment_range, self.source_code),
+                line_position: text_position(*comment_range, self.source_code),
                 slice: self.source_code.slice(*comment_range),
             };
 
@@ -125,7 +125,7 @@ impl<'a> CommentsVisitor<'a> {
                 preceding: self.preceding_node,
                 parent: self.parents.last().copied(),
                 following: None,
-                text_position: text_position(*comment_range, self.source_code),
+                line_position: text_position(*comment_range, self.source_code),
                 slice: self.source_code.slice(*comment_range),
             };
 
@@ -280,7 +280,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
     }
 }
 
-fn text_position(comment_range: TextRange, source_code: SourceCode) -> CommentTextPosition {
+fn text_position(comment_range: TextRange, source_code: SourceCode) -> CommentLinePosition {
     let before = &source_code.as_str()[TextRange::up_to(comment_range.start())];
 
     for c in before.chars().rev() {
@@ -289,11 +289,11 @@ fn text_position(comment_range: TextRange, source_code: SourceCode) -> CommentTe
                 break;
             }
             c if is_python_whitespace(c) => continue,
-            _ => return CommentTextPosition::EndOfLine,
+            _ => return CommentLinePosition::EndOfLine,
         }
     }
 
-    CommentTextPosition::OwnLine
+    CommentLinePosition::OwnLine
 }
 
 /// A comment decorated with additional information about its surrounding context in the source document.
@@ -305,7 +305,7 @@ pub(super) struct DecoratedComment<'a> {
     preceding: Option<AnyNodeRef<'a>>,
     following: Option<AnyNodeRef<'a>>,
     parent: Option<AnyNodeRef<'a>>,
-    text_position: CommentTextPosition,
+    line_position: CommentLinePosition,
     slice: SourceCodeSlice,
 }
 
@@ -443,14 +443,14 @@ impl<'a> DecoratedComment<'a> {
     }
 
     /// The position of the comment in the text.
-    pub(super) fn text_position(&self) -> CommentTextPosition {
-        self.text_position
+    pub(super) fn line_position(&self) -> CommentLinePosition {
+        self.line_position
     }
 }
 
 impl From<DecoratedComment<'_>> for SourceComment {
     fn from(decorated: DecoratedComment) -> Self {
-        Self::new(decorated.slice, decorated.text_position)
+        Self::new(decorated.slice, decorated.line_position)
     }
 }
 
@@ -659,8 +659,8 @@ impl<'a> CommentsBuilder<'a> {
                 self.push_dangling_comment(node, comment);
             }
             CommentPlacement::Default(comment) => {
-                match comment.text_position() {
-                    CommentTextPosition::EndOfLine => {
+                match comment.line_position() {
+                    CommentLinePosition::EndOfLine => {
                         match (comment.preceding_node(), comment.following_node()) {
                             (Some(preceding), Some(_)) => {
                                 // Attach comments with both preceding and following node to the preceding
@@ -682,7 +682,7 @@ impl<'a> CommentsBuilder<'a> {
                             }
                         }
                     }
-                    CommentTextPosition::OwnLine => {
+                    CommentLinePosition::OwnLine => {
                         match (comment.preceding_node(), comment.following_node()) {
                             // Following always wins for a leading comment
                             // ```python

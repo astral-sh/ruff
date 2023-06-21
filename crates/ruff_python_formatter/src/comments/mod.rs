@@ -117,14 +117,14 @@ pub(crate) struct SourceComment {
     slice: SourceCodeSlice,
     /// Whether the comment has been formatted or not.
     formatted: Cell<bool>,
-    position: CommentTextPosition,
+    line_position: CommentLinePosition,
 }
 
 impl SourceComment {
-    fn new(slice: SourceCodeSlice, position: CommentTextPosition) -> Self {
+    fn new(slice: SourceCodeSlice, position: CommentLinePosition) -> Self {
         Self {
             slice,
-            position,
+            line_position: position,
             formatted: Cell::new(false),
         }
     }
@@ -135,8 +135,8 @@ impl SourceComment {
         &self.slice
     }
 
-    pub(crate) const fn position(&self) -> CommentTextPosition {
-        self.position
+    pub(crate) const fn line_position(&self) -> CommentLinePosition {
+        self.line_position
     }
 
     /// Marks the comment as formatted
@@ -163,7 +163,7 @@ impl SourceComment {
 
 /// The position of a comment in the source text.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) enum CommentTextPosition {
+pub(crate) enum CommentLinePosition {
     /// A comment that is on the same line as the preceding token and is separated by at least one line break from the following token.
     ///
     /// # Examples
@@ -176,7 +176,7 @@ pub(crate) enum CommentTextPosition {
     /// ```
     ///
     /// `# comment` is an end of line comments because it is separated by at least one line break from the following token `b`.
-    /// Comments that not only end, but also start on a new line are [`OwnLine`](CommentTextPosition::OwnLine) comments.
+    /// Comments that not only end, but also start on a new line are [`OwnLine`](CommentLinePosition::OwnLine) comments.
     EndOfLine,
 
     /// A Comment that is separated by at least one line break from the preceding token.
@@ -193,13 +193,13 @@ pub(crate) enum CommentTextPosition {
     OwnLine,
 }
 
-impl CommentTextPosition {
+impl CommentLinePosition {
     pub(crate) const fn is_own_line(self) -> bool {
-        matches!(self, CommentTextPosition::OwnLine)
+        matches!(self, CommentLinePosition::OwnLine)
     }
 
     pub(crate) const fn is_end_of_line(self) -> bool {
-        matches!(self, CommentTextPosition::EndOfLine)
+        matches!(self, CommentLinePosition::EndOfLine)
     }
 }
 
@@ -335,7 +335,7 @@ impl<'a> Comments<'a> {
     {
         self.trailing_comments(node)
             .iter()
-            .any(|comment| comment.position().is_own_line())
+            .any(|comment| comment.line_position().is_own_line())
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
