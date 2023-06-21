@@ -117,6 +117,40 @@ PERF101.py:23:10: PERF101 [*] Do not cast an iterable to `list` before iterating
    23 |+for i in {1, 2, 3}:  # PERF101
 24 24 |     pass
 25 25 | 
-26 26 | 
+26 26 | for i in list(
+
+PERF101.py:26:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+24 |       pass
+25 |   
+26 |   for i in list(
+   |  __________^
+27 | |     {
+28 | |     1,
+29 | |     2,
+30 | |     3,
+31 | |     }
+32 | | ):
+   | |_^ PERF101
+33 |       pass
+   |
+   = help: Remove `list()` cast
+
+ℹ Fix
+23 23 | for i in list({1, 2, 3}):  # PERF101
+24 24 |     pass
+25 25 | 
+26    |-for i in list(
+27    |-    {
+   26 |+for i in {
+28 27 |     1,
+29 28 |     2,
+30 29 |     3,
+31    |-    }
+32    |-):
+   30 |+    }:
+33 31 |     pass
+34 32 | 
+35 33 | 
 
 

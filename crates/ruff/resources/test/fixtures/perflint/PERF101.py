@@ -23,6 +23,15 @@ for i in list([1, 2, 3]):  # PERF101
 for i in list({1, 2, 3}):  # PERF101
     pass
 
+for i in list(
+    {
+    1,
+    2,
+    3,
+    }
+):
+    pass
+
 
 for i in list(foo_dict):  # Ok
     pass

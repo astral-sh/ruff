@@ -1,4 +1,4 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
 
@@ -45,7 +45,7 @@ impl AlwaysAutofixableViolation for UnnecessaryListCast {
 
 /// PERF101
 pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
-    let Expr::Call(ast::ExprCall{ func, args, range, ..}) = iter else {
+    let Expr::Call(ast::ExprCall{ func, args, range: list_range, ..}) = iter else {
         return;
     };
 
@@ -60,8 +60,20 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
     };
 
     match &args[0] {
-        Expr::Tuple(_) | Expr::List(_) | Expr::Set(_) => fix_incorrect_list_cast(checker, *range),
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Tuple(ast::ExprTuple {
+            range: iter_range, ..
+        })
+        | Expr::List(ast::ExprList {
+            range: iter_range, ..
+        })
+        | Expr::Set(ast::ExprSet {
+            range: iter_range, ..
+        }) => fix_incorrect_list_cast(checker, *list_range, *iter_range),
+        Expr::Name(ast::ExprName {
+            id,
+            range: iterable_range,
+            ..
+        }) => {
             let scope = checker.semantic().scope();
             if let Some(binding_id) = scope.get(id) {
                 let binding = &checker.semantic().bindings[binding_id];
@@ -74,7 +86,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
                                 value: Some(value), ..
                             }) => match value.as_ref() {
                                 Expr::Tuple(_) | Expr::List(_) | Expr::Set(_) => {
-                                    fix_incorrect_list_cast(checker, *range);
+                                    fix_incorrect_list_cast(checker, *list_range, *iterable_range);
                                 }
                                 _ => {}
                             },
@@ -88,12 +100,16 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
     }
 }
 
-fn fix_incorrect_list_cast(checker: &mut Checker, range: TextRange) {
-    let mut diagnostic = Diagnostic::new(UnnecessaryListCast, range);
+fn fix_incorrect_list_cast(
+    checker: &mut Checker,
+    list_range: TextRange,
+    iterable_range: TextRange,
+) {
+    let mut diagnostic = Diagnostic::new(UnnecessaryListCast, list_range);
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::automatic_edits(
-            Edit::deletion(range.start(), range.start() + TextSize::from(5)),
-            [Edit::deletion(range.end() - TextSize::from(1), range.end())],
+            Edit::deletion(list_range.start(), iterable_range.start()),
+            [Edit::deletion(iterable_range.end(), list_range.end())],
         ));
     }
     checker.diagnostics.push(diagnostic);
