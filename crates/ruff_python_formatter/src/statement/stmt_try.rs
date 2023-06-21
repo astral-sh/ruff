@@ -1,9 +1,14 @@
-use crate::comments::{dangling_node_comments, leading_node_comments, trailing_node_comments};
+use crate::comments;
+use crate::comments::{
+    dangling_node_comments, leading_comments, leading_node_comments, trailing_node_comments,
+};
 use crate::prelude::*;
 use crate::statement::FormatRefWithRule;
+use crate::trivia::lines_before;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::{ExceptHandler, ExceptHandlerExceptHandler, StmtTry};
+use ruff_python_ast::node::AstNode;
+use rustpython_parser::ast::{ExceptHandler, ExceptHandlerExceptHandler, Ranged, StmtTry};
 
 #[derive(Default)]
 pub struct FormatStmtTry;
@@ -73,27 +78,73 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             finalbody,
         } = item;
 
-        let joined_handlers = format_with(|f| {
-            f.join_with(self::format_args!(text(","), soft_line_break_or_space()))
-                .entries(handlers.iter().formatted())
-                .finish()
-        });
+        let comments_info = f.context().comments().clone();
+        let mut dangling_comments = comments_info.dangling_comments(item.as_any_node_ref());
+
         write!(
             f,
             [
                 text("try:"),
                 hard_line_break(),
                 block_indent(&body.format()),
-                joined_handlers,
             ]
         )?;
-        if !orelse.is_empty() {
-            write!(f, [text("else:"), block_indent(&orelse.format())])?;
+
+        for handler in handlers {
+            if lines_before(handler.range().start(), f.context().contents()) > 1 {
+                write!(f, [empty_line()])?;
+            }
+            let handler_comments_start =
+                dangling_comments.partition_point(|comment| comment.slice().end() <= handler.end());
+            let (handler_comments, rest) = dangling_comments.split_at(handler_comments_start);
+            dangling_comments = rest;
+
+            write!(f, [leading_comments(handler_comments), &handler.format()])?;
         }
-        if !finalbody.is_empty() {
-            write!(f, [text("finally:"), block_indent(&finalbody.format())])?;
+
+        if let [.., last] = &orelse[..] {
+            let orelse_comments_start =
+                dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
+            let (orelse_comments, rest) = dangling_comments.split_at(orelse_comments_start);
+            dangling_comments = rest;
+            if let Some(first_orelse_comment) = orelse_comments.first() {
+                if lines_before(first_orelse_comment.slice().start(), f.context().contents()) > 1 {
+                    write!(f, [empty_line()])?;
+                }
+            }
+            write!(
+                f,
+                [
+                    leading_comments(orelse_comments),
+                    text("else:"),
+                    block_indent(&orelse.format())
+                ]
+            )?;
         }
-        Ok(())
+        if let [.., last] = &finalbody[..] {
+            let finally_comments_start =
+                dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
+            let (finally_comments, rest) = dangling_comments.split_at(finally_comments_start);
+            dangling_comments = rest;
+            if let Some(first_finally_comment) = finally_comments.first() {
+                if lines_before(
+                    first_finally_comment.slice().start(),
+                    f.context().contents(),
+                ) > 1
+                {
+                    write!(f, [empty_line()])?;
+                }
+            }
+            write!(
+                f,
+                [
+                    leading_comments(finally_comments),
+                    text("finally:"),
+                    block_indent(&finalbody.format())
+                ]
+            )?;
+        }
+        write!(f, [comments::dangling_comments(dangling_comments)])
     }
 
     fn fmt_dangling_comments(&self, _node: &StmtTry, _f: &mut PyFormatter) -> FormatResult<()> {

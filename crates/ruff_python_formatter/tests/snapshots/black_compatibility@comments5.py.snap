@@ -93,7 +93,7 @@ if __name__ == "__main__":
          # Comment belongs to the `if` block.
      # This one belongs to the `while` block.
  
-@@ -8,26 +8,25 @@
+@@ -8,26 +8,26 @@
  
  # This one is properly standalone now.
  
@@ -116,9 +116,9 @@ if __name__ == "__main__":
  try:
 -    with open(some_other_file) as w:
 -        w.write(data)
--
 +    with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as w:
 +        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ 
  except OSError:
 -    print("problems")
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
@@ -128,7 +128,7 @@ if __name__ == "__main__":
  
  
  # leading function comment
-@@ -42,7 +41,7 @@
+@@ -42,7 +42,7 @@
  # leading 1
  @deco1
  # leading 2
@@ -137,7 +137,7 @@ if __name__ == "__main__":
  # leading 3
  @deco3
  def decorated1():
-@@ -52,7 +51,7 @@
+@@ -52,7 +52,7 @@
  # leading 1
  @deco1
  # leading 2
@@ -146,7 +146,7 @@ if __name__ == "__main__":
  # leading function comment
  def decorated1():
      ...
-@@ -70,4 +69,4 @@
+@@ -70,4 +70,4 @@
  
  
  if __name__ == "__main__":
@@ -182,6 +182,7 @@ with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as f:
 try:
     with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as w:
         NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+
 except OSError:
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 

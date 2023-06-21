@@ -87,7 +87,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
  
  
  def g():
-@@ -21,45 +15,38 @@
+@@ -21,45 +15,39 @@
      def inner():
          pass
  
@@ -117,7 +117,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
  
          def i_should_be_followed_by_only_one_newline():
              pass
--
+ 
      except ImportError:
 -
          def i_should_be_followed_by_only_one_newline():
@@ -182,6 +182,7 @@ elif os.name == "nt":
 
         def i_should_be_followed_by_only_one_newline():
             pass
+
     except ImportError:
         def i_should_be_followed_by_only_one_newline():
             pass
