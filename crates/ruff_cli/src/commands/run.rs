@@ -7,6 +7,7 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
+use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
@@ -80,8 +81,10 @@ pub(crate) fn run(
     // Load the caches.
     let caches = bool::from(cache).then(|| {
         package_roots
-            .par_iter()
-            .map(|(package_root, _)| {
+            .values()
+            .flatten()
+            .dedup()
+            .map(|package_root| {
                 let settings = resolver.resolve_all(package_root, pyproject_config);
                 let cache = Cache::open(
                     &settings.cli.cache_dir,
