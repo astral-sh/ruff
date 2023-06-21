@@ -225,28 +225,19 @@ impl<'a> TypingTarget<'a> {
                 let Some(new_target) = TypingTarget::try_from_expr(element, checker) else {
                     return false;
                 };
-                match new_target {
-                    TypingTarget::None => true,
-                    _ => new_target.contains_none(checker),
-                }
+                new_target.contains_none(checker)
             }),
             TypingTarget::Annotated(element) => {
                 let Some(new_target) = TypingTarget::try_from_expr(element, checker) else {
                     return false;
                 };
-                match new_target {
-                    TypingTarget::None => true,
-                    _ => new_target.contains_none(checker),
-                }
+                new_target.contains_none(checker)
             }
             TypingTarget::ForwardReference(expr) => {
                 let Some(new_target) = TypingTarget::try_from_expr(expr, checker) else {
                     return false;
                 };
-                match new_target {
-                    TypingTarget::None => true,
-                    _ => new_target.contains_none(checker),
-                }
+                new_target.contains_none(checker)
             }
         }
     }
