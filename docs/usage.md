@@ -22,7 +22,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.273
+  rev: v0.0.274
   hooks:
     - id: ruff
 ```
@@ -32,7 +32,7 @@ Or, to enable autofix:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.273
+  rev: v0.0.274
   hooks:
     - id: ruff
       args: [ --fix, --exit-non-zero-on-fix ]
