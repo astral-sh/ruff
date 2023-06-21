@@ -167,7 +167,7 @@ def __await__(): return (yield)
      **kwargs,
  ) -> str:
 -    return text[number:-1]
-+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++    return text[number : -1]
  
  
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
@@ -330,7 +330,7 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    return text[number : -1]
 
 
 def spaces(

@@ -82,8 +82,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                     checker.semantic(),
                 )?;
                 let reference_edit = Edit::range_replacement(binding, func.range());
-                #[allow(deprecated)]
-                Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
+                Ok(Fix::suggested_edits(import_edit, [reference_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);

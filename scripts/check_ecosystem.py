@@ -85,6 +85,8 @@ REPOSITORIES: list[Repository] = [
     Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
+    Repository("pypa", "setuptools", "main"),
+    Repository("python", "mypy", "master"),
     Repository("DisnakeDev", "disnake", "master"),
     Repository("scikit-build", "scikit-build", "main"),
     Repository("scikit-build", "scikit-build-core", "main"),

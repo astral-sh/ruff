@@ -264,32 +264,30 @@ instruction()#comment with bad spacing
      if typedargslist:
 -        parameters.children = [children[0], body, children[-1]]  # (1  # )1
 -        parameters.children = [
--            children[0],
 +        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (1
-             body,
--            children[-1],  # type: ignore
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )1
++            children[0],  # (1
++            body,
++            children[-1],  # )1
 +        ]
 +        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
-+            body,
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: ignore
+             children[0],
+             body,
+             children[-1],  # type: ignore
          ]
      else:
 -        parameters.children = [
 -            parameters.children[0],  # (2 what if this was actually long
 +        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (2 what if this was actually long
++            parameters.NOT_IMPLEMENTED_attr[0],  # (2 what if this was actually long
              body,
 -            parameters.children[-1],  # )2
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )2
++            parameters.NOT_IMPLEMENTED_attr[-1],  # )2
          ]
 -        parameters.children = [parameters.what_if_this_was_actually_long.children[0], body, parameters.children[-1]]  # type: ignore
 +        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
++            parameters.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr[0],
 +            body,
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
++            parameters.NOT_IMPLEMENTED_attr[-1],
 +        ]  # type: ignore
      if (
 -        self._proc is not None
@@ -460,25 +458,25 @@ else:
 def inline_comments_in_brackets_ruin_everything():
     if typedargslist:
         parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (1
+            children[0],  # (1
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )1
+            children[-1],  # )1
         ]
         parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+            children[0],
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: ignore
+            children[-1],  # type: ignore
         ]
     else:
         parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (2 what if this was actually long
+            parameters.NOT_IMPLEMENTED_attr[0],  # (2 what if this was actually long
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )2
+            parameters.NOT_IMPLEMENTED_attr[-1],  # )2
         ]
         parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+            parameters.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr[0],
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+            parameters.NOT_IMPLEMENTED_attr[-1],
         ]  # type: ignore
     if (
         NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right

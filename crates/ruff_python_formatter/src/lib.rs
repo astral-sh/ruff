@@ -273,36 +273,7 @@ if True:
 
         let formatted_code = printed.as_code();
 
-        let reformatted = match format_module(formatted_code) {
-            Ok(reformatted) => reformatted,
-            Err(err) => {
-                panic!(
-                    "Expected formatted code to be valid syntax: {err}:\
-                    \n---\n{formatted_code}---\n",
-                );
-            }
-        };
-
-        if reformatted.as_code() != formatted_code {
-            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
-                .unified_diff()
-                .header("Formatted once", "Formatted twice")
-                .to_string();
-            panic!(
-                r#"Reformatting the formatted code a second time resulted in formatting changes.
----
-{diff}---
-
-Formatted once:
----
-{formatted_code}---
-
-Formatted twice:
----
-{}---"#,
-                reformatted.as_code()
-            );
-        }
+        ensure_stability_when_formatting_twice(formatted_code);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -374,6 +345,8 @@ Formatted twice:
         let reformatted =
             format_module(formatted_code).unwrap_or_else(|err| panic!("Expected formatted code to be valid syntax but it contains syntax errors: {err}\n{formatted_code}"));
 
+        ensure_stability_when_formatting_twice(formatted_code);
+
         if reformatted.as_code() != formatted_code {
             let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
                 .unified_diff()
@@ -404,6 +377,40 @@ Formatted twice:
         assert_snapshot!(snapshot);
 
         Ok(())
+    }
+
+    /// Format another time and make sure that there are no changes anymore
+    fn ensure_stability_when_formatting_twice(formatted_code: &str) {
+        let reformatted = match format_module(formatted_code) {
+            Ok(reformatted) => reformatted,
+            Err(err) => {
+                panic!(
+                    "Expected formatted code to be valid syntax: {err}:\
+                    \n---\n{formatted_code}---\n",
+                );
+            }
+        };
+
+        if reformatted.as_code() != formatted_code {
+            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
+                .unified_diff()
+                .header("Formatted once", "Formatted twice")
+                .to_string();
+            panic!(
+                r#"Reformatting the formatted code a second time resulted in formatting changes.
+---
+{diff}---
+
+Formatted once:
+---
+{formatted_code}---
+
+Formatted twice:
+---
+{}---"#,
+                reformatted.as_code()
+            );
+        }
     }
 
     /// Use this test to debug the formatting of some snipped

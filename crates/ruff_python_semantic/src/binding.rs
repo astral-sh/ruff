@@ -75,7 +75,7 @@ impl<'a> Binding<'a> {
     pub const fn is_unbound(&self) -> bool {
         matches!(
             self.kind,
-            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException
+            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException(_)
         )
     }
 
@@ -427,7 +427,11 @@ pub enum BindingKind<'a> {
     ///
     /// After the `except` block, `x` is unbound, despite the lack
     /// of an explicit `del` statement.
-    UnboundException,
+    ///
+    ///
+    /// Stores the ID of the binding that was shadowed in the enclosing
+    /// scope, if any.
+    UnboundException(Option<BindingId>),
 }
 
 bitflags! {

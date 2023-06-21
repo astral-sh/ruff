@@ -46,7 +46,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,50 +1,26 @@
+@@ -1,50 +1,30 @@
 -zero(
 -    one,
 -).two(
@@ -86,7 +86,11 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 -        },
 -        api_key=api_key,
 -    )["extensions"]["sdk"]["token"]
-+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++    return NOT_IMPLEMENTED_call()["NOT_YET_IMPLEMENTED_STRING"][
++        "NOT_YET_IMPLEMENTED_STRING"
++    ][
++        "NOT_YET_IMPLEMENTED_STRING"
++    ]
  
  
  # Edge case where a bug in a working-in-progress version of
@@ -126,7 +130,11 @@ NOT_IMPLEMENTED_call()
 
 # Example from https://github.com/psf/black/issues/3229
 def refresh_token(self, device_family, refresh_token, api_key):
-    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    return NOT_IMPLEMENTED_call()["NOT_YET_IMPLEMENTED_STRING"][
+        "NOT_YET_IMPLEMENTED_STRING"
+    ][
+        "NOT_YET_IMPLEMENTED_STRING"
+    ]
 
 
 # Edge case where a bug in a working-in-progress version of

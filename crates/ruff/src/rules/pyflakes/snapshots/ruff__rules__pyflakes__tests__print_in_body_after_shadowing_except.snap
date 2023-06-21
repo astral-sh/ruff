@@ -19,14 +19,6 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
   7 |+    except Exception:
 8 8 |         pass
 9 9 | 
-10 10 |     print(x)
-
-<filename>:10:11: F821 Undefined name `x`
-   |
- 8 |         pass
- 9 | 
-10 |     print(x)
-   |           ^ F821
-   |
+10 10 |     # No error here, though it should arguably be an F821 error. `x` will
 
 

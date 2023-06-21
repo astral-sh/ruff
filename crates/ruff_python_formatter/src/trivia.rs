@@ -112,9 +112,8 @@ impl Token {
         self.range.start()
     }
 
-    #[allow(unused)]
     pub(crate) const fn end(&self) -> TextSize {
-        self.range.start()
+        self.range.end()
     }
 }
 

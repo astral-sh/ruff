@@ -81,17 +81,18 @@ pub(crate) fn run(
     // Load the caches.
     let caches = bool::from(cache).then(|| {
         package_roots
-            .values()
-            .flatten()
-            .dedup()
-            .map(|package_root| {
-                let settings = resolver.resolve_all(package_root, pyproject_config);
+            .iter()
+            .map(|(package, package_root)| package_root.unwrap_or(package))
+            .unique()
+            .par_bridge()
+            .map(|cache_root| {
+                let settings = resolver.resolve_all(cache_root, pyproject_config);
                 let cache = Cache::open(
                     &settings.cli.cache_dir,
-                    package_root.to_path_buf(),
+                    cache_root.to_path_buf(),
                     &settings.lib,
                 );
-                (&**package_root, cache)
+                (cache_root, cache)
             })
             .collect::<HashMap<&Path, Cache>>()
     });
@@ -109,8 +110,16 @@ pub(crate) fn run(
                         .and_then(|package| *package);
 
                     let settings = resolver.resolve_all(path, pyproject_config);
-                    let package_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
-                    let cache = caches.as_ref().and_then(|caches| caches.get(&package_root));
+
+                    let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                    let cache = caches.as_ref().and_then(|caches| {
+                        if let Some(cache) = caches.get(&cache_root) {
+                            Some(cache)
+                        } else {
+                            debug!("No cache found for {}", cache_root.display());
+                            None
+                        }
+                    });
 
                     lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
