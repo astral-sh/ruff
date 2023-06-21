@@ -40,5 +40,5 @@ pub(super) fn convert_inplace_argument_to_assignment(
         false,
     )
     .ok()?;
-    Some(Fix::manual_edits(insert_assignment, [remove_argument]))
+    Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
 }
