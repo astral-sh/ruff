@@ -1,12 +1,14 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-use crate::comments::CommentLinePosition;
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
+use crate::other::arguments::{
+    assign_argument_separator_comment_placement, find_argument_separators,
+};
 use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
 use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, ExprSlice, Ranged};
 use std::cmp::Ordering;
 
@@ -24,7 +26,7 @@ pub(super) fn place_comment<'a>(
         handle_trailing_end_of_line_body_comment,
         handle_trailing_end_of_line_condition_comment,
         handle_module_level_own_line_comment_before_class_or_function_comment,
-        handle_positional_only_arguments_separator_comment,
+        handle_arguments_separator_comment,
         handle_trailing_binary_expression_left_or_operator_comment,
         handle_leading_function_with_decorators_comment,
         handle_dict_unpacking_comment,
@@ -629,18 +631,11 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Attaches comments for the positional-only arguments separator `/` as trailing comments to the
-/// enclosing [`Arguments`] node.
+/// Attaches comments for the positional only arguments separator `/` or the keywords only arguments
+/// separator `*` as dangling comments to the enclosing [`Arguments`] node.
 ///
-/// ```python
-/// def test(
-///     a,
-///     # Positional arguments only after here
-///     /, # trailing positional argument comment.
-///     b,
-/// ): pass
-/// ```
-fn handle_positional_only_arguments_separator_comment<'a>(
+/// See [`assign_argument_separator_comment_placement`]
+fn handle_arguments_separator_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
@@ -648,45 +643,19 @@ fn handle_positional_only_arguments_separator_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    // Using the `/` without any leading arguments is a syntax error.
-    let Some(last_argument_or_default) = comment.preceding_node() else {
-        return CommentPlacement::Default(comment);
-    };
-
-    let is_last_positional_argument =
-        are_same_optional(last_argument_or_default, arguments.posonlyargs.last());
-
-    if !is_last_positional_argument {
-        return CommentPlacement::Default(comment);
+    let (slash, star) = find_argument_separators(locator.contents(), arguments);
+    let comment_range = comment.slice().range();
+    let placement = assign_argument_separator_comment_placement(
+        slash.as_ref(),
+        star.as_ref(),
+        comment_range,
+        comment.line_position(),
+    );
+    if placement.is_some() {
+        return CommentPlacement::dangling(comment.enclosing_node(), comment);
     }
 
-    let trivia_end = comment
-        .following_node()
-        .map_or(arguments.end(), |following| following.start());
-    let trivia_range = TextRange::new(last_argument_or_default.end(), trivia_end);
-
-    if let Some(slash_offset) = find_pos_only_slash_offset(trivia_range, locator) {
-        let comment_start = comment.slice().range().start();
-        let is_slash_comment = match comment.line_position() {
-            CommentLinePosition::EndOfLine => {
-                let preceding_end_line = locator.line_end(last_argument_or_default.end());
-                let slash_comments_start = preceding_end_line.min(slash_offset);
-
-                comment_start >= slash_comments_start
-                    && locator.line_end(slash_offset) > comment_start
-            }
-            CommentLinePosition::OwnLine => comment_start < slash_offset,
-        };
-
-        if is_slash_comment {
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
-        } else {
-            CommentPlacement::Default(comment)
-        }
-    } else {
-        // Should not happen, but let's go with it
-        CommentPlacement::Default(comment)
-    }
+    CommentPlacement::Default(comment)
 }
 
 /// Handles comments between the left side and the operator of a binary expression (trailing comments of the left),
@@ -935,35 +904,6 @@ fn handle_slice_comments<'a>(
     } else {
         CommentPlacement::dangling(expr_slice.as_any_node_ref(), comment)
     }
-}
-
-/// Finds the offset of the `/` that separates the positional only and arguments from the other arguments.
-/// Returns `None` if the positional only separator `/` isn't present in the specified range.
-fn find_pos_only_slash_offset(
-    between_arguments_range: TextRange,
-    locator: &Locator,
-) -> Option<TextSize> {
-    let mut tokens =
-        SimpleTokenizer::new(locator.contents(), between_arguments_range).skip_trivia();
-
-    if let Some(comma) = tokens.next() {
-        debug_assert_eq!(comma.kind(), TokenKind::Comma);
-
-        if let Some(maybe_slash) = tokens.next() {
-            if maybe_slash.kind() == TokenKind::Slash {
-                return Some(maybe_slash.start());
-            }
-
-            debug_assert_eq!(
-                maybe_slash.kind(),
-                TokenKind::RParen,
-                "{:?}",
-                maybe_slash.kind()
-            );
-        }
-    }
-
-    None
 }
 
 /// Handles own line comments between the last function decorator and the *header* of the function.

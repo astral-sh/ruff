@@ -97,3 +97,137 @@ def foo(
     b=3 + 2  # comment
 ):
     ...
+
+
+# Comments on the slash or the star, both of which don't have a node
+def f11(
+    a,
+    # positional only comment, leading
+    /, # positional only comment, trailing
+    b,
+):
+    pass
+
+def f12(
+    a=1,
+    # positional only comment, leading
+    /, # positional only comment, trailing
+    b=2,
+):
+    pass
+
+def f13(
+    a,
+    # positional only comment, leading
+    /, # positional only comment, trailing
+):
+    pass
+
+def f21(
+    a=1,
+    # keyword only comment, leading
+    *, # keyword only comment, trailing
+    b=2,
+):
+    pass
+
+def f22(
+    a,
+    # keyword only comment, leading
+    *, # keyword only comment, trailing
+    b,
+):
+    pass
+
+def f23(
+    a,
+    # keyword only comment, leading
+    *args, # keyword only comment, trailing
+    b,
+):
+    pass
+
+def f24(
+    # keyword only comment, leading
+    *, # keyword only comment, trailing
+    a
+):
+    pass
+
+
+def f31(
+    a=1,
+    # positional only comment, leading
+    /, # positional only comment, trailing
+    b=2,
+    # keyword only comment, leading
+    *, # keyword only comment, trailing
+    c=3,
+):
+    pass
+
+def f32(
+    a,
+    # positional only comment, leading
+    /, # positional only comment, trailing
+    b,
+    # keyword only comment, leading
+    *, # keyword only comment, trailing
+    c,
+):
+    pass
+
+def f33(
+    a,
+    # positional only comment, leading
+    /,  # positional only comment, trailing
+    # keyword only comment, leading
+    *args, # keyword only comment, trailing
+    c,
+):
+    pass
+
+
+def f34(
+    a,
+    # positional only comment, leading
+    /,  # positional only comment, trailing
+    # keyword only comment, leading
+    *, # keyword only comment, trailing
+    c,
+):
+    pass
+
+def f35(
+    # keyword only comment, leading
+    *, # keyword only comment, trailing
+    c,
+):
+    pass
+
+# Multiple trailing comments
+def f41(
+    a,
+    / # 1
+    , # 2
+    # 3
+    * # 4
+    , # 5
+    c,
+):
+    pass
+
+# Multiple trailing comments strangely places. The goal here is only stable formatting,
+# the comments are placed to strangely to keep their relative position intact
+def f42(
+    a,
+    / # 1
+    # 2
+    , # 3
+    # 4
+    * # 5
+    # 6
+    , # 7
+    c,
+):
+    pass
