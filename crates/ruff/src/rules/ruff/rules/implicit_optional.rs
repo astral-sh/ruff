@@ -340,7 +340,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         if let Expr::Constant(ast::ExprConstant {
             range,
             value: Constant::Str(value),
-            kind: _,
+            ..
         }) = annotation.as_ref()
         {
             // Quoted annotation.
