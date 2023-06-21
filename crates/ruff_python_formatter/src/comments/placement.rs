@@ -420,7 +420,7 @@ fn handle_trailing_body_comment<'a>(
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
     let comment_indentation_len = comment_indentation.len();
 
-    // Keep the comment on the if it's a trailing comment
+    // Keep the comment on the entire statement in case it's a trailing comment
     // ```python
     // if "first if":
     //     pass
@@ -428,6 +428,7 @@ fn handle_trailing_body_comment<'a>(
     //     pass
     // # Trailing if comment
     // ```
+    // Here we keep the comment a trailing comment of the `if`
     let Some(preceding_node_indentation) = whitespace::indentation_at_offset(locator, preceding_node.start()) else {
         return CommentPlacement::Default(comment);
     };
@@ -436,7 +437,7 @@ fn handle_trailing_body_comment<'a>(
     }
 
     let mut current_child = last_child;
-    let mut parent_body = comment.preceding_node();
+    let mut parent_body = Some(preceding_node);
     let mut grand_parent_body = None;
 
     loop {
