@@ -4,9 +4,10 @@ use anyhow::Result;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -65,14 +66,16 @@ pub struct ImplicitOptional {
     conversion_type: ConversionType,
 }
 
-impl AlwaysAutofixableViolation for ImplicitOptional {
+impl Violation for ImplicitOptional {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("PEP 484 prohibits implicit `Optional`")
     }
 
-    fn autofix_title(&self) -> String {
-        format!("Convert to `{}`", self.conversion_type)
+    fn autofix_title(&self) -> Option<String> {
+        Some(format!("Convert to `{}`", self.conversion_type))
     }
 }
 
@@ -229,7 +232,7 @@ impl<'a> TypingTarget<'a> {
                     _ => new_target.contains_none(semantic),
                 }
             }
-            // TODO(charlie): Add support for forward references (quoted annotations).
+            // TODO(charlie): Add support for nested forward references (e.g., `Union["A", "B"]`).
             TypingTarget::ForwardReference => true,
         }
     }
@@ -333,15 +336,42 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         let Some(annotation) = &def.annotation else {
             continue
         };
-        let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic()) else {
-            continue;
-        };
-        let conversion_type = checker.settings.target_version.into();
 
-        let mut diagnostic = Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+        if let Expr::Constant(ast::ExprConstant {
+            range,
+            value: Constant::Str(value),
+            kind: _,
+        }) = annotation.as_ref()
+        {
+            // Quoted annotation.
+            if let Ok((annotation, kind)) = parse_type_annotation(value, *range, checker.locator) {
+                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker.semantic()) else {
+                    continue;
+                };
+                let conversion_type = checker.settings.target_version.into();
+
+                let mut diagnostic =
+                    Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+                if checker.patch(diagnostic.kind.rule()) {
+                    if kind.is_simple() {
+                        diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        } else {
+            // Unquoted annotation.
+            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic()) else {
+                continue;
+            };
+            let conversion_type = checker.settings.target_version.into();
+
+            let mut diagnostic =
+                Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
+            if checker.patch(diagnostic.kind.rule()) {
+                diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+            }
+            checker.diagnostics.push(diagnostic);
         }
-        checker.diagnostics.push(diagnostic);
     }
 }
