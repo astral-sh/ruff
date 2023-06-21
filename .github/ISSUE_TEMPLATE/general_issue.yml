@@ -1,0 +1,11 @@
+name: 📝 General Issue
+description: Create an issue that doesn't fit in the other categories
+body:
+- type: textarea
+  id: description
+  attributes:
+    label: Description
+    description: >
+      Please describe the issue here.
+  validations:
+    required: true

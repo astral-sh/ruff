@@ -1,0 +1,57 @@
+name: 🐛 Bug Report
+description: Report a problem that you encountered when using ruff
+labels: [Bug]
+body:
+
+- type: markdown
+  attributes:
+    value: >
+      Thank you for submitting a bug report — we really appreciate it!
+
+- type: textarea
+  id: description
+  attributes:
+    label: Bug description
+    description: >
+      Please describe what you were doing and what went wrong.
+  validations:
+    required: true
+
+- type: textarea
+  id: expected-outcome
+  attributes:
+    label: Expected outcome
+    description: >
+      What did you expect to happen instead? (optional)
+  validations:
+    required: false
+
+- type: textarea
+  id: minimal-example
+  attributes:
+    label: Minimal complete verifiable example
+    description: >
+      Provide a minimal self-contained example to help us reproduce the
+      bug, along with any relevant output. This will be automatically
+      formatted into code, so no need for Markdown backticks. (optional,
+      but incredibly helpful!)
+    render: Python
+  validations:
+    required: false
+
+- type: textarea
+  id: package-versions
+  attributes:
+    label: Package versions
+    description: >
+      What version of `ruff` were you using (`ruff --version`) when the problem occurred? (optional)
+
+- type: textarea
+  id: context
+  attributes:
+    label: Additional context
+    description: >
+      Please provide any additional context that would help us
+      understand and fix the bug. (optional)
+  validations:
+    required: false
