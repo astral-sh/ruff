@@ -1,10 +1,9 @@
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-
 /// ## What it does
-/// De-duplicates, groups, and sorts top-level statements based on the order in
-/// which they are referenced.
+/// Groups and sorts top-level statements based on the order in which they are
+/// referenced.
 ///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for statement ordering to make
