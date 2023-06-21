@@ -126,7 +126,7 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -14,39 +13,46 @@
+@@ -14,39 +13,48 @@
      b
      c
      if True:
@@ -136,9 +136,10 @@ def __await__(): return (yield)
          ...
 -    for i in range(10):
 -        print(i)
--        continue
++    for i in NOT_IMPLEMENTED_call():
++        NOT_IMPLEMENTED_call()
+         continue
 -    exec("new-style exec", {}, {})
-+    NOT_YET_IMPLEMENTED_StmtFor
 +    NOT_IMPLEMENTED_call()
      return None
  
@@ -189,7 +190,7 @@ def __await__(): return (yield)
  
  
  def spaces_types(
-@@ -56,70 +62,26 @@
+@@ -56,70 +64,26 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -269,7 +270,7 @@ def __await__(): return (yield)
  
  
  def trailing_comma():
-@@ -135,14 +97,8 @@
+@@ -135,14 +99,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -309,7 +310,9 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    NOT_YET_IMPLEMENTED_StmtFor
+    for i in NOT_IMPLEMENTED_call():
+        NOT_IMPLEMENTED_call()
+        continue
     NOT_IMPLEMENTED_call()
     return None
 

@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,99 +1,56 @@
+@@ -1,61 +1,40 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -164,12 +164,10 @@ if True:
 +NOT_YET_IMPLEMENTED_StmtAssert
  
  # looping over a 1-tuple should also not get wrapped
--for x in (1,):
--    pass
--for (x,) in (1,), (2,), (3,):
--    pass
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
+ for x in (1,):
+@@ -63,37 +42,17 @@
+ for (x,) in (1,), (2,), (3,):
+     pass
  
 -[
 -    1,
@@ -257,8 +255,10 @@ y = {
 NOT_YET_IMPLEMENTED_StmtAssert
 
 # looping over a 1-tuple should also not get wrapped
-NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtFor
+for x in (1,):
+    pass
+for (x,) in (1,), (2,), (3,):
+    pass
 
 [1, 2, 3]
 

@@ -121,7 +121,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,78 +1,68 @@
+@@ -1,78 +1,72 @@
 -import random
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -159,18 +159,22 @@ with open("/path/to/file.txt", mode="r") as read_file:
  
 -for i in range(5):
 -    print(f"{i}) The line above me should be removed!")
-+NOT_YET_IMPLEMENTED_StmtFor
++for i in NOT_IMPLEMENTED_call():
++    NOT_IMPLEMENTED_call()
  
  
 -for i in range(5):
 -    print(f"{i}) The lines above me should be removed!")
-+NOT_YET_IMPLEMENTED_StmtFor
++for i in NOT_IMPLEMENTED_call():
++    NOT_IMPLEMENTED_call()
  
  
 -for i in range(5):
 -    for j in range(7):
 -        print(f"{i}) The lines above me should be removed!")
-+NOT_YET_IMPLEMENTED_StmtFor
++for i in NOT_IMPLEMENTED_call():
++    for j in NOT_IMPLEMENTED_call():
++        NOT_IMPLEMENTED_call()
  
  
 -if random.randint(0, 3) == 0:
@@ -254,13 +258,17 @@ def foo4():
 NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-NOT_YET_IMPLEMENTED_StmtFor
+for i in NOT_IMPLEMENTED_call():
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFor
+for i in NOT_IMPLEMENTED_call():
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFor
+for i in NOT_IMPLEMENTED_call():
+    for j in NOT_IMPLEMENTED_call():
+        NOT_IMPLEMENTED_call()
 
 
 if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:

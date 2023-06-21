@@ -86,7 +86,7 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -1,33 +1,20 @@
+@@ -1,6 +1,6 @@
  while True:
 -    if something.changed:
 -        do.stuff()  # trailing comment
@@ -95,38 +95,40 @@ if __name__ == "__main__":
          # Comment belongs to the `if` block.
      # This one belongs to the `while` block.
  
-     # Should this one, too?  I guess so.
+@@ -8,26 +8,20 @@
  
  # This one is properly standalone now.
--
--for i in range(100):
--    # first we do this
--    if i % 33 == 0:
--        break
  
--    # then we do this
+-for i in range(100):
++for i in NOT_IMPLEMENTED_call():
+     # first we do this
+-    if i % 33 == 0:
++    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+         break
+ 
+     # then we do this
 -    print(i)
--    # and finally we loop around
-+NOT_YET_IMPLEMENTED_StmtFor
++    NOT_IMPLEMENTED_call()
+     # and finally we loop around
  
 -with open(some_temp_file) as f:
 -    data = f.read()
--
++NOT_YET_IMPLEMENTED_StmtWith
+ 
 -try:
 -    with open(some_other_file) as w:
 -        w.write(data)
-+NOT_YET_IMPLEMENTED_StmtWith
++NOT_YET_IMPLEMENTED_StmtTry
  
 -except OSError:
 -    print("problems")
-+NOT_YET_IMPLEMENTED_StmtTry
- 
+-
 -import sys
 +NOT_YET_IMPLEMENTED_StmtImport
  
  
  # leading function comment
-@@ -42,7 +29,7 @@
+@@ -42,7 +36,7 @@
  # leading 1
  @deco1
  # leading 2
@@ -135,7 +137,7 @@ if __name__ == "__main__":
  # leading 3
  @deco3
  def decorated1():
-@@ -52,7 +39,7 @@
+@@ -52,7 +46,7 @@
  # leading 1
  @deco1
  # leading 2
@@ -144,7 +146,7 @@ if __name__ == "__main__":
  # leading function comment
  def decorated1():
      ...
-@@ -69,5 +56,5 @@
+@@ -69,5 +63,5 @@
      ...
  
  
@@ -167,7 +169,14 @@ while True:
 
 # This one is properly standalone now.
 
-NOT_YET_IMPLEMENTED_StmtFor
+for i in NOT_IMPLEMENTED_call():
+    # first we do this
+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+        break
+
+    # then we do this
+    NOT_IMPLEMENTED_call()
+    # and finally we loop around
 
 NOT_YET_IMPLEMENTED_StmtWith
 
