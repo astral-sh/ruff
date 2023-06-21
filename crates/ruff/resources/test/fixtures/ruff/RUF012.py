@@ -31,3 +31,15 @@ class C:
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
     class_variable: ClassVar[list[int]] = []
+
+
+from pydantic import BaseModel
+
+
+class D(BaseModel):
+    mutable_default: list[int] = []
+    immutable_annotation: Sequence[int] = []
+    without_annotation = []
+    correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+    perfectly_fine: list[int] = field(default_factory=list)
+    class_variable: ClassVar[list[int]] = []

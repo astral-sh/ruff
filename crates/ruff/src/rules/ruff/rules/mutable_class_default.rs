@@ -5,7 +5,9 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
+use crate::rules::ruff::rules::helpers::{
+    is_class_var_annotation, is_dataclass, is_pydantic_model,
+};
 
 /// ## What it does
 /// Checks for mutable default values in class attributes.
@@ -57,6 +59,11 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                     && !is_immutable_annotation(annotation, checker.semantic())
                     && !is_dataclass(class_def, checker.semantic())
                 {
+                    // Avoid Pydantic models, which end up copying defaults on instance creation.
+                    if is_pydantic_model(class_def, checker.semantic()) {
+                        return;
+                    }
+
                     checker
                         .diagnostics
                         .push(Diagnostic::new(MutableClassDefault, value.range()));
@@ -64,6 +71,11 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
             }
             Stmt::Assign(ast::StmtAssign { value, .. }) => {
                 if is_mutable_expr(value, checker.semantic()) {
+                    // Avoid Pydantic models, which end up copying defaults on instance creation.
+                    if is_pydantic_model(class_def, checker.semantic()) {
+                        return;
+                    }
+
                     checker
                         .diagnostics
                         .push(Diagnostic::new(MutableClassDefault, value.range()));

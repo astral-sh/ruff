@@ -28,3 +28,12 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
             })
     })
 }
+
+/// Returns `true` if the given class is a Pydantic `BaseModel`.
+pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    class_def.bases.iter().any(|expr| {
+        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["pydantic", "BaseModel"])
+        })
+    })
+}
