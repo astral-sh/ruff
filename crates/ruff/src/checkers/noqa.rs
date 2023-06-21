@@ -14,9 +14,9 @@ use regex::Regex;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::source_code::Locator;
 
-static NOQA_LINE_EXPLANATION_REGEX: Lazy<Regex> = Lazy::new(|| {
+static NOQA_EXPLANATION_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)(?P<explanation>(?i:#.*)?)",
+        r"(?P<noqa>(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)(?P<explanation>(?i:#.*)?)",
     )
         .unwrap()
 });
@@ -38,7 +38,11 @@ pub(crate) fn check_noqa(
     if settings.rules.enabled(Rule::UnexplainedNOQA) {
         for comment_range in comment_ranges {
             let text: &str = &locator.contents()[*comment_range];
-            if let Some(caps) = NOQA_LINE_EXPLANATION_REGEX.captures(text) {
+            let start = match text.trim_start().find("# noqa") {
+                Some(start) => start + 6,
+                None => continue,
+            };
+            if let Some(caps) = NOQA_EXPLANATION_REGEX.captures(&text[start..]) {
                 match (caps.name("noqa"), caps.name("explanation")) {
                     (Some(_noqa), Some(explanation)) if explanation.as_str().is_empty() => {
                         diagnostics.push(Diagnostic::new(
