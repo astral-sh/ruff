@@ -192,7 +192,8 @@ fn rules_by_prefix(
 
     for (code, rule) in rules {
         // Nursery rules have to be explicitly selected, so we ignore them when looking at
-        // prefixes.
+        // prefix-level selectors (e.g., `--select SIM10`), but add the rule itself under
+        // its fully-qualified code (e.g., `--select SIM101`).
         if is_nursery(&rule.group) {
             rules_by_prefix.insert(code.clone(), vec![(rule.path.clone(), rule.attrs.clone())]);
             continue;
@@ -329,10 +330,17 @@ fn generate_iter_impl(
 ) -> TokenStream {
     let mut linter_into_iter_match_arms = quote!();
     for (linter, map) in linter_to_rules {
-        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
-            let rule_name = path.segments.last().unwrap();
-            quote!(#(#attrs)* Rule::#rule_name)
-        });
+        let rule_paths = map
+            .values()
+            .filter(|rule| {
+                // Nursery rules have to be explicitly selected, so we ignore them when looking at
+                // linter-level selectors (e.g., `--select SIM`).
+                !is_nursery(&rule.group)
+            })
+            .map(|Rule { attrs, path, .. }| {
+                let rule_name = path.segments.last().unwrap();
+                quote!(#(#attrs)* Rule::#rule_name)
+            });
         linter_into_iter_match_arms.extend(quote! {
             Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
         });
