@@ -17,11 +17,13 @@ pub struct CollectionLiteralConcatenation {
 /// Checks for concatenation of collections using the `+` operator.
 ///
 /// ## Why is this bad?
-/// Use the unpacking operator (`*`) to unpack the elements of the collection
-/// into the new collection rather than concatenating them literally. This is
-/// more readable and efficient, as it avoids unnecessary collection calls. The
-/// `*` operator is also more flexible as it can unpack any iterable, whereas
-/// `+` operates only on particular sequences which must be of the same type.
+/// Use the unpacking operator (`*`) to unpack collections into new collections
+/// rather than concatenating them literally. This is more readable and
+/// efficient, as it avoids unnecessary collection calls.
+///
+/// The `*` operator is also more flexible as it can unpack any iterable,
+/// whereas `+` operates only on particular sequences which must be of the same
+/// type.
 ///
 /// ## Example
 /// ```python
