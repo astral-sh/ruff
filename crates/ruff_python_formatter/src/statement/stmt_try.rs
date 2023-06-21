@@ -31,6 +31,19 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
             body,
         } = except_handler_except_handler;
 
+        let comments_info = f.context().comments().clone();
+        let leading_comments =
+            comments_info.leading_comments(except_handler_except_handler.as_any_node_ref());
+        if let [first_leading_comment, ..] = &leading_comments[..] {
+            if lines_before(
+                first_leading_comment.slice().start(),
+                f.context().contents(),
+            ) > 1
+            {
+                write!(f, [empty_line()])?;
+            }
+        }
+
         leading_node_comments(except_handler_except_handler).fmt(f)?;
 
         write!(f, [text("except")])?;

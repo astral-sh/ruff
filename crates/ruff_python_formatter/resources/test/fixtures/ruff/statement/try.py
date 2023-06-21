@@ -49,3 +49,11 @@ else:
 # before finally
 finally:
     ...
+
+
+# with line breaks
+try:
+    ...
+
+except:
+    ...
