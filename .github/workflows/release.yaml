@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run skipping uploading artifact."
+        description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run (no uploads)."
         type: string
       sha:
         description: "Optionally, the full sha of the commit to be released"
@@ -392,28 +392,14 @@ jobs:
             *.tar.gz
             *.sha256
 
-  release:
-    name: Release
+  validate-tag:
+    name: Validate tag
     runs-on: ubuntu-latest
-    needs:
-      - macos-universal
-      - macos-x86_64
-      - windows
-      - linux
-      - linux-cross
-      - musllinux
-      - musllinux-cross
-    # If you don't set an input it's a dry run skipping uploading artifact
+    # If you don't set an input tag, it's a dry run (no uploads).
     if: ${{ inputs.tag }}
-    environment:
-      name: release
-    permissions:
-      # For pypi trusted publishing
-      id-token: write
-      # For GitHub release publishing
-      contents: write
     steps:
-      - name: Consistency check tag
+      - uses: actions/checkout@v3
+      - name: Check tag consistency
         run: |
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
           if [ "${{ inputs.tag }}" != "${version}" ]; then
@@ -424,7 +410,7 @@ jobs:
           else
             echo "Releasing ${version}"
           fi
-      - name: Consistency check sha
+      - name: Check SHA consistency
         if: ${{ inputs.sha }}
         run: |
           git_sha=$(git rev-parse HEAD)
@@ -436,6 +422,29 @@ jobs:
           else
             echo "Releasing ${git_sha}"
           fi
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs:
+      - macos-universal
+      - macos-x86_64
+      - windows
+      - linux
+      - linux-cross
+      - musllinux
+      - musllinux-cross
+      - validate-tag
+    # If you don't set an input tag, it's a dry run (no uploads).
+    if: ${{ inputs.tag }}
+    environment:
+      name: release
+    permissions:
+      # For pypi trusted publishing
+      id-token: write
+      # For GitHub release publishing
+      contents: write
+    steps:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
