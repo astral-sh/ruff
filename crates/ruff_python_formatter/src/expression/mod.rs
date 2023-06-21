@@ -1,5 +1,6 @@
 use crate::comments::Comments;
 use crate::context::NodeLevel;
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, Parentheses, Parenthesize};
 use crate::prelude::*;
 use ruff_formatter::{
@@ -85,7 +86,10 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Starred(expr) => expr.format().fmt(f),
             Expr::Name(expr) => expr.format().fmt(f),
             Expr::List(expr) => expr.format().fmt(f),
-            Expr::Tuple(expr) => expr.format().fmt(f),
+            Expr::Tuple(expr) => expr
+                .format()
+                .with_options(TupleParentheses::Expr(parentheses))
+                .fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
         });
 
