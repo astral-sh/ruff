@@ -34,7 +34,7 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
         let comments_info = f.context().comments().clone();
         let leading_comments =
             comments_info.leading_comments(except_handler_except_handler.as_any_node_ref());
-        if let [first_leading_comment, ..] = &leading_comments[..] {
+        if let [first_leading_comment, ..] = leading_comments {
             if lines_before(
                 first_leading_comment.slice().start(),
                 f.context().contents(),
@@ -116,8 +116,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             if lines_before(
                 handler_comments
                     .first()
-                    .map(|c| c.slice().start())
-                    .unwrap_or(handler.range().start()),
+                    .map_or(handler.range().start(), |c| c.slice().start()),
                 f.context().contents(),
             ) > 1
             {
