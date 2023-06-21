@@ -76,13 +76,13 @@ return np.divide(
 ```diff
 --- Black
 +++ Ruff
-@@ -11,53 +11,46 @@
-     {**a, **b, **c}
+@@ -12,52 +12,45 @@
  
  
--a = 5**~4
+ a = 5**~4
 -b = 5 ** f()
--c = -(5**2)
++b = 5 ** NOT_IMPLEMENTED_call()
+ c = -(5**2)
 -d = 5 ** f["hi"]
 -e = lazy(lambda **kwargs: 5)
 -f = f() ** 5
@@ -92,9 +92,6 @@ return np.divide(
 -j = super().name ** 5
 -k = [(2**idx, value) for idx, value in pairs]
 -l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
-+a = 5**NOT_YET_IMPLEMENTED_ExprUnaryOp
-+b = 5 ** NOT_IMPLEMENTED_call()
-+c = NOT_YET_IMPLEMENTED_ExprUnaryOp
 +d = 5 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +e = NOT_IMPLEMENTED_call()
 +f = NOT_IMPLEMENTED_call() ** 5
@@ -115,9 +112,10 @@ return np.divide(
 +q = [i for i in []]
  r = x**y
  
--a = 5.0**~4.0
+ a = 5.0**~4.0
 -b = 5.0 ** f()
--c = -(5.0**2.0)
++b = 5.0 ** NOT_IMPLEMENTED_call()
+ c = -(5.0**2.0)
 -d = 5.0 ** f["hi"]
 -e = lazy(lambda **kwargs: 5)
 -f = f() ** 5.0
@@ -127,9 +125,6 @@ return np.divide(
 -j = super().name ** 5.0
 -k = [(2.0**idx, value) for idx, value in pairs]
 -l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
-+a = 5.0**NOT_YET_IMPLEMENTED_ExprUnaryOp
-+b = 5.0 ** NOT_IMPLEMENTED_call()
-+c = NOT_YET_IMPLEMENTED_ExprUnaryOp
 +d = 5.0 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +e = NOT_IMPLEMENTED_call()
 +f = NOT_IMPLEMENTED_call() ** 5.0
@@ -183,9 +178,9 @@ def function_dont_replace_spaces():
     {**a, **b, **c}
 
 
-a = 5**NOT_YET_IMPLEMENTED_ExprUnaryOp
+a = 5**~4
 b = 5 ** NOT_IMPLEMENTED_call()
-c = NOT_YET_IMPLEMENTED_ExprUnaryOp
+c = -(5**2)
 d = 5 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 e = NOT_IMPLEMENTED_call()
 f = NOT_IMPLEMENTED_call() ** 5
@@ -202,9 +197,9 @@ p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_
 q = [i for i in []]
 r = x**y
 
-a = 5.0**NOT_YET_IMPLEMENTED_ExprUnaryOp
+a = 5.0**~4.0
 b = 5.0 ** NOT_IMPLEMENTED_call()
-c = NOT_YET_IMPLEMENTED_ExprUnaryOp
+c = -(5.0**2.0)
 d = 5.0 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 e = NOT_IMPLEMENTED_call()
 f = NOT_IMPLEMENTED_call() ** 5.0

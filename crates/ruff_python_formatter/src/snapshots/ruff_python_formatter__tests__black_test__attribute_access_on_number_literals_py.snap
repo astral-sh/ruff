@@ -67,7 +67,7 @@ y = 100(no)
 +x = NOT_IMPLEMENTED_call()
 +x = 0O777 .NOT_IMPLEMENTED_attr
 +x = NOT_IMPLEMENTED_call()
-+x = NOT_YET_IMPLEMENTED_ExprUnaryOp
++x = -100.0000J
  
 -if (10).real:
 +if 10 .NOT_IMPLEMENTED_attr:
@@ -97,7 +97,7 @@ x = NOT_IMPLEMENTED_call()
 x = NOT_IMPLEMENTED_call()
 x = 0O777 .NOT_IMPLEMENTED_attr
 x = NOT_IMPLEMENTED_call()
-x = NOT_YET_IMPLEMENTED_ExprUnaryOp
+x = -100.0000J
 
 if 10 .NOT_IMPLEMENTED_attr:
     ...

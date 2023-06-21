@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -171,12 +172,26 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         cli.stdin_filename.as_deref(),
     )?;
 
+    let mut writer: Box<dyn Write> = match cli.output_file {
+        Some(path) if !cli.watch => {
+            colored::control::set_override(false);
+            let file = File::create(path)?;
+            Box::new(BufWriter::new(file))
+        }
+        _ => Box::new(BufWriter::new(io::stdout())),
+    };
+
     if cli.show_settings {
-        commands::show_settings::show_settings(&cli.files, &pyproject_config, &overrides)?;
+        commands::show_settings::show_settings(
+            &cli.files,
+            &pyproject_config,
+            &overrides,
+            &mut writer,
+        )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides)?;
+        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -276,7 +291,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             noqa.into(),
             autofix,
         )?;
-        printer.write_continuously(&messages)?;
+        printer.write_continuously(&mut writer, &messages)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -308,7 +323,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                         noqa.into(),
                         autofix,
                     )?;
-                    printer.write_continuously(&messages)?;
+                    printer.write_continuously(&mut writer, &messages)?;
                 }
                 Err(err) => return Err(err.into()),
             }
@@ -341,10 +356,9 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
             if cli.statistics {
-                printer.write_statistics(&diagnostics)?;
+                printer.write_statistics(&diagnostics, &mut writer)?;
             } else {
-                let mut stdout = BufWriter::new(io::stdout().lock());
-                printer.write_once(&diagnostics, &mut stdout)?;
+                printer.write_once(&diagnostics, &mut writer)?;
             }
         }
 

@@ -6,6 +6,32 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of multi-character strings in `.strip()`, `.lstrip()`, and
+/// `.rstrip()` calls.
+///
+/// ## Why is this bad?
+/// All characters in the call to `.strip()`, `.lstrip()`, or `.rstrip()` are
+/// removed from the leading and trailing ends of the string. If the string
+/// contains multiple characters, the reader may be misled into thinking that
+/// a prefix or suffix is being removed, rather than a set of characters.
+///
+/// In Python 3.9 and later, you can use `str#removeprefix` and
+/// `str#removesuffix` to remove an exact prefix or suffix from a string,
+/// respectively, which should be preferred when possible.
+///
+/// ## Example
+/// ```python
+/// "abcba".strip("ab")  # "c"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "abcba".removeprefix("ab").removesuffix("ba")  # "c"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
 #[violation]
 pub struct StripWithMultiCharacters;
 

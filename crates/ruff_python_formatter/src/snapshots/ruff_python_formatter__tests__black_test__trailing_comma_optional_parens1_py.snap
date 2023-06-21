@@ -43,7 +43,7 @@ class A:
 -    _winapi.ERROR_SEM_TIMEOUT,
 -    _winapi.ERROR_PIPE_BUSY,
 -) or _check_timeout(t):
-+if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right or NOT_IMPLEMENTED_call():
      pass
  
  if x:
@@ -82,7 +82,7 @@ class A:
 ## Ruff Output
 
 ```py
-if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right or NOT_IMPLEMENTED_call():
     pass
 
 if x:

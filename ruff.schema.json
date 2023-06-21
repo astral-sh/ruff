@@ -32,17 +32,6 @@
         "null"
       ]
     },
-    "copyright": {
-      "description": "Options for the `copyright` plugin.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/CopyrightOptions"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "dummy-variable-rgx": {
       "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
       "type": [
@@ -203,6 +192,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ComprehensionsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-copyright": {
+      "description": "Options for the `copyright` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8CopyrightOptions"
         },
         {
           "type": "null"
@@ -631,35 +631,6 @@
         }
       ]
     },
-    "CopyrightOptions": {
-      "type": "object",
-      "properties": {
-        "author": {
-          "description": "Author to enforce within the copyright notice. If provided, the author must be present immediately following the copyright notice.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "min-file-size": {
-          "description": "A minimum file size (in bytes) required for a copyright notice to be enforced. By default, all files are validated.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint",
-          "minimum": 0.0
-        },
-        "notice-rgx": {
-          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+(\\(C\\)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
     "Flake8AnnotationsOptions": {
       "type": "object",
       "properties": {
@@ -773,6 +744,35 @@
           "description": "Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).",
           "type": [
             "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8CopyrightOptions": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Author to enforce within the copyright notice. If provided, the author must be present immediately following the copyright notice.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "min-file-size": {
+          "description": "A minimum file size (in bytes) required for a copyright notice to be enforced. By default, all files are validated.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "notice-rgx": {
+          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+(\\(C\\)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
+          "type": [
+            "string",
             "null"
           ]
         }

@@ -5,6 +5,26 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `raise` statements that raise a literal value.
+///
+/// ## Why is this bad?
+/// `raise` must be followed by an exception instance or an exception class,
+/// and exceptions must be instances of `BaseException` or a subclass thereof.
+/// Raising a literal will raise a `TypeError` at runtime.
+///
+/// ## Example
+/// ```python
+/// raise "foo"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// raise Exception("foo")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[violation]
 pub struct RaiseLiteral;
 

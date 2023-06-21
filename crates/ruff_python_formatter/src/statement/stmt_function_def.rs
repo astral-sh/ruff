@@ -37,9 +37,9 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
     ) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
-        let dangling_comments = comments.dangling_comments(item.into());
+        let dangling_comments = comments.dangling_comments(item);
         let trailing_definition_comments_start =
-            dangling_comments.partition_point(|comment| comment.position().is_own_line());
+            dangling_comments.partition_point(|comment| comment.line_position().is_own_line());
 
         let (leading_function_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);

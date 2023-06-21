@@ -32,5 +32,7 @@ def find_ruff_bin() -> Path:
 
 if __name__ == "__main__":
     ruff = find_ruff_bin()
-    completed_process = subprocess.run([ruff, *sys.argv[1:]])
+    # Passing a path-like to `subprocess.run()` on windows is only supported in 3.8+,
+    # but we also support 3.7
+    completed_process = subprocess.run([os.fsdecode(ruff), *sys.argv[1:]])
     sys.exit(completed_process.returncode)

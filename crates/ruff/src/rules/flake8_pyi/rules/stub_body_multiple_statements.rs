@@ -32,6 +32,6 @@ pub(crate) fn stub_body_multiple_statements(checker: &mut Checker, stmt: &Stmt, 
 
     checker.diagnostics.push(Diagnostic::new(
         StubBodyMultipleStatements,
-        stmt.identifier(checker.locator),
+        stmt.identifier(),
     ));
 }

@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Int, Ranged, Stmt};
+use rustpython_parser::ast::{self, Identifier, Int, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -94,7 +94,10 @@ fn fix_banned_relative_import(
         panic!("Expected Stmt::ImportFrom");
     };
     let node = ast::StmtImportFrom {
-        module: Some(module_path.to_string().into()),
+        module: Some(Identifier::new(
+            module_path.to_string(),
+            TextRange::default(),
+        )),
         names: names.clone(),
         level: Some(Int::new(0)),
         range: TextRange::default(),

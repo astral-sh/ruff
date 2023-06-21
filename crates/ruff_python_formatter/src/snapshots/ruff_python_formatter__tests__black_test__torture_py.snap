@@ -42,7 +42,7 @@ assert (
 ```diff
 --- Black
 +++ Ruff
-@@ -2,57 +2,21 @@
+@@ -2,57 +2,24 @@
  (
      ()
      << 0
@@ -96,8 +96,10 @@ assert (
 -        othr.parameters,
 -        othr.meta_data,
 -        othr.schedule,
--    )
-+    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++    return (
++        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+     )
  
  
 -assert a_function(
@@ -128,7 +130,10 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 def test(self, othr):
-    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+    return (
+        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    )
 
 
 NOT_YET_IMPLEMENTED_StmtAssert

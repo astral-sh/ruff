@@ -34,14 +34,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             let mut last_node: Option<AnyNodeRef> = None;
 
             for arg_with_default in posonlyargs {
-                joiner.entry(&arg_with_default.into_format());
+                joiner.entry(&arg_with_default.format());
 
-                last_node = Some(
-                    arg_with_default
-                        .default
-                        .as_deref()
-                        .map_or_else(|| (&arg_with_default.def).into(), AnyNodeRef::from),
-                );
+                last_node = Some(arg_with_default.into());
             }
 
             if !posonlyargs.is_empty() {
@@ -49,14 +44,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             }
 
             for arg_with_default in args {
-                joiner.entry(&arg_with_default.into_format());
+                joiner.entry(&arg_with_default.format());
 
-                last_node = Some(
-                    arg_with_default
-                        .default
-                        .as_deref()
-                        .map_or_else(|| (&arg_with_default.def).into(), AnyNodeRef::from),
-                );
+                last_node = Some(arg_with_default.into());
             }
 
             // kw only args need either a `*args` ahead of them capturing all var args or a `*`
@@ -74,14 +64,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             }
 
             for arg_with_default in kwonlyargs {
-                joiner.entry(&arg_with_default.into_format());
+                joiner.entry(&arg_with_default.format());
 
-                last_node = Some(
-                    arg_with_default
-                        .default
-                        .as_deref()
-                        .map_or_else(|| (&arg_with_default.def).into(), AnyNodeRef::from),
-                );
+                last_node = Some(arg_with_default.into());
             }
 
             if let Some(kwarg) = kwarg {

@@ -16,7 +16,7 @@ custom.py:4:8: ICN001 `dask.array` should be imported as `da`
   |
 3 | import altair  # unconventional
 4 | import dask.array  # unconventional
-  |        ^^^^ ICN001
+  |        ^^^^^^^^^^ ICN001
 5 | import dask.dataframe  # unconventional
 6 | import matplotlib.pyplot  # unconventional
   |
@@ -27,7 +27,7 @@ custom.py:5:8: ICN001 `dask.dataframe` should be imported as `dd`
 3 | import altair  # unconventional
 4 | import dask.array  # unconventional
 5 | import dask.dataframe  # unconventional
-  |        ^^^^ ICN001
+  |        ^^^^^^^^^^^^^^ ICN001
 6 | import matplotlib.pyplot  # unconventional
 7 | import numpy  # unconventional
   |
@@ -38,7 +38,7 @@ custom.py:6:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
 4 | import dask.array  # unconventional
 5 | import dask.dataframe  # unconventional
 6 | import matplotlib.pyplot  # unconventional
-  |        ^^^^^^^^^^ ICN001
+  |        ^^^^^^^^^^^^^^^^^ ICN001
 7 | import numpy  # unconventional
 8 | import pandas  # unconventional
   |
@@ -115,7 +115,7 @@ custom.py:13:8: ICN001 `plotly.express` should be imported as `px`
 11 | import holoviews  # unconventional
 12 | import panel  # unconventional
 13 | import plotly.express  # unconventional
-   |        ^^^^^^ ICN001
+   |        ^^^^^^^^^^^^^^ ICN001
 14 | import matplotlib  # unconventional
 15 | import polars  # unconventional
    |

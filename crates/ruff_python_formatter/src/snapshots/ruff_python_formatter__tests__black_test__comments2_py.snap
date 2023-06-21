@@ -227,7 +227,7 @@ instruction()#comment with bad spacing
  ]
  
  not_shareables = [
-@@ -37,50 +33,51 @@
+@@ -37,49 +33,57 @@
      # builtin types and objects
      type,
      object,
@@ -267,13 +267,13 @@ instruction()#comment with bad spacing
 -            children[0],
 +        parameters.NOT_IMPLEMENTED_attr = [
 +            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (1
-+            body,
+             body,
+-            children[-1],  # type: ignore
 +            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )1
 +        ]
 +        parameters.NOT_IMPLEMENTED_attr = [
 +            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
-             body,
--            children[-1],  # type: ignore
++            body,
 +            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: ignore
          ]
      else:
@@ -286,24 +286,25 @@ instruction()#comment with bad spacing
 +            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )2
          ]
 -        parameters.children = [parameters.what_if_this_was_actually_long.children[0], body, parameters.children[-1]]  # type: ignore
--    if (
--        self._proc is not None
--        # has the child process finished?
--        and self._returncode is None
--        # the child process has finished, but the
--        # transport hasn't been notified yet?
--        and self._proc.poll() is None
--    ):
 +        parameters.NOT_IMPLEMENTED_attr = [
 +            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
 +            body,
 +            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
 +        ]  # type: ignore
-+    if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+     if (
+-        self._proc is not None
++        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+         # has the child process finished?
+-        and self._returncode is None
++        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+         # the child process has finished, but the
+         # transport hasn't been notified yet?
+-        and self._proc.poll() is None
++        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+     ):
          pass
      # no newline before or after
-     short = [
-@@ -91,48 +88,14 @@
+@@ -91,48 +95,14 @@
      ]
  
      # no newline after
@@ -357,7 +358,7 @@ instruction()#comment with bad spacing
      while True:
          if False:
              continue
-@@ -141,25 +104,13 @@
+@@ -141,25 +111,13 @@
          # and round and round we go
  
      # let's return
@@ -386,7 +387,7 @@ instruction()#comment with bad spacing
  
  
  #######################
-@@ -167,7 +118,7 @@
+@@ -167,7 +125,7 @@
  #######################
  
  
@@ -479,7 +480,14 @@ def inline_comments_in_brackets_ruin_everything():
             body,
             NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
         ]  # type: ignore
-    if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    if (
+        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        # has the child process finished?
+        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        # the child process has finished, but the
+        # transport hasn't been notified yet?
+        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    ):
         pass
     # no newline before or after
     short = [

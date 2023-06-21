@@ -68,9 +68,8 @@ pub(crate) fn property_with_parameters(
         > 1
         && checker.semantic().is_builtin("property")
     {
-        checker.diagnostics.push(Diagnostic::new(
-            PropertyWithParameters,
-            stmt.identifier(checker.locator),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));
     }
 }

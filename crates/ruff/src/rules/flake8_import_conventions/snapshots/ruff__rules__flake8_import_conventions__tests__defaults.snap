@@ -16,7 +16,7 @@ defaults.py:4:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
   |
 3 | import altair  # unconventional
 4 | import matplotlib.pyplot  # unconventional
-  |        ^^^^^^^^^^ ICN001
+  |        ^^^^^^^^^^^^^^^^^ ICN001
 5 | import numpy  # unconventional
 6 | import pandas  # unconventional
   |

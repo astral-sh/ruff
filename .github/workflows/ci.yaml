@@ -76,6 +76,9 @@ jobs:
           cargo insta test --all --all-features
           git diff --exit-code
       - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
+        # Skipped as it's currently broken. The resource were moved from the
+        # ruff_cli to ruff crate, but this test was not updated.
+        if: false
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -217,11 +220,10 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
-          manylinux: auto
           args: --out dist
       - name: "Test wheel"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          pip install --force-reinstall --find-links dist ${{ env.PACKAGE_NAME }}
           ruff --help
           python -m ruff --help
       - name: "Remove wheels from cache"

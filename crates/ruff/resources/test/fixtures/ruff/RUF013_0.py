@@ -185,3 +185,18 @@ def f(arg: Union[Annotated[int, ...], Annotated[Optional[float], ...]] = None):
 
 def f(arg: Union[Annotated[int, ...], Union[str, bytes]] = None):  # RUF011
     pass
+
+
+# Quoted
+
+
+def f(arg: "int" = None):
+    pass
+
+
+def f(arg: "str" = None):
+    pass
+
+
+def f(arg: "Optional[int]" = None):
+    pass

@@ -8,8 +8,8 @@ use ruff_macros::ConfigurationOptions;
 use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
-    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint,
@@ -499,7 +499,7 @@ pub struct Options {
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     #[option_group]
     /// Options for the `copyright` plugin.
-    pub copyright: Option<copyright::settings::Options>,
+    pub flake8_copyright: Option<flake8_copyright::settings::Options>,
     #[option_group]
     /// Options for the `flake8-errmsg` plugin.
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,

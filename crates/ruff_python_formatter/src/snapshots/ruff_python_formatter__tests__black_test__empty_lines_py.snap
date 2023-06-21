@@ -105,7 +105,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,89 +1,70 @@
+@@ -1,89 +1,79 @@
 -"""Docstring."""
 +"NOT_YET_IMPLEMENTED_STRING"
  
@@ -137,13 +137,12 @@ def g():
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
 -    prev = leaf.prev_sibling
--    if not prev:
++    prev = leaf.NOT_IMPLEMENTED_attr
+     if not prev:
 -        prevp = preceding_leaf(p)
 -        if not prevp or prevp.type in OPENING_BRACKETS:
-+    prev = leaf.NOT_IMPLEMENTED_attr
-+    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
 +        prevp = NOT_IMPLEMENTED_call()
-+        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
              return NO
  
 -        if prevp.type == token.EQUAL:
@@ -155,7 +154,10 @@ def g():
 -                syms.argument,
 -            }:
 +        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++            if (
++                prevp.NOT_IMPLEMENTED_attr
++                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++            ):
                  return NO
  
 -        elif prevp.type == token.DOUBLESTAR:
@@ -167,7 +169,10 @@ def g():
 -                syms.dictsetmaker,
 -            }:
 +        elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++            if (
++                prevp.NOT_IMPLEMENTED_attr
++                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++            ):
                  return NO
  
  
@@ -205,14 +210,13 @@ def g():
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
 -    prev = leaf.prev_sibling
--    if not prev:
--        prevp = preceding_leaf(p)
 +    prev = leaf.NOT_IMPLEMENTED_attr
-+    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+     if not prev:
+-        prevp = preceding_leaf(p)
 +        prevp = NOT_IMPLEMENTED_call()
  
 -        if not prevp or prevp.type in OPENING_BRACKETS:
-+        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
              # Start of the line or a bracketed expression.
              # More than one line for the comment.
              return NO
@@ -226,7 +230,10 @@ def g():
 -                syms.argument,
 -            }:
 +        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++            if (
++                prevp.NOT_IMPLEMENTED_attr
++                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++            ):
                  return NO
 ```
 
@@ -254,17 +261,23 @@ def f():
     NOT_YET_IMPLEMENTED_StmtAssert
 
     prev = leaf.NOT_IMPLEMENTED_attr
-    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+    if not prev:
         prevp = NOT_IMPLEMENTED_call()
-        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
             return NO
 
         if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+            if (
+                prevp.NOT_IMPLEMENTED_attr
+                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+            ):
                 return NO
 
         elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+            if (
+                prevp.NOT_IMPLEMENTED_attr
+                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+            ):
                 return NO
 
 
@@ -292,16 +305,19 @@ def g():
     NOT_YET_IMPLEMENTED_StmtAssert
 
     prev = leaf.NOT_IMPLEMENTED_attr
-    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+    if not prev:
         prevp = NOT_IMPLEMENTED_call()
 
-        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
             # Start of the line or a bracketed expression.
             # More than one line for the comment.
             return NO
 
         if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-            if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+            if (
+                prevp.NOT_IMPLEMENTED_attr
+                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+            ):
                 return NO
 ```
 

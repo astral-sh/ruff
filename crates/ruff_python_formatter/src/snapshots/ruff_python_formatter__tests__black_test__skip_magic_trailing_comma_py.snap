@@ -97,7 +97,7 @@ func(
 +    b,
 +    c,
 +    d,
-+) = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++) = NOT_IMPLEMENTED_call() and NOT_IMPLEMENTED_call()
  
 -func(argument1, (one, two), argument4, argument5, argument6)
 +NOT_IMPLEMENTED_call()
@@ -133,7 +133,7 @@ NOT_IMPLEMENTED_call()
     b,
     c,
     d,
-) = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+) = NOT_IMPLEMENTED_call() and NOT_IMPLEMENTED_call()
 
 NOT_IMPLEMENTED_call()
 ```

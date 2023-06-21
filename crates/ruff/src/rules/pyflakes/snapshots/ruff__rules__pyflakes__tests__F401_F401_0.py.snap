@@ -44,7 +44,7 @@ F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
 10 | import multiprocessing.process
 11 | import logging.config
 12 | import logging.handlers
-   |        ^^^^^^^ F401
+   |        ^^^^^^^^^^^^^^^^ F401
 13 | from typing import (
 14 |     TYPE_CHECKING,
    |

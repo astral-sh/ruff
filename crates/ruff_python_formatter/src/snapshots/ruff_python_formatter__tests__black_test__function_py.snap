@@ -179,7 +179,7 @@ def __await__(): return (yield)
 +    c=[],
 +    d={},
 +    e=True,
-+    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
++    f=-1,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 +    h="NOT_YET_IMPLEMENTED_STRING",
 +    i="NOT_YET_IMPLEMENTED_STRING",
@@ -189,15 +189,13 @@ def __await__(): return (yield)
  
  
  def spaces_types(
-@@ -55,71 +61,27 @@
-     c: list = [],
+@@ -56,70 +62,26 @@
      d: dict = {},
      e: bool = True,
--    f: int = -1,
+     f: int = -1,
 -    g: int = 1 if False else 2,
 -    h: str = "",
 -    i: str = r"",
-+    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
 +    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 +    h: str = "NOT_YET_IMPLEMENTED_STRING",
 +    i: str = "NOT_YET_IMPLEMENTED_STRING",
@@ -341,7 +339,7 @@ def spaces(
     c=[],
     d={},
     e=True,
-    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    f=-1,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
     h="NOT_YET_IMPLEMENTED_STRING",
     i="NOT_YET_IMPLEMENTED_STRING",
@@ -356,7 +354,7 @@ def spaces_types(
     c: list = [],
     d: dict = {},
     e: bool = True,
-    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    f: int = -1,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
     h: str = "NOT_YET_IMPLEMENTED_STRING",
     i: str = "NOT_YET_IMPLEMENTED_STRING",

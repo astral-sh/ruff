@@ -77,7 +77,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
         if !has_slots(&class.body) {
             checker.diagnostics.push(Diagnostic::new(
                 NoSlotsInNamedtupleSubclass,
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
     }

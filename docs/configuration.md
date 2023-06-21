@@ -212,6 +212,8 @@ Options:
           Ignore any `# noqa` comments
       --format <FORMAT>
           Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure]
+  -o, --output-file <OUTPUT_FILE>
+          Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311]
       --config <CONFIG>

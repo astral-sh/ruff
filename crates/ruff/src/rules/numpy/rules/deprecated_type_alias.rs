@@ -12,7 +12,7 @@ use crate::registry::AsRule;
 /// ## Why is this bad?
 /// NumPy's `np.int` has long been an alias of the builtin `int`. The same
 /// goes for `np.float`, `np.bool`, and others. These aliases exist
-/// primarily primarily for historic reasons, and have been a cause of
+/// primarily for historic reasons, and have been a cause of
 /// frequent confusion for newcomers.
 ///
 /// These aliases were been deprecated in 1.20, and removed in 1.24.

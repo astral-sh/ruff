@@ -53,7 +53,7 @@ pub(crate) fn unnecessary_class_parentheses(
         return;
     }
 
-    let offset = stmt.identifier(checker.locator).start();
+    let offset = stmt.identifier().start();
     let contents = checker.locator.after(offset);
 
     // Find the open and closing parentheses between the class name and the colon, if they exist.

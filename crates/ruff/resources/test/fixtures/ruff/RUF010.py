@@ -34,12 +34,3 @@ f"{ascii(bla)}"  # OK
     " intermediary content "
     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
 )
-
-
-f"{str(bla)}"  # RUF010
-
-f"{str(bla):20}"  # RUF010
-
-f"{bla!s}"  # RUF010
-
-f"{bla!s:20}"  # OK

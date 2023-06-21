@@ -73,7 +73,7 @@ pub(crate) fn useless_object_inheritance(
             diagnostic.try_set_fix(|| {
                 let edit = remove_argument(
                     checker.locator,
-                    stmt.identifier(checker.locator).start(),
+                    stmt.identifier().start(),
                     expr.range(),
                     &class_def.bases,
                     &class_def.keywords,

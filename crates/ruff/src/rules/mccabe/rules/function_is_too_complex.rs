@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for functions with a high `McCabe` complexity.
@@ -142,7 +141,6 @@ pub(crate) fn function_is_too_complex(
     name: &str,
     body: &[Stmt],
     max_complexity: usize,
-    locator: &Locator,
 ) -> Option<Diagnostic> {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
@@ -152,7 +150,7 @@ pub(crate) fn function_is_too_complex(
                 complexity,
                 max_complexity,
             },
-            stmt.identifier(locator),
+            stmt.identifier(),
         ))
     } else {
         None

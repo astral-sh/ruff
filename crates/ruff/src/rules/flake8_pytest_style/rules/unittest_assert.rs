@@ -3,7 +3,9 @@ use std::hash::BuildHasherDefault;
 use anyhow::{anyhow, bail, Result};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Keyword, Stmt, UnaryOp};
+use rustpython_parser::ast::{
+    self, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -388,7 +390,7 @@ impl UnittestAssert {
                 };
                 let node1 = ast::ExprAttribute {
                     value: Box::new(node.into()),
-                    attr: "search".into(),
+                    attr: Identifier::new("search".to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };

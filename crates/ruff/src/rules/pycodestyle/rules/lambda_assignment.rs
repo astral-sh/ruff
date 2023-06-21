@@ -1,5 +1,7 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arg, ArgWithDefault, Arguments, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -201,7 +203,7 @@ fn function(
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-                name: name.into(),
+                name: Identifier::new(name.to_string(), TextRange::default()),
                 args: Box::new(Arguments {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
@@ -217,7 +219,7 @@ fn function(
         }
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-        name: name.into(),
+        name: Identifier::new(name.to_string(), TextRange::default()),
         args: Box::new(args.clone()),
         body: vec![body],
         decorator_list: vec![],

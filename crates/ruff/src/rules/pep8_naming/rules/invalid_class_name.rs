@@ -3,7 +3,6 @@ use rustpython_parser::ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::Locator;
 
 use crate::settings::types::IdentifierPattern;
 
@@ -54,7 +53,6 @@ pub(crate) fn invalid_class_name(
     class_def: &Stmt,
     name: &str,
     ignore_names: &[IdentifierPattern],
-    locator: &Locator,
 ) -> Option<Diagnostic> {
     if ignore_names
         .iter()
@@ -69,7 +67,7 @@ pub(crate) fn invalid_class_name(
             InvalidClassName {
                 name: name.to_string(),
             },
-            class_def.identifier(locator),
+            class_def.identifier(),
         ));
     }
     None
