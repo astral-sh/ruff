@@ -14,7 +14,7 @@ pub(super) fn place_comment<'a>(
     mut comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let handlers = [
+    static HANDLERS: &[for<'a> fn(DecoratedComment<'a>, &Locator) -> CommentPlacement<'a>] = &[
         handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment,
         handle_match_comment,
         handle_in_between_bodies_own_line_comment,
@@ -28,7 +28,7 @@ pub(super) fn place_comment<'a>(
         handle_leading_function_with_decorators_comment,
         handle_dict_unpacking_comment,
     ];
-    for handler in handlers {
+    for handler in HANDLERS {
         comment = match handler(comment, locator) {
             CommentPlacement::Default(comment) => comment,
             placement => return placement,
