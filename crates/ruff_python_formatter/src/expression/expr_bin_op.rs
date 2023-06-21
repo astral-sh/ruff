@@ -323,6 +323,10 @@ fn can_break(expr: &Expr) -> bool {
         }) => !expressions.is_empty(),
         Expr::Call(ExprCall { args, keywords, .. }) => !(args.is_empty() && keywords.is_empty()),
         Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::GeneratorExp(_) => true,
+        Expr::UnaryOp(ExprUnaryOp { operand, .. }) => match operand.as_ref() {
+            Expr::BinOp(_) => true,
+            _ => can_break(operand.as_ref()),
+        },
         _ => false,
     }
 }

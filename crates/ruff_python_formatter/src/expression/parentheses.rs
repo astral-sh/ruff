@@ -42,7 +42,7 @@ pub(super) fn default_expression_needs_parentheses(
 }
 
 /// Configures if the expression should be parenthesized.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum Parenthesize {
     /// Parenthesize the expression if it has parenthesis in the source.
     #[default]
@@ -56,11 +56,11 @@ pub enum Parenthesize {
 }
 
 impl Parenthesize {
-    const fn is_if_breaks(self) -> bool {
+    pub(crate) const fn is_if_breaks(self) -> bool {
         matches!(self, Parenthesize::IfBreaks)
     }
 
-    const fn is_preserve(self) -> bool {
+    pub(crate) const fn is_preserve(self) -> bool {
         matches!(self, Parenthesize::Preserve)
     }
 }

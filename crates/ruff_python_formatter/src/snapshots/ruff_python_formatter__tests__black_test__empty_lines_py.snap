@@ -105,7 +105,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,89 +1,70 @@
+@@ -1,47 +1,35 @@
 -"""Docstring."""
 +"NOT_YET_IMPLEMENTED_STRING"
  
@@ -137,11 +137,10 @@ def g():
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
 -    prev = leaf.prev_sibling
--    if not prev:
++    prev = leaf.NOT_IMPLEMENTED_attr
+     if not prev:
 -        prevp = preceding_leaf(p)
 -        if not prevp or prevp.type in OPENING_BRACKETS:
-+    prev = leaf.NOT_IMPLEMENTED_attr
-+    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
 +        prevp = NOT_IMPLEMENTED_call()
 +        if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
              return NO
@@ -171,11 +170,11 @@ def g():
                  return NO
  
  
- ###############################################################################
+@@ -49,41 +37,34 @@
  # SECTION BECAUSE SECTIONS
  ###############################################################################
--
  
+-
  def g():
 -    NO = ""
 -    SPACE = " "
@@ -205,10 +204,9 @@ def g():
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
 -    prev = leaf.prev_sibling
--    if not prev:
--        prevp = preceding_leaf(p)
 +    prev = leaf.NOT_IMPLEMENTED_attr
-+    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+     if not prev:
+-        prevp = preceding_leaf(p)
 +        prevp = NOT_IMPLEMENTED_call()
  
 -        if not prevp or prevp.type in OPENING_BRACKETS:
@@ -254,7 +252,7 @@ def f():
     NOT_YET_IMPLEMENTED_StmtAssert
 
     prev = leaf.NOT_IMPLEMENTED_attr
-    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+    if not prev:
         prevp = NOT_IMPLEMENTED_call()
         if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
             return NO
@@ -292,7 +290,7 @@ def g():
     NOT_YET_IMPLEMENTED_StmtAssert
 
     prev = leaf.NOT_IMPLEMENTED_attr
-    if NOT_YET_IMPLEMENTED_ExprUnaryOp:
+    if not prev:
         prevp = NOT_IMPLEMENTED_call()
 
         if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
