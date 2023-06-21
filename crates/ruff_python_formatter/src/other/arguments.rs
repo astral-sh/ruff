@@ -5,11 +5,15 @@ use rustpython_parser::ast::{Arguments, Ranged};
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 
-use crate::comments::{dangling_node_comments, leading_node_comments};
+use crate::comments::{
+    dangling_comments, leading_comments, leading_node_comments, trailing_comments,
+    CommentLinePosition, SourceComment,
+};
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
 use crate::FormatNodeRule;
+use ruff_text_size::{TextRange, TextSize};
 
 #[derive(Default)]
 pub struct FormatArguments;
@@ -28,6 +32,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         let saved_level = f.context().node_level();
         f.context_mut().set_node_level(NodeLevel::Expression);
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+        let slash_and_star = find_argument_separators(f.context().contents(), item);
+
         let format_inner = format_with(|f: &mut PyFormatter| {
             let separator = format_with(|f| write!(f, [text(","), soft_line_break_or_space()]));
             let mut joiner = f.join_with(separator);
@@ -39,9 +47,29 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 last_node = Some(arg_with_default.into());
             }
 
-            if !posonlyargs.is_empty() {
-                joiner.entry(&text("/"));
-            }
+            let slash_comments_end = if posonlyargs.is_empty() {
+                0
+            } else {
+                let slash_comments_end = dangling.partition_point(|comment| {
+                    let assignment = assign_argument_separator_comment_placement(
+                        slash_and_star.slash,
+                        slash_and_star.star,
+                        comment.slice().range(),
+                        comment.line_position(),
+                    )
+                    .expect("Unexpected dangling comment type in function arguments");
+                    matches!(
+                        assignment,
+                        ArgumentSeparatorCommentLocation::SlashLeading
+                            | ArgumentSeparatorCommentLocation::SlashTrailing
+                    )
+                });
+                joiner.entry(&CommentsAroundText {
+                    text: "/",
+                    comments: &dangling[..slash_comments_end],
+                });
+                slash_comments_end
+            };
 
             for arg_with_default in args {
                 joiner.entry(&arg_with_default.format());
@@ -60,7 +88,26 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 ]);
                 last_node = Some(vararg.as_any_node_ref());
             } else if !kwonlyargs.is_empty() {
-                joiner.entry(&text("*"));
+                // Given very strange comment placement, comments here may not actually have been
+                // marked as `StarLeading`/`StarTrailing`, but that's fine since we still produce
+                // a stable formatting in this case
+                // ```python
+                // def f42(
+                //     a,
+                //     / # 1
+                //     # 2
+                //     , # 3
+                //     # 4
+                //     * # 5
+                //     , # 6
+                //     c,
+                // ):
+                //     pass
+                // ```
+                joiner.entry(&CommentsAroundText {
+                    text: "*",
+                    comments: &dangling[slash_comments_end..],
+                });
             }
 
             for arg_with_default in kwonlyargs {
@@ -127,7 +174,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 f,
                 [
                     text("("),
-                    block_indent(&dangling_node_comments(item)),
+                    block_indent(&dangling_comments(dangling)),
                     text(")")
                 ]
             )?;
@@ -151,4 +198,350 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         // Handled in `fmt_fields`
         Ok(())
     }
+}
+
+struct CommentsAroundText<'a> {
+    text: &'static str,
+    comments: &'a [SourceComment],
+}
+
+impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if self.comments.is_empty() {
+            text(self.text).fmt(f)
+        } else {
+            // There might be own line comments in trailing, but those are weird and we can kinda
+            // ignore them
+            // ```python
+            // def f42(
+            //     a,
+            //     # leading comment (own line)
+            //     / # first trailing comment (end-of-line)
+            //     # trailing own line comment
+            //     ,
+            //     c,
+            // ):
+            // ```
+            let (leading, trailing) = self.comments.split_at(
+                self.comments
+                    .partition_point(|comment| comment.line_position().is_own_line()),
+            );
+            write!(
+                f,
+                [
+                    leading_comments(leading),
+                    text(self.text),
+                    trailing_comments(trailing)
+                ]
+            )
+        }
+    }
+}
+
+/// `/` and `*` in a function signature
+///
+/// ```text
+/// def f(arg_a, /, arg_b, *, arg_c): pass
+///            ^ ^  ^    ^ ^  ^ slash preceding end
+///              ^  ^    ^ ^  ^ slash
+///                 ^    ^ ^  ^ slash following start
+///                      ^ ^  ^ star preceding end
+///                        ^  ^ star
+///                           ^ star following start
+/// ```
+#[derive(Debug)]
+pub(crate) struct ArgumentSeparators {
+    /// (preceding_end, slash, following_start)
+    pub(crate) slash: Option<(TextSize, TextRange, TextSize)>,
+    /// (preceding_end, star, following_start)
+    pub(crate) star: Option<(TextSize, TextRange, TextSize)>,
+}
+
+/// Finds slash and star in `f(a, /, b, *, c)`
+pub(crate) fn find_argument_separators(
+    contents: &str,
+    arguments: &Arguments,
+) -> ArgumentSeparators {
+    // We only compute preceding_end and token location here since following_start depends on the
+    // star location, but the star location depends on slash's position
+    let slash = if arguments.posonlyargs.is_empty() {
+        // If there are no positional only arguments the default handling below is wrong
+        None
+    } else if let Some(preceding_end) = arguments.posonlyargs.last().map(Ranged::end) {
+        // ```text
+        // def f(a1=1, a2=2, /, a3, a4): pass
+        //                 ^^^^^^^^^^^ the range (defaults)
+        // def f(a1, a2, /, a3, a4): pass
+        //             ^^^^^^^^^^^^ the range (no default)
+        // ```
+        let range = TextRange::new(preceding_end, arguments.end());
+        let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
+
+        let comma = tokens
+            .next()
+            .expect("The function definition can't end here");
+        debug_assert!(comma.kind() == TokenKind::Comma, "{comma:?}");
+        let slash = tokens
+            .next()
+            .expect("The function definition can't end here");
+        debug_assert!(slash.kind() == TokenKind::Slash, "{slash:?}");
+
+        Some((preceding_end, slash.range))
+    } else {
+        None
+    };
+
+    // If we have a vararg we have a node that the comments attach to
+    let star = if arguments.kwonlyargs.is_empty() || arguments.vararg.is_some() {
+        // If there are no keyword only arguments the default handling below is wrong.
+        // When the vararg is present the comments attach there and we don't need to do manual
+        // formatting
+        None
+        // No keyword only arguments, no star
+    } else if let Some(first_keyword_argument) = arguments.kwonlyargs.first() {
+        // Check in that order:
+        // * `f(a, /, b, *, c)` and `f(a=1, /, b=2, *, c)`
+        // * `f(a, /, *, b)`
+        // * `f(*, b)` (else branch)
+        let after_arguments = arguments
+            .args
+            .last()
+            .map(|arg| arg.range.end())
+            .or(slash.map(|(_, slash)| slash.end()));
+        if let Some(after) = after_arguments {
+            let range = TextRange::new(after, arguments.end());
+            let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
+
+            let comma = tokens
+                .next()
+                .expect("The function definition can't end here");
+            debug_assert!(comma.kind() == TokenKind::Comma, "{comma:?}");
+            let star = tokens
+                .next()
+                .expect("The function definition can't end here");
+            debug_assert!(star.kind() == TokenKind::Star, "{star:?}");
+            Some((after, star.range, first_keyword_argument.start()))
+        } else {
+            let mut tokens = SimpleTokenizer::new(contents, arguments.range).skip_trivia();
+
+            let lparen = tokens
+                .next()
+                .expect("The function definition can't end here");
+            debug_assert!(lparen.kind() == TokenKind::LParen, "{lparen:?}");
+            let star = tokens
+                .next()
+                .expect("The function definition can't end here");
+            debug_assert!(star.kind() == TokenKind::Star, "{star:?}");
+            Some((
+                arguments.range.start(),
+                star.range,
+                first_keyword_argument.start(),
+            ))
+        }
+    } else {
+        None
+    };
+
+    // Now that we have star, compute how long slash trailing comments can go
+    // Check in that order:
+    // * `f(a, /, b)`
+    // * `f(a, /, *b)`
+    // * `f(a, /, *, b)`
+    // * `f(a, /)`
+    let slash_following_start = arguments
+        .args
+        .first()
+        .map(Ranged::start)
+        .or(arguments.vararg.as_ref().map(|first| first.start()))
+        .or(star.map(|(_, star, _)| star.start()))
+        .unwrap_or(arguments.end());
+    let slash = slash.map(|(preceding_end, slash)| (preceding_end, slash, slash_following_start));
+
+    ArgumentSeparators { slash, star }
+}
+
+/// Locates positional only arguments separator `/` or the keywords only arguments
+/// separator `*` comments.
+///
+/// ```python
+/// def test(
+///     a,
+///     # Positional only arguments after here
+///     /, # trailing positional argument comment.
+///     b,
+/// ):
+///     pass
+/// ```
+/// or
+/// ```python
+/// def f(
+///     a="",
+///     # Keyword only arguments only after here
+///     *, # trailing keyword argument comment.
+///     b="",
+/// ):
+///     pass
+/// ```
+/// or
+/// ```python
+/// def f(
+///     a,
+///     # positional only comment, leading
+///     /,  # positional only comment, trailing
+///     b,
+///     # keyword only comment, leading
+///     *, # keyword only comment, trailing
+///     c,
+/// ):
+///     pass
+/// ```
+/// Notably, the following is possible:
+/// ```python
+/// def f32(
+///     a,
+///     # positional only comment, leading
+///     /,  # positional only comment, trailing
+///     # keyword only comment, leading
+///     *, # keyword only comment, trailing
+///     c,
+/// ):
+///     pass
+/// ```
+///
+/// ## Background
+///
+/// ```text
+/// def f(a1, a2): pass
+///       ^^^^^^ arguments (args)
+/// ```
+/// Use a star to separate keyword only arguments:
+/// ```text
+/// def f(a1, a2, *, a3, a4): pass
+///       ^^^^^^            arguments (args)
+///                  ^^^^^^ keyword only arguments (kwargs)
+/// ```
+/// Use a slash to separate positional only arguments. Note that this changes the arguments left
+/// of the slash while the star change the arguments right of it:
+/// ```text
+/// def f(a1, a2, /, a3, a4): pass
+///       ^^^^^^            positional only arguments (posonlyargs)
+///                  ^^^^^^ arguments (args)
+/// ```
+/// You can combine both:
+/// ```text
+/// def f(a1, a2, /, a3, a4, *, a5, a6): pass
+///       ^^^^^^                       positional only arguments (posonlyargs)
+///                  ^^^^^^            arguments (args)
+///                             ^^^^^^ keyword only arguments (kwargs)
+/// ```
+/// They can all have defaults, meaning that the preceding node ends at the default instead of the
+/// argument itself:
+/// ```text
+/// def f(a1=1, a2=2, /, a3=3, a4=4, *, a5=5, a6=6): pass
+///          ^     ^        ^     ^        ^     ^ defaults
+///       ^^^^^^^^^^                               positional only arguments (posonlyargs)
+///                      ^^^^^^^^^^                arguments (args)
+///                                     ^^^^^^^^^^ keyword only arguments (kwargs)
+/// ```
+/// An especially difficult case is having no regular arguments, so comments from both slash and
+/// star will attach to either a2 or a3 and the next token is incorrect.
+/// ```text
+/// def f(a1, a2, /, *, a3, a4): pass
+///       ^^^^^^               positional only arguments (posonlyargs)
+///                     ^^^^^^ keyword only arguments (kwargs)
+/// ```
+pub(crate) fn assign_argument_separator_comment_placement(
+    slash: Option<(TextSize, TextRange, TextSize)>,
+    star: Option<(TextSize, TextRange, TextSize)>,
+    comment_range: TextRange,
+    text_position: CommentLinePosition,
+) -> Option<ArgumentSeparatorCommentLocation> {
+    if let Some((preceding_end, slash, following_start)) = slash {
+        // ```python
+        // def f(
+        //    # start too early
+        //    a,  # not own line
+        //    # this is the one
+        //    /, # too late (handled later)
+        //    b,
+        // )
+        // ```
+        if comment_range.start() > preceding_end
+            && comment_range.start() < slash.start()
+            && text_position.is_own_line()
+        {
+            return Some(ArgumentSeparatorCommentLocation::SlashLeading);
+        }
+
+        // ```python
+        // def f(
+        //    a,
+        //    # too early (handled above)
+        //    /, # this is the one
+        //    # not end-of-line
+        //    b,
+        // )
+        // ```
+        if comment_range.start() > slash.end()
+            && comment_range.start() < following_start
+            && text_position.is_end_of_line()
+        {
+            return Some(ArgumentSeparatorCommentLocation::SlashTrailing);
+        }
+    }
+
+    if let Some((preceding_end, star, following_start)) = star {
+        // ```python
+        // def f(
+        //    # start too early
+        //    a,  # not own line
+        //    # this is the one
+        //    *, # too late (handled later)
+        //    b,
+        // )
+        // ```
+        if comment_range.start() > preceding_end
+            && comment_range.start() < star.start()
+            && text_position.is_own_line()
+        {
+            return Some(ArgumentSeparatorCommentLocation::StarLeading);
+        }
+
+        // ```python
+        // def f(
+        //    a,
+        //    # too early (handled above)
+        //    *, # this is the one
+        //    # not end-of-line
+        //    b,
+        // )
+        // ```
+        if comment_range.start() > star.end()
+            && comment_range.start() < following_start
+            && text_position.is_end_of_line()
+        {
+            return Some(ArgumentSeparatorCommentLocation::StarTrailing);
+        }
+    }
+    None
+}
+
+/// ```python
+/// def f(
+///     a,
+///     # before slash
+///     /,  # after slash
+///     b,
+///     # before star
+///     *, # after star
+///     c,
+/// ):
+///     pass
+/// ```
+#[derive(Debug)]
+pub(crate) enum ArgumentSeparatorCommentLocation {
+    SlashLeading,
+    SlashTrailing,
+    StarLeading,
+    StarTrailing,
 }
