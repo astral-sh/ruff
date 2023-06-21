@@ -359,4 +359,22 @@ RUF013_0.py:201:12: RUF013 PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
+RUF013_0.py:209:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+    |
+209 | def f(arg: Union["int", "str"] = None):  # RUF013
+    |            ^^^^^^^^^^^^^^^^^^^ RUF013
+210 |     pass
+    |
+    = help: Convert to `Optional[T]`
+
+ℹ Suggested fix
+206 206 |     pass
+207 207 | 
+208 208 | 
+209     |-def f(arg: Union["int", "str"] = None):  # RUF013
+    209 |+def f(arg: Optional[Union["int", "str"]] = None):  # RUF013
+210 210 |     pass
+211 211 | 
+212 212 | 
+
 
