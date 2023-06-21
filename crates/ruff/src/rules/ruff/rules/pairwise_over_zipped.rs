@@ -6,6 +6,32 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for use of `zip()` to iterate over successive pairs of elements.
+///
+/// ## Why is this bad?
+/// When iterating over successive pairs of elements, prefer
+/// `itertools.pairwise()` over `zip()`.
+///
+/// `itertools.pairwise()` is more readable and conveys the intent of the code
+/// more clearly.
+///
+/// ## Example
+/// ```python
+/// letters = "ABCD"
+/// zip(letters, letters[1:])  # ("A", "B"), ("B", "C"), ("C", "D")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from itertools import pairwise
+///
+/// letters = "ABCD"
+/// pairwise(letters)  # ("A", "B"), ("B", "C"), ("C", "D")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
 #[violation]
 pub struct PairwiseOverZipped;
 
