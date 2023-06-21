@@ -1892,6 +1892,7 @@ dependencies = [
  "typed-arena",
  "unicode-width",
  "unicode_names2",
+ "unindent",
 ]
 
 [[package]]
@@ -2924,6 +2925,12 @@ source = "git+https://github.com/youknowone/unicode_names2.git?rev=4ce16aa85cbcd
 dependencies = [
  "phf",
 ]
+
+[[package]]
+name = "unindent"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aa30f5ea51ff7edfc797c6d3f9ec8cbd8cfedef5371766b7181d33977f4814f"
 
 [[package]]
 name = "untrusted"

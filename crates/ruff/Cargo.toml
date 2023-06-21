@@ -84,6 +84,7 @@ pretty_assertions = "1.3.0"
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
+unindent = "0.2.1"
 
 [features]
 default = []
