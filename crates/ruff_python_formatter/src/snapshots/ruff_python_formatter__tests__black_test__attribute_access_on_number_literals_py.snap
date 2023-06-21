@@ -73,9 +73,8 @@ y = 100(no)
 +if 10 .NOT_IMPLEMENTED_attr:
      ...
  
--y = 100[no]
+ y = 100[no]
 -y = 100(no)
-+y = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +y = NOT_IMPLEMENTED_call()
 ```
 
@@ -102,7 +101,7 @@ x = -100.0000J
 if 10 .NOT_IMPLEMENTED_attr:
     ...
 
-y = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+y = 100[no]
 y = NOT_IMPLEMENTED_call()
 ```
 

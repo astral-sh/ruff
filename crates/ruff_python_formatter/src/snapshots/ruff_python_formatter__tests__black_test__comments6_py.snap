@@ -153,12 +153,9 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  
      tup = (
          another_element,
-@@ -84,35 +85,22 @@
- 
- 
+@@ -86,33 +87,20 @@
  def func(
--    a=some_list[0],  # type: int
-+    a=NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: int
+     a=some_list[0],  # type: int
  ):  # type: () -> int
 -    c = call(
 -        0.0123,
@@ -293,7 +290,7 @@ def f(
 
 
 def func(
-    a=NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: int
+    a=some_list[0],  # type: int
 ):  # type: () -> int
     c = NOT_IMPLEMENTED_call()
 

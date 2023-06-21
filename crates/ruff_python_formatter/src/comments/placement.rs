@@ -1,16 +1,14 @@
-use std::cmp::Ordering;
-
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
-
-use ruff_python_ast::node::AnyNodeRef;
+use crate::comments::visitor::{CommentPlacement, DecoratedComment};
+use crate::comments::CommentLinePosition;
+use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
+use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
 use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
-
-use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-use crate::comments::CommentLinePosition;
-use crate::trivia::{SimpleTokenizer, Token, TokenKind};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Expr, ExprSlice, Ranged};
+use std::cmp::Ordering;
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
@@ -30,6 +28,7 @@ pub(super) fn place_comment<'a>(
         handle_trailing_binary_expression_left_or_operator_comment,
         handle_leading_function_with_decorators_comment,
         handle_dict_unpacking_comment,
+        handle_slice_comments,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -834,6 +833,87 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     } else {
         // Otherwise attach the comment as trailing comment to the previous statement
         CommentPlacement::trailing(preceding, comment)
+    }
+}
+
+/// Handles the attaching comments left or right of the colon in a slice as trailing comment of the
+/// preceding node or leading comment of the following node respectively.
+/// ```python
+/// a = "input"[
+///     1 # c
+///     # d
+///     :2
+/// ]
+/// ```
+fn handle_slice_comments<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let expr_slice = match comment.enclosing_node() {
+        AnyNodeRef::ExprSlice(expr_slice) => expr_slice,
+        AnyNodeRef::ExprSubscript(expr_subscript) => {
+            if expr_subscript.value.end() < expr_subscript.slice.start() {
+                if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
+                    expr_slice
+                } else {
+                    return CommentPlacement::Default(comment);
+                }
+            } else {
+                return CommentPlacement::Default(comment);
+            }
+        }
+        _ => return CommentPlacement::Default(comment),
+    };
+
+    let ExprSlice {
+        range: _,
+        lower,
+        upper,
+        step,
+    } = expr_slice;
+
+    // Check for `foo[ # comment`, but only if they are on the same line
+    let after_lbracket = matches!(
+        first_non_trivia_token_rev(comment.slice().start(), locator.contents()),
+        Some(Token {
+            kind: TokenKind::LBracket,
+            ..
+        })
+    );
+    if comment.line_position().is_end_of_line() && after_lbracket {
+        // Keep comments after the opening bracket there by formatting them outside the
+        // soft block indent
+        // ```python
+        // "a"[ # comment
+        //     1:
+        // ]
+        // ```
+        debug_assert!(
+            matches!(comment.enclosing_node(), AnyNodeRef::ExprSubscript(_)),
+            "{:?}",
+            comment.enclosing_node()
+        );
+        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+    }
+
+    let assignment =
+        assign_comment_in_slice(comment.slice().range(), locator.contents(), expr_slice);
+    let node = match assignment {
+        ExprSliceCommentSection::Lower => lower,
+        ExprSliceCommentSection::Upper => upper,
+        ExprSliceCommentSection::Step => step,
+    };
+
+    if let Some(node) = node {
+        if comment.slice().start() < node.start() {
+            CommentPlacement::leading(node.as_ref().into(), comment)
+        } else {
+            // If a trailing comment is an end of line comment that's fine because we have a node
+            // ahead of it
+            CommentPlacement::trailing(node.as_ref().into(), comment)
+        }
+    } else {
+        CommentPlacement::dangling(expr_slice.as_any_node_ref(), comment)
     }
 }
 

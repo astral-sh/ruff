@@ -273,7 +273,7 @@ d={'a':1,
 +    debug: bool = False,
 +    **kwargs,
 +) -> str:
-+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++    return text[number : -1]
 +
 +
  # fmt: on
@@ -296,7 +296,7 @@ d={'a':1,
  
  
  def spaces_types(
-@@ -51,76 +70,61 @@
+@@ -51,76 +70,71 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -323,15 +323,22 @@ d={'a':1,
  
  
  def subscriptlist():
--    atom[
--        # fmt: off
+     atom[
+         # fmt: off
 -        'some big and',
 -        'complex subscript',
 -        # fmt: on
 -        goes + here,
 -        andhere,
--    ]
-+    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++        (
++            "NOT_YET_IMPLEMENTED_STRING",
++            "NOT_YET_IMPLEMENTED_STRING",
++            # fmt: on
++            goes
++            + here,
++            andhere,
++        )
+     ]
  
  
  def import_as_names():
@@ -390,7 +397,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
-@@ -130,13 +134,15 @@
+@@ -130,13 +144,15 @@
  
  
  def on_and_off_broken():
@@ -411,7 +418,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,80 +151,21 @@
+@@ -145,80 +161,21 @@
  
  def long_lines():
      if True:
@@ -551,7 +558,7 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    return text[number : -1]
 
 
 # fmt: on
@@ -595,7 +602,17 @@ something = {
 
 
 def subscriptlist():
-    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    atom[
+        # fmt: off
+        (
+            "NOT_YET_IMPLEMENTED_STRING",
+            "NOT_YET_IMPLEMENTED_STRING",
+            # fmt: on
+            goes
+            + here,
+            andhere,
+        )
+    ]
 
 
 def import_as_names():
