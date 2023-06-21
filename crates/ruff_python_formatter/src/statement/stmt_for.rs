@@ -1,10 +1,26 @@
 use crate::comments::{leading_alternate_branch_comments, trailing_comments};
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::{Ranged, Stmt, StmtFor};
+use rustpython_parser::ast::{Expr, Ranged, Stmt, StmtFor};
+
+#[derive(Debug)]
+struct ExprTupleWithoutParentheses<'a>(&'a Expr);
+
+impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        match self.0 {
+            Expr::Tuple(expr_tuple) => expr_tuple
+                .format()
+                .with_options(TupleParentheses::StripInsideForLoop)
+                .fmt(f),
+            other => other.format().with_options(Parenthesize::IfBreaks).fmt(f),
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct FormatStmtFor;
@@ -34,9 +50,7 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
             [
                 text("for"),
                 space(),
-                // TODO: the `IfBreaks` is currently ignored by
-                // https://github.com/astral-sh/ruff/blob/4b9b6829dccabdd4faf6efa6a118b4868347a701/crates/ruff_python_formatter/src/expression/expr_tuple.rs#L78
-                target.format().with_options(Parenthesize::IfBreaks),
+                ExprTupleWithoutParentheses(target.as_ref()),
                 space(),
                 text("in"),
                 space(),

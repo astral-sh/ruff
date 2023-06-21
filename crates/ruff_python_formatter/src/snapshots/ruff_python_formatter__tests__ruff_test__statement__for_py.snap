@@ -75,7 +75,7 @@ for (
 
 
 # remove brackets around x,y but keep them around z,w
-for (x, y) in (z, w):
+for x, y in (z, w):
     ...
 
 

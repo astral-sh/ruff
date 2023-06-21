@@ -36,7 +36,7 @@ for (((((k, v))))) in d.items():
  # Only remove tuple brackets after `for`
 -for k, v in d.items():
 -    print(k, v)
-+for (k, v) in NOT_IMPLEMENTED_call():
++for k, v in NOT_IMPLEMENTED_call():
 +    NOT_IMPLEMENTED_call()
  
  # Don't touch tuple brackets after `in`
@@ -62,13 +62,13 @@ for (((((k, v))))) in d.items():
 -    dfkasdjfldsjflkdsjflkdsjfdslkfjldsjfgkjdshgkljjdsfldgkhsdofudsfudsofajdslkfjdslkfjldisfjdffjsdlkfjdlkjjkdflskadjldkfjsalkfjdasj.items()
 -):
 -    print(k, v)
-+for (k, v) in NOT_IMPLEMENTED_call():
++for k, v in NOT_IMPLEMENTED_call():
 +    NOT_IMPLEMENTED_call()
  
  # Test deeply nested brackets
 -for k, v in d.items():
 -    print(k, v)
-+for (k, v) in NOT_IMPLEMENTED_call():
++for k, v in NOT_IMPLEMENTED_call():
 +    NOT_IMPLEMENTED_call()
 ```
 
@@ -76,7 +76,7 @@ for (((((k, v))))) in d.items():
 
 ```py
 # Only remove tuple brackets after `for`
-for (k, v) in NOT_IMPLEMENTED_call():
+for k, v in NOT_IMPLEMENTED_call():
     NOT_IMPLEMENTED_call()
 
 # Don't touch tuple brackets after `in`
@@ -91,11 +91,11 @@ for (
 ) in NOT_IMPLEMENTED_call():
     NOT_IMPLEMENTED_call()
 
-for (k, v) in NOT_IMPLEMENTED_call():
+for k, v in NOT_IMPLEMENTED_call():
     NOT_IMPLEMENTED_call()
 
 # Test deeply nested brackets
-for (k, v) in NOT_IMPLEMENTED_call():
+for k, v in NOT_IMPLEMENTED_call():
     NOT_IMPLEMENTED_call()
 ```
 
