@@ -8,6 +8,10 @@ x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
 b, c, d = (2, 3, 4)
 
+del (
+    # Dangling comment
+)
+
 # Delete something
 del x  # Deleted something
 # Done deleting
@@ -71,6 +75,10 @@ x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
 b, c, d = (2, 3, 4)
 
+del (
+    # Dangling comment
+)
+
 # Delete something
 del x  # Deleted something
 # Done deleting
@@ -80,8 +88,7 @@ del (
     # Deleting something
     x  # Deleted something
     # Finishing deletes
-    # Completed
-)
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -89,8 +96,7 @@ del (
     # Deleting something
     x  # Deleted something
     # Finishing deletes
-    # Completed
-)
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -107,18 +113,11 @@ del (
     x  # Deleted something
     # Finishing deletes
     # Dangling comment
-    # Completed
-)
+)  # Completed
 # Done deleting
 
 # Delete something
-del (
-    x,
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-    b,
-    c,
-    d,
-)  # Delete these
+del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Delete these
 # Ready to delete
 
 # Delete something
@@ -128,7 +127,7 @@ del (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     b,
     c,
-    d
+    d,
     # Deleted
 )  # Completed
 # Done
