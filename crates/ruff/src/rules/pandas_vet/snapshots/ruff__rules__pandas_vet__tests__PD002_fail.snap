@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pandas_vet/mod.rs
   |
   = help: Assign to variable; remove `inplace` arg
 
-ℹ Suggested fix
+ℹ Possible fix
 1 1 | 
 2 2 | import pandas as pd
 3 3 | x = pd.DataFrame()

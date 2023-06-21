@@ -12,7 +12,7 @@ PD002.py:5:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
   |
   = help: Assign to variable; remove `inplace` arg
 
-ℹ Suggested fix
+ℹ Possible fix
 2 2 | 
 3 3 | x = pd.DataFrame()
 4 4 | 
@@ -33,7 +33,7 @@ PD002.py:7:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
   |
   = help: Assign to variable; remove `inplace` arg
 
-ℹ Suggested fix
+ℹ Possible fix
 4 4 | 
 5 5 | x.drop(["a"], axis=1, inplace=True)
 6 6 | 
@@ -53,7 +53,7 @@ PD002.py:10:5: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
    |
    = help: Assign to variable; remove `inplace` arg
 
-ℹ Suggested fix
+ℹ Possible fix
 6  6  | 
 7  7  | x.drop(["a"], axis=1, inplace=True)
 8  8  | 
@@ -75,7 +75,7 @@ PD002.py:17:9: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
    |
    = help: Assign to variable; remove `inplace` arg
 
-ℹ Suggested fix
+ℹ Possible fix
 13 13 | )
 14 14 | 
 15 15 | if True:
@@ -97,7 +97,7 @@ PD002.py:22:33: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
    |
    = help: Assign to variable; remove `inplace` arg
 
-ℹ Suggested fix
+ℹ Possible fix
 19 19 |         axis=1,
 20 20 |     )
 21 21 | 
