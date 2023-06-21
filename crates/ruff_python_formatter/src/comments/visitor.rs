@@ -615,18 +615,6 @@ impl<'a> CommentPlacement<'a> {
             comment: comment.into(),
         }
     }
-
-    /// Returns the placement if it isn't [`CommentPlacement::Default`], otherwise calls `f` and returns the result.
-    #[inline]
-    pub(super) fn or_else<F>(self, f: F) -> Self
-    where
-        F: FnOnce(DecoratedComment<'a>) -> CommentPlacement<'a>,
-    {
-        match self {
-            CommentPlacement::Default(comment) => f(comment),
-            placement => placement,
-        }
-    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
