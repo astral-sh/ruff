@@ -47,18 +47,16 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 ```diff
 --- Black
 +++ Ruff
-@@ -1,8 +1,8 @@
- # These brackets are redundant, therefore remove.
+@@ -2,7 +2,7 @@
  try:
      a.something
--except AttributeError as err:
+ except AttributeError as err:
 -    raise err
-+except (AttributeError) as err:
 +    NOT_YET_IMPLEMENTED_StmtRaise
  
  # This is tuple of exceptions.
  # Although this could be replaced with just the exception,
-@@ -10,13 +10,13 @@
+@@ -10,28 +10,26 @@
  try:
      a.something
  except (AttributeError,) as err:
@@ -74,11 +72,12 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
  
  # Test long variants.
  try:
-@@ -24,14 +24,14 @@
- except (
-     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error
- ) as err:
+     a.something
+-except (
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error
+-) as err:
 -    raise err
++except some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error as err:
 +    NOT_YET_IMPLEMENTED_StmtRaise
  
  try:
@@ -91,7 +90,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
  
  try:
      a.something
-@@ -39,4 +39,4 @@
+@@ -39,4 +37,4 @@
      some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
      some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
  ) as err:
@@ -105,7 +104,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 # These brackets are redundant, therefore remove.
 try:
     a.something
-except (AttributeError) as err:
+except AttributeError as err:
     NOT_YET_IMPLEMENTED_StmtRaise
 
 # This is tuple of exceptions.
@@ -125,9 +124,7 @@ except (AttributeError, ValueError) as err:
 # Test long variants.
 try:
     a.something
-except (
-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error
-) as err:
+except some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error as err:
     NOT_YET_IMPLEMENTED_StmtRaise
 
 try:

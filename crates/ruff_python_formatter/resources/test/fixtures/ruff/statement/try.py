@@ -3,6 +3,11 @@ try:
 except:
     ...
 
+try:
+    ...
+except (KeyError):  # should remove brackets and be a single line
+    ...
+
 
 try: # try
     ...
@@ -11,7 +16,7 @@ try: # try
 except (Exception, ValueError) as exc:  # except line
     ...
 # before except 2
-except (KeyError) as key:  # except line 2
+except KeyError as key:  # except line 2
     ...
     # in body 2
 # before else
@@ -33,7 +38,7 @@ except (Exception, ValueError) as exc:  # except line
     ...
 
 # before except 2
-except (KeyError) as key:  # except line 2
+except KeyError as key:  # except line 2
     ...
     # in body 2
 

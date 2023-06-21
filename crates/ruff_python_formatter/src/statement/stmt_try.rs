@@ -2,6 +2,7 @@ use crate::comments;
 use crate::comments::{
     dangling_node_comments, leading_comments, leading_node_comments, trailing_node_comments,
 };
+use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::FormatRefWithRule;
 use crate::trivia::lines_before;
@@ -35,7 +36,10 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
         write!(f, [text("except")])?;
 
         if let Some(type_) = type_ {
-            write!(f, [space(), type_.format()])?;
+            write!(
+                f,
+                [space(), type_.format().with_options(Parenthesize::IfBreaks)]
+            )?;
             if let Some(name) = name {
                 write!(
                     f,
