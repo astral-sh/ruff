@@ -7,7 +7,9 @@ use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Expr, Op
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -152,20 +154,20 @@ enum TypingTarget<'a> {
 }
 
 impl<'a> TypingTarget<'a> {
-    fn try_from_expr(expr: &'a Expr, checker: &Checker) -> Option<Self> {
+    fn try_from_expr(expr: &'a Expr, semantic: &SemanticModel, locator: &Locator) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                if checker.semantic().match_typing_expr(value, "Optional") {
+                if semantic.match_typing_expr(value, "Optional") {
                     return Some(TypingTarget::Optional);
                 }
                 let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else{
                     return None;
                 };
-                if checker.semantic().match_typing_expr(value, "Literal") {
+                if semantic.match_typing_expr(value, "Literal") {
                     Some(TypingTarget::Literal(elements.iter().collect()))
-                } else if checker.semantic().match_typing_expr(value, "Union") {
+                } else if semantic.match_typing_expr(value, "Union") {
                     Some(TypingTarget::Union(elements.iter().collect()))
-                } else if checker.semantic().match_typing_expr(value, "Annotated") {
+                } else if semantic.match_typing_expr(value, "Annotated") {
                     elements.first().map(TypingTarget::Annotated)
                 } else {
                     None
@@ -182,62 +184,59 @@ impl<'a> TypingTarget<'a> {
                 value: Constant::Str(string),
                 range,
                 ..
-            }) => parse_type_annotation(string, *range, checker.locator)
-                // In case of a parse error, we return `None` to avoid false positives.
-                .map_or(Some(TypingTarget::None), |(expr, _)| {
+            }) => parse_type_annotation(string, *range, locator)
+                // In case of a parse error, we return `Any` to avoid false positives.
+                .map_or(Some(TypingTarget::Any), |(expr, _)| {
                     Some(TypingTarget::ForwardReference(expr))
                 }),
-            _ => checker
-                .semantic()
-                .resolve_call_path(expr)
-                .and_then(|call_path| {
-                    if checker.semantic().match_typing_call_path(&call_path, "Any") {
-                        Some(TypingTarget::Any)
-                    } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
-                        Some(TypingTarget::Object)
-                    } else {
-                        None
-                    }
-                }),
+            _ => semantic.resolve_call_path(expr).and_then(|call_path| {
+                if semantic.match_typing_call_path(&call_path, "Any") {
+                    Some(TypingTarget::Any)
+                } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
+                    Some(TypingTarget::Object)
+                } else {
+                    None
+                }
+            }),
         }
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `None`.
-    fn contains_none(&self, checker: &Checker) -> bool {
+    fn contains_none(&self, semantic: &SemanticModel, locator: &Locator) -> bool {
         match self {
             TypingTarget::None
             | TypingTarget::Optional
             | TypingTarget::Any
             | TypingTarget::Object => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, checker) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
                     return false;
                 };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match new_target {
                     TypingTarget::None => true,
-                    TypingTarget::Literal(_) => new_target.contains_none(checker),
+                    TypingTarget::Literal(_) => new_target.contains_none(semantic, locator),
                     _ => false,
                 }
             }),
             TypingTarget::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, checker) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
                     return false;
                 };
-                new_target.contains_none(checker)
+                new_target.contains_none(semantic, locator)
             }),
             TypingTarget::Annotated(element) => {
-                let Some(new_target) = TypingTarget::try_from_expr(element, checker) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
                     return false;
                 };
-                new_target.contains_none(checker)
+                new_target.contains_none(semantic, locator)
             }
             TypingTarget::ForwardReference(expr) => {
-                let Some(new_target) = TypingTarget::try_from_expr(expr, checker) else {
+                let Some(new_target) = TypingTarget::try_from_expr(expr, semantic, locator) else {
                     return false;
                 };
-                new_target.contains_none(checker)
+                new_target.contains_none(semantic, locator)
             }
         }
     }
@@ -252,9 +251,10 @@ impl<'a> TypingTarget<'a> {
 /// This function assumes that the annotation is a valid typing annotation expression.
 fn type_hint_explicitly_allows_none<'a>(
     annotation: &'a Expr,
-    checker: &Checker,
+    semantic: &SemanticModel,
+    locator: &Locator,
 ) -> Option<&'a Expr> {
-    let Some(target) = TypingTarget::try_from_expr(annotation, checker) else {
+    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator) else {
         return Some(annotation);
     };
     match target {
@@ -264,9 +264,9 @@ fn type_hint_explicitly_allows_none<'a>(
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should
         // be returned.
-        TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(expr, checker),
+        TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(expr, semantic, locator),
         _ => {
-            if target.contains_none(checker) {
+            if target.contains_none(semantic, locator) {
                 None
             } else {
                 Some(annotation)
@@ -350,7 +350,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         {
             // Quoted annotation.
             if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator) {
-                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker) else {
+                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker.semantic(), checker.locator) else {
                     continue;
                 };
                 let conversion_type = checker.settings.target_version.into();
@@ -366,7 +366,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             }
         } else {
             // Unquoted annotation.
-            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker) else {
+            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic(), checker.locator) else {
                 continue;
             };
             let conversion_type = checker.settings.target_version.into();
