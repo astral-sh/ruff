@@ -2,7 +2,7 @@
 
 pub mod preorder;
 
-use rustpython_ast::{ArgWithDefault, Decorator};
+use rustpython_ast::Decorator;
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr,
     ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
@@ -60,9 +60,6 @@ pub trait Visitor<'a> {
     }
     fn visit_arg(&mut self, arg: &'a Arg) {
         walk_arg(self, arg);
-    }
-    fn visit_arg_with_default(&mut self, arg_with_default: &'a ArgWithDefault) {
-        walk_arg_with_default(self, arg_with_default);
     }
     fn visit_keyword(&mut self, keyword: &'a Keyword) {
         walk_keyword(self, keyword);
@@ -606,17 +603,34 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
+    // Defaults are evaluated before annotations.
     for arg in &arguments.posonlyargs {
-        visitor.visit_arg_with_default(arg);
+        if let Some(default) = &arg.default {
+            visitor.visit_expr(default);
+        }
     }
     for arg in &arguments.args {
-        visitor.visit_arg_with_default(arg);
+        if let Some(default) = &arg.default {
+            visitor.visit_expr(default);
+        }
+    }
+    for arg in &arguments.kwonlyargs {
+        if let Some(default) = &arg.default {
+            visitor.visit_expr(default);
+        }
+    }
+
+    for arg in &arguments.posonlyargs {
+        visitor.visit_arg(&arg.def);
+    }
+    for arg in &arguments.args {
+        visitor.visit_arg(&arg.def);
     }
     if let Some(arg) = &arguments.vararg {
         visitor.visit_arg(arg);
     }
     for arg in &arguments.kwonlyargs {
-        visitor.visit_arg_with_default(arg);
+        visitor.visit_arg(&arg.def);
     }
     if let Some(arg) = &arguments.kwarg {
         visitor.visit_arg(arg);
@@ -627,16 +641,6 @@ pub fn walk_arg<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arg: &'a Arg) {
     if let Some(expr) = &arg.annotation {
         visitor.visit_annotation(expr);
     }
-}
-
-pub fn walk_arg_with_default<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    arg_with_default: &'a ArgWithDefault,
-) {
-    if let Some(expr) = &arg_with_default.default {
-        visitor.visit_expr(expr);
-    }
-    visitor.visit_arg(&arg_with_default.def);
 }
 
 pub fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a Keyword) {
