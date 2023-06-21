@@ -3852,8 +3852,8 @@ where
                             );
                         }
 
-                        // Grab the existing binding.
-                        let existing_id = self.semantic.scope().get(name);
+                        // Store the existing binding, if any.
+                        let existing_id = self.semantic.lookup(name);
 
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(
@@ -3885,22 +3885,12 @@ where
                             }
                         }
 
-                        if let Some(existing_id) = existing_id {
-                            // If the name was already bound, restore the existing binding. We can't
-                            // know whether this handler will trigger, so we proceed as if it
-                            // didn't. Treat it as an entirely new binding to avoid creating a cycle
-                            // in the shadowing graph.
-                            let binding_id = self.semantic.copy_binding(existing_id);
-                            self.semantic.scope_mut().add(name, binding_id);
-                        } else {
-                            // If the name wasn't already bound, mark it as unbound.
-                            self.add_binding(
-                                name,
-                                range,
-                                BindingKind::UnboundException,
-                                BindingFlags::empty(),
-                            );
-                        }
+                        self.add_binding(
+                            name,
+                            range,
+                            BindingKind::UnboundException(existing_id),
+                            BindingFlags::empty(),
+                        );
                     }
                     None => walk_except_handler(self, except_handler),
                 }
@@ -4248,7 +4238,7 @@ impl<'a> Checker<'a> {
             let shadowed = &self.semantic.bindings[shadowed_id];
             if !matches!(
                 shadowed.kind,
-                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException,
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_),
             ) {
                 let references = shadowed.references.clone();
                 let is_global = shadowed.is_global();
