@@ -31,6 +31,7 @@ pub(super) fn place_comment<'a>(
         handle_leading_function_with_decorators_comment,
         handle_dict_unpacking_comment,
         handle_slice_comments,
+        handle_attribute_comment,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -1003,6 +1004,43 @@ fn handle_dict_unpacking_comment<'a>(
     }
 
     CommentPlacement::Default(comment)
+}
+
+// Own line comments coming after the node are always dangling comments
+// ```python
+// (
+//      a
+//      # trailing a comment
+//      . # dangling comment
+//      # or this
+//      b
+// )
+// ```
+fn handle_attribute_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let Some(attribute) = comment.enclosing_node().expr_attribute() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // It must be a comment AFTER the name
+    if comment.preceding_node().is_none() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let between_value_and_attr = TextRange::new(attribute.value.end(), attribute.attr.start());
+
+    let dot = SimpleTokenizer::new(locator.contents(), between_value_and_attr)
+        .skip_trivia()
+        .next()
+        .expect("Expected the `.` character after the value");
+
+    if TextRange::new(dot.end(), attribute.attr.start()).contains(comment.slice().start()) {
+        CommentPlacement::dangling(attribute.into(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.

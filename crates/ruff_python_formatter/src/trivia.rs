@@ -164,6 +164,9 @@ pub(crate) enum TokenKind {
     /// '*'
     Star,
 
+    /// `.`.
+    Dot,
+
     /// Any other non trivia token. Always has a length of 1
     Other,
 
@@ -184,6 +187,7 @@ impl TokenKind {
             ':' => TokenKind::Colon,
             '/' => TokenKind::Slash,
             '*' => TokenKind::Star,
+            '.' => TokenKind::Dot,
             _ => TokenKind::Other,
         }
     }

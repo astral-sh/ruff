@@ -276,7 +276,7 @@ last_call()
  Name
  None
  True
-@@ -30,134 +31,120 @@
+@@ -30,98 +31,90 @@
  -1
  ~int and not v1 ^ 123 + v2 | True
  (~int) and (not ((v1 ^ (123 + v2)) | True))
@@ -297,8 +297,15 @@ last_call()
 -(str or None) if True else (str or bytes or None)
 -str or None if (1 if True else 2) else str or bytes or None
 -(str or None) if (1 if True else 2) else (str or bytes or None)
+-(
+-    (super_long_variable_name or None)
+-    if (1 if super_long_test_name else 2)
+-    else (str or bytes or None)
+-)
+-{"2.7": dead, "3.7": (long_live or die_hard)}
+-{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
 ++really ** -confusing ** ~operator**-precedence
-+flags & ~select.NOT_IMPLEMENTED_attr and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++flags & ~select.EPOLLIN and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +lambda x: True
 +lambda x: True
 +lambda x: True
@@ -321,7 +328,9 @@ last_call()
 +    "NOT_YET_IMPLEMENTED_STRING": (long_live or die_hard),
 +    **{"NOT_YET_IMPLEMENTED_STRING": verygood},
 +}
-+{**a, **b, **c}
+ {**a, **b, **c}
+-{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
+-({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 +{
 +    "NOT_YET_IMPLEMENTED_STRING",
 +    "NOT_YET_IMPLEMENTED_STRING",
@@ -330,16 +339,7 @@ last_call()
 +    "NOT_YET_IMPLEMENTED_STRING",
 +    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 +}
- (
--    (super_long_variable_name or None)
--    if (1 if super_long_test_name else 2)
--    else (str or bytes or None)
--)
--{"2.7": dead, "3.7": (long_live or die_hard)}
--{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
--{**a, **b, **c}
--{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
--({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
++(
 +    {"NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING"},
 +    (True or False),
 +    (+value),
@@ -364,17 +364,17 @@ last_call()
 -    4,
 -    5,
 -]
--[
--    4,
--    *a,
--    5,
--]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
 +[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
  [
+-    4,
+-    *a,
+-    5,
+-]
+-[
      this_is_a_very_long_variable_which_will_force_a_delimiter_split,
      element,
      another,
@@ -415,11 +415,6 @@ last_call()
 -call(a, *gidgets[:2])
 -call(**self.screen_kwargs)
 -call(b, **self.screen_kwargs)
--lukasz.langa.pl
--call.me(maybe)
--(1).real
--(1.0).real
--....__class__
 +NOT_YET_IMPLEMENTED_ExprSetComp
 +NOT_YET_IMPLEMENTED_ExprSetComp
 +NOT_YET_IMPLEMENTED_ExprSetComp
@@ -445,13 +440,13 @@ last_call()
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
-+lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
+ lukasz.langa.pl
+-call.me(maybe)
 +NOT_IMPLEMENTED_call()
-+1 .NOT_IMPLEMENTED_attr
-+1.0 .NOT_IMPLEMENTED_attr
-+....NOT_IMPLEMENTED_attr
- list[str]
- dict[str, int]
+ (1).real
+ (1.0).real
+ ....__class__
+@@ -130,34 +123,28 @@
  tuple[str, ...]
  tuple[str, int, float, dict[str, int]]
  tuple[
@@ -504,12 +499,11 @@ last_call()
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
 -numpy[:, ::-1]
--numpy[np.newaxis, :]
++numpy[:,  :: -1]
+ numpy[np.newaxis, :]
 -(str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
 -{"2.7": dead, "3.7": long_live or die_hard}
 -{"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
-+numpy[:,  :: -1]
-+numpy[np.NOT_IMPLEMENTED_attr, :]
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 +{
 +    "NOT_YET_IMPLEMENTED_STRING": dead,
@@ -570,10 +564,7 @@ last_call()
  )
 -what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
 -    vars_to_remove
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call())
-+    - NOT_IMPLEMENTED_call()
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -591,7 +582,10 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_IMPLEMENTED_call())
++    - NOT_IMPLEMENTED_call()
+ )
 -Ø = set()
 -authors.łukasz.say_thanks()
 +result = NOT_IMPLEMENTED_call()
@@ -683,70 +677,40 @@ last_call()
  ):
      return True
  if (
-@@ -327,24 +296,44 @@
+@@ -327,13 +296,18 @@
  ):
      return True
  if (
 -    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
--    | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
-+    ~aaaa.NOT_IMPLEMENTED_attr
-+    + aaaa.NOT_IMPLEMENTED_attr
-+    - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
-+    | aaaa.NOT_IMPLEMENTED_attr
-+    & aaaa.NOT_IMPLEMENTED_attr % aaaa.NOT_IMPLEMENTED_attr
-+    ^ aaaa.NOT_IMPLEMENTED_attr
-+    << aaaa.NOT_IMPLEMENTED_attr
-+    >> aaaa.NOT_IMPLEMENTED_attr**aaaa.NOT_IMPLEMENTED_attr // aaaa.NOT_IMPLEMENTED_attr
++    ~aaaa.a
++    + aaaa.b
++    - aaaa.c * aaaa.d / aaaa.e
+     | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
  ):
      return True
  if (
 -    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
 -    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
--    ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
-+    ~aaaaaaaa.NOT_IMPLEMENTED_attr
-+    + aaaaaaaa.NOT_IMPLEMENTED_attr
-+    - aaaaaaaa.NOT_IMPLEMENTED_attr
-+    @ aaaaaaaa.NOT_IMPLEMENTED_attr
-+    / aaaaaaaa.NOT_IMPLEMENTED_attr
-+    | aaaaaaaa.NOT_IMPLEMENTED_attr
-+    & aaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaa.NOT_IMPLEMENTED_attr
-+    ^ aaaaaaaa.NOT_IMPLEMENTED_attr
-+    << aaaaaaaa.NOT_IMPLEMENTED_attr
-+    >> aaaaaaaa.NOT_IMPLEMENTED_attr
-+    **aaaaaaaa.NOT_IMPLEMENTED_attr
-+    // aaaaaaaa.NOT_IMPLEMENTED_attr
++    ~aaaaaaaa.a
++    + aaaaaaaa.b
++    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
++    | aaaaaaaa.f
++    & aaaaaaaa.g % aaaaaaaa.h
+     ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
- if (
--    ~aaaaaaaaaaaaaaaa.a
--    + aaaaaaaaaaaaaaaa.b
--    - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
+@@ -341,7 +315,8 @@
+     ~aaaaaaaaaaaaaaaa.a
+     + aaaaaaaaaaaaaaaa.b
+     - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
 -    | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
--    ^ aaaaaaaaaaaaaaaa.i
--    << aaaaaaaaaaaaaaaa.k
--    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
-+    ~aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    @ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    | aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    & aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    ^ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    << aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    >> aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    **aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    // aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
- ):
-     return True
- (
-@@ -363,8 +352,9 @@
- bbbb >> bbbb * bbbb
- (
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-+    ^ bbbb.NOT_IMPLEMENTED_attr
-+    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
++    | aaaaaaaaaaaaaaaa.f
++    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
+     ^ aaaaaaaaaaaaaaaa.i
+     << aaaaaaaaaaaaaaaa.k
+     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
+@@ -366,5 +341,5 @@
+     ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
      ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  )
 -last_call()
@@ -791,7 +755,7 @@ not great
 ~int and not v1 ^ 123 + v2 | True
 (~int) and (not ((v1 ^ (123 + v2)) | True))
 +really ** -confusing ** ~operator**-precedence
-flags & ~select.NOT_IMPLEMENTED_attr and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+flags & ~select.EPOLLIN and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 lambda x: True
 lambda x: True
 lambda x: True
@@ -872,11 +836,11 @@ NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
-lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
+lukasz.langa.pl
 NOT_IMPLEMENTED_call()
-1 .NOT_IMPLEMENTED_attr
-1.0 .NOT_IMPLEMENTED_attr
-....NOT_IMPLEMENTED_attr
+(1).real
+(1.0).real
+....__class__
 list[str]
 dict[str, int]
 tuple[str, ...]
@@ -918,7 +882,7 @@ numpy[1 : c + 1, c]
 numpy[-(c + 1) :, d]
 numpy[:, l[-2]]
 numpy[:,  :: -1]
-numpy[np.NOT_IMPLEMENTED_attr, :]
+numpy[np.newaxis, :]
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 {
     "NOT_YET_IMPLEMENTED_STRING": dead,
@@ -1055,44 +1019,30 @@ if (
 ):
     return True
 if (
-    ~aaaa.NOT_IMPLEMENTED_attr
-    + aaaa.NOT_IMPLEMENTED_attr
-    - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
-    | aaaa.NOT_IMPLEMENTED_attr
-    & aaaa.NOT_IMPLEMENTED_attr % aaaa.NOT_IMPLEMENTED_attr
-    ^ aaaa.NOT_IMPLEMENTED_attr
-    << aaaa.NOT_IMPLEMENTED_attr
-    >> aaaa.NOT_IMPLEMENTED_attr**aaaa.NOT_IMPLEMENTED_attr // aaaa.NOT_IMPLEMENTED_attr
+    ~aaaa.a
+    + aaaa.b
+    - aaaa.c * aaaa.d / aaaa.e
+    | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
 ):
     return True
 if (
-    ~aaaaaaaa.NOT_IMPLEMENTED_attr
-    + aaaaaaaa.NOT_IMPLEMENTED_attr
-    - aaaaaaaa.NOT_IMPLEMENTED_attr
-    @ aaaaaaaa.NOT_IMPLEMENTED_attr
-    / aaaaaaaa.NOT_IMPLEMENTED_attr
-    | aaaaaaaa.NOT_IMPLEMENTED_attr
-    & aaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaa.NOT_IMPLEMENTED_attr
-    ^ aaaaaaaa.NOT_IMPLEMENTED_attr
-    << aaaaaaaa.NOT_IMPLEMENTED_attr
-    >> aaaaaaaa.NOT_IMPLEMENTED_attr
-    **aaaaaaaa.NOT_IMPLEMENTED_attr
-    // aaaaaaaa.NOT_IMPLEMENTED_attr
+    ~aaaaaaaa.a
+    + aaaaaaaa.b
+    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
+    | aaaaaaaa.f
+    & aaaaaaaa.g % aaaaaaaa.h
+    ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
 ):
     return True
 if (
-    ~aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    @ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    | aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    & aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    ^ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    << aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    >> aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    **aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    // aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    ~aaaaaaaaaaaaaaaa.a
+    + aaaaaaaaaaaaaaaa.b
+    - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
+    | aaaaaaaaaaaaaaaa.f
+    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
+    ^ aaaaaaaaaaaaaaaa.i
+    << aaaaaaaaaaaaaaaa.k
+    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 ):
     return True
 (
@@ -1111,8 +1061,7 @@ aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
 bbbb >> bbbb * bbbb
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    ^ bbbb.NOT_IMPLEMENTED_attr
-    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 )
 NOT_IMPLEMENTED_call()

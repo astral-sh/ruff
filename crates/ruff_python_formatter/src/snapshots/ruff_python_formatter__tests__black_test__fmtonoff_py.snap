@@ -253,19 +253,18 @@ d={'a':1,
 - async with some_connection() as conn:
 -     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
 - await asyncio.sleep(1)
--@asyncio.coroutine
++    "NOT_YET_IMPLEMENTED_STRING"
++    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    await NOT_IMPLEMENTED_call()
++
++
+ @asyncio.coroutine
 -@some_decorator(
 -with_args=True,
 -many_args=[1,2,3]
 -)
 -def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
 - return text[number:-1]
-+    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith
-+    await NOT_IMPLEMENTED_call()
-+
-+
-+@asyncio.NOT_IMPLEMENTED_attr
 +@NOT_IMPLEMENTED_call()
 +def function_signature_stress_test(
 +    number: int,
@@ -399,7 +398,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
-@@ -130,13 +146,15 @@
+@@ -130,13 +146,13 @@
  
  
  def on_and_off_broken():
@@ -414,13 +413,11 @@ d={'a':1,
 +    this = NOT_IMPLEMENTED_call()
 +    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +    NOT_IMPLEMENTED_call()
-+    (
-+        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-+    )
++    now.considers.multiple.fmt.directives.within.one.prefix
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,80 +163,21 @@
+@@ -145,80 +161,21 @@
  
  def long_lines():
      if True:
@@ -552,7 +549,7 @@ async def coroutine(arg, exec=False):
     await NOT_IMPLEMENTED_call()
 
 
-@asyncio.NOT_IMPLEMENTED_attr
+@asyncio.coroutine
 @NOT_IMPLEMENTED_call()
 def function_signature_stress_test(
     number: int,
@@ -668,9 +665,7 @@ def on_and_off_broken():
     this = NOT_IMPLEMENTED_call()
     and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
     NOT_IMPLEMENTED_call()
-    (
-        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-    )
+    now.considers.multiple.fmt.directives.within.one.prefix
     # fmt: on
     # fmt: off
     # ...but comments still get reformatted even though they should not be

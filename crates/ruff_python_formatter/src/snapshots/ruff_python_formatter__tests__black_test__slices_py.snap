@@ -76,11 +76,7 @@ x[
 ```diff
 --- Black
 +++ Ruff
-@@ -1,33 +1,33 @@
--slice[a.b : c.d]
-+slice[a.NOT_IMPLEMENTED_attr : c.NOT_IMPLEMENTED_attr]
- slice[d :: d + 1]
- slice[d + 1 :: d]
+@@ -4,30 +4,30 @@
  slice[d::d]
  slice[0]
  slice[-1]
@@ -144,7 +140,7 @@ x[
 ## Ruff Output
 
 ```py
-slice[a.NOT_IMPLEMENTED_attr : c.NOT_IMPLEMENTED_attr]
+slice[a.b : c.d]
 slice[d :: d + 1]
 slice[d + 1 :: d]
 slice[d::d]

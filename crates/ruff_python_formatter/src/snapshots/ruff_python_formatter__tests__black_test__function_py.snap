@@ -116,10 +116,10 @@ def __await__(): return (yield)
 +NOT_YET_IMPLEMENTED_StmtImport
  
 -from third_party import X, Y, Z
+-
+-from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
--from library import some_connection, some_decorator
--
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
@@ -154,9 +154,8 @@ def __await__(): return (yield)
 +    await NOT_IMPLEMENTED_call()
  
  
--@asyncio.coroutine
+ @asyncio.coroutine
 -@some_decorator(with_args=True, many_args=[1, 2, 3])
-+@asyncio.NOT_IMPLEMENTED_attr
 +@NOT_IMPLEMENTED_call()
  def function_signature_stress_test(
      number: int,
@@ -323,7 +322,7 @@ async def coroutine(arg, exec=False):
     await NOT_IMPLEMENTED_call()
 
 
-@asyncio.NOT_IMPLEMENTED_attr
+@asyncio.coroutine
 @NOT_IMPLEMENTED_call()
 def function_signature_stress_test(
     number: int,

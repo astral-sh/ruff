@@ -55,22 +55,21 @@ y = 100(no)
 +x = NOT_IMPLEMENTED_call()
 +x = NOT_IMPLEMENTED_call()
 +x = NOT_IMPLEMENTED_call()
-+x = 1. .NOT_IMPLEMENTED_attr
-+x = 1E+1 .NOT_IMPLEMENTED_attr
-+x = 1E-1 .NOT_IMPLEMENTED_attr
++x = (1.).imag
++x = (1E+1).imag
++x = (1E-1).real
 +x = NOT_IMPLEMENTED_call()
-+x = 123456789.123456789E123456789 .NOT_IMPLEMENTED_attr
++x = (123456789.123456789E123456789).real
 +x = NOT_IMPLEMENTED_call()
-+x = 123456789J.NOT_IMPLEMENTED_attr
++x = 123456789J.real
 +x = NOT_IMPLEMENTED_call()
 +x = NOT_IMPLEMENTED_call()
 +x = NOT_IMPLEMENTED_call()
-+x = 0O777 .NOT_IMPLEMENTED_attr
++x = (0O777).real
 +x = NOT_IMPLEMENTED_call()
 +x = -100.0000J
  
--if (10).real:
-+if 10 .NOT_IMPLEMENTED_attr:
+ if (10).real:
      ...
  
  y = 100[no]
@@ -84,21 +83,21 @@ y = 100(no)
 x = NOT_IMPLEMENTED_call()
 x = NOT_IMPLEMENTED_call()
 x = NOT_IMPLEMENTED_call()
-x = 1. .NOT_IMPLEMENTED_attr
-x = 1E+1 .NOT_IMPLEMENTED_attr
-x = 1E-1 .NOT_IMPLEMENTED_attr
+x = (1.).imag
+x = (1E+1).imag
+x = (1E-1).real
 x = NOT_IMPLEMENTED_call()
-x = 123456789.123456789E123456789 .NOT_IMPLEMENTED_attr
+x = (123456789.123456789E123456789).real
 x = NOT_IMPLEMENTED_call()
-x = 123456789J.NOT_IMPLEMENTED_attr
+x = 123456789J.real
 x = NOT_IMPLEMENTED_call()
 x = NOT_IMPLEMENTED_call()
 x = NOT_IMPLEMENTED_call()
-x = 0O777 .NOT_IMPLEMENTED_attr
+x = (0O777).real
 x = NOT_IMPLEMENTED_call()
 x = -100.0000J
 
-if 10 .NOT_IMPLEMENTED_attr:
+if (10).real:
     ...
 
 y = 100[no]
