@@ -312,5 +312,7 @@ RUF013_0.py:186:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 186     |-def f(arg: Union[Annotated[int, ...], Union[str, bytes]] = None):  # RUF011
     186 |+def f(arg: Optional[Union[Annotated[int, ...], Union[str, bytes]]] = None):  # RUF011
 187 187 |     pass
+188 188 | 
+189 189 | 
 
 
