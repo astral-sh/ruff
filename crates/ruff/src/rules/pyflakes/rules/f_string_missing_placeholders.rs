@@ -89,8 +89,7 @@ fn fix_f_string_missing_placeholders(
     checker: &mut Checker,
 ) -> Fix {
     let content = &checker.locator.contents()[TextRange::new(prefix_range.end(), tok_range.end())];
-    #[allow(deprecated)]
-    Fix::unspecified(Edit::replacement(
+    Fix::suggested(Edit::replacement(
         unescape_f_string(content),
         prefix_range.start(),
         tok_range.end(),
