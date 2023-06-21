@@ -34,7 +34,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling_comments(item);
-        let slash_and_star = find_argument_separators(f.context().contents(), item);
+        let (slash, star) = find_argument_separators(f.context().contents(), item);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let separator = format_with(|f| write!(f, [text(","), soft_line_break_or_space()]));
@@ -52,8 +52,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             } else {
                 let slash_comments_end = dangling.partition_point(|comment| {
                     let assignment = assign_argument_separator_comment_placement(
-                        slash_and_star.slash,
-                        slash_and_star.star,
+                        slash.as_ref(),
+                        star.as_ref(),
                         comment.slice().range(),
                         comment.line_position(),
                     )
@@ -243,25 +243,29 @@ impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
 /// ```text
 /// def f(arg_a, /, arg_b, *, arg_c): pass
 ///            ^ ^  ^    ^ ^  ^ slash preceding end
-///              ^  ^    ^ ^  ^ slash
+///              ^  ^    ^ ^  ^ slash (a separator)
 ///                 ^    ^ ^  ^ slash following start
 ///                      ^ ^  ^ star preceding end
-///                        ^  ^ star
+///                        ^  ^ star (a separator)
 ///                           ^ star following start
 /// ```
 #[derive(Debug)]
-pub(crate) struct ArgumentSeparators {
-    /// (preceding_end, slash, following_start)
-    pub(crate) slash: Option<(TextSize, TextRange, TextSize)>,
-    /// (preceding_end, star, following_start)
-    pub(crate) star: Option<(TextSize, TextRange, TextSize)>,
+pub(crate) struct ArgumentSeparator {
+    /// The end of the last node or separator before this separator
+    pub(crate) preceding_end: TextSize,
+    /// The range of the separator itself
+    pub(crate) separator: TextRange,
+    /// The start of the first node or separator following this separator
+    pub(crate) following_start: TextSize,
 }
 
 /// Finds slash and star in `f(a, /, b, *, c)`
+///
+/// Returns slash and star
 pub(crate) fn find_argument_separators(
     contents: &str,
     arguments: &Arguments,
-) -> ArgumentSeparators {
+) -> (Option<ArgumentSeparator>, Option<ArgumentSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
     let slash = if arguments.posonlyargs.is_empty() {
@@ -308,8 +312,8 @@ pub(crate) fn find_argument_separators(
             .last()
             .map(|arg| arg.range.end())
             .or(slash.map(|(_, slash)| slash.end()));
-        if let Some(after) = after_arguments {
-            let range = TextRange::new(after, arguments.end());
+        if let Some(preceding_end) = after_arguments {
+            let range = TextRange::new(preceding_end, arguments.end());
             let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
 
             let comma = tokens
@@ -320,7 +324,12 @@ pub(crate) fn find_argument_separators(
                 .next()
                 .expect("The function definition can't end here");
             debug_assert!(star.kind() == TokenKind::Star, "{star:?}");
-            Some((after, star.range, first_keyword_argument.start()))
+
+            Some(ArgumentSeparator {
+                preceding_end,
+                separator: star.range,
+                following_start: first_keyword_argument.start(),
+            })
         } else {
             let mut tokens = SimpleTokenizer::new(contents, arguments.range).skip_trivia();
 
@@ -332,11 +341,11 @@ pub(crate) fn find_argument_separators(
                 .next()
                 .expect("The function definition can't end here");
             debug_assert!(star.kind() == TokenKind::Star, "{star:?}");
-            Some((
-                arguments.range.start(),
-                star.range,
-                first_keyword_argument.start(),
-            ))
+            Some(ArgumentSeparator {
+                preceding_end: arguments.range.start(),
+                separator: star.range,
+                following_start: first_keyword_argument.start(),
+            })
         }
     } else {
         None
@@ -353,11 +362,15 @@ pub(crate) fn find_argument_separators(
         .first()
         .map(Ranged::start)
         .or(arguments.vararg.as_ref().map(|first| first.start()))
-        .or(star.map(|(_, star, _)| star.start()))
+        .or(star.as_ref().map(|star| star.separator.start()))
         .unwrap_or(arguments.end());
-    let slash = slash.map(|(preceding_end, slash)| (preceding_end, slash, slash_following_start));
+    let slash = slash.map(|(preceding_end, slash)| ArgumentSeparator {
+        preceding_end,
+        separator: slash,
+        following_start: slash_following_start,
+    });
 
-    ArgumentSeparators { slash, star }
+    (slash, star)
 }
 
 /// Locates positional only arguments separator `/` or the keywords only arguments
@@ -451,12 +464,17 @@ pub(crate) fn find_argument_separators(
 ///                     ^^^^^^ keyword only arguments (kwargs)
 /// ```
 pub(crate) fn assign_argument_separator_comment_placement(
-    slash: Option<(TextSize, TextRange, TextSize)>,
-    star: Option<(TextSize, TextRange, TextSize)>,
+    slash: Option<&ArgumentSeparator>,
+    star: Option<&ArgumentSeparator>,
     comment_range: TextRange,
     text_position: CommentLinePosition,
 ) -> Option<ArgumentSeparatorCommentLocation> {
-    if let Some((preceding_end, slash, following_start)) = slash {
+    if let Some(ArgumentSeparator {
+        preceding_end,
+        separator: slash,
+        following_start,
+    }) = slash
+    {
         // ```python
         // def f(
         //    # start too early
@@ -466,7 +484,7 @@ pub(crate) fn assign_argument_separator_comment_placement(
         //    b,
         // )
         // ```
-        if comment_range.start() > preceding_end
+        if comment_range.start() > *preceding_end
             && comment_range.start() < slash.start()
             && text_position.is_own_line()
         {
@@ -483,14 +501,19 @@ pub(crate) fn assign_argument_separator_comment_placement(
         // )
         // ```
         if comment_range.start() > slash.end()
-            && comment_range.start() < following_start
+            && comment_range.start() < *following_start
             && text_position.is_end_of_line()
         {
             return Some(ArgumentSeparatorCommentLocation::SlashTrailing);
         }
     }
 
-    if let Some((preceding_end, star, following_start)) = star {
+    if let Some(ArgumentSeparator {
+        preceding_end,
+        separator: star,
+        following_start,
+    }) = star
+    {
         // ```python
         // def f(
         //    # start too early
@@ -500,7 +523,7 @@ pub(crate) fn assign_argument_separator_comment_placement(
         //    b,
         // )
         // ```
-        if comment_range.start() > preceding_end
+        if comment_range.start() > *preceding_end
             && comment_range.start() < star.start()
             && text_position.is_own_line()
         {
@@ -517,7 +540,7 @@ pub(crate) fn assign_argument_separator_comment_placement(
         // )
         // ```
         if comment_range.start() > star.end()
-            && comment_range.start() < following_start
+            && comment_range.start() < *following_start
             && text_position.is_end_of_line()
         {
             return Some(ArgumentSeparatorCommentLocation::StarTrailing);

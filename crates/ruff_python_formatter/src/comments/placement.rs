@@ -643,11 +643,11 @@ fn handle_arguments_separator_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    let slash_and_star = find_argument_separators(locator.contents(), arguments);
+    let (slash, star) = find_argument_separators(locator.contents(), arguments);
     let comment_range = comment.slice().range();
     let placement = assign_argument_separator_comment_placement(
-        slash_and_star.slash,
-        slash_and_star.star,
+        slash.as_ref(),
+        star.as_ref(),
         comment_range,
         comment.line_position(),
     );
