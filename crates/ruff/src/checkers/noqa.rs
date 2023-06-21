@@ -41,12 +41,14 @@ pub(crate) fn check_noqa(
             if let Some(caps) = NOQA_LINE_EXPLANATION_REGEX.captures(text) {
                 match (caps.name("noqa"), caps.name("explanation")) {
                     (Some(_noqa), Some(explanation)) if explanation.as_str().is_empty() => {
-                        diagnostics.push(Diagnostic::new(UnexplainedNOQA, *comment_range));
+                        diagnostics.push(Diagnostic::new(
+                            UnexplainedNOQA {
+                                directive: text.to_string(),
+                            },
+                            *comment_range,
+                        ));
                     }
-                    (Some(_noqa), None) => {
-                        diagnostics.push(Diagnostic::new(UnexplainedNOQA, *comment_range));
-                    }
-                    _ => {}
+                    _ => continue,
                 }
             }
         }
@@ -57,7 +59,10 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
-        if matches!(diagnostic.kind.rule(), Rule::BlanketNOQA) {
+        if matches!(
+            diagnostic.kind.rule(),
+            Rule::BlanketNOQA | Rule::UnexplainedNOQA
+        ) {
             continue;
         }
 

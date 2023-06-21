@@ -22,11 +22,16 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## References
 /// - [Ruff documentation: Error suppression](https://beta.ruff.rs/docs/configuration/#error-suppression)
 #[violation]
-pub struct UnexplainedNOQA;
+pub struct UnexplainedNOQA {
+    pub directive: String,
+}
 
 impl Violation for UnexplainedNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexplained `noqa` directive")
+        let UnexplainedNOQA { directive } = self;
+        format!(
+            "Unexplained `noqa` directive, consider adding an explanation comment to `{directive}`"
+        )
     }
 }
