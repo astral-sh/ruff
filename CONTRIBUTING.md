@@ -12,7 +12,7 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
   - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
 - [MkDocs](#mkdocs)
 - [Release Process](#release-process)
-- [Benchmarks](#benchmarks)
+- [Benchmarks](#benchmarking-and-profiling)
 
 ## The Basics
 
@@ -307,7 +307,15 @@ downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-ag
 as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/astral-sh/ruff/blob/main/scripts/Dockerfile.ecosystem).
 Note that this check will take a while to run.
 
-## Benchmarks
+## Benchmarking and Profiling
+
+We have several ways of benchmarking and profiling Ruff:
+
+- Our main performance benchmark comparing Ruff with other tools on the CPython codebase
+- Microbenchmarks which the linter or the formatter on individual files. There run on pull requests.
+- Profiling the linter on either the microbenchmarks or entire projects
+
+### CPython Benchmark
 
 First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,
 which makes it a good target for benchmarking.
@@ -386,9 +394,9 @@ Summary
   159.43 ± 2.48 times faster than 'pycodestyle crates/ruff/resources/test/cpython'
 ```
 
-You can run `poetry install` from `./scripts` to create a working environment for the above. All
-reported benchmarks were computed using the versions specified by `./scripts/pyproject.toml`
-on Python 3.11.
+You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the
+above. All reported benchmarks were computed using the versions specified by
+`./scripts/benchmarks/pyproject.toml` on Python 3.11.
 
 To benchmark Pylint, remove the following files from the CPython repository:
 
@@ -429,3 +437,116 @@ Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
   Time (mean ± σ):     30.119 s ±  0.195 s    [User: 28.638 s, System: 0.390 s]
   Range (min … max):   29.813 s … 30.356 s    10 runs
 ```
+
+## Microbenchmarks
+
+The `ruff_benchmark` crate benchmarks the linter and the formatter on individual files.
+
+You can run the benchmarks with
+
+```shell
+cargo benchmark
+```
+
+### Benchmark driven Development
+
+Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
+`--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
+`--benchmark=<name>` to compare against that benchmark. Criterion will print a message telling you
+if the benchmark improved/regressed compared to that baseline.
+
+```shell
+# Run once on your "baseline" code
+cargo benchmark --save-baseline=main
+
+# Then iterate with
+cargo benchmark --baseline=main
+```
+
+### PR Summary
+
+You can use `--save-baseline` and `critcmp` to get a pretty comparison between two recordings.
+This is useful to illustrate the improvements of a PR.
+
+```shell
+# On main
+cargo benchmark --save-baseline=main
+
+# After applying your changes
+cargo benchmark --save-baseline=pr
+
+critcmp main pr
+```
+
+You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comparison.
+
+```bash
+cargo install critcmp
+```
+
+### Tips
+
+- Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
+  to only run the pydantic tests.
+- Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
+- Use `cargo benchmark --quick` to get faster results (more prone to noise)
+
+## Profiling Projects
+
+You can either use the microbenchmarks from above or a project directory for benchmarking. There
+are a lot of profiling tools out there,
+[The Rust Performance Book](https://nnethercote.github.io/perf-book/profiling.html) lists some
+examples.
+
+### Linux
+
+Install `perf` and build `ruff_benchmark` with the `release-debug` profile and then run it with perf
+
+```shell
+cargo bench -p ruff_benchmark --no-run --profile=release-debug && perf record -g -F 9999 cargo bench -p ruff_benchmark --profile=release-debug -- --profile-time=1
+```
+
+You can also use the `ruff_dev` launcher to run `ruff check` multiple times on a repository to
+gather enough samples for a good flamegraph (change the 999, the sample rate, and the 30, the number
+of checks, to your liking)
+
+```shell
+cargo build --bin ruff_dev --profile=release-debug
+perf record -g -F 999 target/release-debug/ruff_dev repeat --repeat 30 --exit-zero --no-cache path/to/cpython > /dev/null
+```
+
+Then convert the recorded profile
+
+```shell
+perf script -F +pid > /tmp/test.perf
+```
+
+You can now view the converted file with [firefox profiler](https://profiler.firefox.com/), with a
+more in-depth guide [here](https://profiler.firefox.com/docs/#/./guide-perf-profiling)
+
+An alternative is to convert the perf data to `flamegraph.svg` using
+[flamegraph](https://github.com/flamegraph-rs/flamegraph) (`cargo install flamegraph`):
+
+```shell
+flamegraph --perfdata perf.data
+```
+
+### Mac
+
+Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
+
+```shell
+cargo install cargo-instruments
+```
+
+Then run the profiler with
+
+```shell
+cargo instruments -t time --bench linter --profile release-debug -p ruff_benchmark -- --profile-time=1
+```
+
+- `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc`
+  for profiling the allocations.
+- You may want to pass an additional filter to run a single test file
+
+Otherwise, follow the instructions from the linux section.
