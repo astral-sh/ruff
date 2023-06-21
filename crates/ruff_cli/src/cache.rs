@@ -66,7 +66,6 @@ impl Cache {
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings.
-    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn open(cache_dir: &Path, package_root: PathBuf, settings: &Settings) -> Cache {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
@@ -103,24 +102,26 @@ impl Cache {
             );
             package.files.clear();
         }
+        Cache::new(path, package)
+    }
+
+    /// Create an empty `Cache`.
+    fn empty(path: PathBuf, package_root: PathBuf) -> Cache {
+        let package = PackageCache {
+            package_root,
+            files: HashMap::new(),
+        };
+        Cache::new(path, package)
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn new(path: PathBuf, package: PackageCache) -> Cache {
         Cache {
             path,
             package,
             new_files: Mutex::new(HashMap::new()),
-            last_seen_cache: SystemTime::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
-        }
-    }
-
-    /// Create an empty `Cache`.
-    #[allow(clippy::cast_possible_truncation)]
-    fn empty(path: PathBuf, package_root: PathBuf) -> Cache {
-        Cache {
-            path,
-            package: PackageCache {
-                package_root,
-                files: HashMap::new(),
-            },
-            new_files: Mutex::new(HashMap::new()),
+            // SAFETY: this will be truncated to the year ~2554 (so don't use
+            // this code after that!).
             last_seen_cache: SystemTime::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         }
     }
@@ -138,6 +139,7 @@ impl Cache {
         // Remove cached files that we haven't seen in a while.
         let now = self.last_seen_cache;
         self.package.files.retain(|_, file| {
+            // SAFETY: this will be truncated to the year ~2554.
             (now - *file.last_seen.get_mut()) >= MAX_LAST_SEEN.as_millis() as u64
         });
 
@@ -248,7 +250,7 @@ pub(crate) struct FileCache {
     /// Timestamp when we last linted this file.
     ///
     /// Represented as the number of milliseconds since Unix epoch. This will
-    /// break in 1970 + ~584 years.
+    /// break in 1970 + ~584 years (~2554).
     last_seen: AtomicU64,
     /// Imports made.
     imports: ImportMap,
