@@ -7,6 +7,7 @@ use ruff_formatter::{
 };
 use rustpython_parser::ast::Expr;
 
+mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
@@ -59,7 +60,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         );
 
         let format_expr = format_with(|f| match item {
-            Expr::BoolOp(expr) => expr.format().fmt(f),
+            Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::NamedExpr(expr) => expr.format().fmt(f),
             Expr::BinOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::UnaryOp(expr) => expr.format().fmt(f),
