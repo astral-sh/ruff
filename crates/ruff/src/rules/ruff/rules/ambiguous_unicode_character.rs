@@ -15,7 +15,7 @@ use crate::settings::Settings;
 /// Checks for ambiguous unicode characters in strings.
 ///
 /// ## Why is this bad?
-/// Ambiguous unicode characters in strings can confuse readers and cause
+/// The use of ambiguous unicode characters can confuse readers and cause
 /// subtle bugs.
 ///
 /// ## Example
@@ -64,8 +64,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
 /// Checks for ambiguous unicode characters in docstrings.
 ///
 /// ## Why is this bad?
-/// Ambiguous unicode characters in docstrings can confuse readers and cause
-/// subtle bugs in documentation tools.
+/// The use of ambiguous unicode characters can confuse readers and cause
+/// subtle bugs.
 ///
 /// ## Example
 /// ```python
@@ -113,8 +113,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
 /// Checks for ambiguous unicode characters in comments.
 ///
 /// ## Why is this bad?
-/// Ambiguous unicode characters in comments can confuse readers and cause
-/// subtle bugs in tools that parse comments.
+/// The use of ambiguous unicode characters can confuse readers and cause
+/// subtle bugs.
 ///
 /// ## Example
 /// ```python

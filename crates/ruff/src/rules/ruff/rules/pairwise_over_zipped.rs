@@ -10,9 +10,11 @@ use crate::checkers::ast::Checker;
 /// Checks for use of `zip()` to iterate over successive pairs of elements.
 ///
 /// ## Why is this bad?
-/// Use `itertools.pairwise()` instead of `zip()` to iterate over successive
-/// pairs of elements. This is more readable as it avoids the need to slice the
-/// iterable and conveys the intent more clearly.
+/// When iterating over successive pairs of elements, prefer
+/// `itertools.pairwise()` over `zip()`.
+///
+/// `itertools.pairwise()` is more readable and conveys the intent of the code
+/// more clearly.
 ///
 /// ## Example
 /// ```python

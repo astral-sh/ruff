@@ -14,16 +14,19 @@ pub struct CollectionLiteralConcatenation {
 }
 
 /// ## What it does
-/// Checks for concatenation of collections using the `+` operator.
+/// Checks for uses of the `+` operator to concatenate collections.
 ///
 /// ## Why is this bad?
-/// Use the unpacking operator (`*`) to unpack collections into new collections
-/// rather than concatenating them literally. This is more readable and
-/// efficient, as it avoids unnecessary collection calls.
+/// In Python, the `+` operator can be used to concatenate collections (e.g.,
+/// `x + y` to concatenate the lists `x` and `y`).
 ///
-/// The `*` operator is also more flexible as it can unpack any iterable,
-/// whereas `+` operates only on particular sequences which must be of the same
-/// type.
+/// However, collections can be concatenated more efficiently using the
+/// unpacking operator (e.g., `[*x, *y]` to concatenate `x` and `y`).
+///
+/// Prefer the unpacking operator to concatenate collections, as it is more
+/// readable and flexible. The `*` operator can unpack any iterable, whereas
+///  `+` operates only on particular sequences which, in many cases, must be of
+/// the same type.
 ///
 /// ## Example
 /// ```python
