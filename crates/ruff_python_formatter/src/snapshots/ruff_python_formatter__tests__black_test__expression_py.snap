@@ -281,7 +281,8 @@ last_call()
  ~int and not v1 ^ 123 + v2 | True
  (~int) and (not ((v1 ^ (123 + v2)) | True))
 -+(really ** -(confusing ** ~(operator**-precedence)))
--flags & ~select.EPOLLIN and waiters.write_task is not None
+++really ** -confusing ** ~operator**-precedence
+ flags & ~select.EPOLLIN and waiters.write_task is not None
 -lambda arg: None
 -lambda a=True: a
 -lambda a, b, c=True: a
@@ -304,8 +305,6 @@ last_call()
 -)
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
-++really ** -confusing ** ~operator**-precedence
-+flags & ~select.EPOLLIN and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +lambda x: True
 +lambda x: True
 +lambda x: True
@@ -364,17 +363,17 @@ last_call()
 -    4,
 -    5,
 -]
+-[
+-    4,
+-    *a,
+-    5,
+-]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
 +[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
  [
--    4,
--    *a,
--    5,
--]
--[
      this_is_a_very_long_variable_which_will_force_a_delimiter_split,
      element,
      another,
@@ -397,8 +396,21 @@ last_call()
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 -}
--Python3 > Python2 > COBOL
--Life is Life
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++[i for i in []]
++[i for i in []]
++[i for i in []]
++[i for i in []]
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+ Python3 > Python2 > COBOL
+ Life is Life
 -call()
 -call(arg)
 -call(kwarg="hey")
@@ -415,21 +427,6 @@ last_call()
 -call(a, *gidgets[:2])
 -call(**self.screen_kwargs)
 -call(b, **self.screen_kwargs)
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+[i for i in []]
-+[i for i in []]
-+[i for i in []]
-+[i for i in []]
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
@@ -556,19 +553,10 @@ last_call()
 -g = 1, *"ten"
 -what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
 -    vars_to_remove
-+e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+f = 1, NOT_YET_IMPLEMENTED_ExprStarred
-+g = 1, NOT_YET_IMPLEMENTED_ExprStarred
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
-+    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- )
+-)
 -what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
 -    vars_to_remove
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
-+    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -576,7 +564,13 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
++e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++f = 1, NOT_YET_IMPLEMENTED_ExprStarred
++g = 1, NOT_YET_IMPLEMENTED_ExprStarred
++what_is_up_with_those_new_coord_names = (
++    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -586,7 +580,10 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ )
 -Ø = set()
 -authors.łukasz.say_thanks()
 +result = NOT_IMPLEMENTED_call()
@@ -641,44 +638,29 @@ last_call()
      ...
  for j in 1 + (2 + 3):
      ...
-@@ -272,28 +254,16 @@
+@@ -272,7 +254,7 @@
      addr_proto,
      addr_canonname,
      addr_sockaddr,
 -) in socket.getaddrinfo("google.com", "http"):
 +) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
      pass
--a = (
--    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
--    in qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
--)
--a = (
--    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
--    not in qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
--)
--a = (
--    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
--    is qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
--)
--a = (
--    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
--    is not qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
--)
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+ a = (
+     aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
+@@ -291,9 +273,9 @@
+     is not qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
+ )
  if (
 -    threading.current_thread() != threading.main_thread()
 -    and threading.current_thread() != threading.main_thread()
 -    or signal.getsignal(signal.SIGINT) != signal.default_int_handler
-+    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+    or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
++    and NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
++    or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) != signal.default_int_handler
  ):
      return True
  if (
-@@ -327,13 +297,18 @@
+@@ -327,13 +309,18 @@
  ):
      return True
  if (
@@ -700,7 +682,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -341,7 +316,8 @@
+@@ -341,7 +328,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -710,7 +692,7 @@ last_call()
      ^ aaaaaaaaaaaaaaaa.i
      << aaaaaaaaaaaaaaaa.k
      >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
-@@ -366,5 +342,5 @@
+@@ -366,5 +354,5 @@
      ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
      ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  )
@@ -756,7 +738,7 @@ not great
 ~int and not v1 ^ 123 + v2 | True
 (~int) and (not ((v1 ^ (123 + v2)) | True))
 +really ** -confusing ** ~operator**-precedence
-flags & ~select.EPOLLIN and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+flags & ~select.EPOLLIN and waiters.write_task is not None
 lambda x: True
 lambda x: True
 lambda x: True
@@ -825,8 +807,8 @@ NOT_YET_IMPLEMENTED_ExprSetComp
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+Python3 > Python2 > COBOL
+Life is Life
 NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
@@ -980,14 +962,26 @@ for (
     addr_sockaddr,
 ) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
     pass
-a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+a = (
+    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
+    in qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
+)
+a = (
+    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
+    not in qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
+)
+a = (
+    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
+    is qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
+)
+a = (
+    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
+    is not qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
+)
 if (
-    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-    or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
+    and NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
+    or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) != signal.default_int_handler
 ):
     return True
 if (

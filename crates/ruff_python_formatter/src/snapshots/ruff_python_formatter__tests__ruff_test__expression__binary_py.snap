@@ -252,7 +252,13 @@ aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp
 
 # But only for expressions that have a statement parent.
 not (aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp)
-[NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right]
+[
+    a
+    + [
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+    ]
+    in c,
+]
 
 
 # leading comment

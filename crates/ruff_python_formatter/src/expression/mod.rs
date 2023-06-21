@@ -76,7 +76,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Await(expr) => expr.format().fmt(f),
             Expr::Yield(expr) => expr.format().fmt(f),
             Expr::YieldFrom(expr) => expr.format().fmt(f),
-            Expr::Compare(expr) => expr.format().fmt(f),
+            Expr::Compare(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::JoinedStr(expr) => expr.format().fmt(f),

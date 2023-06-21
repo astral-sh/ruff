@@ -152,21 +152,22 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/3184.
-@@ -52,29 +34,27 @@
-     async def call(param):
+@@ -53,28 +35,29 @@
          if param:
              # fmt: off
--            if param[0:4] in (
+             if param[0:4] in (
 -                "ABCD", "EFGH"
 -            )  :
-+            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++                "NOT_YET_IMPLEMENTED_STRING",
++                "NOT_YET_IMPLEMENTED_STRING",
++            ):
                  # fmt: on
 -                print ( "This won't be formatted" )
 +                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -            elif param[0:4] in ("ZZZZ",):
 -                print ( "This won't be formatted either" )
-+            elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++            elif param[0:4] in ("NOT_YET_IMPLEMENTED_STRING",):
 +                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -        print("This will be formatted")
@@ -189,7 +190,7 @@ elif   unformatted:
      # fmt: on
  
  
-@@ -82,6 +62,6 @@
+@@ -82,6 +65,6 @@
  if x:
      return x
  # fmt: off
@@ -239,11 +240,14 @@ class A:
     async def call(param):
         if param:
             # fmt: off
-            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+            if param[0:4] in (
+                "NOT_YET_IMPLEMENTED_STRING",
+                "NOT_YET_IMPLEMENTED_STRING",
+            ):
                 # fmt: on
                 NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-            elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+            elif param[0:4] in ("NOT_YET_IMPLEMENTED_STRING",):
                 NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
         NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)

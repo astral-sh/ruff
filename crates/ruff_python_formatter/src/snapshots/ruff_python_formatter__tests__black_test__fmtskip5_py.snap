@@ -22,15 +22,14 @@ else:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,9 @@
+@@ -1,9 +1,10 @@
  a, b, c = 3, 4, 5
  if (
--    a == 3
+     a == 3
 -    and b    != 9  # fmt: skip
--    and c is not None
-+    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right  # fmt: skip
-+    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    and b
++    != 9  # fmt: skip
+     and c is not None
  ):
 -    print("I'm good!")
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
@@ -44,9 +43,10 @@ else:
 ```py
 a, b, c = 3, 4, 5
 if (
-    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right  # fmt: skip
-    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    a == 3
+    and b
+    != 9  # fmt: skip
+    and c is not None
 ):
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:

@@ -83,7 +83,7 @@ def func():
 +    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
          embedded = []
          for exc in exc_value.exceptions:
--            if exc not in _seen:
+             if exc not in _seen:
 -                embedded.append(
 -                    # This should be left alone (before)
 -                    traceback.TracebackException.from_exception(
@@ -97,7 +97,6 @@ def func():
 -                    )
 -                    # This should be left alone (after)
 -                )
-+            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
 +                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
      # everything is fine if the expression isn't nested
@@ -130,7 +129,7 @@ def func():
     if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         embedded = []
         for exc in exc_value.exceptions:
-            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+            if exc not in _seen:
                 NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
     # everything is fine if the expression isn't nested

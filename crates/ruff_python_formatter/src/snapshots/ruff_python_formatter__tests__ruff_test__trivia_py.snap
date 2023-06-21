@@ -62,7 +62,7 @@ class Test:
 
 c = 30
 
-while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+while a == 10:
     ...
 
     # trailing comment with one line before
@@ -71,7 +71,7 @@ while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
 
 d = 40
 
-while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+while b == 20:
     ...
     # no empty line before
 

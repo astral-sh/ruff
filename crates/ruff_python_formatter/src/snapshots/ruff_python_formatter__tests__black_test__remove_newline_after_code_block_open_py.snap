@@ -179,21 +179,21 @@ with open("/path/to/file.txt", mode="r") as read_file:
  
 -if random.randint(0, 3) == 0:
 -    print("The new line above me is about to be removed!")
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) == 0:
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -if random.randint(0, 3) == 0:
 -    print("The new lines above me is about to be removed!")
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) == 0:
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -if random.randint(0, 3) == 0:
 -    if random.uniform(0, 1) > 0.5:
 -        print("Two lines above me are about to be removed!")
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) == 0:
++    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) > 0.5:
 +        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
@@ -273,16 +273,16 @@ for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) == 0:
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) == 0:
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) == 0:
+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) > 0.5:
         NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 

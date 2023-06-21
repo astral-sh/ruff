@@ -101,8 +101,7 @@ if __name__ == "__main__":
 -for i in range(100):
 +for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
      # first we do this
--    if i % 33 == 0:
-+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+     if i % 33 == 0:
          break
  
      # then we do this
@@ -117,11 +116,11 @@ if __name__ == "__main__":
 -try:
 -    with open(some_other_file) as w:
 -        w.write(data)
--
--except OSError:
--    print("problems")
 +NOT_YET_IMPLEMENTED_StmtTry
  
+-except OSError:
+-    print("problems")
+-
 -import sys
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -151,7 +150,7 @@ if __name__ == "__main__":
  
 -if __name__ == "__main__":
 -    main()
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++if __name__ == "NOT_YET_IMPLEMENTED_STRING":
 +    NOT_IMPLEMENTED_call()
 ```
 
@@ -170,7 +169,7 @@ while True:
 
 for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
     # first we do this
-    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    if i % 33 == 0:
         break
 
     # then we do this
@@ -223,7 +222,7 @@ def g():
     ...
 
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if __name__ == "NOT_YET_IMPLEMENTED_STRING":
     NOT_IMPLEMENTED_call()
 ```
 

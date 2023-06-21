@@ -99,13 +99,12 @@ return np.divide(
 +i = NOT_IMPLEMENTED_call() ** 5
 +j = NOT_IMPLEMENTED_call().name ** 5
 +k = [i for i in []]
-+l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  m = [([2**63], [1, 2**63])]
--n = count <= 10**5
+ n = count <= 10**5
 -o = settings(max_examples=10**6)
 -p = {(k, k**2): v**2 for k, v in pairs}
 -q = [10**i for i in range(6)]
-+n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +q = [i for i in []]
@@ -131,13 +130,12 @@ return np.divide(
 +i = NOT_IMPLEMENTED_call() ** 5.0
 +j = NOT_IMPLEMENTED_call().name ** 5.0
 +k = [i for i in []]
-+l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  m = [([2.0**63.0], [1.0, 2**63.0])]
--n = count <= 10**5.0
+ n = count <= 10**5.0
 -o = settings(max_examples=10**6.0)
 -p = {(k, k**2): v**2.0 for k, v in pairs}
 -q = [10.5**i for i in range(6)]
-+n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +q = [i for i in []]
@@ -187,9 +185,9 @@ h = 5 ** NOT_IMPLEMENTED_call()
 i = NOT_IMPLEMENTED_call() ** 5
 j = NOT_IMPLEMENTED_call().name ** 5
 k = [i for i in []]
-l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 m = [([2**63], [1, 2**63])]
-n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+n = count <= 10**5
 o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 q = [i for i in []]
@@ -206,9 +204,9 @@ h = 5.0 ** NOT_IMPLEMENTED_call()
 i = NOT_IMPLEMENTED_call() ** 5.0
 j = NOT_IMPLEMENTED_call().name ** 5.0
 k = [i for i in []]
-l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 m = [([2.0**63.0], [1.0, 2**63.0])]
-n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+n = count <= 10**5.0
 o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 q = [i for i in []]
