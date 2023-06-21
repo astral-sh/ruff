@@ -3852,6 +3852,9 @@ where
                             );
                         }
 
+                        // Grab the existing binding.
+                        let existing_id = self.semantic.scope().get(name);
+
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(
                             name,
@@ -3861,14 +3864,6 @@ where
                         );
 
                         walk_except_handler(self, except_handler);
-
-                        // Remove it from the scope immediately after.
-                        self.add_binding(
-                            name,
-                            range,
-                            BindingKind::UnboundException,
-                            BindingFlags::empty(),
-                        );
 
                         // If the exception name wasn't used in the scope, emit a diagnostic.
                         if !self.semantic.is_used(binding_id) {
@@ -3888,6 +3883,23 @@ where
                                 }
                                 self.diagnostics.push(diagnostic);
                             }
+                        }
+
+                        if let Some(existing_id) = existing_id {
+                            // If the name was already bound, restore the existing binding. We can't
+                            // know whether this handler will trigger, so we proceed as if it
+                            // didn't. Treat it as an entirely new binding to avoid creating a cycle
+                            // in the shadowing graph.
+                            let binding_id = self.semantic.copy_binding(existing_id);
+                            self.semantic.scope_mut().add(name, binding_id);
+                        } else {
+                            // If the name wasn't already bound, mark it as unbound.
+                            self.add_binding(
+                                name,
+                                range,
+                                BindingKind::UnboundException,
+                                BindingFlags::empty(),
+                            );
                         }
                     }
                     None => walk_except_handler(self, except_handler),

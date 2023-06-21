@@ -228,6 +228,12 @@ impl<'a> SemanticModel<'a> {
             .map(|binding_id| &self.bindings[binding_id])
     }
 
+    /// Create a copy of the given [`BindingId`] and return the new [`BindingId`].
+    pub fn copy_binding(&mut self, id: BindingId) -> BindingId {
+        let binding = self.bindings[id].clone();
+        self.bindings.push(binding)
+    }
+
     /// Return the [`BindingId`] that the given [`BindingId`] shadows, if any.
     ///
     /// Note that this will only return bindings that are shadowed by a binding in a parent scope.

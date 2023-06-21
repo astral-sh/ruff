@@ -353,9 +353,40 @@ mod tests {
             except Exception as x:
                 pass
 
+            # No error here, though it should arguably be an F821 error. `x` will
+            # be unbound after the `except` block (assuming an exception is raised
+            # and caught).
             print(x)
             "#,
-        "print_after_shadowing_except"
+        "print_in_body_after_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            try:
+                x = 3
+            except ImportError as x:
+                print(x)
+            else:
+                print(x)
+            "#,
+        "print_in_try_else_after_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            list = [1, 2, 3]
+
+            for e in list:
+                if e % 2 == 0:
+                    try:
+                        pass
+                    except Exception as e:
+                        print(e)
+                else:
+                    print(e)
+            "#,
+        "print_in_if_else_after_shadowing_except"
     )]
     #[test_case(
         r#"
@@ -1991,7 +2022,11 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
+            &[
+                Rule::UnusedImport,
+                Rule::RedefinedWhileUnused,
+                Rule::UnusedVariable,
+            ],
         );
     }
 
