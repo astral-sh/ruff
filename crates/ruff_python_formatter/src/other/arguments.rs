@@ -268,10 +268,7 @@ pub(crate) fn find_argument_separators(
 ) -> (Option<ArgumentSeparator>, Option<ArgumentSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
-    let slash = if arguments.posonlyargs.is_empty() {
-        // If there are no positional only arguments the default handling below is wrong
-        None
-    } else if let Some(preceding_end) = arguments.posonlyargs.last().map(Ranged::end) {
+    let slash = if let Some(preceding_end) = arguments.posonlyargs.last().map(Ranged::end) {
         // ```text
         // def f(a1=1, a2=2, /, a3, a4): pass
         //                 ^^^^^^^^^^^ the range (defaults)
@@ -296,12 +293,10 @@ pub(crate) fn find_argument_separators(
     };
 
     // If we have a vararg we have a node that the comments attach to
-    let star = if arguments.kwonlyargs.is_empty() || arguments.vararg.is_some() {
-        // If there are no keyword only arguments the default handling below is wrong.
+    let star = if arguments.vararg.is_some() {
         // When the vararg is present the comments attach there and we don't need to do manual
         // formatting
         None
-        // No keyword only arguments, no star
     } else if let Some(first_keyword_argument) = arguments.kwonlyargs.first() {
         // Check in that order:
         // * `f(a, /, b, *, c)` and `f(a=1, /, b=2, *, c)`
