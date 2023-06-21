@@ -11,12 +11,14 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## Example
 /// ```python
-/// foo == ""  # noqa: PLC1901
+/// def foo(bar = 1):  # noqa: ARG001
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// foo == ""  # noqa: PLC1901  # Check for empty string, not just falsiness.
+/// def foo(bar = 1):  # noqa: ARG001  # We'll use arg `bar` a future version.
+///     ...
 /// ```
 ///
 /// ## References
