@@ -11,6 +11,22 @@ use crate::rules::ruff::rules::confusables::CONFUSABLES;
 use crate::rules::ruff::rules::Context;
 use crate::settings::Settings;
 
+/// ## What it does
+/// Checks for ambiguous unicode characters in strings.
+///
+/// ## Why is this bad?
+/// Ambiguous unicode characters in strings can confuse readers and cause
+/// subtle bugs.
+///
+/// ## Example
+/// ```python
+/// print("Ηello, world!")  # "Η" is the Greek eta (`U+0397`).
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")  # "H" is the Latin capital H (`U+0048`).
+/// ```
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
     confusable: char,
@@ -44,6 +60,22 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     }
 }
 
+/// ## What it does
+/// Checks for ambiguous unicode characters in docstrings.
+///
+/// ## Why is this bad?
+/// Ambiguous unicode characters in docstrings can confuse readers and cause
+/// subtle bugs in documentation tools.
+///
+/// ## Example
+/// ```python
+/// """A lovely docstring (with a `U+FF09` parenthesis）."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// """A lovely docstring (with no strange parentheses)."""
+/// ```
 #[violation]
 pub struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
@@ -77,6 +109,22 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     }
 }
 
+/// ## What it does
+/// Checks for ambiguous unicode characters in comments.
+///
+/// ## Why is this bad?
+/// Ambiguous unicode characters in comments can confuse readers and cause
+/// subtle bugs in tools that parse comments.
+///
+/// ## Example
+/// ```python
+/// foo()  # nоqa  # "о" is Cyrillic (`U+043E`)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo()  # noqa  # "o" is Latin (`U+006F`)
+/// ```
 #[violation]
 pub struct AmbiguousUnicodeCharacterComment {
     confusable: char,

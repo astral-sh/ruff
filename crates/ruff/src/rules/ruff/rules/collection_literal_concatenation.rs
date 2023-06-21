@@ -13,6 +13,31 @@ pub struct CollectionLiteralConcatenation {
     expr: String,
 }
 
+/// ## What it does
+/// Checks for concatenation of collections using the `+` operator.
+///
+/// ## Why is this bad?
+/// Use the unpacking operator (`*`) to unpack the elements of the collection
+/// into the new collection rather than concatenating them literally. This is
+/// more readable and efficient, as it avoids unnecessary collection calls. The
+/// `*` operator is also more flexible as it can unpack any iterable, whereas
+/// `+` operates only on particular sequences which must be of the same type.
+///
+/// ## Example
+/// ```python
+/// foo = [2, 3, 4]
+/// bar = [1] + foo + [5, 6]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = [2, 3, 4]
+/// bar = [1, *foo, 5, 6]
+/// ```
+///
+/// ## References
+/// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
+/// - [Python docs: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 impl Violation for CollectionLiteralConcatenation {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
