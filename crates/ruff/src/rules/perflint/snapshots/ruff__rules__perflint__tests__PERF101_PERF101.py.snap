@@ -1,0 +1,122 @@
+---
+source: crates/ruff/src/rules/perflint/mod.rs
+---
+PERF101.py:7:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+  |
+5 | foo_int = 123
+6 | 
+7 | for i in list(foo_tuple):  # PERF101
+  |          ^^^^^^^^^^^^^^^ PERF101
+8 |     pass
+  |
+  = help: Remove `list()` cast
+
+ℹ Fix
+4 4 | foo_dict = {1: 2, 3: 4}
+5 5 | foo_int = 123
+6 6 | 
+7   |-for i in list(foo_tuple):  # PERF101
+  7 |+for i in foo_tuple:  # PERF101
+8 8 |     pass
+9 9 | 
+10 10 | for i in list(foo_list):  # PERF101
+
+PERF101.py:10:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+ 8 |     pass
+ 9 | 
+10 | for i in list(foo_list):  # PERF101
+   |          ^^^^^^^^^^^^^^ PERF101
+11 |     pass
+   |
+   = help: Remove `list()` cast
+
+ℹ Fix
+7  7  | for i in list(foo_tuple):  # PERF101
+8  8  |     pass
+9  9  | 
+10    |-for i in list(foo_list):  # PERF101
+   10 |+for i in foo_list:  # PERF101
+11 11 |     pass
+12 12 | 
+13 13 | for i in list(foo_set):  # PERF101
+
+PERF101.py:13:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+11 |     pass
+12 | 
+13 | for i in list(foo_set):  # PERF101
+   |          ^^^^^^^^^^^^^ PERF101
+14 |     pass
+   |
+   = help: Remove `list()` cast
+
+ℹ Fix
+10 10 | for i in list(foo_list):  # PERF101
+11 11 |     pass
+12 12 | 
+13    |-for i in list(foo_set):  # PERF101
+   13 |+for i in foo_set:  # PERF101
+14 14 |     pass
+15 15 | 
+16 16 | 
+
+PERF101.py:17:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+17 | for i in list((1, 2, 3)):  # PERF101
+   |          ^^^^^^^^^^^^^^^ PERF101
+18 |     pass
+   |
+   = help: Remove `list()` cast
+
+ℹ Fix
+14 14 |     pass
+15 15 | 
+16 16 | 
+17    |-for i in list((1, 2, 3)):  # PERF101
+   17 |+for i in (1, 2, 3):  # PERF101
+18 18 |     pass
+19 19 | 
+20 20 | for i in list([1, 2, 3]):  # PERF101
+
+PERF101.py:20:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+18 |     pass
+19 | 
+20 | for i in list([1, 2, 3]):  # PERF101
+   |          ^^^^^^^^^^^^^^^ PERF101
+21 |     pass
+   |
+   = help: Remove `list()` cast
+
+ℹ Fix
+17 17 | for i in list((1, 2, 3)):  # PERF101
+18 18 |     pass
+19 19 | 
+20    |-for i in list([1, 2, 3]):  # PERF101
+   20 |+for i in [1, 2, 3]:  # PERF101
+21 21 |     pass
+22 22 | 
+23 23 | for i in list({1, 2, 3}):  # PERF101
+
+PERF101.py:23:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+21 |     pass
+22 | 
+23 | for i in list({1, 2, 3}):  # PERF101
+   |          ^^^^^^^^^^^^^^^ PERF101
+24 |     pass
+   |
+   = help: Remove `list()` cast
+
+ℹ Fix
+20 20 | for i in list([1, 2, 3]):  # PERF101
+21 21 |     pass
+22 22 | 
+23    |-for i in list({1, 2, 3}):  # PERF101
+   23 |+for i in {1, 2, 3}:  # PERF101
+24 24 |     pass
+25 25 | 
+26 26 | 
+
+
