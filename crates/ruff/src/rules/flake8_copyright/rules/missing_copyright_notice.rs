@@ -28,7 +28,7 @@ pub(crate) fn missing_copyright_notice(
     settings: &Settings,
 ) -> Option<Diagnostic> {
     // Ignore files that are too small to contain a copyright notice.
-    if locator.len() < settings.copyright.min_file_size {
+    if locator.len() < settings.flake8_copyright.min_file_size {
         return None;
     }
 
@@ -40,8 +40,8 @@ pub(crate) fn missing_copyright_notice(
     };
 
     // Locate the copyright notice.
-    if let Some(match_) = settings.copyright.notice_rgx.find(contents) {
-        match settings.copyright.author {
+    if let Some(match_) = settings.flake8_copyright.notice_rgx.find(contents) {
+        match settings.flake8_copyright.author {
             Some(ref author) => {
                 // Ensure that it's immediately followed by the author.
                 if contents[match_.end()..].trim_start().starts_with(author) {
