@@ -99,10 +99,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             returns,
             ..
         }) => {
-            visitor.visit_arguments(args);
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
+            visitor.visit_arguments(args);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
@@ -115,10 +115,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             returns,
             ..
         }) => {
-            visitor.visit_arguments(args);
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
+            visitor.visit_arguments(args);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
@@ -131,14 +131,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             decorator_list,
             ..
         }) => {
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
+            }
             for expr in bases {
                 visitor.visit_expr(expr);
             }
             for keyword in keywords {
                 visitor.visit_keyword(keyword);
-            }
-            for decorator in decorator_list {
-                visitor.visit_decorator(decorator);
             }
             visitor.visit_body(body);
         }
@@ -180,10 +180,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             value,
             ..
         }) => {
-            visitor.visit_annotation(annotation);
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
+            visitor.visit_annotation(annotation);
             visitor.visit_expr(target);
         }
         Stmt::For(ast::StmtFor {
@@ -633,10 +633,10 @@ pub fn walk_arg_with_default<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     arg_with_default: &'a ArgWithDefault,
 ) {
-    visitor.visit_arg(&arg_with_default.def);
     if let Some(expr) = &arg_with_default.default {
         visitor.visit_expr(expr);
     }
+    visitor.visit_arg(&arg_with_default.def);
 }
 
 pub fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a Keyword) {
