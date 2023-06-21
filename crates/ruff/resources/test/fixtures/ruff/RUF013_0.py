@@ -206,9 +206,18 @@ def f(arg: "Optional[int]" = None):
     pass
 
 
-def f(arg: Union["int", "str"] = None):  # False negative
+def f(arg: Union["int", "str"] = None):  # RUF013
     pass
 
 
 def f(arg: Union["int", "None"] = None):
+    pass
+
+
+def f(arg: Union["No" "ne", "int"] = None):
+    pass
+
+
+# Avoid flagging when there's a parse error in the forward reference
+def f(arg: Union["<>", "int"] = None):
     pass

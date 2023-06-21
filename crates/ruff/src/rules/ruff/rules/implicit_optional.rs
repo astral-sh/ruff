@@ -7,6 +7,7 @@ use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Expr, Op
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
 
@@ -145,15 +146,15 @@ enum TypingTarget<'a> {
     None,
     Any,
     Object,
-    ForwardReference,
     Optional,
+    ForwardReference(Expr),
     Union(Vec<&'a Expr>),
     Literal(Vec<&'a Expr>),
     Annotated(&'a Expr),
 }
 
 impl<'a> TypingTarget<'a> {
-    fn try_from_expr(expr: &'a Expr, semantic: &SemanticModel) -> Option<Self> {
+    fn try_from_expr(expr: &'a Expr, semantic: &SemanticModel, locator: &Locator) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if semantic.match_typing_expr(value, "Optional") {
@@ -180,9 +181,14 @@ impl<'a> TypingTarget<'a> {
                 ..
             }) => Some(TypingTarget::None),
             Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
+                value: Constant::Str(string),
+                range,
                 ..
-            }) => Some(TypingTarget::ForwardReference),
+            }) => parse_type_annotation(string, *range, locator)
+                // In case of a parse error, we return `Any` to avoid false positives.
+                .map_or(Some(TypingTarget::Any), |(expr, _)| {
+                    Some(TypingTarget::ForwardReference(expr))
+                }),
             _ => semantic.resolve_call_path(expr).and_then(|call_path| {
                 if semantic.match_typing_call_path(&call_path, "Any") {
                     Some(TypingTarget::Any)
@@ -196,44 +202,42 @@ impl<'a> TypingTarget<'a> {
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `None`.
-    fn contains_none(&self, semantic: &SemanticModel) -> bool {
+    fn contains_none(&self, semantic: &SemanticModel, locator: &Locator) -> bool {
         match self {
             TypingTarget::None
             | TypingTarget::Optional
             | TypingTarget::Any
             | TypingTarget::Object => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
                     return false;
                 };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match new_target {
                     TypingTarget::None => true,
-                    TypingTarget::Literal(_) => new_target.contains_none(semantic),
+                    TypingTarget::Literal(_) => new_target.contains_none(semantic, locator),
                     _ => false,
                 }
             }),
             TypingTarget::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
                     return false;
                 };
-                match new_target {
-                    TypingTarget::None => true,
-                    _ => new_target.contains_none(semantic),
-                }
+                new_target.contains_none(semantic, locator)
             }),
             TypingTarget::Annotated(element) => {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
                     return false;
                 };
-                match new_target {
-                    TypingTarget::None => true,
-                    _ => new_target.contains_none(semantic),
-                }
+                new_target.contains_none(semantic, locator)
             }
-            // TODO(charlie): Add support for nested forward references (e.g., `Union["A", "B"]`).
-            TypingTarget::ForwardReference => true,
+            TypingTarget::ForwardReference(expr) => {
+                let Some(new_target) = TypingTarget::try_from_expr(expr, semantic, locator) else {
+                    return false;
+                };
+                new_target.contains_none(semantic, locator)
+            }
         }
     }
 }
@@ -248,8 +252,9 @@ impl<'a> TypingTarget<'a> {
 fn type_hint_explicitly_allows_none<'a>(
     annotation: &'a Expr,
     semantic: &SemanticModel,
+    locator: &Locator,
 ) -> Option<&'a Expr> {
-    let Some(target) = TypingTarget::try_from_expr(annotation, semantic) else {
+    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator) else {
         return Some(annotation);
     };
     match target {
@@ -259,9 +264,9 @@ fn type_hint_explicitly_allows_none<'a>(
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should
         // be returned.
-        TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(expr, semantic),
+        TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(expr, semantic, locator),
         _ => {
-            if target.contains_none(semantic) {
+            if target.contains_none(semantic, locator) {
                 None
             } else {
                 Some(annotation)
@@ -339,13 +344,13 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
 
         if let Expr::Constant(ast::ExprConstant {
             range,
-            value: Constant::Str(value),
+            value: Constant::Str(string),
             ..
         }) = annotation.as_ref()
         {
             // Quoted annotation.
-            if let Ok((annotation, kind)) = parse_type_annotation(value, *range, checker.locator) {
-                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker.semantic()) else {
+            if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator) {
+                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker.semantic(), checker.locator) else {
                     continue;
                 };
                 let conversion_type = checker.settings.target_version.into();
@@ -361,7 +366,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             }
         } else {
             // Unquoted annotation.
-            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic()) else {
+            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic(), checker.locator) else {
                 continue;
             };
             let conversion_type = checker.settings.target_version.into();
