@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/copyright/mod.rs
+source: crates/ruff/src/rules/flake8_copyright/mod.rs
 ---
 <filename>:1:1: CPY001 Missing copyright notice at top of file
   |

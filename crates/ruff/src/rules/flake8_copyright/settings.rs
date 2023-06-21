@@ -1,4 +1,4 @@
-//! Settings for the `copyright` plugin.
+//! Settings for the `flake8-copyright` plugin.
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -12,7 +12,7 @@ use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
-    rename = "CopyrightOptions"
+    rename = "Flake8CopyrightOptions"
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {

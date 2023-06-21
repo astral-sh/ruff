@@ -75,7 +75,7 @@ import os
 "#
             .trim(),
             &settings::Settings {
-                copyright: super::settings::Settings {
+                flake8_copyright: super::settings::Settings {
                     author: Some("Ruff".to_string()),
                     ..super::settings::Settings::default()
                 },
@@ -95,7 +95,7 @@ import os
 "#
             .trim(),
             &settings::Settings {
-                copyright: super::settings::Settings {
+                flake8_copyright: super::settings::Settings {
                     author: Some("Ruff".to_string()),
                     ..super::settings::Settings::default()
                 },
@@ -113,7 +113,7 @@ import os
 "#
             .trim(),
             &settings::Settings {
-                copyright: super::settings::Settings {
+                flake8_copyright: super::settings::Settings {
                     min_file_size: 256,
                     ..super::settings::Settings::default()
                 },
