@@ -82,7 +82,7 @@ def func():
 -    if isinstance(exc_value, MultiError):
 +    if NOT_IMPLEMENTED_call():
          embedded = []
--        for exc in exc_value.exceptions:
+         for exc in exc_value.exceptions:
 -            if exc not in _seen:
 -                embedded.append(
 -                    # This should be left alone (before)
@@ -97,7 +97,6 @@ def func():
 -                    )
 -                    # This should be left alone (after)
 -                )
-+        for exc in exc_value.NOT_IMPLEMENTED_attr:
 +            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
 +                NOT_IMPLEMENTED_call()
  
@@ -130,7 +129,7 @@ def func():
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
     if NOT_IMPLEMENTED_call():
         embedded = []
-        for exc in exc_value.NOT_IMPLEMENTED_attr:
+        for exc in exc_value.exceptions:
             if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
                 NOT_IMPLEMENTED_call()
 

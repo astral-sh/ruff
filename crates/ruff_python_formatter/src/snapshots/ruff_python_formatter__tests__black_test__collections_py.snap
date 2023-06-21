@@ -165,7 +165,7 @@ if True:
  
  # looping over a 1-tuple should also not get wrapped
  for x in (1,):
-@@ -63,37 +42,17 @@
+@@ -63,14 +42,10 @@
  for (x,) in (1,), (2,), (3,):
      pass
  
@@ -181,13 +181,9 @@ if True:
 +NOT_IMPLEMENTED_call()
  
  if True:
--    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
--        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
--        | {pylons.controllers.WSGIController}
--    )
-+    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
-+        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
-+    }
+     IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
+@@ -79,21 +54,6 @@
+     )
  
  if True:
 -    ec2client.get_waiter("instance_stopped").wait(
@@ -266,9 +262,10 @@ division_result_tuple = (6 / 2,)
 NOT_IMPLEMENTED_call()
 
 if True:
-    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
-        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
-    }
+    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
+        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
+        | {pylons.controllers.WSGIController}
+    )
 
 if True:
     NOT_IMPLEMENTED_call()

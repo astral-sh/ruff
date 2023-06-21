@@ -88,9 +88,8 @@ if __name__ == "__main__":
 +++ Ruff
 @@ -1,6 +1,6 @@
  while True:
--    if something.changed:
+     if something.changed:
 -        do.stuff()  # trailing comment
-+    if something.NOT_IMPLEMENTED_attr:
 +        NOT_IMPLEMENTED_call()  # trailing comment
          # Comment belongs to the `if` block.
      # This one belongs to the `while` block.
@@ -118,11 +117,11 @@ if __name__ == "__main__":
 -try:
 -    with open(some_other_file) as w:
 -        w.write(data)
-+NOT_YET_IMPLEMENTED_StmtTry
- 
+-
 -except OSError:
 -    print("problems")
--
++NOT_YET_IMPLEMENTED_StmtTry
+ 
 -import sys
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -160,7 +159,7 @@ if __name__ == "__main__":
 
 ```py
 while True:
-    if something.NOT_IMPLEMENTED_attr:
+    if something.changed:
         NOT_IMPLEMENTED_call()  # trailing comment
         # Comment belongs to the `if` block.
     # This one belongs to the `while` block.
