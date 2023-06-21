@@ -20,33 +20,33 @@ RUF012.py:10:26: RUF012 Mutable class attributes should be annotated with `typin
 12 |     class_variable: typing.ClassVar[list[int]] = []
    |
 
-RUF012.py:16:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:17:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
-15 | class B:
-16 |     mutable_default: list[int] = []
+16 | class B:
+17 |     mutable_default: list[int] = []
    |                                  ^^ RUF012
-17 |     immutable_annotation: Sequence[int] = []
-18 |     without_annotation = []
+18 |     immutable_annotation: Sequence[int] = []
+19 |     without_annotation = []
    |
 
-RUF012.py:18:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:19:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
-16 |     mutable_default: list[int] = []
-17 |     immutable_annotation: Sequence[int] = []
-18 |     without_annotation = []
+17 |     mutable_default: list[int] = []
+18 |     immutable_annotation: Sequence[int] = []
+19 |     without_annotation = []
    |                          ^^ RUF012
-19 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-20 |     class_variable: ClassVar[list[int]] = []
+20 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+21 |     class_variable: ClassVar[list[int]] = []
    |
 
-RUF012.py:30:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:32:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
-28 |     mutable_default: list[int] = []
-29 |     immutable_annotation: Sequence[int] = []
-30 |     without_annotation = []
+30 |     mutable_default: list[int] = []
+31 |     immutable_annotation: Sequence[int] = []
+32 |     without_annotation = []
    |                          ^^ RUF012
-31 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-32 |     perfectly_fine: list[int] = field(default_factory=list)
+33 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+34 |     perfectly_fine: list[int] = field(default_factory=list)
    |
 
 
