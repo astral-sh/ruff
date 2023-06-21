@@ -142,6 +142,7 @@ enum TypingTarget<'a> {
     None,
     Any,
     Object,
+    ForwardReference,
     Optional,
     Union(Vec<&'a Expr>),
     Literal(Vec<&'a Expr>),
@@ -175,6 +176,10 @@ impl<'a> TypingTarget<'a> {
                 value: Constant::None,
                 ..
             }) => Some(TypingTarget::None),
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(_),
+                ..
+            }) => Some(TypingTarget::ForwardReference),
             _ => semantic.resolve_call_path(expr).and_then(|call_path| {
                 if semantic.match_typing_call_path(&call_path, "Any") {
                     Some(TypingTarget::Any)
@@ -196,8 +201,8 @@ impl<'a> TypingTarget<'a> {
             | TypingTarget::Object => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
                 let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
-                return false;
-            };
+                    return false;
+                };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match new_target {
@@ -208,8 +213,8 @@ impl<'a> TypingTarget<'a> {
             }),
             TypingTarget::Union(elements) => elements.iter().any(|element| {
                 let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
-                return false;
-            };
+                    return false;
+                };
                 match new_target {
                     TypingTarget::None => true,
                     _ => new_target.contains_none(semantic),
@@ -217,13 +222,15 @@ impl<'a> TypingTarget<'a> {
             }),
             TypingTarget::Annotated(element) => {
                 let Some(new_target) = TypingTarget::try_from_expr(element, semantic) else {
-                return false;
-            };
+                    return false;
+                };
                 match new_target {
                     TypingTarget::None => true,
                     _ => new_target.contains_none(semantic),
                 }
             }
+            // TODO(charlie): Add support for forward references (quoted annotations).
+            TypingTarget::ForwardReference => true,
         }
     }
 }
@@ -305,7 +312,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
     }
 }
 
-/// RUF011
+/// RUF013
 pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
     for ArgWithDefault {
         def,
