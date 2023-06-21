@@ -95,13 +95,21 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         )?;
 
         for handler in handlers {
-            if lines_before(handler.range().start(), f.context().contents()) > 1 {
-                write!(f, [empty_line()])?;
-            }
             let handler_comments_start =
                 dangling_comments.partition_point(|comment| comment.slice().end() <= handler.end());
             let (handler_comments, rest) = dangling_comments.split_at(handler_comments_start);
             dangling_comments = rest;
+
+            if lines_before(
+                handler_comments
+                    .first()
+                    .map(|c| c.slice().start())
+                    .unwrap_or(handler.range().start()),
+                f.context().contents(),
+            ) > 1
+            {
+                write!(f, [empty_line()])?;
+            }
 
             write!(f, [leading_comments(handler_comments), &handler.format()])?;
         }

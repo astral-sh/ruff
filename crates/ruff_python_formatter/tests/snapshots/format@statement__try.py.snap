@@ -101,6 +101,7 @@ try:
 # before except
 except (Exception, ValueError) as exc:  # except line
     ...
+
 # before except 2
 except (
     KeyError  # except line 2
