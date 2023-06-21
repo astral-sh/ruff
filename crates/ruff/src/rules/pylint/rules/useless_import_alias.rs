@@ -49,8 +49,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             asname.to_string(),
             alias.range(),
         )));
