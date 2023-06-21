@@ -1,47 +1,35 @@
 //! This module provides helper utilities to format an expression that has a left side, an operator,
 //! and a right side (binary like).
 
+use crate::expression::parentheses::Parentheses;
 use crate::prelude::*;
 use ruff_formatter::{format_args, write};
-use rustpython_parser::ast::{BoolOp, Expr, ExprBinOp, Operator};
+use rustpython_parser::ast::Expr;
 
-#[derive(Clone, Debug)]
-pub(super) struct FormatBinaryLike<'a> {
-    layout: BinaryLikeLayout,
-    binary: BinaryLike<'a>,
-}
+/// Trait to implement a binary like syntax that has a left operand, an operator, and a right operand.
+pub(super) trait FormatBinaryLike<'ast> {
+    /// The type implementing the formatting of the operator.
+    type FormatOperator: Format<PyFormatContext<'ast>>;
 
-impl<'a> FormatBinaryLike<'a> {
-    pub(super) fn expand_left(binary: BinaryLike<'a>) -> Self {
-        Self {
-            layout: BinaryLikeLayout::ExpandLeft,
-            binary,
-        }
-    }
+    /// Formats the binary like expression to `f`.
+    fn fmt_binary(
+        &self,
+        parentheses: Option<Parentheses>,
+        f: &mut PyFormatter<'ast, '_>,
+    ) -> FormatResult<()> {
+        let left = self.left()?;
+        let operator = self.operator();
+        let right = self.right()?;
 
-    pub(super) fn expand_right(binary: BinaryLike<'a>) -> Self {
-        Self {
-            layout: BinaryLikeLayout::ExpandRight,
-            binary,
-        }
-    }
+        let layout = if parentheses == Some(Parentheses::Custom) {
+            self.binary_layout()
+        } else {
+            BinaryLayout::Default
+        };
 
-    pub(super) fn expand_right_then_left(binary: BinaryLike<'a>) -> Self {
-        Self {
-            layout: BinaryLikeLayout::ExpandRightThenLeft,
-            binary,
-        }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for FormatBinaryLike<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let left = self.binary.left();
-        let operator = self.binary.operator();
-        let right = self.binary.right();
-
-        match self.layout {
-            BinaryLikeLayout::ExpandLeft => {
+        match layout {
+            BinaryLayout::Default => self.fmt_default(f),
+            BinaryLayout::ExpandLeft => {
                 let left = left.format().memoized();
                 let right = right.format().memoized();
                 write!(
@@ -73,7 +61,7 @@ impl Format<PyFormatContext<'_>> for FormatBinaryLike<'_> {
                     .with_mode(BestFittingMode::AllLines)]
                 )
             }
-            BinaryLikeLayout::ExpandRight => {
+            BinaryLayout::ExpandRight => {
                 let left_group = f.group_id("BinaryLeft");
 
                 write!(
@@ -105,7 +93,7 @@ impl Format<PyFormatContext<'_>> for FormatBinaryLike<'_> {
                     ]
                 )
             }
-            BinaryLikeLayout::ExpandRightThenLeft => {
+            BinaryLayout::ExpandRightThenLeft => {
                 // The formatter expands group-sequences from right to left, and expands both if
                 // there isn't enough space when expanding only one of them.
                 write!(
@@ -121,97 +109,30 @@ impl Format<PyFormatContext<'_>> for FormatBinaryLike<'_> {
             }
         }
     }
-}
 
-#[derive(Copy, Clone, Debug)]
-#[allow(clippy::enum_variant_names)]
-enum BinaryLikeLayout {
-    /// Tries to fit both the left and the right side on a single line by expanding the left side if necessary.
-    ///
-    ///```python
-    /// [
-    ///     a,
-    ///     b
-    /// ] & c
-    ///```
-    ExpandLeft,
-
-    /// Tries to fit both the left and the right side on a single line by expanding the right side if necessary.
-    /// ```python
-    /// a & [
-    ///     b,
-    ///     c
-    /// ]
-    /// ```
-    ExpandRight,
-
-    /// Tries to fit both the `left` and the `right` side on a single line by
-    /// * expanding the right side if necessary
-    /// * expanding the left side if necessary
-    /// * expanding the left and the right side if necessary
-    /// ```python
-    /// [
-    ///     a,
-    ///     b
-    /// ] & [
-    ///     c,
-    ///     d
-    /// ]
-    /// ```
-    ExpandRightThenLeft,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub(super) enum BinaryLike<'a> {
-    BinaryExpression(&'a ExprBinOp),
-    BooleanExpression {
-        left: &'a Expr,
-        operator: BoolOp,
-        right: &'a Expr,
-    },
-}
-
-impl BinaryLike<'_> {
-    fn left(&self) -> &Expr {
-        match self {
-            BinaryLike::BinaryExpression(ExprBinOp { left, .. }) => left.as_ref(),
-            BinaryLike::BooleanExpression { left, .. } => left,
+    /// Determines which binary layout to use.
+    fn binary_layout(&self) -> BinaryLayout {
+        if let (Ok(left), Ok(right)) = (self.left(), self.right()) {
+            BinaryLayout::from_left_right(left, right)
+        } else {
+            BinaryLayout::Default
         }
     }
 
-    fn right(&self) -> &Expr {
-        match self {
-            BinaryLike::BinaryExpression(ExprBinOp { right, .. }) => right.as_ref(),
-            BinaryLike::BooleanExpression { right, .. } => right,
-        }
-    }
+    /// Formats the node according to the default layout.
+    fn fmt_default(&self, f: &mut PyFormatter<'ast, '_>) -> FormatResult<()>;
 
-    fn operator(&self) -> BinaryLikeOperator {
-        match self {
-            BinaryLike::BinaryExpression(ExprBinOp { op, .. }) => BinaryLikeOperator::Binary(*op),
-            BinaryLike::BooleanExpression { operator, .. } => {
-                BinaryLikeOperator::Boolean(*operator)
-            }
-        }
-    }
+    /// Returns the left operator
+    fn left(&self) -> FormatResult<&Expr>;
+
+    /// Returns the right operator.
+    fn right(&self) -> FormatResult<&Expr>;
+
+    /// Returns the object that formats the operator.
+    fn operator(&self) -> Self::FormatOperator;
 }
 
-#[derive(Copy, Clone)]
-enum BinaryLikeOperator {
-    Binary(Operator),
-    Boolean(BoolOp),
-}
-
-impl Format<PyFormatContext<'_>> for BinaryLikeOperator {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        match self {
-            BinaryLikeOperator::Binary(binary) => binary.format().fmt(f),
-            BinaryLikeOperator::Boolean(operator) => operator.format().fmt(f),
-        }
-    }
-}
-
-pub(super) fn can_break_expr(expr: &Expr) -> bool {
+fn can_break_expr(expr: &Expr) -> bool {
     use ruff_python_ast::prelude::*;
 
     match expr {
@@ -235,5 +156,60 @@ pub(super) fn can_break_expr(expr: &Expr) -> bool {
             _ => can_break_expr(operand.as_ref()),
         },
         _ => false,
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum BinaryLayout {
+    /// Put each operand on their own line if either side expands
+    Default,
+
+    /// Try to expand the left to make it fit. Add parentheses if the left or right don't fit.
+    ///
+    ///```python
+    /// [
+    ///     a,
+    ///     b
+    /// ] & c
+    ///```
+    ExpandLeft,
+
+    /// Try to expand the right to make it fix. Add parentheses if the left or right don't fit.
+    ///
+    /// ```python
+    /// a & [
+    ///     b,
+    ///     c
+    /// ]
+    /// ```
+    ExpandRight,
+
+    /// Both the left and right side can be expanded. Try in the following order:
+    /// * expand the right side
+    /// * expand the left side
+    /// * expand both sides
+    ///
+    /// to make the expression fit
+    ///
+    /// ```python
+    /// [
+    ///     a,
+    ///     b
+    /// ] & [
+    ///     c,
+    ///     d
+    /// ]
+    /// ```
+    ExpandRightThenLeft,
+}
+
+impl BinaryLayout {
+    pub(super) fn from_left_right(left: &Expr, right: &Expr) -> BinaryLayout {
+        match (can_break_expr(left), can_break_expr(right)) {
+            (false, false) => BinaryLayout::Default,
+            (true, false) => BinaryLayout::ExpandLeft,
+            (false, true) => BinaryLayout::ExpandRight,
+            (true, true) => BinaryLayout::ExpandRightThenLeft,
+        }
     }
 }
