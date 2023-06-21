@@ -69,7 +69,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         if let Some(lower) = lower {
             write!(f, [lower.format(), line_suffix_boundary()])?;
         } else {
-            dangling_comments(&dangling_lower_comments).fmt(f)?;
+            dangling_comments(dangling_lower_comments).fmt(f)?;
         }
 
         // First colon
