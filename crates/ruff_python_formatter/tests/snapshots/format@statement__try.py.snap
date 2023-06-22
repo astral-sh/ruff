@@ -106,7 +106,6 @@ try:
     # try
     ...
     # end of body
-
 # before except
 except (Exception, ValueError) as exc:  # except line
     ...
