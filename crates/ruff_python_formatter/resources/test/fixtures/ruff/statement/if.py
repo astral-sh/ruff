@@ -62,3 +62,12 @@ else:
     pass
 # Don't drop this comment 3
 x = 3
+
+# Regression test for a following if that could get confused for an elif
+# Originally found in https://github.com/gradio-app/gradio/blob/1570b94a02d23d051ae137e0063974fd8a48b34e/gradio/external.py#L478
+if True:
+    pass
+else:  # Comment
+    if False:
+        pass
+    pass
