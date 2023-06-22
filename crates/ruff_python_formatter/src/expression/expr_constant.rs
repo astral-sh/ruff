@@ -2,15 +2,11 @@ use crate::comments::Comments;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
+use crate::expression::string::FormatString;
 use crate::prelude::*;
-use crate::trivia::SimpleTokenizer;
 use crate::{not_yet_implemented_custom_text, verbatim_text, FormatNodeRule};
-use ruff_formatter::{write, FormatContext, FormatError};
-use ruff_python_ast::str::{is_implicit_concatenation, leading_quote};
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Constant, ExprConstant, Ranged};
-use rustpython_parser::lexer::{lex_starts_at, Lexer};
-use rustpython_parser::{Mode, Tok};
+use ruff_formatter::write;
+use rustpython_parser::ast::{Constant, ExprConstant};
 
 #[derive(Default)]
 pub struct FormatExprConstant;
@@ -33,7 +29,7 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
             Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. } => {
                 write!(f, [verbatim_text(item)])
             }
-            Constant::Str(_) => FormatString { constant: item }.fmt(f),
+            Constant::Str(_) => FormatString::new(item).fmt(f),
             Constant::Bytes(_) => {
                 not_yet_implemented_custom_text(r#"b"NOT_YET_IMPLEMENTED_BYTE_STRING""#).fmt(f)
             }
@@ -70,25 +66,6 @@ impl NeedsParentheses for ExprConstant {
         match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
             Parentheses::Optional => Parentheses::Never,
             parentheses => parentheses,
-        }
-    }
-}
-
-struct FormatString<'a> {
-    constant: &'a ExprConstant,
-}
-
-impl Format<PyFormatContext<'_>> for FormatString<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let constant = self.constant;
-        debug_assert!(constant.value.is_str());
-
-        let string_content = f.context().locator().slice(constant.range());
-
-        if is_implicit_concatenation(string_content) {
-            not_yet_implemented_custom_text(r#""NOT_YET_IMPLEMENTED_STRING""#).fmt(f)
-        } else {
-            source_text_slice(constant.range(), ContainsNewlines::Detect).fmt(f)
         }
     }
 }

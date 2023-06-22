@@ -263,12 +263,11 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
  
  
  def bar():
--    """This is another docstring
+     """This is another docstring
 -    with more lines of text
 -    """
-+    '''This is another docstring
 +  with more lines of text
-+  '''
++  """
      return
  
  
@@ -280,12 +279,11 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
  
  
  def troz():
--    """Indentation with tabs
+     """Indentation with tabs
 -    is just as OK
 -    """
-+    '''Indentation with tabs
 +	is just as OK
-+	'''
++	"""
      return
  
  
@@ -353,12 +351,19 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
      pass
  
  
-@@ -93,20 +95,25 @@
+@@ -88,25 +90,30 @@
+ 
+ 
+ def that():
+-    """ "hey yah" """
++    ''' "hey yah" '''
+ 
  
  def and_that():
-     """
+-    """
 -    "hey yah" """
-+  "hey yah" """
++    '''
++  "hey yah" '''
  
  
  def and_this():
@@ -370,26 +375,21 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
  
  def multiline_whitespace():
 -    """ """
-+    '''
++    """
 +    
 +    
 +    
 +    
-+    '''
++    """
  
  
  def oneline_whitespace():
 -    """ """
-+    '''      '''
++    """      """
  
  
  def empty():
-@@ -114,12 +121,12 @@
- 
- 
- def single_quotes():
--    "testing"
-+    'testing'
+@@ -118,8 +125,8 @@
  
  
  def believe_it_or_not_this_is_in_the_py_stdlib():
@@ -445,33 +445,21 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
      pass
  
  
-@@ -161,14 +168,14 @@
- 
- 
- def multiline_backslash_1():
--    """
-+    '''
-   hey\there\
--  \ """
-+  \ '''
- 
+@@ -168,7 +175,7 @@
  
  def multiline_backslash_2():
--    """
+     """
 -    hey there \ """
-+    '''
-+  hey there \ '''
++  hey there \ """
  
  
  # Regression test for #3425
-@@ -178,8 +185,8 @@
- 
+@@ -179,7 +186,7 @@
  
  def multiline_backslash_3():
--    """
+     """
 -    already escaped \\"""
-+    '''
-+  already escaped \\ '''
++  already escaped \\ """
  
  
  def my_god_its_full_of_stars_1():
@@ -484,16 +472,6 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
  
  
  def docstring_almost_at_line_limit():
-@@ -213,7 +220,7 @@
- 
- 
- def stable_quote_normalization_with_immediate_inner_single_quote(self):
--    """'<text here>
-+    ''''<text here>
- 
-     <text here, since without another non-empty line black is stable>
--    """
-+    '''
 ```
 
 ## Ruff Output
@@ -519,9 +497,9 @@ def foo():
 
 
 def bar():
-    '''This is another docstring
+    """This is another docstring
   with more lines of text
-  '''
+  """
     return
 
 
@@ -532,9 +510,9 @@ def baz():
 
 
 def troz():
-    '''Indentation with tabs
+    """Indentation with tabs
 	is just as OK
-	'''
+	"""
     return
 
 
@@ -591,12 +569,12 @@ def this():
 
 
 def that():
-    """ "hey yah" """
+    ''' "hey yah" '''
 
 
 def and_that():
-    """
-  "hey yah" """
+    '''
+  "hey yah" '''
 
 
 def and_this():
@@ -605,16 +583,16 @@ def and_this():
 
 
 def multiline_whitespace():
-    '''
+    """
     
     
     
     
-    '''
+    """
 
 
 def oneline_whitespace():
-    '''      '''
+    """      """
 
 
 def empty():
@@ -622,7 +600,7 @@ def empty():
 
 
 def single_quotes():
-    'testing'
+    "testing"
 
 
 def believe_it_or_not_this_is_in_the_py_stdlib():
@@ -669,14 +647,14 @@ def backslash_space():
 
 
 def multiline_backslash_1():
-    '''
+    """
   hey\there\
-  \ '''
+  \ """
 
 
 def multiline_backslash_2():
-    '''
-  hey there \ '''
+    """
+  hey there \ """
 
 
 # Regression test for #3425
@@ -686,8 +664,8 @@ def multiline_backslash_really_long_dont_crash():
 
 
 def multiline_backslash_3():
-    '''
-  already escaped \\ '''
+    """
+  already escaped \\ """
 
 
 def my_god_its_full_of_stars_1():
@@ -721,10 +699,10 @@ def multiline_docstring_at_line_limit():
 
 
 def stable_quote_normalization_with_immediate_inner_single_quote(self):
-    ''''<text here>
+    """'<text here>
 
     <text here, since without another non-empty line black is stable>
-    '''
+    """
 ```
 
 ## Black Output

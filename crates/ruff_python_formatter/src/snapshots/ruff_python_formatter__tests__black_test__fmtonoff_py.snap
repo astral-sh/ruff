@@ -253,7 +253,7 @@ d={'a':1,
 - async with some_connection() as conn:
 -     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
 - await asyncio.sleep(1)
-+    'Single-line docstring. Multiline is harder to reformat.'
++    "Single-line docstring. Multiline is harder to reformat."
 +    NOT_YET_IMPLEMENTED_StmtAsyncWith
 +    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +
@@ -269,7 +269,7 @@ d={'a':1,
 +def function_signature_stress_test(
 +    number: int,
 +    no_annotation=None,
-+    text: str = 'default',
++    text: str = "default",
 +    *,
 +    debug: bool = False,
 +    **kwargs,
@@ -290,22 +290,21 @@ d={'a':1,
 +    f=-1,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 +    h="",
-+    i=r'',
++    i=r"",
 +):
 +    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-@@ -51,14 +72,14 @@
+@@ -51,68 +72,66 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
 -    g: int = 1 if False else 2,
 +    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
      h: str = "",
--    i: str = r"",
-+    i: str = r'',
+     i: str = r"",
  ):
      ...
  
@@ -315,7 +314,13 @@ d={'a':1,
      ...
  
  
-@@ -71,48 +92,46 @@
+ something = {
+     # fmt: off
+-    key: 'value',
++    key: "value",
+ }
+ 
+ 
  def subscriptlist():
      atom[
          # fmt: off
@@ -325,8 +330,8 @@ d={'a':1,
 -        goes + here,
 -        andhere,
 +        (
-+            'some big and',
-+            'complex subscript',
++            "some big and",
++            "complex subscript",
 +            # fmt: on
 +            goes
 +            + here,
@@ -338,31 +343,34 @@ d={'a':1,
  def import_as_names():
      # fmt: off
 -    from hello import a,        b
+-    'unformatted'
 +    NOT_YET_IMPLEMENTED_StmtImportFrom
-     'unformatted'
++    "unformatted"
      # fmt: on
  
  
  def testlist_star_expr():
      # fmt: off
 -    a , b = *hello
+-    'unformatted'
 +    a, b = NOT_YET_IMPLEMENTED_ExprStarred
-     'unformatted'
++    "unformatted"
      # fmt: on
  
  
  def yield_expr():
      # fmt: off
 -    yield hello
+-    'unformatted'
 +    NOT_YET_IMPLEMENTED_ExprYield
-     'unformatted'
++    "unformatted"
      # fmt: on
--    "formatted"
-+    'formatted'
+     "formatted"
      # fmt: off
 -    ( yield hello )
+-    'unformatted'
 +    (NOT_YET_IMPLEMENTED_ExprYield)
-     'unformatted'
++    "unformatted"
      # fmt: on
  
  
@@ -405,13 +413,11 @@ d={'a':1,
 -                implicit_default=True,
 -            )
 -        )
-+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-         # fmt: off
+-        # fmt: off
 -        a = (
 -            unnecessary_bracket()
 -        )
-+        a = NOT_IMPLEMENTED_call()
-         # fmt: on
+-        # fmt: on
 -    _type_comment_re = re.compile(
 -        r"""
 -        ^
@@ -432,9 +438,11 @@ d={'a':1,
 -        )
 -        $
 -        """,
--        # fmt: off
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+         # fmt: off
 -        re.MULTILINE|re.VERBOSE
--        # fmt: on
++        a = NOT_IMPLEMENTED_call()
+         # fmt: on
 -    )
 +    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
@@ -480,7 +488,7 @@ d={'a':1,
 -d={'a':1,
 -   'b':2}
 +l = [1, 2, 3]
-+d = {'a': 1, 'b': 2}
++d = {"a": 1, "b": 2}
 ```
 
 ## Ruff Output
@@ -519,7 +527,7 @@ def func_no_args():
 
 
 async def coroutine(arg, exec=False):
-    'Single-line docstring. Multiline is harder to reformat.'
+    "Single-line docstring. Multiline is harder to reformat."
     NOT_YET_IMPLEMENTED_StmtAsyncWith
     await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
@@ -529,7 +537,7 @@ async def coroutine(arg, exec=False):
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
-    text: str = 'default',
+    text: str = "default",
     *,
     debug: bool = False,
     **kwargs,
@@ -547,7 +555,7 @@ def spaces(
     f=-1,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
     h="",
-    i=r'',
+    i=r"",
 ):
     offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
@@ -562,7 +570,7 @@ def spaces_types(
     f: int = -1,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
     h: str = "",
-    i: str = r'',
+    i: str = r"",
 ):
     ...
 
@@ -573,7 +581,7 @@ def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
 
 something = {
     # fmt: off
-    key: 'value',
+    key: "value",
 }
 
 
@@ -581,8 +589,8 @@ def subscriptlist():
     atom[
         # fmt: off
         (
-            'some big and',
-            'complex subscript',
+            "some big and",
+            "complex subscript",
             # fmt: on
             goes
             + here,
@@ -594,26 +602,26 @@ def subscriptlist():
 def import_as_names():
     # fmt: off
     NOT_YET_IMPLEMENTED_StmtImportFrom
-    'unformatted'
+    "unformatted"
     # fmt: on
 
 
 def testlist_star_expr():
     # fmt: off
     a, b = NOT_YET_IMPLEMENTED_ExprStarred
-    'unformatted'
+    "unformatted"
     # fmt: on
 
 
 def yield_expr():
     # fmt: off
     NOT_YET_IMPLEMENTED_ExprYield
-    'unformatted'
+    "unformatted"
     # fmt: on
-    'formatted'
+    "formatted"
     # fmt: off
     (NOT_YET_IMPLEMENTED_ExprYield)
-    'unformatted'
+    "unformatted"
     # fmt: on
 
 
@@ -669,7 +677,7 @@ NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file
 l = [1, 2, 3]
-d = {'a': 1, 'b': 2}
+d = {"a": 1, "b": 2}
 ```
 
 ## Black Output

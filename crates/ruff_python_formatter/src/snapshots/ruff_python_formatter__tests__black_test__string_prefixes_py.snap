@@ -39,10 +39,9 @@ def docstring_multiline():
  name = "Łukasz"
 -(f"hello {name}", f"hello {name}")
 -(b"", b"")
--("", "")
 +(NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
 +(b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
-+(u"", U"")
+ ("", "")
  (r"", R"")
  
 -(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
@@ -80,7 +79,7 @@ def docstring_multiline():
 name = "Łukasz"
 (NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
 (b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
-(u"", U"")
+("", "")
 (r"", R"")
 
 (

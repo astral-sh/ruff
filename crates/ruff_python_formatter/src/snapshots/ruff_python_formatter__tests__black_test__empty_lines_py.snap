@@ -105,19 +105,6 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,9 +3,9 @@
- 
- # leading comment
- def f():
--    NO = ""
--    SPACE = " "
--    DOUBLESPACE = "  "
-+    NO = ''
-+    SPACE = ' '
-+    DOUBLESPACE = '  '
- 
-     t = leaf.type
-     p = leaf.parent  # trailing comment
 @@ -16,32 +16,40 @@
      if t == token.COMMENT:  # another trailing comment
          return DOUBLESPACE
@@ -175,21 +162,14 @@ def g():
                  return NO
  
  
-@@ -49,11 +57,10 @@
+@@ -49,7 +57,6 @@
  # SECTION BECAUSE SECTIONS
  ###############################################################################
  
 -
  def g():
--    NO = ""
--    SPACE = " "
--    DOUBLESPACE = "  "
-+    NO = ''
-+    SPACE = ' '
-+    DOUBLESPACE = '  '
- 
-     t = leaf.type
-     p = leaf.parent
+     NO = ""
+     SPACE = " "
 @@ -67,11 +74,11 @@
          return DOUBLESPACE
  
@@ -237,9 +217,9 @@ def g():
 
 # leading comment
 def f():
-    NO = ''
-    SPACE = ' '
-    DOUBLESPACE = '  '
+    NO = ""
+    SPACE = " "
+    DOUBLESPACE = "  "
 
     t = leaf.type
     p = leaf.parent  # trailing comment
@@ -292,9 +272,9 @@ def f():
 ###############################################################################
 
 def g():
-    NO = ''
-    SPACE = ' '
-    DOUBLESPACE = '  '
+    NO = ""
+    SPACE = " "
+    DOUBLESPACE = "  "
 
     t = leaf.type
     p = leaf.parent

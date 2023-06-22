@@ -268,10 +268,9 @@ last_call()
 --- Black
 +++ Ruff
 @@ -1,5 +1,6 @@
--"some_string"
--b"\\xa3"
 +...
-+'some_string'
+ "some_string"
+-b"\\xa3"
 +b"NOT_YET_IMPLEMENTED_BYTE_STRING"
  Name
  None
@@ -298,6 +297,11 @@ last_call()
 -(str or None) if True else (str or bytes or None)
 -str or None if (1 if True else 2) else str or bytes or None
 -(str or None) if (1 if True else 2) else (str or bytes or None)
+-(
+-    (super_long_variable_name or None)
+-    if (1 if super_long_test_name else 2)
+-    else (str or bytes or None)
+-)
 +lambda x: True
 +lambda x: True
 +lambda x: True
@@ -311,31 +315,24 @@ last_call()
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 +(NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-+{'2.7': dead, '3.7': (long_live or die_hard)}
-+{'2.7': dead, '3.7': (long_live or die_hard), **{'3.6': verygood}}
-+{**a, **b, **c}
-+{
-+    '2.7',
-+    '3.6',
-+    '3.7',
-+    '3.8',
-+    '3.9',
-+    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
-+}
- (
--    (super_long_variable_name or None)
--    if (1 if super_long_test_name else 2)
--    else (str or bytes or None)
--)
--{"2.7": dead, "3.7": (long_live or die_hard)}
--{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
--{**a, **b, **c}
+ {"2.7": dead, "3.7": (long_live or die_hard)}
+ {"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
+ {**a, **b, **c}
 -{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
 -({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
-+    {'a': 'b'},
++{
++    "2.7",
++    "3.6",
++    "3.7",
++    "3.8",
++    "3.9",
++    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
++}
++(
++    {"a": "b"},
 +    (True or False),
 +    (+value),
-+    'string',
++    "string",
 +    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
 +) or None
  ()
@@ -356,17 +353,17 @@ last_call()
 -    4,
 -    5,
 -]
--[
--    4,
--    *a,
--    5,
--]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
 +[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
  [
+-    4,
+-    *a,
+-    5,
+-]
+-[
      this_is_a_very_long_variable_which_will_force_a_delimiter_split,
      element,
      another,
@@ -492,16 +489,15 @@ last_call()
 +numpy[:,  :: -1]
  numpy[np.newaxis, :]
 -(str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
--{"2.7": dead, "3.7": long_live or die_hard}
--{"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+{'2.7': dead, '3.7': long_live or die_hard}
+ {"2.7": dead, "3.7": long_live or die_hard}
+-{"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
 +{
-+    '2.7',
-+    '3.6',
-+    '3.7',
-+    '3.8',
-+    '3.9',
++    "2.7",
++    "3.6",
++    "3.7",
++    "3.8",
++    "3.9",
 +    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 +}
  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
@@ -689,7 +685,7 @@ last_call()
 
 ```py
 ...
-'some_string'
+"some_string"
 b"NOT_YET_IMPLEMENTED_BYTE_STRING"
 Name
 None
@@ -736,22 +732,22 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-{'2.7': dead, '3.7': (long_live or die_hard)}
-{'2.7': dead, '3.7': (long_live or die_hard), **{'3.6': verygood}}
+{"2.7": dead, "3.7": (long_live or die_hard)}
+{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
 {**a, **b, **c}
 {
-    '2.7',
-    '3.6',
-    '3.7',
-    '3.8',
-    '3.9',
+    "2.7",
+    "3.6",
+    "3.7",
+    "3.8",
+    "3.9",
     (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 }
 (
-    {'a': 'b'},
+    {"a": "b"},
     (True or False),
     (+value),
-    'string',
+    "string",
     b"NOT_YET_IMPLEMENTED_BYTE_STRING",
 ) or None
 ()
@@ -844,13 +840,13 @@ numpy[:, l[-2]]
 numpy[:,  :: -1]
 numpy[np.newaxis, :]
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-{'2.7': dead, '3.7': long_live or die_hard}
+{"2.7": dead, "3.7": long_live or die_hard}
 {
-    '2.7',
-    '3.6',
-    '3.7',
-    '3.8',
-    '3.9',
+    "2.7",
+    "3.6",
+    "3.7",
+    "3.8",
+    "3.9",
     NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 }
 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]

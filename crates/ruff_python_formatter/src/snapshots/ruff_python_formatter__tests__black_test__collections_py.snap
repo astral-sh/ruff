@@ -134,13 +134,7 @@ if True:
  nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
  nested_long_lines = [
      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-@@ -47,15 +29,12 @@
-     "oneple": (1,),
- }
- {"oneple": (1,)}
--["ls", "lsoneple/%s" % (foo,)]
-+['ls', 'lsoneple/%s' % (foo,)]
- x = {"oneple": (1,)}
+@@ -52,10 +34,7 @@
  y = {
      "oneple": (1,),
  }
@@ -230,7 +224,7 @@ nested_long_lines = [
     "oneple": (1,),
 }
 {"oneple": (1,)}
-['ls', 'lsoneple/%s' % (foo,)]
+["ls", "lsoneple/%s" % (foo,)]
 x = {"oneple": (1,)}
 y = {
     "oneple": (1,),

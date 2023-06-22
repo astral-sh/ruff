@@ -116,10 +116,10 @@ def __await__(): return (yield)
 +NOT_YET_IMPLEMENTED_StmtImport
  
 -from third_party import X, Y, Z
--
--from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
+-from library import some_connection, some_decorator
+-
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
@@ -179,7 +179,7 @@ def __await__(): return (yield)
 +    f=-1,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 +    h="",
-+    i=r'',
++    i=r"",
 +):
 +    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
@@ -193,8 +193,7 @@ def __await__(): return (yield)
 -    g: int = 1 if False else 2,
 +    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
      h: str = "",
--    i: str = r"",
-+    i: str = r'',
+     i: str = r"",
  ):
      ...
  
@@ -340,7 +339,7 @@ def spaces(
     f=-1,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
     h="",
-    i=r'',
+    i=r"",
 ):
     offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
@@ -355,7 +354,7 @@ def spaces_types(
     f: int = -1,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
     h: str = "",
-    i: str = r'',
+    i: str = r"",
 ):
     ...
 

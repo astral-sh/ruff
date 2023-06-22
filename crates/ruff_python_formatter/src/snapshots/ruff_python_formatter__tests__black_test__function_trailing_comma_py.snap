@@ -74,26 +74,6 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -2,7 +2,7 @@
-     a,
- ):
-     d = {
--        "key": "value",
-+        'key': 'value',
-     }
-     tup = (1,)
- 
-@@ -12,8 +12,8 @@
-     b,
- ):
-     d = {
--        "key": "value",
--        "key2": "value2",
-+        'key': 'value',
-+        'key2': 'value2',
-     }
-     tup = (
-         1,
 @@ -24,18 +24,14 @@
  def f(
      a: int = 1,
@@ -198,7 +178,7 @@ def f(
     a,
 ):
     d = {
-        'key': 'value',
+        "key": "value",
     }
     tup = (1,)
 
@@ -208,8 +188,8 @@ def f2(
     b,
 ):
     d = {
-        'key': 'value',
-        'key2': 'value2',
+        "key": "value",
+        "key2": "value2",
     }
     tup = (
         1,

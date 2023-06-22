@@ -70,7 +70,7 @@ class A:
 -            self.min_length,
 -        ) % {"min_length": self.min_length}
 +        return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
-+            'min_length': self.min_length,
++            "min_length": self.min_length,
 +        }
  
  
@@ -112,7 +112,7 @@ if x:
 class X:
     def get_help_text(self):
         return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
-            'min_length': self.min_length,
+            "min_length": self.min_length,
         }
 
 
