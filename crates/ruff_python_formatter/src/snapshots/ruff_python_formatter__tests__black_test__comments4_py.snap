@@ -195,7 +195,7 @@ def foo3(list_a, list_b):
 -        )
 -        .filter(User.xyz.is_(None))
 -    )
-+    return NOT_IMPLEMENTED_call()
++    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def foo3(list_a, list_b):
@@ -206,7 +206,7 @@ def foo3(list_a, list_b):
 -            db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
 -        )
 -        .filter(User.xyz.is_(None))
-+        NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      )
 ```
 
@@ -227,13 +227,13 @@ def foo(list_a, list_b):
 
 def foo2(list_a, list_b):
     # Standalone comment reasonably placed.
-    return NOT_IMPLEMENTED_call()
+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def foo3(list_a, list_b):
     return (
         # Standalone comment but weirdly placed.
-        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     )
 ```
 

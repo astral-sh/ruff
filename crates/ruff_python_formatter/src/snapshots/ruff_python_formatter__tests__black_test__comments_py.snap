@@ -166,9 +166,9 @@ async def wat():
  # Explains why we use global state.
 -GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
 +GLOBAL_STATE = {
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 +}
  
  
@@ -201,7 +201,7 @@ async def wat():
  
  
 -@fast(really=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  async def wat():
      # This comment, for some reason \
      # contains a trailing backslash.
@@ -211,7 +211,7 @@ async def wat():
      # Comment after ending a block.
      if result:
 -        print("A OK", file=sys.stdout)
-+        NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
          # Comment between things.
 -        print()
 +        NOT_IMPLEMENTED_call()
@@ -269,9 +269,9 @@ def function(default=None):
 
 # Explains why we use global state.
 GLOBAL_STATE = {
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 }
 
 
@@ -285,14 +285,14 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 #' <h1>This is pweave!</h1>
 
 
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 async def wat():
     # This comment, for some reason \
     # contains a trailing backslash.
     NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
     # Comment after ending a block.
     if result:
-        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         # Comment between things.
         NOT_IMPLEMENTED_call()
 

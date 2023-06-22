@@ -109,7 +109,7 @@ elif   unformatted:
 -            ]  # Includes an formatted indentation.
 -    },
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # Regression test for https://github.com/psf/black/issues/2015.
@@ -123,14 +123,14 @@ elif   unformatted:
 -    + path,
 -    check=True,
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # Regression test for https://github.com/psf/black/issues/3026.
  def test_func():
      # yapf: disable
 -    if  unformatted(  args  ):
-+    if NOT_IMPLEMENTED_call():
++    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
          return True
      # yapf: enable
      elif b:
@@ -142,13 +142,13 @@ elif   unformatted:
 -    # fmt: on
 -        print ( "This won't be formatted" )
 -    print ( "This won't be formatted either" )
-+    for _ in NOT_IMPLEMENTED_call():
++    for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
 +        # fmt: on
-+        NOT_IMPLEMENTED_call()
-+    NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  else:
 -    print("This will be formatted")
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # Regression test for https://github.com/psf/black/issues/3184.
@@ -200,17 +200,17 @@ elif   unformatted:
 
 ```py
 # Regression test for https://github.com/psf/black/issues/3129.
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # Regression test for https://github.com/psf/black/issues/2015.
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # Regression test for https://github.com/psf/black/issues/3026.
 def test_func():
     # yapf: disable
-    if NOT_IMPLEMENTED_call():
+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         return True
     # yapf: enable
     elif b:
@@ -222,12 +222,12 @@ def test_func():
 # Regression test for https://github.com/psf/black/issues/2567.
 if True:
     # fmt: off
-    for _ in NOT_IMPLEMENTED_call():
+    for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         # fmt: on
-        NOT_IMPLEMENTED_call()
-    NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # Regression test for https://github.com/psf/black/issues/3184.

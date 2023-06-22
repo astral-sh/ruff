@@ -62,7 +62,7 @@ y = 100(no)
 +x = (123456789.123456789E123456789).real
 +x = NOT_IMPLEMENTED_call()
 +x = 123456789J.real
-+x = NOT_IMPLEMENTED_call()
++x = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +x = NOT_IMPLEMENTED_call()
 +x = NOT_IMPLEMENTED_call()
 +x = (0O777).real
@@ -74,7 +74,7 @@ y = 100(no)
  
  y = 100[no]
 -y = 100(no)
-+y = NOT_IMPLEMENTED_call()
++y = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -90,7 +90,7 @@ x = NOT_IMPLEMENTED_call()
 x = (123456789.123456789E123456789).real
 x = NOT_IMPLEMENTED_call()
 x = 123456789J.real
-x = NOT_IMPLEMENTED_call()
+x = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 x = NOT_IMPLEMENTED_call()
 x = NOT_IMPLEMENTED_call()
 x = (0O777).real
@@ -101,7 +101,7 @@ if (10).real:
     ...
 
 y = 100[no]
-y = NOT_IMPLEMENTED_call()
+y = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

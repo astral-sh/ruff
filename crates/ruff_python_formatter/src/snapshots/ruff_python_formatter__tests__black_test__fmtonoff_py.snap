@@ -241,10 +241,10 @@ d={'a':1,
 +        NOT_YET_IMPLEMENTED_StmtRaise
 +    if False:
 +        ...
-+    for i in NOT_IMPLEMENTED_call():
-+        NOT_IMPLEMENTED_call()
++    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +        continue
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    return None
 +
 +
@@ -255,7 +255,7 @@ d={'a':1,
 - await asyncio.sleep(1)
 +    "NOT_YET_IMPLEMENTED_STRING"
 +    NOT_YET_IMPLEMENTED_StmtAsyncWith
-+    await NOT_IMPLEMENTED_call()
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +
 +
  @asyncio.coroutine
@@ -265,7 +265,7 @@ d={'a':1,
 -)
 -def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
 - return text[number:-1]
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +def function_signature_stress_test(
 +    number: int,
 +    no_annotation=None,
@@ -292,7 +292,7 @@ d={'a':1,
 +    h="NOT_YET_IMPLEMENTED_STRING",
 +    i="NOT_YET_IMPLEMENTED_STRING",
 +):
-+    offset = NOT_IMPLEMENTED_call()
++    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
@@ -312,7 +312,7 @@ d={'a':1,
  
  
 -def spaces2(result=_core.Value(None)):
-+def spaces2(result=NOT_IMPLEMENTED_call()):
++def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
      ...
  
  
@@ -429,7 +429,7 @@ d={'a':1,
 -                implicit_default=True,
 -            )
 -        )
-+        NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
          # fmt: off
 -        a = (
 -            unnecessary_bracket()
@@ -460,7 +460,7 @@ d={'a':1,
 -        re.MULTILINE|re.VERBOSE
 -        # fmt: on
 -    )
-+    _type_comment_re = NOT_IMPLEMENTED_call()
++    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def single_literal_yapf_disable():
@@ -496,7 +496,7 @@ d={'a':1,
 -    # fmt: on
 -    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # fmt: off
 -yield  'hello'
 +NOT_YET_IMPLEMENTED_ExprYield
@@ -536,21 +536,21 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    for i in NOT_IMPLEMENTED_call():
-        NOT_IMPLEMENTED_call()
+    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         continue
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     return None
 
 
 async def coroutine(arg, exec=False):
     "NOT_YET_IMPLEMENTED_STRING"
     NOT_YET_IMPLEMENTED_StmtAsyncWith
-    await NOT_IMPLEMENTED_call()
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 @asyncio.coroutine
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
@@ -574,7 +574,7 @@ def spaces(
     h="NOT_YET_IMPLEMENTED_STRING",
     i="NOT_YET_IMPLEMENTED_STRING",
 ):
-    offset = NOT_IMPLEMENTED_call()
+    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -592,7 +592,7 @@ def spaces_types(
     ...
 
 
-def spaces2(result=NOT_IMPLEMENTED_call()):
+def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
     ...
 
 
@@ -674,11 +674,11 @@ def on_and_off_broken():
 
 def long_lines():
     if True:
-        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         # fmt: off
         a = NOT_IMPLEMENTED_call()
         # fmt: on
-    _type_comment_re = NOT_IMPLEMENTED_call()
+    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def single_literal_yapf_disable():
@@ -686,7 +686,7 @@ def single_literal_yapf_disable():
     BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
 
 
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # fmt: off
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file

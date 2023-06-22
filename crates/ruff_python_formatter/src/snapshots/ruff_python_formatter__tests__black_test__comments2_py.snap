@@ -243,19 +243,19 @@ instruction()#comment with bad spacing
      Cheese,
 -    Cheese("Wensleydale"),
 -    SubBytes(b"spam"),
-+    NOT_IMPLEMENTED_call(),
-+    NOT_IMPLEMENTED_call(),
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
  ]
  
 -if "PYTHON" in os.environ:
 -    add_compiler(compiler_from_env())
 +if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  else:
      # for compiler in compilers.values():
      # add_compiler(compiler)
 -    add_compiler(compilers[(7.0, 32)])
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      # add_compiler(compilers[(7.1, 64)])
  
  
@@ -307,7 +307,7 @@ instruction()#comment with bad spacing
 -""",
 -        arg3=True,
 -    )
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
      ############################################################################
  
@@ -342,7 +342,7 @@ instruction()#comment with bad spacing
 -        # right
 -        if element is not None
 -    ]
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    lcomp = [i for i in []]
 +    lcomp2 = [i for i in []]
 +    lcomp3 = [i for i in []]
@@ -357,7 +357,7 @@ instruction()#comment with bad spacing
 -        syms.simple_stmt,
 -        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
 -    )
-+    return NOT_IMPLEMENTED_call()
++    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -CONFIG_FILES = (
@@ -434,16 +434,16 @@ not_shareables = [
     "NOT_YET_IMPLEMENTED_STRING",
     # user-defined types and objects
     Cheese,
-    NOT_IMPLEMENTED_call(),
-    NOT_IMPLEMENTED_call(),
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 ]
 
 if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:
     # for compiler in compilers.values():
     # add_compiler(compiler)
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     # add_compiler(compilers[(7.1, 64)])
 
 
@@ -489,11 +489,11 @@ def inline_comments_in_brackets_ruin_everything():
     ]
 
     # no newline after
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
     ############################################################################
 
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     lcomp = [i for i in []]
     lcomp2 = [i for i in []]
     lcomp3 = [i for i in []]
@@ -505,7 +505,7 @@ def inline_comments_in_brackets_ruin_everything():
         # and round and round we go
 
     # let's return
-    return NOT_IMPLEMENTED_call()
+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final

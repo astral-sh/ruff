@@ -80,7 +80,7 @@ def func():
 +    lcomp3 = [i for i in []]
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
 -    if isinstance(exc_value, MultiError):
-+    if NOT_IMPLEMENTED_call():
++    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
          embedded = []
          for exc in exc_value.exceptions:
 -            if exc not in _seen:
@@ -98,7 +98,7 @@ def func():
 -                    # This should be left alone (after)
 -                )
 +            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+                NOT_IMPLEMENTED_call()
++                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
      # everything is fine if the expression isn't nested
 -    traceback.TracebackException.from_exception(
@@ -110,7 +110,7 @@ def func():
 -        # shared between sub-exceptions are not omitted
 -        _seen=set(_seen),
 -    )
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # %%
@@ -127,14 +127,14 @@ def func():
     x = "NOT_YET_IMPLEMENTED_STRING"
     lcomp3 = [i for i in []]
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
-    if NOT_IMPLEMENTED_call():
+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         embedded = []
         for exc in exc_value.exceptions:
             if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-                NOT_IMPLEMENTED_call()
+                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
     # everything is fine if the expression isn't nested
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # %%

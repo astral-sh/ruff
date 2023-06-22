@@ -22,13 +22,13 @@ print("hello, world")
 +++ Ruff
 @@ -1 +1 @@
 -print("hello, world")
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
 
 ```py
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

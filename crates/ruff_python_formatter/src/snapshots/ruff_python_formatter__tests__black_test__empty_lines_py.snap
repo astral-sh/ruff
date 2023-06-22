@@ -137,7 +137,7 @@ def g():
      if not prev:
 -        prevp = preceding_leaf(p)
 -        if not prevp or prevp.type in OPENING_BRACKETS:
-+        prevp = NOT_IMPLEMENTED_call()
++        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
              return NO
  
@@ -199,7 +199,7 @@ def g():
      prev = leaf.prev_sibling
      if not prev:
 -        prevp = preceding_leaf(p)
-+        prevp = NOT_IMPLEMENTED_call()
++        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -        if not prevp or prevp.type in OPENING_BRACKETS:
 +        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
@@ -245,7 +245,7 @@ def f():
 
     prev = leaf.prev_sibling
     if not prev:
-        prevp = NOT_IMPLEMENTED_call()
+        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
             return NO
 
@@ -283,7 +283,7 @@ def g():
 
     prev = leaf.prev_sibling
     if not prev:
-        prevp = NOT_IMPLEMENTED_call()
+        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
         if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
             # Start of the line or a bracketed expression.

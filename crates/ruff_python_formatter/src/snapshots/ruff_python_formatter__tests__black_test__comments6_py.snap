@@ -169,12 +169,12 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -        0.0789,
 -        a[-1],  # type: ignore
 -    )
-+    c = NOT_IMPLEMENTED_call()
++    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -    c = call(
 -        "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa"  # type: ignore
 -    )
-+    c = NOT_IMPLEMENTED_call()
++    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -result = (  # aaa
@@ -194,10 +194,10 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    foo,
 -    [AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, BBBBBBBBBBBB],  # type: ignore
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-+aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
++aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
@@ -292,9 +292,9 @@ def f(
 def func(
     a=some_list[0],  # type: int
 ):  # type: () -> int
-    c = NOT_IMPLEMENTED_call()
+    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-    c = NOT_IMPLEMENTED_call()
+    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 result = "NOT_YET_IMPLEMENTED_STRING"  # aaa
@@ -306,9 +306,9 @@ AAAAAAAAAAAAA = (
     + AAAAAAAAAAAAA
 )  # type: ignore
 
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
+aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # type: ignore[arg-type]
 ```
 
 ## Black Output
