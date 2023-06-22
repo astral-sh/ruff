@@ -106,8 +106,8 @@ some_module.some_function(
 -    call2(
 -        arg=[1, 2, 3],
 -    )
-+    NOT_IMPLEMENTED_call()
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      x = {
 -        "a": 1,
 -        "b": 2,
@@ -161,7 +161,7 @@ some_module.some_function(
 -        this_shouldn_t_get_a_trailing_comma_too
 -    )
 -):
-+def func() -> NOT_IMPLEMENTED_call():
++def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
      pass
  
  
@@ -170,7 +170,7 @@ some_module.some_function(
 -        this_shouldn_t_get_a_trailing_comma_too
 -    )
 -):
-+def func() -> NOT_IMPLEMENTED_call():
++def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
      pass
  
  
@@ -178,7 +178,7 @@ some_module.some_function(
 -some_module.some_function(
 -    argument1, (one_element_tuple,), argument4, argument5, argument6
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # Inner trailing comma causes outer to explode
 -some_module.some_function(
@@ -191,7 +191,7 @@ some_module.some_function(
 -    argument5,
 -    argument6,
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -223,8 +223,8 @@ def f2(
 def f(
     a: int = 1,
 ):
-    NOT_IMPLEMENTED_call()
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     x = {
         "NOT_YET_IMPLEMENTED_STRING": 1,
         "NOT_YET_IMPLEMENTED_STRING": 2,
@@ -257,19 +257,19 @@ def some_method_with_a_really_long_name(
     pass
 
 
-def func() -> NOT_IMPLEMENTED_call():
+def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
     pass
 
 
-def func() -> NOT_IMPLEMENTED_call():
+def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
     pass
 
 
 # Make sure inner one-element tuple won't explode
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # Inner trailing comma causes outer to explode
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

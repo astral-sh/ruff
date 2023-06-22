@@ -431,18 +431,18 @@ last_call()
 +NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()  # note: no trailing comma pre-3.6
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # note: no trailing comma pre-3.6
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  lukasz.langa.pl
 -call.me(maybe)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  (1).real
  (1.0).real
  ....__class__
@@ -454,9 +454,6 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
--]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
 +    (
 +        str,
 +        int,
@@ -464,6 +461,9 @@ last_call()
 +        dict[str, int],
 +    )
  ]
+-very_long_variable_name_filters: t.List[
+-    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
+-]
 -xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)
@@ -494,7 +494,7 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -171,62 +158,58 @@
+@@ -171,62 +158,59 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
@@ -541,7 +541,8 @@ last_call()
 +    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
 +    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
 +    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call() + NOT_IMPLEMENTED_call(),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
++    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 +    "NOT_YET_IMPLEMENTED_STRING": 1,
 +    "NOT_YET_IMPLEMENTED_STRING": 1,
      **kwargs,
@@ -555,16 +556,19 @@ last_call()
 -g = 1, *"ten"
 -what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
 -    vars_to_remove
-+e = NOT_IMPLEMENTED_call()
++e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +f = 1, NOT_YET_IMPLEMENTED_ExprStarred
 +g = 1, NOT_YET_IMPLEMENTED_ExprStarred
 +what_is_up_with_those_new_coord_names = (
-+    (coord_names + NOT_IMPLEMENTED_call())
-+    + NOT_IMPLEMENTED_call()
++    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  )
 -what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
 -    vars_to_remove
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -582,10 +586,7 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call())
-+    - NOT_IMPLEMENTED_call()
- )
+-)
 -Ø = set()
 -authors.łukasz.say_thanks()
 +result = NOT_IMPLEMENTED_call()
@@ -595,7 +596,7 @@ last_call()
  mapping = {
      A: 0.25 * (10.0 / 12),
      B: 0.1 * (10.0 / 12),
-@@ -236,31 +219,29 @@
+@@ -236,31 +220,29 @@
  
  
  def gen():
@@ -611,7 +612,7 @@ last_call()
  
  async def f():
 -    await some.complicated[0].call(with_args=(True or (1 is not 1)))
-+    await NOT_IMPLEMENTED_call()
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -print(*[] or [1])
@@ -622,9 +623,9 @@ last_call()
 -    force=False
 -), "Short message"
 -assert parens is TooMany
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
@@ -640,12 +641,12 @@ last_call()
      ...
  for j in 1 + (2 + 3):
      ...
-@@ -272,28 +253,16 @@
+@@ -272,28 +254,16 @@
      addr_proto,
      addr_canonname,
      addr_sockaddr,
 -) in socket.getaddrinfo("google.com", "http"):
-+) in NOT_IMPLEMENTED_call():
++) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
      pass
 -a = (
 -    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
@@ -677,7 +678,7 @@ last_call()
  ):
      return True
  if (
-@@ -327,13 +296,18 @@
+@@ -327,13 +297,18 @@
  ):
      return True
  if (
@@ -699,7 +700,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -341,7 +315,8 @@
+@@ -341,7 +316,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -709,7 +710,7 @@ last_call()
      ^ aaaaaaaaaaaaaaaa.i
      << aaaaaaaaaaaaaaaa.k
      >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
-@@ -366,5 +341,5 @@
+@@ -366,5 +342,5 @@
      ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
      ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  )
@@ -827,17 +828,17 @@ NOT_YET_IMPLEMENTED_ExprSetComp
 NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()  # note: no trailing comma pre-3.6
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # note: no trailing comma pre-3.6
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 lukasz.langa.pl
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 (1).real
 (1.0).real
 ....__class__
@@ -909,7 +910,8 @@ SomeName
     "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call() + NOT_IMPLEMENTED_call(),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
+    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
     "NOT_YET_IMPLEMENTED_STRING": 1,
     "NOT_YET_IMPLEMENTED_STRING": 1,
     **kwargs,
@@ -918,16 +920,16 @@ a = (1,)
 b = (1,)
 c = 1
 d = (1,) + a + (2,)
-e = NOT_IMPLEMENTED_call()
+e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 f = 1, NOT_YET_IMPLEMENTED_ExprStarred
 g = 1, NOT_YET_IMPLEMENTED_ExprStarred
 what_is_up_with_those_new_coord_names = (
-    (coord_names + NOT_IMPLEMENTED_call())
-    + NOT_IMPLEMENTED_call()
+    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 )
 what_is_up_with_those_new_coord_names = (
-    (coord_names | NOT_IMPLEMENTED_call())
-    - NOT_IMPLEMENTED_call()
+    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 )
 result = NOT_IMPLEMENTED_call()
 result = NOT_IMPLEMENTED_call()
@@ -949,12 +951,12 @@ def gen():
 
 
 async def f():
-    await NOT_IMPLEMENTED_call()
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
@@ -976,7 +978,7 @@ for (
     addr_proto,
     addr_canonname,
     addr_sockaddr,
-) in NOT_IMPLEMENTED_call():
+) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
     pass
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right

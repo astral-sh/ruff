@@ -82,8 +82,8 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -        **kwargs,
 -    )
 +    NOT_YET_IMPLEMENTED_StmtWith
-+    NOT_IMPLEMENTED_call()  # negate top
-+    return NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # negate top
++    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def g():
@@ -94,7 +94,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
          pass
  
 -    print("Inner defs should breathe a little.")
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def h():
@@ -102,7 +102,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
          pass
  
 -    print("Inner defs should breathe a little.")
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -if os.name == "posix":
@@ -153,8 +153,8 @@ def f(
     **kwargs,
 ) -> A:
     NOT_YET_IMPLEMENTED_StmtWith
-    NOT_IMPLEMENTED_call()  # negate top
-    return NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # negate top
+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def g():
@@ -163,14 +163,14 @@ def g():
     def inner():
         pass
 
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def h():
     def inner():
         pass
 
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:

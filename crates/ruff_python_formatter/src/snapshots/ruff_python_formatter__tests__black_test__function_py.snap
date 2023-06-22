@@ -136,11 +136,11 @@ def __await__(): return (yield)
          ...
 -    for i in range(10):
 -        print(i)
-+    for i in NOT_IMPLEMENTED_call():
-+        NOT_IMPLEMENTED_call()
++    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
          continue
 -    exec("new-style exec", {}, {})
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      return None
  
  
@@ -151,12 +151,12 @@ def __await__(): return (yield)
 -    await asyncio.sleep(1)
 +    "NOT_YET_IMPLEMENTED_STRING"
 +    NOT_YET_IMPLEMENTED_StmtAsyncWith
-+    await NOT_IMPLEMENTED_call()
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  @asyncio.coroutine
 -@some_decorator(with_args=True, many_args=[1, 2, 3])
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  def function_signature_stress_test(
      number: int,
      no_annotation=None,
@@ -184,7 +184,7 @@ def __await__(): return (yield)
 +    h="NOT_YET_IMPLEMENTED_STRING",
 +    i="NOT_YET_IMPLEMENTED_STRING",
 +):
-+    offset = NOT_IMPLEMENTED_call()
++    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
@@ -205,7 +205,7 @@ def __await__(): return (yield)
  
 -def spaces2(result=_core.Value(None)):
 -    assert fut is self._read_fut, (fut, self._read_fut)
-+def spaces2(result=NOT_IMPLEMENTED_call()):
++def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
@@ -263,9 +263,9 @@ def __await__(): return (yield)
 -        """,
 -        re.MULTILINE | re.VERBOSE,
 -    )
-+        NOT_IMPLEMENTED_call()
-+        NOT_IMPLEMENTED_call()
-+    _type_comment_re = NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def trailing_comma():
@@ -309,21 +309,21 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    for i in NOT_IMPLEMENTED_call():
-        NOT_IMPLEMENTED_call()
+    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         continue
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     return None
 
 
 async def coroutine(arg, exec=False):
     "NOT_YET_IMPLEMENTED_STRING"
     NOT_YET_IMPLEMENTED_StmtAsyncWith
-    await NOT_IMPLEMENTED_call()
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 @asyncio.coroutine
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
@@ -346,7 +346,7 @@ def spaces(
     h="NOT_YET_IMPLEMENTED_STRING",
     i="NOT_YET_IMPLEMENTED_STRING",
 ):
-    offset = NOT_IMPLEMENTED_call()
+    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -364,7 +364,7 @@ def spaces_types(
     ...
 
 
-def spaces2(result=NOT_IMPLEMENTED_call()):
+def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -374,9 +374,9 @@ def example(session):
 
 def long_lines():
     if True:
-        NOT_IMPLEMENTED_call()
-        NOT_IMPLEMENTED_call()
-    _type_comment_re = NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def trailing_comma():

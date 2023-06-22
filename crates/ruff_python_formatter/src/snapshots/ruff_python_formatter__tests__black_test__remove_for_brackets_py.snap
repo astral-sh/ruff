@@ -37,13 +37,13 @@ for (((((k, v))))) in d.items():
 -for k, v in d.items():
 -    print(k, v)
 +for k, v in NOT_IMPLEMENTED_call():
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # Don't touch tuple brackets after `in`
  for module in (core, _unicodefun):
 -    if hasattr(module, "_verify_python3_env"):
 -        module._verify_python3_env = lambda: None
-+    if NOT_IMPLEMENTED_call():
++    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
 +        module._verify_python3_env = lambda x: True
  
  # Brackets remain for long for loop lines
@@ -53,7 +53,7 @@ for (((((k, v))))) in d.items():
 -) in d.items():
 -    print(k, v)
 +) in NOT_IMPLEMENTED_call():
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -for (
 -    k,
@@ -63,13 +63,13 @@ for (((((k, v))))) in d.items():
 -):
 -    print(k, v)
 +for k, v in NOT_IMPLEMENTED_call():
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # Test deeply nested brackets
 -for k, v in d.items():
 -    print(k, v)
 +for k, v in NOT_IMPLEMENTED_call():
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -77,11 +77,11 @@ for (((((k, v))))) in d.items():
 ```py
 # Only remove tuple brackets after `for`
 for k, v in NOT_IMPLEMENTED_call():
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # Don't touch tuple brackets after `in`
 for module in (core, _unicodefun):
-    if NOT_IMPLEMENTED_call():
+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         module._verify_python3_env = lambda x: True
 
 # Brackets remain for long for loop lines
@@ -89,14 +89,14 @@ for (
     why_would_anyone_choose_to_name_a_loop_variable_with_a_name_this_long,
     i_dont_know_but_we_should_still_check_the_behaviour_if_they_do,
 ) in NOT_IMPLEMENTED_call():
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 for k, v in NOT_IMPLEMENTED_call():
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # Test deeply nested brackets
 for k, v in NOT_IMPLEMENTED_call():
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

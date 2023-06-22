@@ -91,10 +91,10 @@ func(
  
  # Trailing commas in multiple chained non-nested parens.
 -zero(one).two(three).four(five)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -(a, b, c, d) = func1(arg1) and func2(arg2)
 +(
@@ -102,10 +102,10 @@ func(
 +    b,
 +    c,
 +    d,
-+) = NOT_IMPLEMENTED_call() and NOT_IMPLEMENTED_call()
++) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -func(argument1, (one, two), argument4, argument5, argument6)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -134,18 +134,18 @@ set_of_types = {tuple[(int,)]}
 small_tuple = (1,)
 
 # Trailing commas in multiple chained non-nested parens.
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 (
     a,
     b,
     c,
     d,
-) = NOT_IMPLEMENTED_call() and NOT_IMPLEMENTED_call()
+) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

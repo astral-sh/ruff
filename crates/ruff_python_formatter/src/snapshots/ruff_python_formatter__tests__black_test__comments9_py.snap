@@ -188,7 +188,7 @@ def bar():
  # leading 2
  # leading 2 extra
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # leading 3
  @deco3
  # leading 4
@@ -197,7 +197,7 @@ def bar():
  @deco1
  # leading 2
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # leading 3 that already has an empty line
  @deco3
@@ -206,7 +206,7 @@ def bar():
  @deco1
  # leading 2
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # leading 3
  @deco3
  
@@ -300,7 +300,7 @@ some = statement
 @deco1
 # leading 2
 # leading 2 extra
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # leading 3
 @deco3
 # leading 4
@@ -314,7 +314,7 @@ some = statement
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # leading 3 that already has an empty line
 @deco3
@@ -329,7 +329,7 @@ some = statement
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # leading 3
 @deco3
 

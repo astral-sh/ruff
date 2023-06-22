@@ -47,7 +47,7 @@ def function(a:int=42):
  result = 1  #  type: ignore
  result = 1  # This comment is talking about type: ignore
 -square = Square(4)  #  type: Optional[Square]
-+square = NOT_IMPLEMENTED_call()  #  type: Optional[Square]
++square = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  #  type: Optional[Square]
  
  
  def function(a: int = 42):
@@ -71,7 +71,7 @@ result = (1,)  # Another one
 
 result = 1  #  type: ignore
 result = 1  # This comment is talking about type: ignore
-square = NOT_IMPLEMENTED_call()  #  type: Optional[Square]
+square = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  #  type: Optional[Square]
 
 
 def function(a: int = 42):

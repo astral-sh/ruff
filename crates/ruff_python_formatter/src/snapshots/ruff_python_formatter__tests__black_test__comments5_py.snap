@@ -99,7 +99,7 @@ if __name__ == "__main__":
  # This one is properly standalone now.
  
 -for i in range(100):
-+for i in NOT_IMPLEMENTED_call():
++for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
      # first we do this
 -    if i % 33 == 0:
 +    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
@@ -107,7 +107,7 @@ if __name__ == "__main__":
  
      # then we do this
 -    print(i)
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      # and finally we loop around
  
 -with open(some_temp_file) as f:
@@ -132,7 +132,7 @@ if __name__ == "__main__":
  @deco1
  # leading 2
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # leading 3
  @deco3
  def decorated1():
@@ -141,7 +141,7 @@ if __name__ == "__main__":
  @deco1
  # leading 2
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # leading function comment
  def decorated1():
      ...
@@ -168,13 +168,13 @@ while True:
 
 # This one is properly standalone now.
 
-for i in NOT_IMPLEMENTED_call():
+for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
     # first we do this
     if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
         break
 
     # then we do this
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     # and finally we loop around
 
 NOT_YET_IMPLEMENTED_StmtWith
@@ -196,7 +196,7 @@ def wat():
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # leading 3
 @deco3
 def decorated1():
@@ -206,7 +206,7 @@ def decorated1():
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # leading function comment
 def decorated1():
     ...

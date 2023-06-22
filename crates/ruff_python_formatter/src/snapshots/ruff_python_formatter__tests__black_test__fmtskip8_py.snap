@@ -80,7 +80,7 @@ async def test_async_with():
 -def some_func(  unformatted,  args  ):  # fmt: skip
 -    print("I am some_func")
 +def some_func(unformatted, args):  # fmt: skip
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      return 0
      # Make sure this comment is not removed.
  
@@ -90,8 +90,8 @@ async def test_async_with():
 -    print("I am some_async_func")
 -    await asyncio.sleep(1)
 +async def some_async_func(unformatted, args):  # fmt: skip
-+    NOT_IMPLEMENTED_call()
-+    await NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # Make sure a leading comment is not removed.
@@ -109,29 +109,29 @@ async def test_async_with():
  # Make sure a leading comment is not removed.
 -if  unformatted_call(  args  ):  # fmt: skip
 -    print("First branch")
-+if NOT_IMPLEMENTED_call():  # fmt: skip
-+    NOT_IMPLEMENTED_call()
++if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      # Make sure this is not removed.
 -elif  another_unformatted_call(  args  ):  # fmt: skip
 -    print("Second branch")
 -else  :  # fmt: skip
 -    print("Last branch")
-+elif NOT_IMPLEMENTED_call():  # fmt: skip
-+    NOT_IMPLEMENTED_call()
++elif NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +else:  # fmt: skip
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -while  some_condition(  unformatted,  args  ):  # fmt: skip
 -    print("Do something")
-+while NOT_IMPLEMENTED_call():  # fmt: skip
-+    NOT_IMPLEMENTED_call()
++while NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -for  i  in  some_iter(  unformatted,  args  ):  # fmt: skip
 -    print("Do something")
-+for i in NOT_IMPLEMENTED_call():  # fmt: skip
-+    NOT_IMPLEMENTED_call()
++for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  async def test_async_for():
@@ -165,15 +165,15 @@ async def test_async_with():
 ```py
 # Make sure a leading comment is not removed.
 def some_func(unformatted, args):  # fmt: skip
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     return 0
     # Make sure this comment is not removed.
 
 
 # Make sure a leading comment is not removed.
 async def some_async_func(unformatted, args):  # fmt: skip
-    NOT_IMPLEMENTED_call()
-    await NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # Make sure a leading comment is not removed.
@@ -181,21 +181,21 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 # Make sure a leading comment is not removed.
-if NOT_IMPLEMENTED_call():  # fmt: skip
-    NOT_IMPLEMENTED_call()
+if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     # Make sure this is not removed.
-elif NOT_IMPLEMENTED_call():  # fmt: skip
-    NOT_IMPLEMENTED_call()
+elif NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:  # fmt: skip
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-while NOT_IMPLEMENTED_call():  # fmt: skip
-    NOT_IMPLEMENTED_call()
+while NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-for i in NOT_IMPLEMENTED_call():  # fmt: skip
-    NOT_IMPLEMENTED_call()
+for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):  # fmt: skip
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 async def test_async_for():

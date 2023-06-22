@@ -247,12 +247,12 @@ mod tests {
         let input = r#"
 # preceding
 if    True:
-    print( "hi" )
+    pass
 # trailing
 "#;
         let expected = r#"# preceding
 if True:
-    NOT_IMPLEMENTED_call()
+    pass
 # trailing
 "#;
         let actual = format_module(input)?.as_code().to_string();
