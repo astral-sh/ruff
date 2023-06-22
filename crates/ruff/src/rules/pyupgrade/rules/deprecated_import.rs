@@ -281,8 +281,15 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "get_overloads",
     "overload",
     "reveal_type",
-    // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument.
-    // "dataclass_transform",
+];
+
+// Python 3.12+
+
+// Members of `typing_extensions` that were moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
+    // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument,
+    // which was introduced in Python 3.12.
+    "dataclass_transform",
 ];
 
 struct ImportReplacer<'a> {
@@ -368,6 +375,9 @@ impl<'a> ImportReplacer<'a> {
                 }
                 if self.version >= PythonVersion::Py311 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_311);
+                }
+                if self.version >= PythonVersion::Py312 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_312);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
