@@ -48,3 +48,12 @@ if True: from collections import (
 
 # OK
 from a import b
+
+# Ok: `typing_extensions` contains backported improvements.
+from typing_extensions import SupportsIndex
+
+# Ok: `typing_extensions` contains backported improvements.
+from typing_extensions import NamedTuple
+
+# Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+from typing_extensions import dataclass_transform

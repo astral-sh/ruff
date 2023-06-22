@@ -107,7 +107,7 @@ def foo3(list_a, list_b):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,94 +1,22 @@
+@@ -1,94 +1,28 @@
 -from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
 -    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 -)
@@ -118,7 +118,7 @@ def foo3(list_a, list_b):
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
  
--class C:
+ class C:
 -    @pytest.mark.parametrize(
 -        ("post_data", "message"),
 -        [
@@ -161,12 +161,14 @@ def foo3(list_a, list_b):
 -            ),
 -        ],
 -    )
--    def test_fails_invalid_post_data(
--        self, pyramid_config, db_request, post_data, message
--    ):
++    @NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+     def test_fails_invalid_post_data(
+         self, pyramid_config, db_request, post_data, message
+     ):
 -        pyramid_config.testing_securitypolicy(userid=1)
 -        db_request.POST = MultiDict(post_data)
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        db_request.POST = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def foo(list_a, list_b):
@@ -195,7 +197,7 @@ def foo3(list_a, list_b):
 -        )
 -        .filter(User.xyz.is_(None))
 -    )
-+    return NOT_IMPLEMENTED_call()
++    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def foo3(list_a, list_b):
@@ -206,7 +208,7 @@ def foo3(list_a, list_b):
 -            db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
 -        )
 -        .filter(User.xyz.is_(None))
-+        NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      )
 ```
 
@@ -217,7 +219,13 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class C:
+    @NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    def test_fails_invalid_post_data(
+        self, pyramid_config, db_request, post_data, message
+    ):
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        db_request.POST = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def foo(list_a, list_b):
@@ -227,13 +235,13 @@ def foo(list_a, list_b):
 
 def foo2(list_a, list_b):
     # Standalone comment reasonably placed.
-    return NOT_IMPLEMENTED_call()
+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def foo3(list_a, list_b):
     return (
         # Standalone comment but weirdly placed.
-        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     )
 ```
 

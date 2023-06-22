@@ -32,25 +32,28 @@ for (((((k, v))))) in d.items():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,27 +1,13 @@
+@@ -1,27 +1,22 @@
  # Only remove tuple brackets after `for`
 -for k, v in d.items():
 -    print(k, v)
-+NOT_YET_IMPLEMENTED_StmtFor
++for k, v in NOT_IMPLEMENTED_call():
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # Don't touch tuple brackets after `in`
--for module in (core, _unicodefun):
+ for module in (core, _unicodefun):
 -    if hasattr(module, "_verify_python3_env"):
 -        module._verify_python3_env = lambda: None
-+NOT_YET_IMPLEMENTED_StmtFor
++    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++        module._verify_python3_env = lambda x: True
  
  # Brackets remain for long for loop lines
--for (
--    why_would_anyone_choose_to_name_a_loop_variable_with_a_name_this_long,
--    i_dont_know_but_we_should_still_check_the_behaviour_if_they_do,
+ for (
+     why_would_anyone_choose_to_name_a_loop_variable_with_a_name_this_long,
+     i_dont_know_but_we_should_still_check_the_behaviour_if_they_do,
 -) in d.items():
 -    print(k, v)
-+NOT_YET_IMPLEMENTED_StmtFor
++) in NOT_IMPLEMENTED_call():
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -for (
 -    k,
@@ -59,30 +62,41 @@ for (((((k, v))))) in d.items():
 -    dfkasdjfldsjflkdsjflkdsjfdslkfjldsjfgkjdshgkljjdsfldgkhsdofudsfudsofajdslkfjdslkfjldisfjdffjsdlkfjdlkjjkdflskadjldkfjsalkfjdasj.items()
 -):
 -    print(k, v)
-+NOT_YET_IMPLEMENTED_StmtFor
++for k, v in NOT_IMPLEMENTED_call():
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # Test deeply nested brackets
 -for k, v in d.items():
 -    print(k, v)
-+NOT_YET_IMPLEMENTED_StmtFor
++for k, v in NOT_IMPLEMENTED_call():
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
 
 ```py
 # Only remove tuple brackets after `for`
-NOT_YET_IMPLEMENTED_StmtFor
+for k, v in NOT_IMPLEMENTED_call():
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # Don't touch tuple brackets after `in`
-NOT_YET_IMPLEMENTED_StmtFor
+for module in (core, _unicodefun):
+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+        module._verify_python3_env = lambda x: True
 
 # Brackets remain for long for loop lines
-NOT_YET_IMPLEMENTED_StmtFor
+for (
+    why_would_anyone_choose_to_name_a_loop_variable_with_a_name_this_long,
+    i_dont_know_but_we_should_still_check_the_behaviour_if_they_do,
+) in NOT_IMPLEMENTED_call():
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-NOT_YET_IMPLEMENTED_StmtFor
+for k, v in NOT_IMPLEMENTED_call():
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # Test deeply nested brackets
-NOT_YET_IMPLEMENTED_StmtFor
+for k, v in NOT_IMPLEMENTED_call():
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

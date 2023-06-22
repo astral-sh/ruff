@@ -2,10 +2,10 @@ use crate::comments::{trailing_comments, Comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::prelude::*;
 use crate::trivia::{SimpleTokenizer, TokenKind};
-use crate::FormatNodeRule;
-use ruff_formatter::FormatContext;
+use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use ruff_formatter::prelude::{hard_line_break, space, text};
+use ruff_formatter::{Format, FormatContext, FormatResult};
 use ruff_python_ast::prelude::UnaryOp;
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{ExprUnaryOp, Ranged};

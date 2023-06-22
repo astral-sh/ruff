@@ -105,7 +105,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,89 +1,79 @@
+@@ -1,59 +1,46 @@
 -"""Docstring."""
 +"NOT_YET_IMPLEMENTED_STRING"
  
@@ -119,12 +119,9 @@ def g():
 +    SPACE = "NOT_YET_IMPLEMENTED_STRING"
 +    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
  
--    t = leaf.type
--    p = leaf.parent  # trailing comment
--    v = leaf.value
-+    t = leaf.NOT_IMPLEMENTED_attr
-+    p = leaf.NOT_IMPLEMENTED_attr  # trailing comment
-+    v = leaf.NOT_IMPLEMENTED_attr
+     t = leaf.type
+     p = leaf.parent  # trailing comment
+     v = leaf.value
  
 -    if t in ALWAYS_NO_SPACE:
 +    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
@@ -136,12 +133,11 @@ def g():
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
--    prev = leaf.prev_sibling
-+    prev = leaf.NOT_IMPLEMENTED_attr
+     prev = leaf.prev_sibling
      if not prev:
 -        prevp = preceding_leaf(p)
 -        if not prevp or prevp.type in OPENING_BRACKETS:
-+        prevp = NOT_IMPLEMENTED_call()
++        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
              return NO
  
@@ -154,10 +150,7 @@ def g():
 -                syms.argument,
 -            }:
 +        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+            if (
-+                prevp.NOT_IMPLEMENTED_attr
-+                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+            ):
++            if prevp.parent and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
                  return NO
  
 -        elif prevp.type == token.DOUBLESTAR:
@@ -169,10 +162,7 @@ def g():
 -                syms.dictsetmaker,
 -            }:
 +        elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+            if (
-+                prevp.NOT_IMPLEMENTED_attr
-+                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+            ):
++            if prevp.parent and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
                  return NO
  
  
@@ -189,12 +179,9 @@ def g():
 +    SPACE = "NOT_YET_IMPLEMENTED_STRING"
 +    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
  
--    t = leaf.type
--    p = leaf.parent
--    v = leaf.value
-+    t = leaf.NOT_IMPLEMENTED_attr
-+    p = leaf.NOT_IMPLEMENTED_attr
-+    v = leaf.NOT_IMPLEMENTED_attr
+     t = leaf.type
+     p = leaf.parent
+@@ -61,29 +48,23 @@
  
      # Comment because comments
  
@@ -209,11 +196,10 @@ def g():
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
--    prev = leaf.prev_sibling
-+    prev = leaf.NOT_IMPLEMENTED_attr
+     prev = leaf.prev_sibling
      if not prev:
 -        prevp = preceding_leaf(p)
-+        prevp = NOT_IMPLEMENTED_call()
++        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -        if not prevp or prevp.type in OPENING_BRACKETS:
 +        if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
@@ -230,10 +216,7 @@ def g():
 -                syms.argument,
 -            }:
 +        if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+            if (
-+                prevp.NOT_IMPLEMENTED_attr
-+                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+            ):
++            if prevp.parent and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
                  return NO
 ```
 
@@ -249,9 +232,9 @@ def f():
     SPACE = "NOT_YET_IMPLEMENTED_STRING"
     DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
 
-    t = leaf.NOT_IMPLEMENTED_attr
-    p = leaf.NOT_IMPLEMENTED_attr  # trailing comment
-    v = leaf.NOT_IMPLEMENTED_attr
+    t = leaf.type
+    p = leaf.parent  # trailing comment
+    v = leaf.value
 
     if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
         pass
@@ -260,24 +243,18 @@ def f():
 
     NOT_YET_IMPLEMENTED_StmtAssert
 
-    prev = leaf.NOT_IMPLEMENTED_attr
+    prev = leaf.prev_sibling
     if not prev:
-        prevp = NOT_IMPLEMENTED_call()
+        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
             return NO
 
         if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-            if (
-                prevp.NOT_IMPLEMENTED_attr
-                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-            ):
+            if prevp.parent and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
                 return NO
 
         elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-            if (
-                prevp.NOT_IMPLEMENTED_attr
-                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-            ):
+            if prevp.parent and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
                 return NO
 
 
@@ -290,9 +267,9 @@ def g():
     SPACE = "NOT_YET_IMPLEMENTED_STRING"
     DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
 
-    t = leaf.NOT_IMPLEMENTED_attr
-    p = leaf.NOT_IMPLEMENTED_attr
-    v = leaf.NOT_IMPLEMENTED_attr
+    t = leaf.type
+    p = leaf.parent
+    v = leaf.value
 
     # Comment because comments
 
@@ -304,9 +281,9 @@ def g():
     # Another comment because more comments
     NOT_YET_IMPLEMENTED_StmtAssert
 
-    prev = leaf.NOT_IMPLEMENTED_attr
+    prev = leaf.prev_sibling
     if not prev:
-        prevp = NOT_IMPLEMENTED_call()
+        prevp = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
         if not prevp or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
             # Start of the line or a bracketed expression.
@@ -314,10 +291,7 @@ def g():
             return NO
 
         if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-            if (
-                prevp.NOT_IMPLEMENTED_attr
-                and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-            ):
+            if prevp.parent and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
                 return NO
 ```
 

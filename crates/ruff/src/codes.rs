@@ -157,7 +157,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // pylint
         (Pylint, "C0414") => (RuleGroup::Unspecified, rules::pylint::rules::UselessImportAlias),
-        (Pylint, "C1901") => (RuleGroup::Unspecified, rules::pylint::rules::CompareToEmptyString),
+        (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Unspecified, rules::pylint::rules::UnnecessaryDirectLambdaCall),
         (Pylint, "C0208") => (RuleGroup::Unspecified, rules::pylint::rules::IterationOverSet),
         (Pylint, "E0100") => (RuleGroup::Unspecified, rules::pylint::rules::YieldInInit),

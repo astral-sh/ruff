@@ -327,14 +327,56 @@ impl<'a> SemanticModel<'a> {
                     // ```
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException => {
+                    //
+                    // Similarly, given:
+                    //
+                    // ```python
+                    // try:
+                    //     pass
+                    // except ValueError as x:
+                    //     pass
+                    //
+                    // print(x)
+                    //
+                    // The `x` in `print(x)` should be treated as unresolved.
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
                         return ResolvedRead::UnboundLocal(binding_id)
                     }
 
-                    // Otherwise, treat it as resolved.
-                    _ => {
+                    // If we hit an unbound exception that shadowed a bound name, resole to the
+                    // bound name. For example, given:
+                    //
+                    // ```python
+                    // x = 1
+                    //
+                    // try:
+                    //     pass
+                    // except ValueError as x:
+                    //     pass
+                    //
+                    // print(x)
+                    // ```
+                    //
+                    // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
+                    BindingKind::UnboundException(Some(binding_id)) => {
+                        // Mark the binding as used.
+                        let context = self.execution_context();
+                        let reference_id = self.references.push(self.scope_id, range, context);
+                        self.bindings[binding_id].references.push(reference_id);
+
+                        // Mark any submodule aliases as used.
+                        if let Some(binding_id) =
+                            self.resolve_submodule(symbol, scope_id, binding_id)
+                        {
+                            let reference_id = self.references.push(self.scope_id, range, context);
+                            self.bindings[binding_id].references.push(reference_id);
+                        }
+
                         return ResolvedRead::Resolved(binding_id);
                     }
+
+                    // Otherwise, treat it as resolved.
+                    _ => return ResolvedRead::Resolved(binding_id),
                 }
             }
 
@@ -368,6 +410,50 @@ impl<'a> SemanticModel<'a> {
         } else {
             ResolvedRead::NotFound
         }
+    }
+
+    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_read`], but
+    /// doesn't add any read references to the resolved symbol.
+    pub fn lookup(&mut self, symbol: &str) -> Option<BindingId> {
+        if self.in_forward_reference() {
+            if let Some(binding_id) = self.scopes.global().get(symbol) {
+                if !self.bindings[binding_id].is_unbound() {
+                    return Some(binding_id);
+                }
+            }
+        }
+
+        let mut seen_function = false;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+            if scope.kind.is_class() {
+                if seen_function && matches!(symbol, "__class__") {
+                    return None;
+                }
+                if index > 0 {
+                    continue;
+                }
+            }
+
+            if let Some(binding_id) = scope.get(symbol) {
+                match self.bindings[binding_id].kind {
+                    BindingKind::Annotation => continue,
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                    BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
+                    _ => return Some(binding_id),
+                }
+            }
+
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return None;
+                }
+            }
+
+            seen_function |= scope.kind.is_any_function();
+        }
+
+        None
     }
 
     /// Given a `BindingId`, return the `BindingId` of the submodule import that it aliases.

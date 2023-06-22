@@ -1,4 +1,6 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
+from __future__ import annotations
+
 import argparse
 import re
 import shutil

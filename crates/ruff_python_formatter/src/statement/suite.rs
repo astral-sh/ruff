@@ -252,7 +252,8 @@ one_leading_newline = 10
 no_leading_newline = 30
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class InTheMiddle:
+    pass
 
 
 trailing_statement = 1
@@ -283,7 +284,8 @@ two_leading_newlines = 20
 one_leading_newline = 10
 no_leading_newline = 30
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class InTheMiddle:
+    pass
 
 trailing_statement = 1
 

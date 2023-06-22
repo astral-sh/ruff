@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Check code snippets in docs are formatted by black."""
+from __future__ import annotations
+
 import argparse
 import os
 import re
 import textwrap
-from collections.abc import Sequence
 from pathlib import Path
 from re import Match
+from typing import TYPE_CHECKING
 
 import black
 from black.mode import Mode, TargetVersion
 from black.parsing import InvalidInput
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 TARGET_VERSIONS = ["py37", "py38", "py39", "py310", "py311"]
 SNIPPED_RE = re.compile(

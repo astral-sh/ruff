@@ -18,29 +18,29 @@ N805.py:12:30: N805 First argument of a method should be named `self`
 13 |             pass
    |
 
-N805.py:27:15: N805 First argument of a method should be named `self`
-   |
-26 |     @pydantic.validator
-27 |     def lower(cls, my_field: str) -> str:
-   |               ^^^ N805
-28 |         pass
-   |
-
 N805.py:31:15: N805 First argument of a method should be named `self`
    |
-30 |     @pydantic.validator("my_field")
+30 |     @pydantic.validator
 31 |     def lower(cls, my_field: str) -> str:
    |               ^^^ N805
 32 |         pass
    |
 
-N805.py:60:29: N805 First argument of a method should be named `self`
+N805.py:35:15: N805 First argument of a method should be named `self`
    |
-58 |         pass
-59 | 
-60 |     def bad_method_pos_only(this, blah, /, self, something: str):
+34 |     @pydantic.validator("my_field")
+35 |     def lower(cls, my_field: str) -> str:
+   |               ^^^ N805
+36 |         pass
+   |
+
+N805.py:64:29: N805 First argument of a method should be named `self`
+   |
+62 |         pass
+63 | 
+64 |     def bad_method_pos_only(this, blah, /, self, something: str):
    |                             ^^^^ N805
-61 |         pass
+65 |         pass
    |
 
 

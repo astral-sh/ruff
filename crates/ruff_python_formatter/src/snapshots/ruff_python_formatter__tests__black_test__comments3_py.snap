@@ -61,7 +61,7 @@ def func():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,46 +3,15 @@
+@@ -3,46 +3,17 @@
  
  # %%
  def func():
@@ -80,9 +80,9 @@ def func():
 +    lcomp3 = [i for i in []]
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
 -    if isinstance(exc_value, MultiError):
-+    if NOT_IMPLEMENTED_call():
++    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
          embedded = []
--        for exc in exc_value.exceptions:
+         for exc in exc_value.exceptions:
 -            if exc not in _seen:
 -                embedded.append(
 -                    # This should be left alone (before)
@@ -97,7 +97,8 @@ def func():
 -                    )
 -                    # This should be left alone (after)
 -                )
-+        NOT_YET_IMPLEMENTED_StmtFor
++            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
      # everything is fine if the expression isn't nested
 -    traceback.TracebackException.from_exception(
@@ -109,7 +110,7 @@ def func():
 -        # shared between sub-exceptions are not omitted
 -        _seen=set(_seen),
 -    )
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # %%
@@ -126,12 +127,14 @@ def func():
     x = "NOT_YET_IMPLEMENTED_STRING"
     lcomp3 = [i for i in []]
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
-    if NOT_IMPLEMENTED_call():
+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         embedded = []
-        NOT_YET_IMPLEMENTED_StmtFor
+        for exc in exc_value.exceptions:
+            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
     # everything is fine if the expression isn't nested
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # %%
