@@ -113,7 +113,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
     }
 
     fn fmt_dangling_comments(&self, _node: &StmtTry, _f: &mut PyFormatter) -> FormatResult<()> {
-        // TODO(konstin): Needs node formatting or this leads to unstable formatting
+        // dangling comments are formatted as part of fmt_fields
         Ok(())
     }
 }
