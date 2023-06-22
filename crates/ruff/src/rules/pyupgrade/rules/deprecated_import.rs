@@ -139,10 +139,11 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ContextManager",
     "Coroutine",
     "DefaultDict",
-    "NewType",
     "TYPE_CHECKING",
     "Text",
     "Type",
+    // Moved in Python 3.6, but `typing_extensions` contains backported bugfixes and optimizations,
+    // "NewType",
 ];
 
 // Python 3.7+
@@ -168,10 +169,12 @@ const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
-    "Literal",
     "OrderedDict",
-    "Protocol",
     "runtime_checkable",
+    // Moved in Python 3.8, but `typing_extensions` contains backported bugfixes and optimizations.
+    // "Literal",
+    // "Protocol",
+    // "SupportsIndex",
 ];
 
 // Python 3.9+
@@ -249,6 +252,10 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "get_args",
     "get_origin",
     "is_typeddict",
+    // Moved in Python 3.8, but `typing_extensions` contains backported bugfixes and optimizations,
+    // which Python 3.10 makes unnecessary.
+    "Literal",
+    "NewType",
 ];
 
 // Python 3.11+
@@ -257,13 +264,10 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
 const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "Any",
     "LiteralString",
-    "NamedTuple",
     "Never",
     "NotRequired",
     "Required",
     "Self",
-    "TypedDict",
-    "Unpack",
     "assert_never",
     "assert_type",
     "clear_overloads",
@@ -271,6 +275,11 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "get_overloads",
     "overload",
     "reveal_type",
+    // Moved in Python 3.11, but `typing_extensions` contains backported bugfixes and optimizations.
+    // "NamedTuple",
+    // "TypedDict",
+    // "Unpack",
+    // "dataclass_transform",
 ];
 
 struct ImportReplacer<'a> {
