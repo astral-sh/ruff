@@ -1,0 +1,20 @@
+---
+source: crates/ruff/src/rules/perflint/mod.rs
+---
+PERF402.py:5:9: PERF402 Use `list()` or `list.copy()` to create a copy of a list
+  |
+3 |     result = []
+4 |     for i in items:
+5 |         result.append(i)  # PERF402
+  |         ^^^^^^^^^^^^^^^^ PERF402
+  |
+
+PERF402.py:12:9: PERF402 Use `list()` or `list.copy()` to create a copy of a list
+   |
+10 |     result = []
+11 |     for i in items:
+12 |         result.insert(0, i)  # PERF402
+   |         ^^^^^^^^^^^^^^^^^^^ PERF402
+   |
+
+

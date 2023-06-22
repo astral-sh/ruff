@@ -1,16 +1,8 @@
-use std::fmt;
-
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Expr;
-use rustpython_parser::{ast, lexer, Mode, Tok};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::prelude::{Ranged, Stmt};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::prelude::{ast, Expr, Stmt};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for cases where a new list is made as a copy of an existing one by appending elements
@@ -43,4 +35,30 @@ impl Violation for UseListCopy {
 }
 
 /// PERF402
-pub(crate) fn use_list_copy(checker: &mut Checker, body: &[Stmt]) {}
+pub(crate) fn use_list_copy(checker: &mut Checker, body: &[Stmt]) {
+    if body.len() != 1 {
+        return
+    }
+
+    let stmt = &body[0];
+
+    let Stmt::Expr(ast::StmtExpr { value, .. })= stmt else {
+        return
+    };
+
+    let Expr::Call(ast::ExprCall { func, range, .. }) = value.as_ref() else {
+        return
+    };
+
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+        return
+    };
+
+    let attr = attr.as_str();
+
+    if attr == "append" || attr == "insert" {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UseListCopy, *range));
+    }
+}

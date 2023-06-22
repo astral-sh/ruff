@@ -16,5 +16,3 @@ def foo():
             result.append(i)  # PERF401
         else:
             result.append(i)  # PERF401
-
-

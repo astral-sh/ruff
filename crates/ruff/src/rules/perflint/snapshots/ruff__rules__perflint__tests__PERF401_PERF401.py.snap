@@ -1,0 +1,22 @@
+---
+source: crates/ruff/src/rules/perflint/mod.rs
+---
+PERF401.py:6:13: PERF401 Use a list comprehension to create a new filtered list
+  |
+4 |     for i in items:
+5 |         if i % 2:
+6 |             result.append(i)  # PERF401
+  |             ^^^^^^^^^^^^^^^^ PERF401
+  |
+
+PERF401.py:14:13: PERF401 Use a list comprehension to create a new filtered list
+   |
+12 |     for i in items:
+13 |         if i % 2:
+14 |             result.append(i)  # PERF401
+   |             ^^^^^^^^^^^^^^^^ PERF401
+15 |         elif i % 2:
+16 |             result.append(i)  # PERF401
+   |
+
+
