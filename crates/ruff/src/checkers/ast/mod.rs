@@ -1481,11 +1481,11 @@ where
                 if self.enabled(Rule::IncorrectDictIterator) {
                     perflint::rules::incorrect_dict_iterator(self, target, iter);
                 }
-                if self.enabled(Rule::UseListComprehension) {
-                    perflint::rules::use_list_comprehension(self, body);
+                if self.enabled(Rule::SlowFilteredListCreation) {
+                    perflint::rules::slow_filtered_list_creation(self, body);
                 }
-                if self.enabled(Rule::UseListCopy) {
-                    perflint::rules::use_list_copy(self, body);
+                if self.enabled(Rule::SlowListCopy) {
+                    perflint::rules::slow_list_copy(self, body);
                 }
                 if self.enabled(Rule::UnnecessaryListCast) {
                     perflint::rules::unnecessary_list_cast(self, iter);

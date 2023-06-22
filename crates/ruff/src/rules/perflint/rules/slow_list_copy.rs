@@ -25,9 +25,9 @@ use crate::checkers::ast::Checker;
 /// filtered = list(original)
 /// ```
 #[violation]
-pub struct UseListCopy;
+pub struct SlowListCopy;
 
-impl Violation for UseListCopy {
+impl Violation for SlowListCopy {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `list()` or `list.copy()` to create a copy of a list")
@@ -35,7 +35,7 @@ impl Violation for UseListCopy {
 }
 
 /// PERF402
-pub(crate) fn use_list_copy(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn slow_list_copy(checker: &mut Checker, body: &[Stmt]) {
     if body.len() != 1 {
         return;
     }
@@ -59,6 +59,6 @@ pub(crate) fn use_list_copy(checker: &mut Checker, body: &[Stmt]) {
     if attr == "append" || attr == "insert" {
         checker
             .diagnostics
-            .push(Diagnostic::new(UseListCopy, *range));
+            .push(Diagnostic::new(SlowListCopy, *range));
     }
 }

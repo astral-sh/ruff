@@ -15,8 +15,8 @@ mod tests {
 
     #[test_case(Rule::UnnecessaryListCast, Path::new("PERF101.py"))]
     #[test_case(Rule::IncorrectDictIterator, Path::new("PERF102.py"))]
-    #[test_case(Rule::UseListComprehension, Path::new("PERF401.py"))]
-    #[test_case(Rule::UseListCopy, Path::new("PERF402.py"))]
+    #[test_case(Rule::SlowFilteredListCreation, Path::new("PERF401.py"))]
+    #[test_case(Rule::SlowListCopy, Path::new("PERF402.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

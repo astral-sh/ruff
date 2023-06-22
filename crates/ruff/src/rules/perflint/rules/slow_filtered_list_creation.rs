@@ -29,9 +29,9 @@ use crate::checkers::ast::Checker;
 /// filtered = [x for x in original if x % 2]
 /// ```
 #[violation]
-pub struct UseListComprehension;
+pub struct SlowFilteredListCreation;
 
-impl Violation for UseListComprehension {
+impl Violation for SlowFilteredListCreation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a list comprehension to create a new filtered list")
@@ -39,7 +39,7 @@ impl Violation for UseListComprehension {
 }
 
 /// PERF401
-pub(crate) fn use_list_comprehension(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn slow_filtered_list_creation(checker: &mut Checker, body: &[Stmt]) {
     if body.len() != 1 {
         return;
     }
@@ -68,7 +68,7 @@ pub(crate) fn use_list_comprehension(checker: &mut Checker, body: &[Stmt]) {
         if attr == "append" {
             checker
                 .diagnostics
-                .push(Diagnostic::new(UseListComprehension, *range));
+                .push(Diagnostic::new(SlowFilteredListCreation, *range));
         }
     }
 }
