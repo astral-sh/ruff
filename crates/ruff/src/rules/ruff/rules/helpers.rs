@@ -3,6 +3,22 @@ use rustpython_parser::ast::{self, Expr};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::SemanticModel;
 
+/// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
+///
+/// While `__slots__` is typically defined via a tuple, Python accepts any iterable and, in
+/// particular, allows the use of a dictionary to define the attribute names (as keys) and
+/// docstrings (as values).
+pub(super) fn is_special_attribute(value: &Expr) -> bool {
+    if let Expr::Name(ast::ExprName { id, .. }) = value {
+        matches!(
+            id.as_str(),
+            "__slots__" | "__dict__" | "__weakref__" | "__annotations__"
+        )
+    } else {
+        false
+    }
+}
+
 /// Returns `true` if the given [`Expr`] is a `dataclasses.field` call.
 pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
