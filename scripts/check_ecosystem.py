@@ -283,8 +283,19 @@ async def main(
 
     logger.debug(f"Checking {len(repositories)} projects")
 
+    # https://stackoverflow.com/a/61478547/3549270
+    # Otherwise doing 3k repositories can take >8GB RAM
+    semaphore = asyncio.Semaphore(50)
+
+    async def limited_parallelism(coro):
+        async with semaphore:
+            return await coro
+
     results = await asyncio.gather(
-        *[compare(ruff1, ruff2, repo, checkouts) for repo in repositories.values()],
+        *[
+            limited_parallelism(compare(ruff1, ruff2, repo, checkouts))
+            for repo in repositories.values()
+        ],
         return_exceptions=True,
     )
 
