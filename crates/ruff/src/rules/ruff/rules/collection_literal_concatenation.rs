@@ -8,11 +8,6 @@ use ruff_python_ast::helpers::has_comments;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[violation]
-pub struct CollectionLiteralConcatenation {
-    expr: String,
-}
-
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
 ///
@@ -43,6 +38,11 @@ pub struct CollectionLiteralConcatenation {
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python docs: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
+#[violation]
+pub struct CollectionLiteralConcatenation {
+    expr: String,
+}
+
 impl Violation for CollectionLiteralConcatenation {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
