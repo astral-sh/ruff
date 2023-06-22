@@ -1,7 +1,6 @@
 :root {
   --black: #261230;
   --white: #ffffff;
-  --light-gray: #826894;
   --radiate: #d7ff64;
   --flare: #6340ac;
   --rock: #78876e;
@@ -46,16 +45,16 @@
   --md-code-fg-color: var(--white);
   --md-code-bg-color: var(--space);
 
-  --md-code-hl-comment-color: var(--light-gray);
-  --md-code-hl-punctuation-color: var(--light-gray);
-  --md-code-hl-generic-color: var(--light-gray);
-  --md-code-hl-variable-color: var(--light-gray);
-  --md-code-hl-string-color: var(--aurora);
-  --md-code-hl-keyword-color: var(--sun);
-  --md-code-hl-operator-color: var(--sun);
-  --md-code-hl-number-color: hsla(0, 67%, 50%, 1);
-  --md-code-hl-special-color: hsla(340, 83%, 47%, 1);
-  --md-code-hl-function-color: var(--cosmic);
+  --md-code-hl-comment-color: var(--asteroid);
+  --md-code-hl-punctuation-color: var(--asteroid);
+  --md-code-hl-generic-color: var(--supernova);
+  --md-code-hl-variable-color: var(--starlight);
+  --md-code-hl-string-color: var(--radiate);
+  --md-code-hl-keyword-color: var(--supernova);
+  --md-code-hl-operator-color: var(--supernova);
+  --md-code-hl-number-color: var(--electron);
+  --md-code-hl-special-color: var(--electron);
+  --md-code-hl-function-color: var(--neutron);
   --md-code-hl-constant-color: var(--radiate);
   --md-code-hl-name-color: var(--md-code-fg-color);
 
