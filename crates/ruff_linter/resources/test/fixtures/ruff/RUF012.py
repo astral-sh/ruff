@@ -59,3 +59,7 @@ class F(BaseSettings):
     without_annotation = []
     class_variable: ClassVar[list[int]] = []
     final_variable: Final[list[int]] = []
+
+
+class E:
+    without_annotation = []

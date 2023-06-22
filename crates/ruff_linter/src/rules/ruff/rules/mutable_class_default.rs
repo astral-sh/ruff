@@ -24,6 +24,10 @@ use crate::rules::ruff::rules::helpers::{
 /// `typing.ClassVar`. When mutability is not required, values should be
 /// immutable types, like `tuple` or `frozenset`.
 ///
+/// As a heuristic, this rule is only applied to classes with at least one
+/// annotated attribute, as unannotated classes are assumed to be deliberately
+/// untyped.
+///
 /// ## Examples
 /// ```python
 /// class A:
@@ -52,6 +56,10 @@ impl Violation for MutableClassDefault {
 
 /// RUF012
 pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    if !class_def.body.iter().any(Stmt::is_ann_assign_stmt) {
+        return;
+    }
+
     for statement in &class_def.body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
