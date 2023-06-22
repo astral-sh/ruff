@@ -53,7 +53,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use anyhow::Result;
     use std::env;
 
