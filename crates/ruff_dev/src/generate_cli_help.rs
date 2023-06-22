@@ -119,7 +119,7 @@ fn check_help_text() -> String {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use anyhow::Result;
 
     use crate::generate_all::Mode;

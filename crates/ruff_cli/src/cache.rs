@@ -299,7 +299,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::env::temp_dir;
     use std::fs;
     use std::io::{self, Write};
