@@ -1,35 +1,150 @@
+use crate::builders::optional_parentheses;
+use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::parentheses::Parentheses;
 use crate::prelude::*;
-use crate::{not_yet_implemented_custom_text, QuoteStyle};
+use crate::QuoteStyle;
 use bitflags::bitflags;
-use ruff_formatter::{write, FormatError};
+use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{ExprConstant, Ranged};
+use rustpython_parser::lexer::lex_starts_at;
+use rustpython_parser::{Mode, Tok};
 use std::borrow::Cow;
 
-pub(super) struct FormatString {
-    string_range: TextRange,
+#[derive(Copy, Clone, Debug)]
+pub enum StringLayout {
+    Default(Option<Parentheses>),
+
+    Flat,
 }
 
-impl FormatString {
-    pub(super) fn new(constant: &ExprConstant) -> Self {
+impl Default for StringLayout {
+    fn default() -> Self {
+        Self::Default(None)
+    }
+}
+
+pub(super) struct FormatString<'a> {
+    constant: &'a ExprConstant,
+    layout: StringLayout,
+}
+
+impl<'a> FormatString<'a> {
+    pub(super) fn new(constant: &'a ExprConstant, layout: StringLayout) -> Self {
         debug_assert!(constant.value.is_str());
-        Self {
-            string_range: constant.range(),
+        Self { constant, layout }
+    }
+}
+
+impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let string_range = self.constant.range();
+        let string_content = f.context().locator().slice(string_range);
+
+        if is_implicit_concatenation(string_content) {
+            let format_continuation = FormatStringContinuation::new(self.constant, self.layout);
+
+            if let StringLayout::Default(Some(Parentheses::Custom)) = self.layout {
+                optional_parentheses(&format_continuation).fmt(f)
+            } else {
+                format_continuation.fmt(f)
+            }
+        } else {
+            FormatStringPart::new(string_range).fmt(f)
         }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatString {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let string_content = f.context().locator().slice(self.string_range);
+struct FormatStringContinuation<'a> {
+    constant: &'a ExprConstant,
+    layout: StringLayout,
+}
 
-        if is_implicit_concatenation(string_content) {
-            not_yet_implemented_custom_text(r#""NOT_YET_IMPLEMENTED" "IMPLICIT_CONCATENATION""#)
-                .fmt(f)
-        } else {
-            FormatStringPart::new(self.string_range).fmt(f)
+impl<'a> FormatStringContinuation<'a> {
+    fn new(constant: &'a ExprConstant, layout: StringLayout) -> Self {
+        debug_assert!(constant.value.is_str());
+        Self { constant, layout }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let comments = f.context().comments().clone();
+        let locator = f.context().locator();
+        let mut dangling_comments = comments.dangling_comments(self.constant);
+
+        let string_range = self.constant.range();
+        let string_content = locator.slice(string_range);
+
+        // The AST parses implicit concatenation as a single string.
+        // Call into the lexer to extract the individual chunks and format each string on its own.
+        // This code does not yet implement the automatic joining of strings that fit on the same line
+        // because this is a black preview style.
+        let lexer = lex_starts_at(string_content, Mode::Module, string_range.start());
+
+        let separator = format_with(|f| match self.layout {
+            StringLayout::Default(_) => soft_line_break_or_space().fmt(f),
+            StringLayout::Flat => space().fmt(f),
+        });
+
+        let mut joiner = f.join_with(separator);
+
+        for token in lexer {
+            let (token, token_range) = token.map_err(|_| FormatError::SyntaxError)?;
+
+            match token {
+                Tok::String { .. } => {
+                    // ```python
+                    // (
+                    //      "a"
+                    //      # leading
+                    //      "the comment above"
+                    // )
+                    // ```
+                    let leading_comments_end = dangling_comments
+                        .partition_point(|comment| comment.slice().start() <= token_range.start());
+
+                    let (leading_part_comments, rest) =
+                        dangling_comments.split_at(leading_comments_end);
+
+                    // ```python
+                    // (
+                    //      "a" # trailing comment
+                    //      "the comment above"
+                    // )
+                    // ```
+                    let trailing_comments_end = rest.partition_point(|comment| {
+                        comment.line_position().is_end_of_line()
+                            && !locator.contains_line_break(TextRange::new(
+                                token_range.end(),
+                                comment.slice().start(),
+                            ))
+                    });
+
+                    let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
+
+                    joiner.entry(&format_args![
+                        line_suffix_boundary(),
+                        leading_comments(leading_part_comments),
+                        FormatStringPart::new(token_range),
+                        trailing_comments(trailing_part_comments)
+                    ]);
+
+                    dangling_comments = rest;
+                }
+                Tok::Comment(_)
+                | Tok::NonLogicalNewline
+                | Tok::Newline
+                | Tok::Indent
+                | Tok::Dedent => continue,
+                token => unreachable!("Unexpected token {token:?}"),
+            }
         }
+
+        debug_assert!(dangling_comments.is_empty());
+
+        joiner.finish()
     }
 }
 

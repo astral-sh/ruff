@@ -1,9 +1,34 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, lines_after, skip_trailing_trivia, Token, TokenKind};
-use ruff_formatter::write;
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::Ranged;
+
+/// Adds parentheses and indents `content` if it doesn't fit on a line.
+pub(crate) fn optional_parentheses<'ast, T>(content: &T) -> OptionalParentheses<'_, 'ast>
+where
+    T: Format<PyFormatContext<'ast>>,
+{
+    OptionalParentheses {
+        inner: Argument::new(content),
+    }
+}
+
+pub(crate) struct OptionalParentheses<'a, 'ast> {
+    inner: Argument<'a, PyFormatContext<'ast>>,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        group(&format_args![
+            if_group_breaks(&text("(")),
+            soft_block_indent(&Arguments::from(&self.inner)),
+            if_group_breaks(&text(")"))
+        ])
+        .fmt(f)
+    }
+}
 
 /// Provides Python specific extensions to [`Formatter`].
 pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
