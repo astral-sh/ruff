@@ -42,6 +42,9 @@ pub(crate) struct Args {
     /// Print only the first error and exit, `-x` is same as pytest
     #[arg(long, short = 'x')]
     pub(crate) exit_first_error: bool,
+    /// Checks each project inside a directory
+    #[arg(long)]
+    pub(crate) multi_project: bool,
 }
 
 /// Generate ourself a `try_parse_from` impl for `CheckArgs`. This is a strange way to use clap but
@@ -54,6 +57,35 @@ struct WrapperArgs {
 }
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
+    let all_success = if args.multi_project {
+        let mut all_success = true;
+        for base_dir in &args.files {
+            for dir in base_dir.read_dir()? {
+                let dir = dir?;
+                println!("Starting {}", dir.path().display());
+                let success = check_repo(&Args {
+                    files: vec![dir.path().clone()],
+                    ..*args
+                });
+                println!("Finished {}: {:?}", dir.path().display(), success);
+                if !matches!(success, Ok(true)) {
+                    all_success = false;
+                }
+            }
+        }
+        all_success
+    } else {
+        check_repo(args)?
+    };
+    if all_success {
+        Ok(ExitCode::SUCCESS)
+    } else {
+        Ok(ExitCode::FAILURE)
+    }
+}
+
+/// Returns whether the check was successful
+pub(crate) fn check_repo(args: &Args) -> anyhow::Result<bool> {
     let start = Instant::now();
 
     // Find files to check (or in this case, format twice). Adapted from ruff_cli
@@ -77,13 +109,20 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let (paths, _resolver) = python_files_in_path(&cli.files, &pyproject_config, &overrides)?;
     assert!(!paths.is_empty(), "no python files in {:?}", cli.files);
 
+    let mut formatted_counter = 0;
     let errors = paths
         .into_iter()
         .map(|dir_entry| {
             // Doesn't make sense to recover here in this test script
-            let file = dir_entry
-                .expect("Iterating the files in the repository failed")
-                .into_path();
+            dir_entry.expect("Iterating the files in the repository failed")
+        })
+        .filter(|dir_entry| {
+            // For some reason it does not filter in the beginning
+            dir_entry.file_name() != "pyproject.toml"
+        })
+        .map(|dir_entry| {
+            let file = dir_entry.path().to_path_buf();
+            formatted_counter += 1;
             // Handle panics (mostly in `debug_assert!`)
             let result = match catch_unwind(|| check_file(&file)) {
                 Ok(result) => result,
@@ -166,20 +205,20 @@ Formatted twice:
         }
 
         if args.exit_first_error {
-            return Ok(ExitCode::FAILURE);
+            return Ok(false);
         }
     }
     let duration = start.elapsed();
     println!(
         "Formatting {} files twice took {:.2}s",
-        cli.files.len(),
+        formatted_counter,
         duration.as_secs_f32()
     );
 
     if any_errors {
-        Ok(ExitCode::FAILURE)
+        Ok(false)
     } else {
-        Ok(ExitCode::SUCCESS)
+        Ok(true)
     }
 }
 
