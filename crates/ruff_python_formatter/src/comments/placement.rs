@@ -29,6 +29,7 @@ pub(super) fn place_comment<'a>(
         handle_trailing_body_comment,
         handle_trailing_end_of_line_body_comment,
         handle_trailing_end_of_line_condition_comment,
+        handle_trailing_end_of_line_except_comment,
         handle_module_level_own_line_comment_before_class_or_function_comment,
         handle_arguments_separator_comment,
         handle_trailing_binary_expression_left_or_operator_comment,
@@ -666,6 +667,41 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     }
 
     CommentPlacement::Default(comment)
+}
+
+/// Handles end of line comments after the `:` of an except clause
+///
+/// ```python
+/// try:
+///    ...
+/// except: # comment
+///     pass
+/// ```
+///
+/// It attaches the comment as dangling comment to the enclosing except handler.
+fn handle_trailing_end_of_line_except_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
+    let AnyNodeRef::ExceptHandlerExceptHandler(handler) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Must be an end of line comment
+    if comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let Some(first_body_statement) = handler.body.first() else {
+        debug_assert!(false); // handlers must have a body
+        return CommentPlacement::Default(comment);
+    };
+
+    if comment.slice().start() > first_body_statement.range().end() {
+        return CommentPlacement::Default(comment);
+    }
+
+    return CommentPlacement::dangling(comment.enclosing_node(), comment);
 }
 
 /// Attaches comments for the positional only arguments separator `/` or the keywords only arguments

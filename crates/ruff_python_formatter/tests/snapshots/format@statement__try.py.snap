@@ -63,6 +63,19 @@ try:
 
 except:
     ...
+
+
+try:
+    ...
+except (Exception, Exception, Exception, Exception, Exception, Exception, Exception) as exc:  # splits exception over multiple lines
+    ...
+
+
+try:
+    ...
+except:
+    a = 10 # trailing comment1
+    b = 11 # trailing comment2
 ```
 
 ## Output
@@ -74,9 +87,7 @@ except:
 
 try:
     ...
-except (
-    KeyError  # should remove brackets and be a single line
-):
+except KeyError:  # should remove brackets and be a single line
     ...
 
 
@@ -88,9 +99,7 @@ try:
 except (Exception, ValueError) as exc:  # except line
     ...
 # before except 2
-except (
-    KeyError  # except line 2
-) as key:
+except KeyError as key:  # except line 2
     ...
     # in body 2
 # before else
@@ -111,9 +120,7 @@ except (Exception, ValueError) as exc:  # except line
     ...
 
 # before except 2
-except (
-    KeyError  # except line 2
-) as key:
+except KeyError as key:  # except line 2
     ...
     # in body 2
 
@@ -132,6 +139,27 @@ try:
 
 except:
     ...
+
+
+try:
+    ...
+except (
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+    Exception,
+) as exc:  # splits exception over multiple lines
+    ...
+
+
+try:
+    ...
+except:
+    a = 10  # trailing comment1
+    b = 11  # trailing comment2
 ```
 
 

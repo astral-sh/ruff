@@ -57,3 +57,16 @@ try:
 
 except:
     ...
+
+
+try:
+    ...
+except (Exception, Exception, Exception, Exception, Exception, Exception, Exception) as exc:  # splits exception over multiple lines
+    ...
+
+
+try:
+    ...
+except:
+    a = 10 # trailing comment1
+    b = 11 # trailing comment2

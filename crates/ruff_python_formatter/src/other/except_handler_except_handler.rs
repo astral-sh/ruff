@@ -1,7 +1,9 @@
+use crate::comments::trailing_comments;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AstNode;
 use rustpython_parser::ast::ExceptHandlerExceptHandler;
 
 #[derive(Default)]
@@ -20,6 +22,9 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
             body,
         } = item;
 
+        let comments_info = f.context().comments().clone();
+        let dangling_comments = comments_info.dangling_comments(item.as_any_node_ref());
+
         write!(f, [text("except")])?;
 
         if let Some(type_) = type_ {
@@ -31,6 +36,13 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                 write!(f, [space(), text("as"), space(), name.format()])?;
             }
         }
-        write!(f, [text(":"), block_indent(&body.format())])
+        write!(
+            f,
+            [
+                text(":"),
+                trailing_comments(dangling_comments),
+                block_indent(&body.format())
+            ]
+        )
     }
 }
