@@ -8,6 +8,7 @@ Example usage:
         --url https://pypi.org/project/flake8-pie/
         --prefix PIE
 """
+from __future__ import annotations
 
 import argparse
 
