@@ -287,9 +287,9 @@ async def main(
     # Otherwise doing 3k repositories can take >8GB RAM
     semaphore = asyncio.Semaphore(50)
 
-    async def limited_parallelism(coro):
+    async def limited_parallelism(coroutine):  # noqa: ANN
         async with semaphore:
-            return await coro
+            return await coroutine
 
     results = await asyncio.gather(
         *[
