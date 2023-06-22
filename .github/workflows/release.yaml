@@ -500,7 +500,7 @@ jobs:
   update-dependents:
     name: Release
     runs-on: ubuntu-latest
-    needs: release
+    needs: publish-release
     steps:
       - name: "Update pre-commit mirror"
         uses: actions/github-script@v6
