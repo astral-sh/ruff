@@ -103,7 +103,7 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
                 }
 
                 keywords.push(ast::Keyword {
-                    arg: name.map(|name| ast::Identifier::new(name, TextRange::new(start, end))),
+                    arg: name,
                     value,
                     range: TextRange::new(start, end),
                 });

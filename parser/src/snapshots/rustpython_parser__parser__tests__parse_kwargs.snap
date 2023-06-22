@@ -33,7 +33,7 @@ expression: parse_ast
                             arg: Some(
                                 Identifier {
                                     id: "keyword",
-                                    range: 22..31,
+                                    range: 22..29,
                                 },
                             ),
                             value: Constant(
