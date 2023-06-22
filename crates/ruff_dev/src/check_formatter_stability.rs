@@ -63,10 +63,8 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
             let dir = dir?;
             println!("Starting {}", dir.path().display());
             let success = check_repo(&Args {
-                files: vec![dir.path().to_path_buf()],
-                format: args.format,
-                exit_first_error: args.exit_first_error,
-                multi_project: args.multi_project,
+                files: vec![dir.path().clone()],
+                ..*args
             });
             println!("Finished {}: {:?}", dir.path().display(), success);
             if !matches!(success, Ok(true)) {
