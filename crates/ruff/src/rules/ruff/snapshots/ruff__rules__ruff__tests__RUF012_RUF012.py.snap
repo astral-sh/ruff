@@ -1,52 +1,34 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-RUF012.py:8:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:9:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
- 7 | class A:
- 8 |     mutable_default: list[int] = []
+ 7 |     }
+ 8 | 
+ 9 |     mutable_default: list[int] = []
    |                                  ^^ RUF012
- 9 |     immutable_annotation: typing.Sequence[int] = []
-10 |     without_annotation = []
+10 |     immutable_annotation: Sequence[int] = []
+11 |     without_annotation = []
    |
 
-RUF012.py:10:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:11:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
- 8 |     mutable_default: list[int] = []
- 9 |     immutable_annotation: typing.Sequence[int] = []
-10 |     without_annotation = []
+ 9 |     mutable_default: list[int] = []
+10 |     immutable_annotation: Sequence[int] = []
+11 |     without_annotation = []
    |                          ^^ RUF012
-11 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-12 |     class_variable: typing.ClassVar[list[int]] = []
+12 |     class_variable: ClassVar[list[int]] = []
+13 |     final_variable: Final[list[int]] = []
    |
 
-RUF012.py:17:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:23:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
-16 | class B:
-17 |     mutable_default: list[int] = []
-   |                                  ^^ RUF012
-18 |     immutable_annotation: Sequence[int] = []
-19 |     without_annotation = []
-   |
-
-RUF012.py:19:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
-   |
-17 |     mutable_default: list[int] = []
-18 |     immutable_annotation: Sequence[int] = []
-19 |     without_annotation = []
+21 |     mutable_default: list[int] = []
+22 |     immutable_annotation: Sequence[int] = []
+23 |     without_annotation = []
    |                          ^^ RUF012
-20 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-21 |     class_variable: ClassVar[list[int]] = []
-   |
-
-RUF012.py:32:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
-   |
-30 |     mutable_default: list[int] = []
-31 |     immutable_annotation: Sequence[int] = []
-32 |     without_annotation = []
-   |                          ^^ RUF012
-33 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-34 |     perfectly_fine: list[int] = field(default_factory=list)
+24 |     perfectly_fine: list[int] = field(default_factory=list)
+25 |     class_variable: ClassVar[list[int]] = []
    |
 
 
