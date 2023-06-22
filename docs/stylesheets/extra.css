@@ -1,6 +1,9 @@
 :root {
   --black: #261230;
   --white: #ffffff;
+  --astral-purple: #1f092a;
+  --astral-purple-alt: #30173d;
+  --light-gray: #826894;
   --radiate: #d7ff64;
   --flare: #6340ac;
   --rock: #78876e;
@@ -22,15 +25,45 @@
   --crater: #f0dfdf;
 }
 
-[data-md-color-scheme="ruff"] {
+[data-md-color-scheme="astral-light"] {
   --md-default-bg-color--dark: var(--black);
   --md-primary-fg-color: var(--galaxy);
   --md-typeset-a-color: var(--flare);
   --md-accent-fg-color: var(--cosmic);
 }
 
-/*[data-md-color-scheme="slate"] {*/
-/*  --md-primary-fg-color: var(--galaxy);*/
-/*  --md-typeset-a-color: var(--cosmic);*/
-/*  --md-accent-fg-color: var(--white);*/
-/*}*/
+[data-md-color-scheme="astral-dark"] {
+  --md-default-bg-color: var(--astral-purple);
+  --md-default-fg-color: var(--white);
+  --md-default-fg-color--light: var(--white);
+  --md-default-fg-color--lighter: var(--white);
+  --md-primary-fg-color: var(--astral-purple-alt);
+  --md-primary-bg-color: var(--white);
+  --md-accent-fg-color: var(--radiate);
+
+  --md-typeset-color: var(--white);
+  --md-typeset-a-color: var(--radiate);
+  --md-typeset-mark-color: var(--sun);
+
+  --md-code-fg-color: var(--white);
+  --md-code-bg-color: var(--astral-purple-alt);
+
+  --md-code-hl-comment-color: var(--light-gray);
+  --md-code-hl-punctuation-color: var(--light-gray);
+  --md-code-hl-generic-color: var(--light-gray);
+  --md-code-hl-variable-color: var(--light-gray);
+  --md-code-hl-string-color: var(--aurora);
+  --md-code-hl-keyword-color: var(--sun);
+  --md-code-hl-operator-color: var(--sun);
+  --md-code-hl-number-color: hsla(0, 67%, 50%, 1);
+  --md-code-hl-special-color: hsla(340, 83%, 47%, 1);
+  --md-code-hl-function-color: var(--cosmic);
+  --md-code-hl-constant-color: var(--radiate);
+  --md-code-hl-name-color: var(--md-code-fg-color);
+
+  --md-typeset-del-color: hsla(6, 90%, 60%, 0.15);
+  --md-typeset-ins-color: hsla(150, 90%, 44%, 0.15);
+
+  --md-typeset-table-color: hsla(0, 0%, 100%, 0.12);
+  --md-typeset-table-color--light: hsla(0, 0%, 100%, 0.035);
+}

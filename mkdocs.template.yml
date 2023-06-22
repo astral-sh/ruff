@@ -14,14 +14,12 @@ theme:
     - content.code.copy
   palette:
     - media: "(prefers-color-scheme: light)"
-      scheme: ruff
-      primary: red
+      scheme: astral-light
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: deep-purple
+      scheme: astral-dark
       toggle:
         icon: material/weather-night
         name: Switch to light mode
