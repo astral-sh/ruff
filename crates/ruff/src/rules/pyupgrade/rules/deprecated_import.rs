@@ -43,6 +43,12 @@ enum Deprecation {
 /// Deprecated imports may be removed in future versions of Python, and
 /// should be replaced with their new equivalents.
 ///
+/// Note that, in some cases, it may be preferable to continue importing
+/// members from `typing_extensions` even after they're added to the Python
+/// standard library, as `typing_extensions` can backport bugfixes and
+/// optimizations from later Python versions. This rule thus avoids flagging
+/// imports from `typing_extensions` in such cases.
+///
 /// ## Example
 /// ```python
 /// from collections import Sequence
@@ -139,10 +145,12 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ContextManager",
     "Coroutine",
     "DefaultDict",
-    "NewType",
     "TYPE_CHECKING",
     "Text",
     "Type",
+    // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
+    // optimizations,
+    // "NewType",
 ];
 
 // Python 3.7+
@@ -168,11 +176,13 @@ const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
-    "Literal",
     "OrderedDict",
-    "Protocol",
-    "SupportsIndex",
     "runtime_checkable",
+    // Introduced in Python 3.8, but `typing_extensions` contains backported bugfixes and
+    // optimizations.
+    // "Literal",
+    // "Protocol",
+    // "SupportsIndex",
 ];
 
 // Python 3.9+
@@ -243,6 +253,8 @@ const TYPING_TO_COLLECTIONS_ABC_310: &[&str] = &["Callable"];
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "Concatenate",
+    "Literal",
+    "NewType",
     "ParamSpecArgs",
     "ParamSpecKwargs",
     "TypeAlias",
@@ -258,21 +270,19 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
 const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "Any",
     "LiteralString",
-    "NamedTuple",
     "Never",
     "NotRequired",
     "Required",
     "Self",
-    "TypedDict",
-    "Unpack",
     "assert_never",
     "assert_type",
     "clear_overloads",
-    "dataclass_transform",
     "final",
     "get_overloads",
     "overload",
     "reveal_type",
+    // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument.
+    // "dataclass_transform",
 ];
 
 struct ImportReplacer<'a> {
