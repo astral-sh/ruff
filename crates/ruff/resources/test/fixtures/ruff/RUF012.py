@@ -1,5 +1,5 @@
 import typing
-from typing import ClassVar, Sequence
+from typing import ClassVar, Sequence, Final
 
 KNOWINGLY_MUTABLE_DEFAULT = []
 
@@ -10,6 +10,7 @@ class A:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     class_variable: typing.ClassVar[list[int]] = []
+    final_variable: typing.Final[list[int]] = []
 
 
 class B:
@@ -18,6 +19,7 @@ class B:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []
 
 
 from dataclasses import dataclass, field
@@ -31,6 +33,7 @@ class C:
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
     class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []
 
 
 from pydantic import BaseModel
@@ -43,3 +46,4 @@ class D(BaseModel):
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
     class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []

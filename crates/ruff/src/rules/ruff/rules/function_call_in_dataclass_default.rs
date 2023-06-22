@@ -55,7 +55,7 @@ use crate::rules::ruff::rules::helpers::{
 /// - `flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDataclassDefaultArgument {
-    pub name: Option<String>,
+    name: Option<String>,
 }
 
 impl Violation for FunctionCallInDataclassDefaultArgument {

@@ -6,7 +6,7 @@ use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
-    is_class_var_annotation, is_dataclass, is_pydantic_model,
+    is_class_var_annotation, is_dataclass, is_final_annotation, is_pydantic_model,
 };
 
 /// ## What it does
@@ -56,6 +56,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
             }) => {
                 if is_mutable_expr(value, checker.semantic())
                     && !is_class_var_annotation(annotation, checker.semantic())
+                    && !is_final_annotation(annotation, checker.semantic())
                     && !is_immutable_annotation(annotation, checker.semantic())
                     && !is_dataclass(class_def, checker.semantic())
                 {
