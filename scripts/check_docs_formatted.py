@@ -179,10 +179,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         generate_docs()
 
     # Get static docs
-    static_docs = []
-    for file in os.listdir("docs"):
-        if file.endswith(".md"):
-            static_docs.append(Path("docs") / file)
+    static_docs = [Path("docs") / f for f in os.listdir("docs") if f.endswith(".md")]
 
     # Check rules generated
     if not Path("docs/rules").exists():
@@ -190,7 +187,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     # Get generated rules
-    generated_docs = [Path("docs/rules") / f for f in os.listdir("docs/rules") if f.endswith(".md")]
+    generated_docs = [
+        Path("docs/rules") / f for f in os.listdir("docs/rules") if f.endswith(".md")
+    ]
 
     if len(generated_docs) == 0:
         print("Please generate rules first.")
