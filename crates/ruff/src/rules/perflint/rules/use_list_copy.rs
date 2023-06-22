@@ -37,7 +37,7 @@ impl Violation for UseListCopy {
 /// PERF402
 pub(crate) fn use_list_copy(checker: &mut Checker, body: &[Stmt]) {
     if body.len() != 1 {
-        return
+        return;
     }
 
     let stmt = &body[0];

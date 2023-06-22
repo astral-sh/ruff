@@ -41,7 +41,7 @@ impl Violation for UseListComprehension {
 /// PERF401
 pub(crate) fn use_list_comprehension(checker: &mut Checker, body: &[Stmt]) {
     if body.len() != 1 {
-        return
+        return;
     }
 
     let stmt = &body[0];
