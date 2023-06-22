@@ -134,7 +134,7 @@ elif   unformatted:
          return True
      # yapf: enable
      elif b:
-@@ -39,49 +21,29 @@
+@@ -39,12 +21,12 @@
  # Regression test for https://github.com/psf/black/issues/2567.
  if True:
      # fmt: off
@@ -152,40 +152,44 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/3184.
--class A:
--    async def call(param):
--        if param:
--            # fmt: off
+@@ -52,29 +34,27 @@
+     async def call(param):
+         if param:
+             # fmt: off
 -            if param[0:4] in (
 -                "ABCD", "EFGH"
 -            )  :
--                # fmt: on
++            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+                 # fmt: on
 -                print ( "This won't be formatted" )
--
++                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ 
 -            elif param[0:4] in ("ZZZZ",):
 -                print ( "This won't be formatted either" )
--
++            elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ 
 -        print("This will be formatted")
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # Regression test for https://github.com/psf/black/issues/2985.
--class Named(t.Protocol):
--    # fmt: off
--    @property
+ class Named(t.Protocol):
+     # fmt: off
+     @property
 -    def  this_wont_be_formatted ( self ) -> str: ...
-+NOT_YET_IMPLEMENTED_StmtClassDef
++    def this_wont_be_formatted(self) -> str:
++        ...
  
  
--class Factory(t.Protocol):
--    def this_will_be_formatted(self, **kwargs) -> Named:
--        ...
+ class Factory(t.Protocol):
+     def this_will_be_formatted(self, **kwargs) -> Named:
+         ...
 -
--    # fmt: on
-+NOT_YET_IMPLEMENTED_StmtClassDef
+     # fmt: on
  
  
- # Regression test for https://github.com/psf/black/issues/3436.
+@@ -82,6 +62,6 @@
  if x:
      return x
  # fmt: off
@@ -231,14 +235,32 @@ else:
 
 
 # Regression test for https://github.com/psf/black/issues/3184.
-NOT_YET_IMPLEMENTED_StmtClassDef
+class A:
+    async def call(param):
+        if param:
+            # fmt: off
+            if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+                # fmt: on
+                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+
+            elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # Regression test for https://github.com/psf/black/issues/2985.
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Named(t.Protocol):
+    # fmt: off
+    @property
+    def this_wont_be_formatted(self) -> str:
+        ...
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Factory(t.Protocol):
+    def this_will_be_formatted(self, **kwargs) -> Named:
+        ...
+    # fmt: on
 
 
 # Regression test for https://github.com/psf/black/issues/3436.

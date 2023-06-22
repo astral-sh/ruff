@@ -52,7 +52,10 @@ b = 20
 
 
 # Adds two lines after `b`
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Test:
+    def a(self):
+        pass
+        # trailing comment
 
 
 # two lines before, one line after

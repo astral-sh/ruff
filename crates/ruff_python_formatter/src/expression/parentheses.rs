@@ -26,6 +26,8 @@ pub(super) fn default_expression_needs_parentheses(
     #[allow(clippy::if_same_then_else)]
     if parenthesize.is_always() {
         Parentheses::Always
+    } else if parenthesize.is_never() {
+        Parentheses::Never
     }
     // `Optional` or `Preserve` and expression has parentheses in source code.
     else if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, source) {
@@ -58,12 +60,20 @@ pub enum Parenthesize {
     /// Parenthesizes the expression only if it doesn't fit on a line.
     IfBreaks,
 
+    /// Always adds parentheses
     Always,
+
+    /// Never adds parentheses. Parentheses are handled by the caller.
+    Never,
 }
 
 impl Parenthesize {
     pub(crate) const fn is_always(self) -> bool {
         matches!(self, Parenthesize::Always)
+    }
+
+    pub(crate) const fn is_never(self) -> bool {
+        matches!(self, Parenthesize::Never)
     }
 
     pub(crate) const fn is_if_breaks(self) -> bool {
