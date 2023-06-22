@@ -79,23 +79,6 @@ fn find_useless_f_strings<'a>(
         })
 }
 
-fn unescape_f_string(content: &str) -> String {
-    content.replace("{{", "{").replace("}}", "}")
-}
-
-fn fix_f_string_missing_placeholders(
-    prefix_range: TextRange,
-    tok_range: TextRange,
-    checker: &mut Checker,
-) -> Fix {
-    let content = &checker.locator.contents()[TextRange::new(prefix_range.end(), tok_range.end())];
-    Fix::automatic(Edit::replacement(
-        unescape_f_string(content),
-        prefix_range.start(),
-        tok_range.end(),
-    ))
-}
-
 /// F541
 pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
@@ -105,13 +88,51 @@ pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checke
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(fix_f_string_missing_placeholders(
+                diagnostic.set_fix(convert_f_string_to_regular_string(
                     prefix_range,
                     tok_range,
-                    checker,
+                    checker.locator,
                 ));
             }
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+/// Unescape an f-string body by replacing `{{` with `{` and `}}` with `}`.
+///
+/// In Python, curly-brace literals within f-strings must be escaped by doubling the braces.
+/// When rewriting an f-string to a regular string, we need to unescape any curly-brace literals.
+///  For example, given `{{Hello, world!}}`, return `{Hello, world!}`.
+fn unescape_f_string(content: &str) -> String {
+    content.replace("{{", "{").replace("}}", "}")
+}
+
+/// Generate a [`Fix`] to rewrite an f-string as a regular string.
+fn convert_f_string_to_regular_string(
+    prefix_range: TextRange,
+    tok_range: TextRange,
+    locator: &Locator,
+) -> Fix {
+    // Extract the f-string body.
+    let mut content =
+        unescape_f_string(locator.slice(TextRange::new(prefix_range.end(), tok_range.end())));
+
+    // If the preceding character is equivalent to the quote character, insert a space to avoid a
+    // syntax error. For example, when removing the `f` prefix in `""f""`, rewrite to `"" ""`
+    // instead of `""""`.
+    if locator
+        .slice(TextRange::up_to(prefix_range.start()))
+        .chars()
+        .last()
+        .map_or(false, |char| content.starts_with(char))
+    {
+        content.insert(0, ' ');
+    }
+
+    Fix::automatic(Edit::replacement(
+        content,
+        prefix_range.start(),
+        tok_range.end(),
+    ))
 }
