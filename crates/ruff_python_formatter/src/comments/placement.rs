@@ -991,14 +991,22 @@ fn handle_dict_unpacking_comment<'a>(
     .skip_trivia();
 
     // we start from the preceding node but we skip its token
-    if let Some(first) = tokens.next() {
-        debug_assert!(matches!(
-            first,
-            Token {
-                kind: TokenKind::LBrace | TokenKind::Comma | TokenKind::Colon,
-                ..
-            }
-        ));
+    for token in tokens.by_ref() {
+        // Skip closing parentheses that are not part of the node range
+        if token.kind == TokenKind::RParen {
+            continue;
+        }
+        debug_assert!(
+            matches!(
+                token,
+                Token {
+                    kind: TokenKind::LBrace | TokenKind::Comma | TokenKind::Colon,
+                    ..
+                }
+            ),
+            "{token:?}",
+        );
+        break;
     }
 
     // if the remaining tokens from the previous node is exactly `**`,

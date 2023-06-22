@@ -48,3 +48,11 @@ mapping = {
     C: 0.1 * (10.0 / 12),
     D: 0.1 * (10.0 / 12),
 }
+
+# Regression test for formatter panic with comment after parenthesized dict value
+# Originally found in https://github.com/bolucat/Firefox/blob/636a717ef025c16434997dc89e42351ef740ee6b/testing/marionette/client/marionette_driver/geckoinstance.py#L109
+a = {
+    1: (2),
+    # comment
+    3: True,
+}
