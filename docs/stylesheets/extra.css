@@ -1,8 +1,6 @@
 :root {
   --black: #261230;
   --white: #ffffff;
-  --astral-purple: #1f092a;
-  --astral-purple-alt: #30173d;
   --light-gray: #826894;
   --radiate: #d7ff64;
   --flare: #6340ac;
@@ -33,11 +31,11 @@
 }
 
 [data-md-color-scheme="astral-dark"] {
-  --md-default-bg-color: var(--astral-purple);
+  --md-default-bg-color: var(--galaxy);
   --md-default-fg-color: var(--white);
   --md-default-fg-color--light: var(--white);
   --md-default-fg-color--lighter: var(--white);
-  --md-primary-fg-color: var(--astral-purple-alt);
+  --md-primary-fg-color: var(--space);
   --md-primary-bg-color: var(--white);
   --md-accent-fg-color: var(--radiate);
 
@@ -46,7 +44,7 @@
   --md-typeset-mark-color: var(--sun);
 
   --md-code-fg-color: var(--white);
-  --md-code-bg-color: var(--astral-purple-alt);
+  --md-code-bg-color: var(--space);
 
   --md-code-hl-comment-color: var(--light-gray);
   --md-code-hl-punctuation-color: var(--light-gray);
