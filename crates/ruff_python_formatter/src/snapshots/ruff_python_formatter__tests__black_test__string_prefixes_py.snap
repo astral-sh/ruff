@@ -33,19 +33,17 @@ def docstring_multiline():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,20 +1,36 @@
+@@ -1,13 +1,31 @@
  #!/usr/bin/env python3
  
--name = "Łukasz"
+ name = "Łukasz"
 -(f"hello {name}", f"hello {name}")
 -(b"", b"")
 -("", "")
--(r"", R"")
-+name = "NOT_YET_IMPLEMENTED_STRING"
 +(NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
 +(b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
-+("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING")
-+("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING")
++(u"", U"")
+ (r"", R"")
  
 -(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
 -(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
@@ -72,15 +70,6 @@ def docstring_multiline():
  
  
  def docstring_singleline():
--    R"""2020 was one hell of a year. The good news is that we were able to"""
-+    "NOT_YET_IMPLEMENTED_STRING"
- 
- 
- def docstring_multiline():
--    R"""
--    clear out all of the issues opened in that time :p
--    """
-+    "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 ## Ruff Output
@@ -88,11 +77,11 @@ def docstring_multiline():
 ```py
 #!/usr/bin/env python3
 
-name = "NOT_YET_IMPLEMENTED_STRING"
+name = "Łukasz"
 (NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
 (b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
-("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING")
-("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING")
+(u"", U"")
+(r"", R"")
 
 (
     NOT_YET_IMPLEMENTED_ExprJoinedStr,
@@ -117,11 +106,13 @@ name = "NOT_YET_IMPLEMENTED_STRING"
 
 
 def docstring_singleline():
-    "NOT_YET_IMPLEMENTED_STRING"
+    R"""2020 was one hell of a year. The good news is that we were able to"""
 
 
 def docstring_multiline():
-    "NOT_YET_IMPLEMENTED_STRING"
+    R"""
+    clear out all of the issues opened in that time :p
+    """
 ```
 
 ## Black Output

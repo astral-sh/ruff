@@ -109,21 +109,15 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -4,21 +4,15 @@
- #
- # Has many lines. Many, many lines.
- # Many, many, many lines.
--"""Module docstring.
-+"NOT_YET_IMPLEMENTED_STRING"
- 
--Possibly also many, many lines.
--"""
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
+@@ -9,16 +9,13 @@
+ Possibly also many, many lines.
+ """
  
 -import os.path
 -import sys
--
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
+ 
 -import a
 -from b.c import X  # some noqa comment
 +NOT_YET_IMPLEMENTED_StmtImport
@@ -137,15 +131,9 @@ async def wat():
  
  
  # Some comment before a function.
-@@ -30,25 +24,26 @@
- 
- 
- def function(default=None):
--    """Docstring comes first.
--
--    Possibly many lines.
--    """
-+    "NOT_YET_IMPLEMENTED_STRING"
+@@ -35,20 +32,24 @@
+     Possibly many lines.
+     """
      # FIXME: Some comment about why this function is crap but still in production.
 -    import inner_imports
 +    NOT_YET_IMPLEMENTED_StmtImport
@@ -166,38 +154,14 @@ async def wat():
  # Explains why we use global state.
 -GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
 +GLOBAL_STATE = {
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "a": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "b": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "c": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 +}
  
  
  # Another comment!
-@@ -56,7 +51,7 @@
- 
- 
- class Foo:
--    """Docstring for class Foo.  Example from Sphinx docs."""
-+    "NOT_YET_IMPLEMENTED_STRING"
- 
-     #: Doc comment for class attribute Foo.bar.
-     #: It can have multiple lines.
-@@ -65,32 +60,31 @@
-     flox = 1.5  #: Doc comment for Foo.flox. One line only.
- 
-     baz = 2
--    """Docstring for class attribute Foo.baz."""
-+    "NOT_YET_IMPLEMENTED_STRING"
- 
-     def __init__(self):
-         #: Doc comment for instance attribute qux.
-         self.qux = 3
- 
-         self.spam = 4
--        """Docstring for instance attribute spam."""
-+        "NOT_YET_IMPLEMENTED_STRING"
- 
- 
+@@ -78,19 +79,18 @@
  #' <h1>This is pweave!</h1>
  
  
@@ -234,7 +198,10 @@ async def wat():
 #
 # Has many lines. Many, many lines.
 # Many, many, many lines.
-"NOT_YET_IMPLEMENTED_STRING"
+"""Module docstring.
+
+Possibly also many, many lines.
+"""
 
 NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImport
@@ -254,7 +221,10 @@ y = 1
 
 
 def function(default=None):
-    "NOT_YET_IMPLEMENTED_STRING"
+    """Docstring comes first.
+
+    Possibly many lines.
+    """
     # FIXME: Some comment about why this function is crap but still in production.
     NOT_YET_IMPLEMENTED_StmtImport
 
@@ -270,9 +240,9 @@ def function(default=None):
 
 # Explains why we use global state.
 GLOBAL_STATE = {
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "a": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "b": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "c": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 }
 
 
@@ -281,7 +251,7 @@ GLOBAL_STATE = {
 
 
 class Foo:
-    "NOT_YET_IMPLEMENTED_STRING"
+    """Docstring for class Foo.  Example from Sphinx docs."""
 
     #: Doc comment for class attribute Foo.bar.
     #: It can have multiple lines.
@@ -290,14 +260,14 @@ class Foo:
     flox = 1.5  #: Doc comment for Foo.flox. One line only.
 
     baz = 2
-    "NOT_YET_IMPLEMENTED_STRING"
+    """Docstring for class attribute Foo.baz."""
 
     def __init__(self):
         #: Doc comment for instance attribute qux.
         self.qux = 3
 
         self.spam = 4
-        "NOT_YET_IMPLEMENTED_STRING"
+        """Docstring for instance attribute spam."""
 
 
 #' <h1>This is pweave!</h1>

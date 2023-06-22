@@ -194,7 +194,7 @@ class C:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,181 +1,46 @@
+@@ -1,159 +1,42 @@
  class C:
      def test(self) -> None:
 -        with patch("black.out", print):
@@ -236,17 +236,11 @@ class C:
 -            # Only send the first n items.
 -            items=items[:num_items]
 -        )
--        return (
--            'Utterly failed doctest test for %s\n   File "%s", line %s, in %s\n\n%s'
--            % (test.name, test.filename, lineno, lname, err)
 +        NOT_YET_IMPLEMENTED_StmtWith
 +        xxxxxxxxxxxxxxxx = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+        return "NOT_YET_IMPLEMENTED_STRING" % (
-+            test.name,
-+            test.filename,
-+            lineno,
-+            lname,
-+            err,
+         return (
+             'Utterly failed doctest test for %s\n   File "%s", line %s, in %s\n\n%s'
+             % (test.name, test.filename, lineno, lname, err)
          )
  
      def omitting_trailers(self) -> None:
@@ -373,18 +367,19 @@ class C:
 +        NOT_YET_IMPLEMENTED_StmtAssert
  
 -        dis_c_instance_method = """\
--        %3d           0 LOAD_FAST                1 (x)
--                      2 LOAD_CONST               1 (1)
--                      4 COMPARE_OP               2 (==)
--                      6 LOAD_FAST                0 (self)
--                      8 STORE_ATTR               0 (x)
--                     10 LOAD_CONST               0 (None)
--                     12 RETURN_VALUE
++        dis_c_instance_method = (
++            """\
+         %3d           0 LOAD_FAST                1 (x)
+                       2 LOAD_CONST               1 (1)
+                       4 COMPARE_OP               2 (==)
+@@ -161,21 +44,8 @@
+                       8 STORE_ATTR               0 (x)
+                      10 LOAD_CONST               0 (None)
+                      12 RETURN_VALUE
 -        """ % (
 -            _C.__init__.__code__.co_firstlineno + 1,
-+        dis_c_instance_method = "NOT_YET_IMPLEMENTED_STRING" % (
-+            _C.__init__.__code__.co_firstlineno
-+            + 1,
++        """
++            % (_C.__init__.__code__.co_firstlineno + 1,)
          )
  
 -        assert (
@@ -411,12 +406,9 @@ class C:
     def test(self) -> None:
         NOT_YET_IMPLEMENTED_StmtWith
         xxxxxxxxxxxxxxxx = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-        return "NOT_YET_IMPLEMENTED_STRING" % (
-            test.name,
-            test.filename,
-            lineno,
-            lname,
-            err,
+        return (
+            'Utterly failed doctest test for %s\n   File "%s", line %s, in %s\n\n%s'
+            % (test.name, test.filename, lineno, lname, err)
         )
 
     def omitting_trailers(self) -> None:
@@ -447,9 +439,17 @@ class C:
 
         NOT_YET_IMPLEMENTED_StmtAssert
 
-        dis_c_instance_method = "NOT_YET_IMPLEMENTED_STRING" % (
-            _C.__init__.__code__.co_firstlineno
-            + 1,
+        dis_c_instance_method = (
+            """\
+        %3d           0 LOAD_FAST                1 (x)
+                      2 LOAD_CONST               1 (1)
+                      4 COMPARE_OP               2 (==)
+                      6 LOAD_FAST                0 (self)
+                      8 STORE_ATTR               0 (x)
+                     10 LOAD_CONST               0 (None)
+                     12 RETURN_VALUE
+        """
+            % (_C.__init__.__code__.co_firstlineno + 1,)
         )
 
         NOT_YET_IMPLEMENTED_StmtAssert

@@ -195,16 +195,16 @@ instruction()#comment with bad spacing
 -    "Any",
 -    "Callable",
 -    "ClassVar",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
++    'Any',
++    'Callable',
++    'ClassVar',
      # ABCs (from collections.abc).
 -    "AbstractSet",  # collections.abc.Set.
 -    "ByteString",
 -    "Container",
-+    "NOT_YET_IMPLEMENTED_STRING",  # collections.abc.Set.
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
++    'AbstractSet',  # collections.abc.Set.
++    'ByteString',
++    'Container',
      # Concrete collection types.
 -    "Counter",
 -    "Deque",
@@ -215,15 +215,15 @@ instruction()#comment with bad spacing
 -    "FrozenSet",
 -    "NamedTuple",  # Not really a type.
 -    "Generator",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",  # Not really a type.
-+    "NOT_YET_IMPLEMENTED_STRING",
++    'Counter',
++    'Deque',
++    'Dict',
++    'DefaultDict',
++    'List',
++    'Set',
++    'FrozenSet',
++    'NamedTuple',  # Not really a type.
++    'Generator',
  ]
  
  not_shareables = [
@@ -237,8 +237,7 @@ instruction()#comment with bad spacing
 +    NOT_IMPLEMENTED_call(),
      42,
      100.0,
--    "spam",
-+    "NOT_YET_IMPLEMENTED_STRING",
+     "spam",
      # user-defined types and objects
      Cheese,
 -    Cheese("Wensleydale"),
@@ -249,7 +248,7 @@ instruction()#comment with bad spacing
  
 -if "PYTHON" in os.environ:
 -    add_compiler(compiler_from_env())
-+if "NOT_YET_IMPLEMENTED_STRING" in os.environ:
++if 'PYTHON' in os.environ:
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  else:
      # for compiler in compilers.values():
@@ -400,23 +399,23 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 
 __all__ = [
     # Super-special typing primitives.
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
+    'Any',
+    'Callable',
+    'ClassVar',
     # ABCs (from collections.abc).
-    "NOT_YET_IMPLEMENTED_STRING",  # collections.abc.Set.
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
+    'AbstractSet',  # collections.abc.Set.
+    'ByteString',
+    'Container',
     # Concrete collection types.
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",  # Not really a type.
-    "NOT_YET_IMPLEMENTED_STRING",
+    'Counter',
+    'Deque',
+    'Dict',
+    'DefaultDict',
+    'List',
+    'Set',
+    'FrozenSet',
+    'NamedTuple',  # Not really a type.
+    'Generator',
 ]
 
 not_shareables = [
@@ -432,14 +431,14 @@ not_shareables = [
     NOT_IMPLEMENTED_call(),
     42,
     100.0,
-    "NOT_YET_IMPLEMENTED_STRING",
+    "spam",
     # user-defined types and objects
     Cheese,
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 ]
 
-if "NOT_YET_IMPLEMENTED_STRING" in os.environ:
+if 'PYTHON' in os.environ:
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:
     # for compiler in compilers.values():

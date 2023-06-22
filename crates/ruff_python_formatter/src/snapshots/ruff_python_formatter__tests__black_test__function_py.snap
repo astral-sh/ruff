@@ -126,7 +126,7 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -14,39 +13,48 @@
+@@ -14,25 +13,24 @@
      b
      c
      if True:
@@ -145,11 +145,10 @@ def __await__(): return (yield)
  
  
  async def coroutine(arg, exec=False):
--    "Single-line docstring. Multiline is harder to reformat."
+     "Single-line docstring. Multiline is harder to reformat."
 -    async with some_connection() as conn:
 -        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
 -    await asyncio.sleep(1)
-+    "NOT_YET_IMPLEMENTED_STRING"
 +    NOT_YET_IMPLEMENTED_StmtAsyncWith
 +    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
@@ -160,9 +159,7 @@ def __await__(): return (yield)
  def function_signature_stress_test(
      number: int,
      no_annotation=None,
--    text: str = "default",
-+    text: str = "NOT_YET_IMPLEMENTED_STRING",
-     *,
+@@ -41,12 +39,22 @@
      debug: bool = False,
      **kwargs,
  ) -> str:
@@ -181,8 +178,8 @@ def __await__(): return (yield)
 +    e=True,
 +    f=-1,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h="NOT_YET_IMPLEMENTED_STRING",
-+    i="NOT_YET_IMPLEMENTED_STRING",
++    h="",
++    i=r'',
 +):
 +    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
@@ -194,11 +191,10 @@ def __await__(): return (yield)
      e: bool = True,
      f: int = -1,
 -    g: int = 1 if False else 2,
--    h: str = "",
--    i: str = r"",
 +    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h: str = "NOT_YET_IMPLEMENTED_STRING",
-+    i: str = "NOT_YET_IMPLEMENTED_STRING",
+     h: str = "",
+-    i: str = r"",
++    i: str = r'',
  ):
      ...
  
@@ -317,7 +313,7 @@ def func_no_args():
 
 
 async def coroutine(arg, exec=False):
-    "NOT_YET_IMPLEMENTED_STRING"
+    "Single-line docstring. Multiline is harder to reformat."
     NOT_YET_IMPLEMENTED_StmtAsyncWith
     await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
@@ -327,7 +323,7 @@ async def coroutine(arg, exec=False):
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
-    text: str = "NOT_YET_IMPLEMENTED_STRING",
+    text: str = "default",
     *,
     debug: bool = False,
     **kwargs,
@@ -343,8 +339,8 @@ def spaces(
     e=True,
     f=-1,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h="NOT_YET_IMPLEMENTED_STRING",
-    i="NOT_YET_IMPLEMENTED_STRING",
+    h="",
+    i=r'',
 ):
     offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
@@ -358,8 +354,8 @@ def spaces_types(
     e: bool = True,
     f: int = -1,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h: str = "NOT_YET_IMPLEMENTED_STRING",
-    i: str = "NOT_YET_IMPLEMENTED_STRING",
+    h: str = "",
+    i: str = r'',
 ):
     ...
 

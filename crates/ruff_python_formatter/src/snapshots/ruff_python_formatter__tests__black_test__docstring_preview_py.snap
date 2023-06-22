@@ -63,10 +63,11 @@ def single_quote_docstring_over_line_limit2():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,48 +1,38 @@
+@@ -1,9 +1,10 @@
  def docstring_almost_at_line_limit():
 -    """long docstring................................................................."""
-+    "NOT_YET_IMPLEMENTED_STRING"
++    """long docstring.................................................................
++    """
  
  
  def docstring_almost_at_line_limit_with_prefix():
@@ -75,11 +76,7 @@ def single_quote_docstring_over_line_limit2():
  
  
  def mulitline_docstring_almost_at_line_limit():
--    """long docstring.................................................................
--
--    ..................................................................................
--    """
-+    "NOT_YET_IMPLEMENTED_STRING"
+@@ -14,10 +15,7 @@
  
  
  def mulitline_docstring_almost_at_line_limit_with_prefix():
@@ -91,8 +88,7 @@ def single_quote_docstring_over_line_limit2():
  
  
  def docstring_at_line_limit():
--    """long docstring................................................................"""
-+    "NOT_YET_IMPLEMENTED_STRING"
+@@ -25,7 +23,7 @@
  
  
  def docstring_at_line_limit_with_prefix():
@@ -101,10 +97,7 @@ def single_quote_docstring_over_line_limit2():
  
  
  def multiline_docstring_at_line_limit():
--    """first line-----------------------------------------------------------------------
--
--    second line----------------------------------------------------------------------"""
-+    "NOT_YET_IMPLEMENTED_STRING"
+@@ -35,9 +33,7 @@
  
  
  def multiline_docstring_at_line_limit_with_prefix():
@@ -115,20 +108,20 @@ def single_quote_docstring_over_line_limit2():
  
  
  def single_quote_docstring_over_line_limit():
--    "We do not want to put the closing quote on a new line as that is invalid (see GH-3141)."
-+    "NOT_YET_IMPLEMENTED_STRING"
+@@ -45,4 +41,4 @@
  
  
  def single_quote_docstring_over_line_limit2():
 -    "We do not want to put the closing quote on a new line as that is invalid (see GH-3141)."
-+    "NOT_YET_IMPLEMENTED_STRING"
++    'We do not want to put the closing quote on a new line as that is invalid (see GH-3141).'
 ```
 
 ## Ruff Output
 
 ```py
 def docstring_almost_at_line_limit():
-    "NOT_YET_IMPLEMENTED_STRING"
+    """long docstring.................................................................
+    """
 
 
 def docstring_almost_at_line_limit_with_prefix():
@@ -136,7 +129,10 @@ def docstring_almost_at_line_limit_with_prefix():
 
 
 def mulitline_docstring_almost_at_line_limit():
-    "NOT_YET_IMPLEMENTED_STRING"
+    """long docstring.................................................................
+
+    ..................................................................................
+    """
 
 
 def mulitline_docstring_almost_at_line_limit_with_prefix():
@@ -144,7 +140,7 @@ def mulitline_docstring_almost_at_line_limit_with_prefix():
 
 
 def docstring_at_line_limit():
-    "NOT_YET_IMPLEMENTED_STRING"
+    """long docstring................................................................"""
 
 
 def docstring_at_line_limit_with_prefix():
@@ -152,7 +148,9 @@ def docstring_at_line_limit_with_prefix():
 
 
 def multiline_docstring_at_line_limit():
-    "NOT_YET_IMPLEMENTED_STRING"
+    """first line-----------------------------------------------------------------------
+
+    second line----------------------------------------------------------------------"""
 
 
 def multiline_docstring_at_line_limit_with_prefix():
@@ -160,11 +158,11 @@ def multiline_docstring_at_line_limit_with_prefix():
 
 
 def single_quote_docstring_over_line_limit():
-    "NOT_YET_IMPLEMENTED_STRING"
+    "We do not want to put the closing quote on a new line as that is invalid (see GH-3141)."
 
 
 def single_quote_docstring_over_line_limit2():
-    "NOT_YET_IMPLEMENTED_STRING"
+    'We do not want to put the closing quote on a new line as that is invalid (see GH-3141).'
 ```
 
 ## Black Output

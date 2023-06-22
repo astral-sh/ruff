@@ -144,13 +144,11 @@ if __name__ == "__main__":
  # leading function comment
  def decorated1():
      ...
-@@ -69,5 +63,5 @@
-     ...
+@@ -70,4 +64,4 @@
  
  
--if __name__ == "__main__":
+ if __name__ == "__main__":
 -    main()
-+if __name__ == "NOT_YET_IMPLEMENTED_STRING":
 +    NOT_IMPLEMENTED_call()
 ```
 
@@ -222,7 +220,7 @@ def g():
     ...
 
 
-if __name__ == "NOT_YET_IMPLEMENTED_STRING":
+if __name__ == "__main__":
     NOT_IMPLEMENTED_call()
 ```
 

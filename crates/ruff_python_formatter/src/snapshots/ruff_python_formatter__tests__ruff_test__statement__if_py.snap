@@ -115,23 +115,23 @@ else:
 # instead of the else.
 # Originally found in https://github.com/python/cpython/blob/ab3823a97bdeefb0266b3c8d493f7f6223ce3686/Lib/dataclasses.py#L539
 
-if "NOT_YET_IMPLEMENTED_STRING":
+if "if 1":
     pass
-elif "NOT_YET_IMPLEMENTED_STRING":
+elif "elif 1":
     pass
 # Don't drop this comment 1
 x = 1
 
-if "NOT_YET_IMPLEMENTED_STRING":
+if "if 2":
     pass
-elif "NOT_YET_IMPLEMENTED_STRING":
+elif "elif 2":
     pass
 else:
     pass
 # Don't drop this comment 2
 x = 2
 
-if "NOT_YET_IMPLEMENTED_STRING":
+if "if 3":
     pass
 else:
     pass
