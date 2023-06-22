@@ -59,16 +59,18 @@ struct WrapperArgs {
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
         let mut all_success = true;
-        for dir in args.files[0].read_dir()? {
-            let dir = dir?;
-            println!("Starting {}", dir.path().display());
-            let success = check_repo(&Args {
-                files: vec![dir.path().clone()],
-                ..*args
-            });
-            println!("Finished {}: {:?}", dir.path().display(), success);
-            if !matches!(success, Ok(true)) {
-                all_success = false;
+        for base_dir in &args.files {
+            for dir in base_dir.read_dir()? {
+                let dir = dir?;
+                println!("Starting {}", dir.path().display());
+                let success = check_repo(&Args {
+                    files: vec![dir.path().clone()],
+                    ..*args
+                });
+                println!("Finished {}: {:?}", dir.path().display(), success);
+                if !matches!(success, Ok(true)) {
+                    all_success = false;
+                }
             }
         }
         all_success
