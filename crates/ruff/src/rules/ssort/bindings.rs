@@ -163,336 +163,161 @@ mod tests {
 
     #[test]
     fn function_def() {
-        let stmt = parse(r#"def function(): pass"#);
+        let stmt = parse(
+            r#"
+                @a
+                def b(c: d = e, /, f: g = h, *i: j, k: l = m, **n: o) -> p:
+                    q = r
+            "#,
+        );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["function"]);
+        assert_eq!(bindings, ["b"]);
     }
 
     #[test]
-    fn function_def_with_walrus_in_defaults() {
+    fn function_def_with_walrus() {
         let stmt = parse(
             r#"
-                def function(
-                    posonly = (posonly_default := None),
+                @(a := b)
+                def c(
+                    d: (e := f) = (g := h),
                     /,
-                    arg = (arg_default := None),
-                    *args,
-                    kwarg = (kwarg_default := None),
-                    **kwargs
-                ):
-                    pass
+                    i: (j := k) = (l := m),
+                    *n: (o := p),
+                    q: (r := s) = (t := u),
+                    **v: (w := x)
+                ) -> (y := z):
+                    aa = ab
             "#,
         );
         let bindings = bindings(&stmt);
         assert_eq!(
             bindings,
-            [
-                "posonly_default",
-                "arg_default",
-                "kwarg_default",
-                "function",
-            ]
+            ["a", "g", "l", "t", "e", "j", "o", "r", "w", "y", "c"]
         );
-    }
-
-    #[test]
-    fn function_def_with_walrus_in_annotations() {
-        let stmt = parse(
-            r#"
-                def function(
-                    posonly: (posonly_type := int),
-                    / ,
-                    arg: (arg_type := int),
-                    *args: (args_type := int),
-                    kwarg: (kwarg_type := int),
-                    **kwargs: (kwargs_type := int)
-                ) -> (return_type := int):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(
-            bindings,
-            [
-                "posonly_type",
-                "arg_type",
-                "args_type",
-                "kwarg_type",
-                "kwargs_type",
-                "return_type",
-                "function",
-            ],
-        );
-    }
-
-    #[test]
-    fn function_def_with_walrus_in_decorator() {
-        let stmt = parse(
-            r#"
-                @(decorator := my_decorator)
-                def function(x):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["decorator", "function"],);
     }
 
     #[test]
     fn async_function_def() {
-        let stmt = parse(r#"async def function(): pass"#);
+        let stmt = parse(
+            r#"
+                @a
+                async def b(c: d = e, /, f: g = h, *i: j, k: l = m, **n: o) -> p:
+                    q = r
+            "#,
+        );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["function"]);
+        assert_eq!(bindings, ["b"]);
     }
 
     #[test]
-    fn async_function_def_with_walrus_in_defaults() {
+    fn async_function_def_with_walrus() {
         let stmt = parse(
             r#"
-                async def function(
-                    posonly = (posonly_default := None),
+                @(a := b)
+                async def c(
+                    d: (e := f) = (g := h),
                     /,
-                    arg = (arg_default := None),
-                    *args,
-                    kwarg = (kwarg_default := None),
-                    **kwargs
-                ):
-                    pass
+                    i: (j := k) = (l := m),
+                    *n: (o := p),
+                    q: (r := s) = (t := u),
+                    **v: (w := x)
+                ) -> (y := z):
+                    aa = ab
             "#,
         );
         let bindings = bindings(&stmt);
         assert_eq!(
             bindings,
-            [
-                "posonly_default",
-                "arg_default",
-                "kwarg_default",
-                "function",
-            ]
+            ["a", "g", "l", "t", "e", "j", "o", "r", "w", "y", "c"]
         );
-    }
-
-    #[test]
-    fn async_function_def_with_walrus_in_annotations() {
-        let stmt = parse(
-            r#"
-                async def function(
-                    posonly: (posonly_type := int),
-                    / ,
-                    arg: (arg_type := int),
-                    *args: (args_type := int),
-                    kwarg: (kwarg_type := int),
-                    **kwargs: (kwargs_type := int)
-                ) -> (return_type := int):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(
-            bindings,
-            [
-                "posonly_type",
-                "arg_type",
-                "args_type",
-                "kwarg_type",
-                "kwargs_type",
-                "return_type",
-                "function",
-            ]
-        );
-    }
-
-    #[test]
-    fn async_function_def_with_walrus_in_decorator() {
-        let stmt = parse(
-            r#"
-                @(decorator := my_decorator)
-                def function(x):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["decorator", "function"]);
     }
 
     #[test]
     fn class_def() {
         let stmt = parse(
             r#"
-                class ClassName:
-                    a = 1
-                    def b(self):
-                        pass
+                @a
+                class b(c, d=f):
+                    g = h
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["ClassName"]);
+        assert_eq!(bindings, ["b"]);
     }
 
     #[test]
-    fn class_def_with_walrus_in_decorator() {
+    fn class_def_with_walrus() {
         let stmt = parse(
             r#"
-                @(decorator := my_decorator)
-                class ClassName:
-                    pass
+                @(a := b)
+                class c((d := e), f=(g := h)):
+                    i = j
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["decorator", "ClassName"]);
+        assert_eq!(bindings, ["a", "d", "g", "c"]);
     }
 
     #[test]
-    fn class_def_with_walrus_in_base_class() {
-        let stmt = parse(
-            r#"
-                class ClassName(BaseClass, (OtherBaseClass := MyBaseClass)):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["OtherBaseClass", "ClassName"]);
-    }
-
-    #[test]
-    fn class_def_with_walrus_in_metaclass() {
-        let stmt = parse(
-            r#"
-                class ClassName(metaclass = (MetaClass := MyMetaClass)):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["MetaClass", "ClassName"]);
-    }
-
-    #[test]
-    fn class_def_with_walrus_in_body() {
-        let stmt = parse(
-            r#"
-                class ClassName:
-                    a = (x := 2)
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["ClassName"]);
-    }
-
-    #[test]
-    fn return_with_variable() {
-        let stmt = parse(r#"return x"#);
+    fn return_() {
+        let stmt = parse(r#"return a"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn return_with_walrus() {
-        let stmt = parse(r#"return (x := 1)"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
-    }
-
-    #[test]
-    fn delete_with_single_variable() {
-        let stmt = parse(r#"del a"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn delete_with_multiple_variables() {
-        let stmt = parse(r#"del a, b"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn delete_with_subscript() {
-        let stmt = parse(r#"del a[b:c]"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn delete_with_attribute() {
-        let stmt = parse(r#"del a.b"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn assign_with_variable() {
-        let stmt = parse(r#"a = b"#);
+        let stmt = parse(r#"return (a := b)"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
-    fn assign_with_unpacked_variable() {
-        let stmt = parse(r#"a, *b = c"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "b"]);
-    }
-
-    #[test]
-    fn assign_with_attribute() {
-        let stmt = parse(r#"a.b = c"#);
+    fn delete() {
+        let stmt = parse(r#"del a, b.c, d[e:f:g]"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
-    fn assign_with_destructured_list() {
-        let stmt = parse(r#"[a, [b, c]] = d"#);
+    fn delete_with_walrus() {
+        let stmt = parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)]"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "b", "c"]);
+        assert_eq!(bindings, ["b", "e", "g", "i", "k"]);
     }
 
     #[test]
-    fn assign_with_destructed_list_and_unpacked_variable() {
-        let stmt = parse(r#"[a, *b] = c"#);
+    fn assign() {
+        let stmt = parse(r#"a, b.c, [d, *e], *f = g"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "b"]);
+        assert_eq!(bindings, ["a", "d", "e", "f"]);
     }
 
     #[test]
     fn assign_with_walrus() {
-        let stmt = parse(r#"a = (b := c)"#);
+        let stmt = parse(r#"a, (b := c).d, [e, *f], *g = (h := i)"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "a"]);
+        assert_eq!(bindings, ["h", "a", "b", "e", "f", "g"]);
     }
 
     #[test]
-    fn aug_assign_with_variable() {
+    fn aug_assign() {
         let stmt = parse(r#"a += b"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
-    fn aug_assign_with_attribute() {
-        let stmt = parse(r#"a.b /= c"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
     fn aug_assign_with_walrus() {
-        let stmt = parse(r#"a ^= (b := c)"#);
+        let stmt = parse(r#"a += (b := c)"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, ["a", "b"]);
     }
 
     #[test]
-    fn ann_assign_with_variable() {
-        let stmt = parse(r#"a: int = b"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a"]);
-    }
-
-    #[test]
-    fn ann_assign_with_no_value() {
-        let stmt = parse(r#"a: int"#);
+    fn ann_assign() {
+        let stmt = parse(r#"a: b = c"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
@@ -505,282 +330,199 @@ mod tests {
     }
 
     #[test]
-    fn for_with_else() {
+    fn for_() {
         let stmt = parse(
             r#"
-                for i in range(10):
-                    a += i
+                for a in b:
+                    c = d
                 else:
-                    b = 1
+                    e = f
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["i", "a", "b"]);
+        assert_eq!(bindings, ["a", "c", "e"]);
     }
 
     #[test]
     fn for_with_walrus() {
         let stmt = parse(
             r#"
-                for i in (r := range(10)):
-                    pass
+                for a in (b := c):
+                    d = e
+                else:
+                    f = g
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["r", "i"]);
+        assert_eq!(bindings, ["b", "a", "d", "f"]);
     }
 
     #[test]
-    fn async_for_with_else() {
+    fn async_for() {
         let stmt = parse(
             r#"
-                async for i in range(10):
-                    a += i
+                async for a in b:
+                    c = d
                 else:
-                    b = 1
+                    e = f
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["i", "a", "b"]);
+        assert_eq!(bindings, ["a", "c", "e"]);
     }
 
     #[test]
     fn async_for_with_walrus() {
         let stmt = parse(
             r#"
-                async for i in (r := range(10)):
-                    pass
+                async for a in (b := c):
+                    d = e
+                else:
+                    f = g
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["r", "i"]);
+        assert_eq!(bindings, ["b", "a", "d", "f"]);
     }
 
     #[test]
-    fn while_with_else() {
+    fn while_() {
         let stmt = parse(
             r#"
-                while x:
-                    a = 1
+                while a:
+                    b = c
                 else:
-                    b = 1
+                    d = e
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "b"]);
+        assert_eq!(bindings, ["b", "d"]);
     }
 
     #[test]
     fn while_with_walrus() {
         let stmt = parse(
             r#"
-                while (x := y):
-                    pass
+                while (a := b):
+                    c = d
+                else:
+                    e = f
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
+        assert_eq!(bindings, ["a", "c", "e"]);
     }
 
     #[test]
-    fn if_with_elif_and_else() {
+    fn if_() {
         let stmt = parse(
             r#"
-                if x:
-                    a = 1
-                elif y:
-                    b = 2
+                if a:
+                    b = c
+                elif d:
+                    e = f
                 else:
-                    c = 3
+                    g = h
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "b", "c"]);
+        assert_eq!(bindings, ["b", "e", "g"]);
     }
 
     #[test]
     fn if_with_walrus() {
         let stmt = parse(
             r#"
-                if (x := y):
-                    pass
+                if (a := b):
+                    c = d
+                elif (e := f):
+                    g = h
+                else:
+                    i = j
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
+        assert_eq!(bindings, ["a", "c", "e", "g", "i"]);
     }
 
     #[test]
     fn with() {
         let stmt = parse(
             r#"
-                with a:
-                    pass
+                with a as b, c as (d, e):
+                    f = g
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn with_with_single_alias() {
-        let stmt = parse(
-            r#"
-                with a as b:
-                    c = 1
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "c"]);
-    }
-
-    #[test]
-    fn with_with_multiple_aliases() {
-        let stmt = parse(
-            r#"
-                with a as b, c as d:
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "d"]);
-    }
-
-    #[test]
-    fn with_with_tuple_alias() {
-        let stmt = parse(
-            r#"
-                with a as (b, c):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "c"]);
+        assert_eq!(bindings, ["b", "d", "e", "f"]);
     }
 
     #[test]
     fn with_with_walrus() {
         let stmt = parse(
             r#"
-                with (a := b) as c:
-                    pass
+                with (a := b) as c, (d := e) as (f, g):
+                    h = i
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "c"]);
+        assert_eq!(bindings, ["a", "c", "d", "f", "g", "h"]);
     }
 
     #[test]
     fn async_with() {
         let stmt = parse(
             r#"
-                async with a:
-                    pass
+                async with a as b, c as (d, e):
+                    f = g
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn async_with_with_single_alias() {
-        let stmt = parse(
-            r#"
-                async with a as b:
-                    c = 1
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "c"]);
-    }
-
-    #[test]
-    fn async_with_with_multiple_aliases() {
-        let stmt = parse(
-            r#"
-                async with a as b, c as d:
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "d"]);
-    }
-
-    #[test]
-    fn async_with_with_tuple_alias() {
-        let stmt = parse(
-            r#"
-                async with a as (b, c):
-                    pass
-            "#,
-        );
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "c"]);
+        assert_eq!(bindings, ["b", "d", "e", "f"]);
     }
 
     #[test]
     fn async_with_with_walrus() {
         let stmt = parse(
             r#"
-                async with (a := b) as c:
-                    pass
+                async with (a := b) as c, (d := e) as (f, g):
+                    h = i
             "#,
         );
+        let bindings = bindings(&stmt);
+        assert_eq!(bindings, ["a", "c", "d", "f", "g", "h"]);
+    }
+
+    #[test]
+    fn raise() {
+        let stmt = parse(r#"raise a from b"#);
+        let bindings = bindings(&stmt);
+        assert_eq!(bindings, [] as [&str; 0]);
+    }
+
+    #[test]
+    fn raise_with_walrus() {
+        let stmt = parse(r#"raise (a := b) from (c := d)"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, ["a", "c"]);
     }
 
     #[test]
-    fn raise() {
-        let stmt = parse(r#"raise"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn raise_with_exception() {
-        let stmt = parse(r#"raise x"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn raise_with_cause() {
-        let stmt = parse(r#"raise x from y"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn raise_with_walrus_in_exception() {
-        let stmt = parse(r#"raise (x := y)"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
-    }
-
-    #[test]
-    fn raise_with_walrus_in_cause() {
-        let stmt = parse(r#"raise x from (y := z)"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["y"]);
-    }
-
-    #[test]
-    fn try_with_else_and_finally() {
+    fn try_() {
         let stmt = parse(
             r#"
                 try:
                     a = b
-                except x as y:
-                    c = d
-                else:
+                except c as d:
                     e = f
-                finally:
+                else:
                     g = h
+                finally:
+                    i = j
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "y", "c", "e", "g"]);
+        assert_eq!(bindings, ["a", "d", "e", "g", "i"]);
     }
 
     #[test]
@@ -789,30 +531,34 @@ mod tests {
             r#"
                 try:
                     a = b
-                except (x := y):
-                    c = d
+                except (c := d) as e:
+                    f = g
+                else:
+                    h = i
+                finally:
+                    j = k
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "x", "c"]);
+        assert_eq!(bindings, ["a", "c", "e", "f", "h", "j"]);
     }
 
     #[test]
-    fn try_star_with_else_and_finally() {
+    fn try_star() {
         let stmt = parse(
             r#"
                 try:
                     a = b
-                except* x as y:
-                    c = d
-                else:
+                except* c as d:
                     e = f
-                finally:
+                else:
                     g = h
+                finally:
+                    i = j
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "y", "c", "e", "g"]);
+        assert_eq!(bindings, ["a", "d", "e", "g", "i"]);
     }
 
     #[test]
@@ -821,103 +567,79 @@ mod tests {
             r#"
                 try:
                     a = b
-                except* (x := y):
-                    c = d
+                except* (c := d) as e:
+                    f = g
+                else:
+                    h = i
+                finally:
+                    j = k
             "#,
         );
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["a", "x", "c"]);
+        assert_eq!(bindings, ["a", "c", "e", "f", "h", "j"]);
     }
 
     #[test]
     fn assert() {
-        let stmt = parse(r#"assert x"#);
+        let stmt = parse(r#"assert a, b"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
-    fn assert_with_message() {
-        let stmt = parse(r#"assert x, y"#);
+    fn assert_with_walrus() {
+        let stmt = parse(r#"assert (a := b), (c := d)"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn assert_with_walrus_in_test() {
-        let stmt = parse(r#"assert (x := y)"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
-    }
-
-    #[test]
-    fn assert_with_walrus_in_message() {
-        let stmt = parse(r#"assert x, (y := z)"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["y"]);
+        assert_eq!(bindings, ["a", "c"]);
     }
 
     #[test]
     fn import() {
-        let stmt = parse(r#"import x"#);
+        let stmt = parse(r#"import a"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
-    }
-
-    #[test]
-    fn import_with_alias() {
-        let stmt = parse(r#"import x as y"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["y"]);
+        assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn import_with_submodule() {
-        let stmt = parse(r#"import x.y.z"#);
+        let stmt = parse(r#"import a.b.c"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
+        assert_eq!(bindings, ["a"]);
+    }
+
+    #[test]
+    fn import_with_alias() {
+        let stmt = parse(r#"import a as b"#);
+        let bindings = bindings(&stmt);
+        assert_eq!(bindings, ["b"]);
     }
 
     #[test]
     fn import_from() {
-        let stmt = parse(r#"from x import y, z"#);
+        let stmt = parse(r#"from a import b, c"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["y", "z"]);
+        assert_eq!(bindings, ["b", "c"]);
     }
 
     #[test]
     fn import_from_with_alias() {
-        let stmt = parse(r#"from x import y as z"#);
+        let stmt = parse(r#"from a import b as c, d as e"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["z"]);
+        assert_eq!(bindings, ["c", "e"]);
     }
 
     #[test]
-    fn global_with_single_name() {
-        let stmt = parse(r#"global x"#);
+    fn global() {
+        let stmt = parse(r#"global a, b"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
+        assert_eq!(bindings, ["a", "b"]);
     }
 
     #[test]
-    fn global_with_multiple_names() {
-        let stmt = parse(r#"global x, y"#);
+    fn nonlocal() {
+        let stmt = parse(r#"nonlocal a, b"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x", "y"]);
-    }
-
-    #[test]
-    fn nonlocal_with_single_name() {
-        let stmt = parse(r#"nonlocal x"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x"]);
-    }
-
-    #[test]
-    fn nonlocal_with_multiple_names() {
-        let stmt = parse(r#"nonlocal x, y"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["x", "y"]);
+        assert_eq!(bindings, ["a", "b"]);
     }
 
     #[test]
@@ -936,7 +658,7 @@ mod tests {
 
     #[test]
     fn continue_() {
-        let stmt = parse(r#"break"#);
+        let stmt = parse(r#"continue"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
@@ -992,16 +714,17 @@ mod tests {
 
     #[test]
     fn lambda() {
-        let stmt = parse(r#"lambda x: x"#);
+        let stmt = parse(r#"lambda a = b, /, c = d, *e, f = g, **h: i"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn lambda_with_walrus() {
-        let stmt = parse(r#"lambda a = (b := c), *, d = (e := f): (g := h)"#);
+        let stmt =
+            parse(r#"lambda a = (b := c), /, d = (e := f), *g, h = (i := j), **k: (l := m)"#);
         let bindings = bindings(&stmt);
-        assert_eq!(bindings, ["b", "e"]);
+        assert_eq!(bindings, ["b", "e", "i"]);
     }
 
     #[test]
@@ -1104,7 +827,7 @@ mod tests {
 
     #[test]
     fn await_() {
-        let stmt = parse(r#"await x"#);
+        let stmt = parse(r#"await a"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
@@ -1118,14 +841,7 @@ mod tests {
 
     #[test]
     fn yield_() {
-        let stmt = parse(r#"yield"#);
-        let bindings = bindings(&stmt);
-        assert_eq!(bindings, [] as [&str; 0]);
-    }
-
-    #[test]
-    fn yield_with_value() {
-        let stmt = parse(r#"yield x"#);
+        let stmt = parse(r#"yield a"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
@@ -1139,7 +855,7 @@ mod tests {
 
     #[test]
     fn yield_from() {
-        let stmt = parse(r#"yield from x"#);
+        let stmt = parse(r#"yield from a"#);
         let bindings = bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
