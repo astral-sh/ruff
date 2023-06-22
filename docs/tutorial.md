@@ -26,7 +26,7 @@ def sum_even_numbers(numbers: List[int]) -> int:
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-To start, we'll install Ruff through PyPI (or with our [preferred package manager](installation.md)):
+To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
 
 ```shell
 > pip install ruff
