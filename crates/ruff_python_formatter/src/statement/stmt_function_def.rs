@@ -85,7 +85,7 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
             [
                 text("def"),
                 space(),
-                dynamic_text(name.as_str(), None),
+                name.format(),
                 item.arguments().format(),
             ]
         )?;

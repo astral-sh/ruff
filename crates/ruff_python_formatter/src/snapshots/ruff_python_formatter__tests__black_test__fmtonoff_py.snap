@@ -222,7 +222,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,30 +16,51 @@
+@@ -18,30 +16,53 @@
  
  # fmt: off
  def func_no_args():
@@ -241,8 +241,10 @@ d={'a':1,
 +        NOT_YET_IMPLEMENTED_StmtRaise
 +    if False:
 +        ...
-+    NOT_YET_IMPLEMENTED_StmtFor
-+    NOT_IMPLEMENTED_call()
++    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        continue
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    return None
 +
 +
@@ -251,20 +253,19 @@ d={'a':1,
 - async with some_connection() as conn:
 -     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
 - await asyncio.sleep(1)
--@asyncio.coroutine
++    "NOT_YET_IMPLEMENTED_STRING"
++    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++
++
+ @asyncio.coroutine
 -@some_decorator(
 -with_args=True,
 -many_args=[1,2,3]
 -)
 -def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
 - return text[number:-1]
-+    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith
-+    await NOT_IMPLEMENTED_call()
-+
-+
-+@asyncio.NOT_IMPLEMENTED_attr
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +def function_signature_stress_test(
 +    number: int,
 +    no_annotation=None,
@@ -273,7 +274,7 @@ d={'a':1,
 +    debug: bool = False,
 +    **kwargs,
 +) -> str:
-+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++    return text[number : -1]
 +
 +
  # fmt: on
@@ -291,12 +292,12 @@ d={'a':1,
 +    h="NOT_YET_IMPLEMENTED_STRING",
 +    i="NOT_YET_IMPLEMENTED_STRING",
 +):
-+    offset = NOT_IMPLEMENTED_call()
++    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-@@ -51,76 +70,61 @@
+@@ -51,76 +72,71 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -311,7 +312,7 @@ d={'a':1,
  
  
 -def spaces2(result=_core.Value(None)):
-+def spaces2(result=NOT_IMPLEMENTED_call()):
++def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
      ...
  
  
@@ -323,15 +324,22 @@ d={'a':1,
  
  
  def subscriptlist():
--    atom[
--        # fmt: off
+     atom[
+         # fmt: off
 -        'some big and',
 -        'complex subscript',
 -        # fmt: on
 -        goes + here,
 -        andhere,
--    ]
-+    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++        (
++            "NOT_YET_IMPLEMENTED_STRING",
++            "NOT_YET_IMPLEMENTED_STRING",
++            # fmt: on
++            goes
++            + here,
++            andhere,
++        )
+     ]
  
  
  def import_as_names():
@@ -390,7 +398,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
-@@ -130,13 +134,15 @@
+@@ -130,13 +146,13 @@
  
  
  def on_and_off_broken():
@@ -405,13 +413,11 @@ d={'a':1,
 +    this = NOT_IMPLEMENTED_call()
 +    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +    NOT_IMPLEMENTED_call()
-+    (
-+        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-+    )
++    now.considers.multiple.fmt.directives.within.one.prefix
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,80 +151,21 @@
+@@ -145,80 +161,21 @@
  
  def long_lines():
      if True:
@@ -423,11 +429,13 @@ d={'a':1,
 -                implicit_default=True,
 -            )
 -        )
--        # fmt: off
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+         # fmt: off
 -        a = (
 -            unnecessary_bracket()
 -        )
--        # fmt: on
++        a = NOT_IMPLEMENTED_call()
+         # fmt: on
 -    _type_comment_re = re.compile(
 -        r"""
 -        ^
@@ -448,13 +456,11 @@ d={'a':1,
 -        )
 -        $
 -        """,
-+        NOT_IMPLEMENTED_call()
-         # fmt: off
+-        # fmt: off
 -        re.MULTILINE|re.VERBOSE
-+        a = NOT_IMPLEMENTED_call()
-         # fmt: on
+-        # fmt: on
 -    )
-+    _type_comment_re = NOT_IMPLEMENTED_call()
++    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def single_literal_yapf_disable():
@@ -490,7 +496,7 @@ d={'a':1,
 -    # fmt: on
 -    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # fmt: off
 -yield  'hello'
 +NOT_YET_IMPLEMENTED_ExprYield
@@ -530,19 +536,21 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    NOT_YET_IMPLEMENTED_StmtFor
-    NOT_IMPLEMENTED_call()
+    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        continue
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     return None
 
 
 async def coroutine(arg, exec=False):
     "NOT_YET_IMPLEMENTED_STRING"
     NOT_YET_IMPLEMENTED_StmtAsyncWith
-    await NOT_IMPLEMENTED_call()
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-@asyncio.NOT_IMPLEMENTED_attr
-@NOT_IMPLEMENTED_call()
+@asyncio.coroutine
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
@@ -551,7 +559,7 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    return text[number : -1]
 
 
 # fmt: on
@@ -566,7 +574,7 @@ def spaces(
     h="NOT_YET_IMPLEMENTED_STRING",
     i="NOT_YET_IMPLEMENTED_STRING",
 ):
-    offset = NOT_IMPLEMENTED_call()
+    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -584,7 +592,7 @@ def spaces_types(
     ...
 
 
-def spaces2(result=NOT_IMPLEMENTED_call()):
+def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
     ...
 
 
@@ -595,7 +603,17 @@ something = {
 
 
 def subscriptlist():
-    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    atom[
+        # fmt: off
+        (
+            "NOT_YET_IMPLEMENTED_STRING",
+            "NOT_YET_IMPLEMENTED_STRING",
+            # fmt: on
+            goes
+            + here,
+            andhere,
+        )
+    ]
 
 
 def import_as_names():
@@ -647,9 +665,7 @@ def on_and_off_broken():
     this = NOT_IMPLEMENTED_call()
     and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
     NOT_IMPLEMENTED_call()
-    (
-        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-    )
+    now.considers.multiple.fmt.directives.within.one.prefix
     # fmt: on
     # fmt: off
     # ...but comments still get reformatted even though they should not be
@@ -658,11 +674,11 @@ def on_and_off_broken():
 
 def long_lines():
     if True:
-        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         # fmt: off
         a = NOT_IMPLEMENTED_call()
         # fmt: on
-    _type_comment_re = NOT_IMPLEMENTED_call()
+    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def single_literal_yapf_disable():
@@ -670,7 +686,7 @@ def single_literal_yapf_disable():
     BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
 
 
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # fmt: off
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file

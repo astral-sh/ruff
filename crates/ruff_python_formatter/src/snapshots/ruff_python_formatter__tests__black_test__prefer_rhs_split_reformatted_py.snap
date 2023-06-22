@@ -25,7 +25,7 @@ xxxxxxxxx_yyy_zzzzzzzz[xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxx
 ```diff
 --- Black
 +++ Ruff
-@@ -9,13 +9,8 @@
+@@ -9,13 +9,10 @@
          m2,
      ),
      third_value,
@@ -33,14 +33,14 @@ xxxxxxxxx_yyy_zzzzzzzz[xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxx
 -    arg1,
 -    arg2,
 -)
-+) = NOT_IMPLEMENTED_call()
++) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # Make when when the left side of assignment plus the opening paren "... = (" is
  # exactly line length limit + 1, it won't be split like that.
--xxxxxxxxx_yyy_zzzzzzzz[
+ xxxxxxxxx_yyy_zzzzzzzz[
 -    xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxxx=1)
--] = 1
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key] = 1
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg), NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ ] = 1
 ```
 
 ## Ruff Output
@@ -57,11 +57,13 @@ xxxxxxxxx_yyy_zzzzzzzz[xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxx
         m2,
     ),
     third_value,
-) = NOT_IMPLEMENTED_call()
+) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # Make when when the left side of assignment plus the opening paren "... = (" is
 # exactly line length limit + 1, it won't be split like that.
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key] = 1
+xxxxxxxxx_yyy_zzzzzzzz[
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg), NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+] = 1
 ```
 
 ## Black Output

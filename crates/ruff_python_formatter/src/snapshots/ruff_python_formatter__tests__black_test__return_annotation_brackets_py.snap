@@ -123,35 +123,36 @@ def foo() -> tuple[int, int, int,]:
      return 2
  
  
-@@ -95,26 +99,14 @@
- 
- 
- # Return type with commas
--def foo() -> tuple[int, int, int]:
-+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+@@ -99,22 +103,22 @@
      return 2
  
  
 -def foo() -> (
 -    tuple[
--        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
--        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
--        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
++def foo() -> tuple[
++    (
+         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
 -    ]
 -):
-+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
++    )
++]:
      return 2
  
  
  # Magic trailing comma example
 -def foo() -> (
 -    tuple[
--        int,
--        int,
--        int,
++def foo() -> tuple[
++    (
+         int,
+         int,
+         int,
 -    ]
 -):
-+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
++    )
++]:
      return 2
 ```
 
@@ -259,16 +260,28 @@ def foo() -> (
 
 
 # Return type with commas
-def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+def foo() -> tuple[int, int, int]:
     return 2
 
 
-def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+def foo() -> tuple[
+    (
+        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+    )
+]:
     return 2
 
 
 # Magic trailing comma example
-def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+def foo() -> tuple[
+    (
+        int,
+        int,
+        int,
+    )
+]:
     return 2
 ```
 

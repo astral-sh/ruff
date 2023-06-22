@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,99 +1,56 @@
+@@ -1,61 +1,40 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -164,12 +164,10 @@ if True:
 +NOT_YET_IMPLEMENTED_StmtAssert
  
  # looping over a 1-tuple should also not get wrapped
--for x in (1,):
--    pass
--for (x,) in (1,), (2,), (3,):
--    pass
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
+ for x in (1,):
+@@ -63,14 +42,10 @@
+ for (x,) in (1,), (2,), (3,):
+     pass
  
 -[
 -    1,
@@ -180,16 +178,12 @@ if True:
  
  division_result_tuple = (6 / 2,)
 -print("foo %r", (foo.bar,))
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  if True:
--    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
--        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
--        | {pylons.controllers.WSGIController}
--    )
-+    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
-+        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
-+    }
+     IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
+@@ -79,21 +54,6 @@
+     )
  
  if True:
 -    ec2client.get_waiter("instance_stopped").wait(
@@ -210,9 +204,9 @@ if True:
 -            "Delay": 5,
 -        },
 -    )
-+    NOT_IMPLEMENTED_call()
-+    NOT_IMPLEMENTED_call()
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -257,23 +251,26 @@ y = {
 NOT_YET_IMPLEMENTED_StmtAssert
 
 # looping over a 1-tuple should also not get wrapped
-NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtFor
+for x in (1,):
+    pass
+for (x,) in (1,), (2,), (3,):
+    pass
 
 [1, 2, 3]
 
 division_result_tuple = (6 / 2,)
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 if True:
-    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = Config.NOT_IMPLEMENTED_attr | {
-        pylons.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr,
-    }
+    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
+        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
+        | {pylons.controllers.WSGIController}
+    )
 
 if True:
-    NOT_IMPLEMENTED_call()
-    NOT_IMPLEMENTED_call()
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

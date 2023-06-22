@@ -75,9 +75,9 @@ if (
 ## Output
 ```py
 if (
-    self.NOT_IMPLEMENTED_attr
+    self._proc
     # has the child process finished?
-    and self.NOT_IMPLEMENTED_attr
+    and self._returncode
     # the child process has finished, but the
     # transport hasn't been notified yet?
     and NOT_IMPLEMENTED_call()
@@ -85,11 +85,11 @@ if (
     pass
 
 if (
-    self.NOT_IMPLEMENTED_attr
-    and self.NOT_IMPLEMENTED_attr
+    self._proc
+    and self._returncode
     and NOT_IMPLEMENTED_call()
-    and self.NOT_IMPLEMENTED_attr
-    and self.NOT_IMPLEMENTED_attr
+    and self._proc
+    and self._returncode
     and NOT_IMPLEMENTED_call()
 ):
     ...

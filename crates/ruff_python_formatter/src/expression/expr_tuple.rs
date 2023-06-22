@@ -10,13 +10,48 @@ use ruff_formatter::formatter::Formatter;
 use ruff_formatter::prelude::{
     block_indent, group, if_group_breaks, soft_block_indent, soft_line_break_or_space, text,
 };
-use ruff_formatter::{format_args, write, Buffer, Format, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, Format, FormatResult, FormatRuleWithOptions};
 use ruff_python_ast::prelude::{Expr, Ranged};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprTuple;
 
+#[derive(Eq, PartialEq, Debug, Default)]
+pub enum TupleParentheses {
+    /// Effectively `None` in `Option<Parentheses>`
+    #[default]
+    Default,
+    /// Effectively `Some(Parentheses)` in `Option<Parentheses>`
+    Expr(Parentheses),
+    /// Handle the special case where we remove parentheses even if they were initially present
+    ///
+    /// Normally, black keeps parentheses, but in the case of loops it formats
+    /// ```python
+    /// for (a, b) in x:
+    ///     pass
+    /// ```
+    /// to
+    /// ```python
+    /// for a, b in x:
+    ///     pass
+    /// ```
+    /// Black still does use parentheses in this position if the group breaks or magic trailing
+    /// comma is used.
+    StripInsideForLoop,
+}
+
 #[derive(Default)]
-pub struct FormatExprTuple;
+pub struct FormatExprTuple {
+    parentheses: TupleParentheses,
+}
+
+impl FormatRuleWithOptions<ExprTuple, PyFormatContext<'_>> for FormatExprTuple {
+    type Options = TupleParentheses;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.parentheses = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
@@ -74,9 +109,14 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                     &text(")"),
                 ]
             )?;
-        } else if is_parenthesized(*range, elts, f) {
-            // If the tuple has parentheses, keep them. Note that unlike other expr parentheses,
-            // those are actually part of the range
+        } else if is_parenthesized(*range, elts, f)
+            && self.parentheses != TupleParentheses::StripInsideForLoop
+        {
+            // If the tuple has parentheses, we generally want to keep them. The exception are for
+            // loops, see `TupleParentheses::StripInsideForLoop` doc comment.
+            //
+            // Unlike other expression parentheses, tuple parentheses are part of the range of the
+            // tuple itself.
             write!(
                 f,
                 [group(&format_args![

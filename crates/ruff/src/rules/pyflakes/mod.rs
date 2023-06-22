@@ -353,9 +353,59 @@ mod tests {
             except Exception as x:
                 pass
 
+            # No error here, though it should arguably be an F821 error. `x` will
+            # be unbound after the `except` block (assuming an exception is raised
+            # and caught).
             print(x)
             "#,
-        "print_after_shadowing_except"
+        "print_in_body_after_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            x = 1
+
+            try:
+                1 / 0
+            except ValueError as x:
+                pass
+            except ImportError as x:
+                pass
+
+            # No error here, though it should arguably be an F821 error. `x` will
+            # be unbound after the `except` block (assuming an exception is raised
+            # and caught).
+            print(x)
+            "#,
+        "print_in_body_after_double_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            try:
+                x = 3
+            except ImportError as x:
+                print(x)
+            else:
+                print(x)
+            "#,
+        "print_in_try_else_after_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            list = [1, 2, 3]
+
+            for e in list:
+                if e % 2 == 0:
+                    try:
+                        pass
+                    except Exception as e:
+                        print(e)
+                else:
+                    print(e)
+            "#,
+        "print_in_if_else_after_shadowing_except"
     )]
     #[test_case(
         r#"
@@ -365,6 +415,79 @@ mod tests {
             del x
             "#,
         "double_del"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def f():
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            # This should resolve to the `x` in `x = 1`.
+            print(x)
+            "#,
+        "load_after_unbind_from_module_scope"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def f():
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            # This should resolve to the `x` in `x = 1`.
+            print(x)
+            "#,
+        "load_after_multiple_unbinds_from_module_scope"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def f():
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            def g():
+                try:
+                    pass
+                except ValueError as x:
+                    pass
+
+                # This should resolve to the `x` in `x = 1`.
+                print(x)
+            "#,
+        "load_after_unbind_from_nested_module_scope"
+    )]
+    #[test_case(
+        r#"
+        class C:
+            x = 1
+
+            def f():
+                try:
+                    pass
+                except ValueError as x:
+                    pass
+
+                # This should raise an F821 error, rather than resolving to the
+                # `x` in `x = 1`.
+                print(x)
+            "#,
+        "load_after_unbind_from_class_scope"
     )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(contents, &Settings::for_rules(&Linter::Pyflakes));

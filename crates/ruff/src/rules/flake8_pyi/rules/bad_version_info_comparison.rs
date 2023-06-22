@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of comparators other than `<` and `>=` for
+/// Checks for uses of comparators other than `<` and `>=` for
 /// `sys.version_info` checks in `.pyi` files. All other comparators, such
 /// as `>`, `<=`, and `==`, are banned.
 ///

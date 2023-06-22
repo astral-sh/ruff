@@ -42,7 +42,7 @@ assert (
 ```diff
 --- Black
 +++ Ruff
-@@ -2,57 +2,24 @@
+@@ -2,20 +2,10 @@
  (
      ()
      << 0
@@ -65,16 +65,16 @@ assert (
  
  importA
  0
- 0 ^ 0  #
+@@ -24,35 +14,15 @@
  
- 
--class A:
--    def foo(self):
+ class A:
+     def foo(self):
 -        for _ in range(10):
 -            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(
 -                xxxxxxxxxxxx
 -            )  # pylint: disable=no-member
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def test(self, othr):
@@ -126,7 +126,10 @@ importA
 0 ^ 0  #
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class A:
+    def foo(self):
+        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def test(self, othr):

@@ -73,7 +73,7 @@ def test_calculate_fades():
 -        ('stuff', 'in')
 -    ],
 -])
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  def test_fader(test):
      pass
  
@@ -122,7 +122,7 @@ TmEx = 2
 # Test data:
 #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
 
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def test_fader(test):
     pass
 

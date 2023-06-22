@@ -477,7 +477,7 @@ pub(crate) fn printf_string_formatting(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use test_case::test_case;
 
     use super::*;

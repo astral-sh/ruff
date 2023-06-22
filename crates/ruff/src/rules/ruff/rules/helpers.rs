@@ -18,6 +18,14 @@ pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticMode
     semantic.match_typing_expr(value, "ClassVar")
 }
 
+/// Returns `true` if the given [`Expr`] is a `typing.Final` annotation.
+pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
+        return false;
+    };
+    semantic.match_typing_expr(value, "Final")
+}
+
 /// Returns `true` if the given class is a dataclass.
 pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     class_def.decorator_list.iter().any(|decorator| {
@@ -26,5 +34,14 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
             .map_or(false, |call_path| {
                 matches!(call_path.as_slice(), ["dataclasses", "dataclass"])
             })
+    })
+}
+
+/// Returns `true` if the given class is a Pydantic `BaseModel`.
+pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    class_def.bases.iter().any(|expr| {
+        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["pydantic", "BaseModel"])
+        })
     })
 }

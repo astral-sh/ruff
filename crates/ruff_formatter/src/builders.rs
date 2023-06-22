@@ -528,7 +528,22 @@ impl<Context> Format<Context> for LineSuffixBoundary {
 /// use ruff_formatter::prelude::*;
 /// use ruff_formatter::{format, write, LineWidth};
 ///
-/// enum SomeLabelId {}
+/// #[derive(Debug, Copy, Clone)]
+/// enum MyLabels {
+///     Main
+/// }
+///
+/// impl tag::LabelDefinition for MyLabels {
+///     fn value(&self) -> u64 {
+///         *self as u64
+///     }
+///
+///     fn name(&self) -> &'static str {
+///         match self {
+///             Self::Main => "Main"
+///         }
+///     }
+/// }
 ///
 /// # fn main() -> FormatResult<()> {
 /// let formatted = format!(
@@ -537,24 +552,24 @@ impl<Context> Format<Context> for LineSuffixBoundary {
 ///         let mut recording = f.start_recording();
 ///         write!(recording, [
 ///             labelled(
-///                 LabelId::of::<SomeLabelId>(),
+///                 LabelId::of(MyLabels::Main),
 ///                 &text("'I have a label'")
 ///             )
 ///         ])?;
 ///
 ///         let recorded = recording.stop();
 ///
-///         let is_labelled = recorded.first().map_or(false, |element| element.has_label(LabelId::of::<SomeLabelId>()));
+///         let is_labelled = recorded.first().map_or(false, |element| element.has_label(LabelId::of(MyLabels::Main)));
 ///
 ///         if is_labelled {
-///             write!(f, [text(" has label SomeLabelId")])
+///             write!(f, [text(" has label `Main`")])
 ///         } else {
-///             write!(f, [text(" doesn't have label SomeLabelId")])
+///             write!(f, [text(" doesn't have label `Main`")])
 ///         }
 ///     })]
 /// )?;
 ///
-/// assert_eq!("'I have a label' has label SomeLabelId", formatted.print()?.as_code());
+/// assert_eq!("'I have a label' has label `Main`", formatted.print()?.as_code());
 /// # Ok(())
 /// # }
 /// ```

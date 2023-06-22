@@ -126,7 +126,7 @@ pub(crate) fn remove_import_members(contents: &str, members: &[&str]) -> String 
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::rules::pyupgrade::fixes::remove_import_members;
 
     #[test]

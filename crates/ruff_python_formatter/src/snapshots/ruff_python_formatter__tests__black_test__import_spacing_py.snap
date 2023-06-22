@@ -62,7 +62,7 @@ __all__ = (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,64 +1,42 @@
+@@ -1,54 +1,32 @@
 -"""The asyncio package, tracking PEP 3156."""
 +"NOT_YET_IMPLEMENTED_STRING"
  
@@ -136,27 +136,7 @@ __all__ = (
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
  __all__ = (
--    base_events.__all__
--    + coroutines.__all__
--    + events.__all__
--    + futures.__all__
--    + locks.__all__
--    + protocols.__all__
--    + runners.__all__
--    + queues.__all__
--    + streams.__all__
--    + tasks.__all__
-+    base_events.NOT_IMPLEMENTED_attr
-+    + coroutines.NOT_IMPLEMENTED_attr
-+    + events.NOT_IMPLEMENTED_attr
-+    + futures.NOT_IMPLEMENTED_attr
-+    + locks.NOT_IMPLEMENTED_attr
-+    + protocols.NOT_IMPLEMENTED_attr
-+    + runners.NOT_IMPLEMENTED_attr
-+    + queues.NOT_IMPLEMENTED_attr
-+    + streams.NOT_IMPLEMENTED_attr
-+    + tasks.NOT_IMPLEMENTED_attr
- )
+     base_events.__all__
 ```
 
 ## Ruff Output
@@ -193,16 +173,16 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
 __all__ = (
-    base_events.NOT_IMPLEMENTED_attr
-    + coroutines.NOT_IMPLEMENTED_attr
-    + events.NOT_IMPLEMENTED_attr
-    + futures.NOT_IMPLEMENTED_attr
-    + locks.NOT_IMPLEMENTED_attr
-    + protocols.NOT_IMPLEMENTED_attr
-    + runners.NOT_IMPLEMENTED_attr
-    + queues.NOT_IMPLEMENTED_attr
-    + streams.NOT_IMPLEMENTED_attr
-    + tasks.NOT_IMPLEMENTED_attr
+    base_events.__all__
+    + coroutines.__all__
+    + events.__all__
+    + futures.__all__
+    + locks.__all__
+    + protocols.__all__
+    + runners.__all__
+    + queues.__all__
+    + streams.__all__
+    + tasks.__all__
 )
 ```
 
