@@ -35,8 +35,8 @@ impl<'a> Visitor<'a> for Bindings<'a> {
 
                 self.visit_arguments(args);
 
-                for expr in returns {
-                    self.visit_annotation(expr);
+                if let Some(returns) = returns {
+                    self.visit_annotation(returns);
                 }
 
                 self.bindings.push(name.as_str());
