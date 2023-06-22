@@ -54,15 +54,7 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
                 [space(), type_.format().with_options(Parenthesize::IfBreaks)]
             )?;
             if let Some(name) = name {
-                write!(
-                    f,
-                    [
-                        space(),
-                        text("as"),
-                        space(),
-                        dynamic_text(name.as_str(), None)
-                    ]
-                )?;
+                write!(f, [space(), text("as"), space(), name.format()])?;
             }
         }
         write!(f, [text(":"), block_indent(&body.format())])?;
