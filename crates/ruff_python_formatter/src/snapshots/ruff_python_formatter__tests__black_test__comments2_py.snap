@@ -349,7 +349,7 @@ instruction()#comment with bad spacing
      while True:
          if False:
              continue
-@@ -141,25 +111,13 @@
+@@ -141,24 +111,18 @@
          # and round and round we go
  
      # let's return
@@ -370,15 +370,17 @@ instruction()#comment with bad spacing
 +CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
  
  
--class Test:
--    def _init_host(self, parsed) -> None:
+ class Test:
+     def _init_host(self, parsed) -> None:
 -        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
--            pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        if (
++            NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right  # type: ignore
++            or not NOT_IMPLEMENTED_call()
++        ):
+             pass
  
  
- #######################
-@@ -167,7 +125,7 @@
+@@ -167,7 +131,7 @@
  #######################
  
  
@@ -511,7 +513,13 @@ def inline_comments_in_brackets_ruin_everything():
 CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Test:
+    def _init_host(self, parsed) -> None:
+        if (
+            NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right  # type: ignore
+            or not NOT_IMPLEMENTED_call()
+        ):
+            pass
 
 
 #######################

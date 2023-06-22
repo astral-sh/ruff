@@ -582,6 +582,12 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
             .as_deref()
             .map(AnyNodeRef::from)
             .or_else(|| Some(AnyNodeRef::from(args.as_ref()))),
+        AnyNodeRef::StmtClassDef(StmtClassDef {
+            bases, keywords, ..
+        }) => keywords
+            .last()
+            .map(AnyNodeRef::from)
+            .or_else(|| bases.last().map(AnyNodeRef::from)),
         _ => None,
     };
 
@@ -622,8 +628,13 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
                 TokenKind::RParen => {
                     // Skip over any closing parentheses
                 }
-                _ => {
-                    unreachable!("Only ')' or ':' should follow the condition")
+                TokenKind::Comma => {
+                    // Skip over any trailing comma
+                }
+                kind => {
+                    unreachable!(
+                        "Only ')' or ':' should follow the condition but encountered {kind:?}"
+                    )
                 }
             }
         }

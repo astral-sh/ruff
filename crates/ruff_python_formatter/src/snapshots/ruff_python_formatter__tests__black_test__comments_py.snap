@@ -114,16 +114,16 @@ async def wat():
  # Has many lines. Many, many lines.
  # Many, many, many lines.
 -"""Module docstring.
--
++"NOT_YET_IMPLEMENTED_STRING"
+ 
 -Possibly also many, many lines.
 -"""
-+"NOT_YET_IMPLEMENTED_STRING"
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
  
 -import os.path
 -import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
- 
+-
 -import a
 -from b.c import X  # some noqa comment
 +NOT_YET_IMPLEMENTED_StmtImport
@@ -137,7 +137,7 @@ async def wat():
  
  
  # Some comment before a function.
-@@ -30,67 +24,50 @@
+@@ -30,25 +24,26 @@
  
  
  def function(default=None):
@@ -173,28 +173,29 @@ async def wat():
  
  
  # Another comment!
- # This time two lines.
+@@ -56,7 +51,7 @@
  
  
--class Foo:
+ class Foo:
 -    """Docstring for class Foo.  Example from Sphinx docs."""
--
--    #: Doc comment for class attribute Foo.bar.
--    #: It can have multiple lines.
--    bar = 1
--
--    flox = 1.5  #: Doc comment for Foo.flox. One line only.
--
--    baz = 2
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+     #: Doc comment for class attribute Foo.bar.
+     #: It can have multiple lines.
+@@ -65,32 +60,31 @@
+     flox = 1.5  #: Doc comment for Foo.flox. One line only.
+ 
+     baz = 2
 -    """Docstring for class attribute Foo.baz."""
--
--    def __init__(self):
--        #: Doc comment for instance attribute qux.
--        self.qux = 3
--
--        self.spam = 4
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+     def __init__(self):
+         #: Doc comment for instance attribute qux.
+         self.qux = 3
+ 
+         self.spam = 4
 -        """Docstring for instance attribute spam."""
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        "NOT_YET_IMPLEMENTED_STRING"
  
  
  #' <h1>This is pweave!</h1>
@@ -279,7 +280,24 @@ GLOBAL_STATE = {
 # This time two lines.
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Foo:
+    "NOT_YET_IMPLEMENTED_STRING"
+
+    #: Doc comment for class attribute Foo.bar.
+    #: It can have multiple lines.
+    bar = 1
+
+    flox = 1.5  #: Doc comment for Foo.flox. One line only.
+
+    baz = 2
+    "NOT_YET_IMPLEMENTED_STRING"
+
+    def __init__(self):
+        #: Doc comment for instance attribute qux.
+        self.qux = 3
+
+        self.spam = 4
+        "NOT_YET_IMPLEMENTED_STRING"
 
 
 #' <h1>This is pweave!</h1>

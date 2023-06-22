@@ -121,7 +121,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,78 +1,72 @@
+@@ -1,78 +1,74 @@
 -import random
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -151,10 +151,10 @@ with open("/path/to/file.txt", mode="r") as read_file:
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
--class Foo:
--    def bar(self):
+ class Foo:
+     def bar(self):
 -        print("The newline above me should be deleted!")
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -for i in range(5):
@@ -255,7 +255,9 @@ def foo4():
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Foo:
+    def bar(self):
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):

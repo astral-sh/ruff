@@ -50,15 +50,15 @@ toml = { version = "0.7.2" }
 # v0.0.1
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e5beb532fdd1e209ad2dbb470438" }
 # v0.0.3
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "08ebbe40d7776cac6e3ba66277d435056f2b8dca" }
+ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "f60e204b73b95bdb6ce87ccd0de34081b4a17c11" }
 # v0.0.3
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "08ebbe40d7776cac6e3ba66277d435056f2b8dca" , default-features = false, features = ["all-nodes-with-ranges", "num-bigint"]}
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "f60e204b73b95bdb6ce87ccd0de34081b4a17c11" , default-features = false, features = ["all-nodes-with-ranges", "num-bigint"]}
 # v0.0.3
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "08ebbe40d7776cac6e3ba66277d435056f2b8dca", default-features = false, features = ["num-bigint"] }
+rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "f60e204b73b95bdb6ce87ccd0de34081b4a17c11", default-features = false, features = ["num-bigint"] }
 # v0.0.3
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "08ebbe40d7776cac6e3ba66277d435056f2b8dca", default-features = false }
+rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "f60e204b73b95bdb6ce87ccd0de34081b4a17c11", default-features = false }
 # v0.0.3
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "08ebbe40d7776cac6e3ba66277d435056f2b8dca" , default-features = false, features = ["full-lexer", "all-nodes-with-ranges", "num-bigint"] }
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "f60e204b73b95bdb6ce87ccd0de34081b4a17c11" , default-features = false, features = ["full-lexer", "all-nodes-with-ranges", "num-bigint"] }
 
 [profile.release]
 lto = "fat"

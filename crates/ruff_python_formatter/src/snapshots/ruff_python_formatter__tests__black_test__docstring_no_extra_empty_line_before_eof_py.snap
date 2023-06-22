@@ -17,12 +17,12 @@ class ClassWithDocstring:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,3 @@
+@@ -1,4 +1,4 @@
  # Make sure when the file ends with class's docstring,
  # It doesn't add extra blank lines.
--class ClassWithDocstring:
+ class ClassWithDocstring:
 -    """A docstring."""
-+NOT_YET_IMPLEMENTED_StmtClassDef
++    "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 ## Ruff Output
@@ -30,7 +30,8 @@ class ClassWithDocstring:
 ```py
 # Make sure when the file ends with class's docstring,
 # It doesn't add extra blank lines.
-NOT_YET_IMPLEMENTED_StmtClassDef
+class ClassWithDocstring:
+    "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 ## Black Output
