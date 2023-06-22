@@ -7,7 +7,7 @@ use ruff_python_ast::source_code::OneIndexed;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of names that are declared as `global` prior to the
+/// Checks for uses of names that are declared as `global` prior to the
 /// relevant `global` declaration.
 ///
 /// ## Why is this bad?
