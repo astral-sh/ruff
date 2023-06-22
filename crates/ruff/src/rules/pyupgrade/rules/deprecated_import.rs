@@ -148,7 +148,8 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "TYPE_CHECKING",
     "Text",
     "Type",
-    // Moved in Python 3.6, but `typing_extensions` contains backported bugfixes and optimizations,
+    // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
+    // optimizations,
     // "NewType",
 ];
 
@@ -177,7 +178,8 @@ const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
     "OrderedDict",
     "runtime_checkable",
-    // Moved in Python 3.8, but `typing_extensions` contains backported bugfixes and optimizations.
+    // Introduced in Python 3.8, but `typing_extensions` contains backported bugfixes and
+    // optimizations.
     // "Literal",
     // "Protocol",
     // "SupportsIndex",
@@ -251,6 +253,8 @@ const TYPING_TO_COLLECTIONS_ABC_310: &[&str] = &["Callable"];
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "Concatenate",
+    "Literal",
+    "NewType",
     "ParamSpecArgs",
     "ParamSpecKwargs",
     "TypeAlias",
@@ -258,10 +262,6 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "get_args",
     "get_origin",
     "is_typeddict",
-    // Moved in Python 3.8, but `typing_extensions` contains backported bugfixes and optimizations,
-    // which Python 3.10 makes unnecessary.
-    "Literal",
-    "NewType",
 ];
 
 // Python 3.11+
@@ -281,10 +281,7 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "get_overloads",
     "overload",
     "reveal_type",
-    // Moved in Python 3.11, but `typing_extensions` contains backported bugfixes and optimizations.
-    // "NamedTuple",
-    // "TypedDict",
-    // "Unpack",
+    // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument.
     // "dataclass_transform",
 ];
 
