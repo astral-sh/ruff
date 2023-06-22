@@ -45,9 +45,7 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
         for i in range(0, len(items), 2):
             flattened_items.add((items[i], items[i + 1]))
 
-    tuples = []
-    for left, right in sorted(flattened_items):
-        tuples.append(f"    {left}u32 => {right},\n")
+    tuples = [f"    {left}u32 => {right},\n" for left, right in sorted(flattened_items)]
 
     print(f"{len(tuples)} confusable tuples.")
 
