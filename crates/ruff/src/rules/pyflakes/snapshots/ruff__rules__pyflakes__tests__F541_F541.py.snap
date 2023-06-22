@@ -269,7 +269,7 @@ F541.py:37:1: F541 [*] f-string without any placeholders
    37 |+'{ 40 }'
 38 38 | f"{{a {{x}}"
 39 39 | f"{{{{x}}}}"
-40 40 | 
+40 40 | ""f""
 
 F541.py:38:1: F541 [*] f-string without any placeholders
    |
@@ -278,6 +278,7 @@ F541.py:38:1: F541 [*] f-string without any placeholders
 38 | f"{{a {{x}}"
    | ^^^^^^^^^^^^ F541
 39 | f"{{{{x}}}}"
+40 | ""f""
    |
    = help: Remove extraneous `f` prefix
 
@@ -288,8 +289,8 @@ F541.py:38:1: F541 [*] f-string without any placeholders
 38    |-f"{{a {{x}}"
    38 |+"{a {x}"
 39 39 | f"{{{{x}}}}"
-40 40 | 
-41 41 | # To be fixed
+40 40 | ""f""
+41 41 | ''f""
 
 F541.py:39:1: F541 [*] f-string without any placeholders
    |
@@ -297,8 +298,8 @@ F541.py:39:1: F541 [*] f-string without any placeholders
 38 | f"{{a {{x}}"
 39 | f"{{{{x}}}}"
    | ^^^^^^^^^^^^ F541
-40 | 
-41 | # To be fixed
+40 | ""f""
+41 | ''f""
    |
    = help: Remove extraneous `f` prefix
 
@@ -308,8 +309,70 @@ F541.py:39:1: F541 [*] f-string without any placeholders
 38 38 | f"{{a {{x}}"
 39    |-f"{{{{x}}}}"
    39 |+"{{x}}"
-40 40 | 
-41 41 | # To be fixed
-42 42 | # Error: f-string: single '}' is not allowed at line 41 column 8
+40 40 | ""f""
+41 41 | ''f""
+42 42 | (""f""r"")
+
+F541.py:40:3: F541 [*] f-string without any placeholders
+   |
+38 | f"{{a {{x}}"
+39 | f"{{{{x}}}}"
+40 | ""f""
+   |   ^^^ F541
+41 | ''f""
+42 | (""f""r"")
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Fix
+37 37 | f'{{ 40 }}'
+38 38 | f"{{a {{x}}"
+39 39 | f"{{{{x}}}}"
+40    |-""f""
+   40 |+"" ""
+41 41 | ''f""
+42 42 | (""f""r"")
+43 43 | 
+
+F541.py:41:3: F541 [*] f-string without any placeholders
+   |
+39 | f"{{{{x}}}}"
+40 | ""f""
+41 | ''f""
+   |   ^^^ F541
+42 | (""f""r"")
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Fix
+38 38 | f"{{a {{x}}"
+39 39 | f"{{{{x}}}}"
+40 40 | ""f""
+41    |-''f""
+   41 |+''""
+42 42 | (""f""r"")
+43 43 | 
+44 44 | # To be fixed
+
+F541.py:42:4: F541 [*] f-string without any placeholders
+   |
+40 | ""f""
+41 | ''f""
+42 | (""f""r"")
+   |    ^^^ F541
+43 | 
+44 | # To be fixed
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Fix
+39 39 | f"{{{{x}}}}"
+40 40 | ""f""
+41 41 | ''f""
+42    |-(""f""r"")
+   42 |+("" ""r"")
+43 43 | 
+44 44 | # To be fixed
+45 45 | # Error: f-string: single '}' is not allowed at line 41 column 8
 
 
