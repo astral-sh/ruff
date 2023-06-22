@@ -1,6 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast;
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{self, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,11 +9,15 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for explicit usages of `list()` on an iterable to iterate over them in a for-loop
+/// Checks for explicit casts to `list` on for-loop iterables.
 ///
 /// ## Why is this bad?
-/// Using a `list()` call to eagerly iterate over an already iterable type is inefficient as a
-/// second list iterator is created, after first iterating the value:
+/// Using a `list()` call to eagerly iterate over an already-iterable type
+/// (like a tuple, list, or set) is inefficient, as it forces Python to create
+/// a new list unnecessarily.
+///
+/// Removing the `list()` call will not change the behavior of the code, but
+/// may improve performance.
 ///
 /// ## Example
 /// ```python
@@ -49,26 +52,37 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
         return;
     };
 
-    if args.is_empty() {
+    if args.len() != 1 {
         return;
     }
 
-    if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-        if id != "list" || !checker.semantic().is_builtin("list") {
-            return;
-        }
+    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else{
+        return;
     };
+
+    if !(id == "list" && checker.semantic().is_builtin("list")) {
+        return;
+    }
 
     match &args[0] {
         Expr::Tuple(ast::ExprTuple {
-            range: iter_range, ..
+            range: iterable_range,
+            ..
         })
         | Expr::List(ast::ExprList {
-            range: iter_range, ..
+            range: iterable_range,
+            ..
         })
         | Expr::Set(ast::ExprSet {
-            range: iter_range, ..
-        }) => fix_incorrect_list_cast(checker, *list_range, *iter_range),
+            range: iterable_range,
+            ..
+        }) => {
+            let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
+            if checker.patch(diagnostic.kind.rule()) {
+                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
+            }
+            checker.diagnostics.push(diagnostic);
+        }
         Expr::Name(ast::ExprName {
             id,
             range: iterable_range,
@@ -76,21 +90,27 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
         }) => {
             let scope = checker.semantic().scope();
             if let Some(binding_id) = scope.get(id) {
-                let binding = &checker.semantic().bindings[binding_id];
+                let binding = checker.semantic().binding(binding_id);
                 if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
                     if let Some(parent_id) = binding.source {
                         let parent = checker.semantic().stmts[parent_id];
-                        match parent {
-                            Stmt::Assign(ast::StmtAssign { value, .. })
-                            | Stmt::AnnAssign(ast::StmtAnnAssign {
-                                value: Some(value), ..
-                            }) => match value.as_ref() {
-                                Expr::Tuple(_) | Expr::List(_) | Expr::Set(_) => {
-                                    fix_incorrect_list_cast(checker, *list_range, *iterable_range);
+                        if let Stmt::Assign(ast::StmtAssign { value, .. })
+                        | Stmt::AnnAssign(ast::StmtAnnAssign {
+                            value: Some(value), ..
+                        })
+                        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
+                        {
+                            if matches!(
+                                value.as_ref(),
+                                Expr::Tuple(_) | Expr::List(_) | Expr::Set(_)
+                            ) {
+                                let mut diagnostic =
+                                    Diagnostic::new(UnnecessaryListCast, *list_range);
+                                if checker.patch(diagnostic.kind.rule()) {
+                                    diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
                                 }
-                                _ => {}
-                            },
-                            _ => (),
+                                checker.diagnostics.push(diagnostic);
+                            }
                         }
                     }
                 }
@@ -100,17 +120,10 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
     }
 }
 
-fn fix_incorrect_list_cast(
-    checker: &mut Checker,
-    list_range: TextRange,
-    iterable_range: TextRange,
-) {
-    let mut diagnostic = Diagnostic::new(UnnecessaryListCast, list_range);
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic_edits(
-            Edit::deletion(list_range.start(), iterable_range.start()),
-            [Edit::deletion(iterable_range.end(), list_range.end())],
-        ));
-    }
-    checker.diagnostics.push(diagnostic);
+/// Generate a [`Fix`] to remove a `list` cast from an expression.
+fn remove_cast(list_range: TextRange, iterable_range: TextRange) -> Fix {
+    Fix::automatic_edits(
+        Edit::deletion(list_range.start(), iterable_range.start()),
+        [Edit::deletion(iterable_range.end(), list_range.end())],
+    )
 }

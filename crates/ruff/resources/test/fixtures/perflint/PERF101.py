@@ -13,7 +13,6 @@ for i in list(foo_list):  # PERF101
 for i in list(foo_set):  # PERF101
     pass
 
-
 for i in list((1, 2, 3)):  # PERF101
     pass
 
@@ -32,13 +31,22 @@ for i in list(
 ):
     pass
 
+for i in list( # Comment
+    {1, 2, 3}
+):  # PERF101
+    pass
 
 for i in list(foo_dict):  # Ok
     pass
-
 
 for i in list(1):  # Ok
     pass
 
 for i in list(foo_int):  # Ok
+    pass
+
+
+import itertools
+
+for i in itertools.product(foo_int):  # Ok
     pass
