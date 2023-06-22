@@ -229,7 +229,7 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r#"^#\s*(http|https)://.*"#, // issue link
         r#"^#\s*\d+$"#,              // issue code - like "003"
-        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003" or "TD-003"
+        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003"
     ])
     .unwrap()
 });
@@ -339,8 +339,7 @@ fn directive_errors(
     }
 }
 
-/// Checks for "static" errors in the comment: missing colon, missing author, etc. This function
-/// modifies `diagnostics` in-place.
+/// Checks for "static" errors in the comment: missing colon, missing author, etc.
 fn static_errors(
     diagnostics: &mut Vec<Diagnostic>,
     comment: &str,
@@ -362,7 +361,7 @@ fn static_errors(
             if let Some(end_index) = trimmed.find(|c: char| c.is_whitespace() || c == ':') {
                 TextSize::try_from(end_index).unwrap()
             } else {
-                // TD-002
+                // TD002
                 diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
 
                 TextSize::new(0)
