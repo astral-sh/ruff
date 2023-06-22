@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 itertools = { workspace = true }
+glob = { workspace = true }
 globset = { workspace = true }
 regex = { workspace = true }
 filetime = { workspace = true }

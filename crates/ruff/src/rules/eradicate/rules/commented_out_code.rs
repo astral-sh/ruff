@@ -14,13 +14,13 @@ use super::super::detection::comment_contains_code;
 /// Commented-out code is dead code, and is often included inadvertently.
 /// It should be removed.
 ///
-/// ## Options
-/// - `task-tags`
-///
 /// ## Example
 /// ```python
 /// # print('foo')
 /// ```
+///
+/// ## Options
+/// - `task-tags`
 #[violation]
 pub struct CommentedOutCode;
 
@@ -48,8 +48,8 @@ fn is_standalone_comment(line: &str) -> bool {
 
 /// ERA001
 pub(crate) fn commented_out_code(
-    indexer: &Indexer,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
@@ -62,8 +62,7 @@ pub(crate) fn commented_out_code(
             let mut diagnostic = Diagnostic::new(CommentedOutCode, *range);
 
             if settings.rules.should_fix(Rule::CommentedOutCode) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                diagnostic.set_fix(Fix::manual(Edit::range_deletion(
                     locator.full_lines_range(*range),
                 )));
             }

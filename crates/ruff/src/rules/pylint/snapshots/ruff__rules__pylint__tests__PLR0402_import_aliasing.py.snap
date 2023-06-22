@@ -12,7 +12,7 @@ import_aliasing.py:9:8: PLR0402 [*] Use `from os import path` in lieu of alias
    |
    = help: Replace with `from os import path`
 
-ℹ Suggested fix
+ℹ Fix
 6  6  | import collections as collections  # [useless-import-alias]
 7  7  | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
 8  8  | from collections import OrderedDict as o_dict
@@ -33,7 +33,7 @@ import_aliasing.py:11:8: PLR0402 [*] Use `from foo.bar import foobar` in lieu of
    |
    = help: Replace with `from foo.bar import foobar`
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | from collections import OrderedDict as o_dict
 9  9  | import os.path as path  # [consider-using-from-import]
 10 10 | import os.path as p

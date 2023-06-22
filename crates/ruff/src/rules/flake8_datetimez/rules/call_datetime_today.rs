@@ -27,10 +27,10 @@ impl Violation for CallDatetimeToday {
 /// Use `datetime.datetime.now(tz=)` instead.
 pub(crate) fn call_datetime_today(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "today"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "today"])
         })
     {
         checker

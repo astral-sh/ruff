@@ -1,5 +1,5 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{self, Constant, Excepthandler, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Constant, ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -68,7 +68,7 @@ pub(crate) fn suppressible_exception(
     checker: &mut Checker,
     stmt: &Stmt,
     try_body: &[Stmt],
-    handlers: &[Excepthandler],
+    handlers: &[ExceptHandler],
     orelse: &[Stmt],
     finalbody: &[Stmt],
 ) {
@@ -90,7 +90,7 @@ pub(crate) fn suppressible_exception(
         return;
     }
     let handler = &handlers[0];
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
+    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
     if body.len() == 1 {
         let node = &body[0];
         if node.is_pass_stmt()
@@ -122,7 +122,7 @@ pub(crate) fn suppressible_exception(
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
                             &ImportRequest::import("contextlib", "suppress"),
                             stmt.start(),
-                            checker.semantic_model(),
+                            checker.semantic(),
                         )?;
                         let replace_try = Edit::range_replacement(
                             format!("with {binding}({exception})"),

@@ -205,8 +205,8 @@ impl<'a> SectionContexts<'a> {
 }
 
 impl<'a> IntoIterator for &'a SectionContexts<'a> {
-    type Item = SectionContext<'a>;
     type IntoIter = SectionContextsIter<'a>;
+    type Item = SectionContext<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()

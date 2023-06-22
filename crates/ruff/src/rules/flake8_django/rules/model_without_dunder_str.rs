@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_ast::helpers::is_const_true;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -56,7 +57,7 @@ pub(crate) fn model_without_dunder_str(
     body: &[Stmt],
     class_location: &Stmt,
 ) -> Option<Diagnostic> {
-    if !checker_applies(checker.semantic_model(), bases, body) {
+    if !is_non_abstract_model(bases, body, checker.semantic()) {
         return None;
     }
     if !has_dunder_method(body) {
@@ -80,12 +81,12 @@ fn has_dunder_method(body: &[Stmt]) -> bool {
     })
 }
 
-fn checker_applies(model: &SemanticModel, bases: &[Expr], body: &[Stmt]) -> bool {
+fn is_non_abstract_model(bases: &[Expr], body: &[Stmt], semantic: &SemanticModel) -> bool {
     for base in bases.iter() {
         if is_model_abstract(body) {
             continue;
         }
-        if helpers::is_model(model, base) {
+        if helpers::is_model(base, semantic) {
             return true;
         }
     }
@@ -112,9 +113,9 @@ fn is_model_abstract(body: &[Stmt]) -> bool {
                 if id != "abstract" {
                     continue;
                 }
-                let Expr::Constant(ast::ExprConstant{value: Constant::Bool(true), ..}) = value.as_ref() else {
+                if !is_const_true(value) {
                     continue;
-                };
+                }
                 return true;
             }
         }

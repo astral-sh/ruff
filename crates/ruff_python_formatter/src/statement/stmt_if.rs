@@ -23,7 +23,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
             } = current_statement;
 
             let first_statement = body.first().ok_or(FormatError::SyntaxError)?;
-            let trailing = comments.dangling_comments(current_statement.into());
+            let trailing = comments.dangling_comments(current_statement);
 
             let trailing_if_comments_end = trailing
                 .partition_point(|comment| comment.slice().start() < first_statement.start());
@@ -32,7 +32,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                 trailing.split_at(trailing_if_comments_end);
 
             if current.is_elif() {
-                let elif_leading = comments.leading_comments(current_statement.into());
+                let elif_leading = comments.leading_comments(current_statement);
                 // Manually format the leading comments because the formatting bypasses `NodeRule::fmt`
                 write!(
                     f,
@@ -73,7 +73,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         if !orelse.is_empty() {
             // Leading comments are always own line comments
             let leading_else_comments_end =
-                else_comments.partition_point(|comment| comment.position().is_own_line());
+                else_comments.partition_point(|comment| comment.line_position().is_own_line());
             let (else_leading, else_trailing) = else_comments.split_at(leading_else_comments_end);
 
             write!(

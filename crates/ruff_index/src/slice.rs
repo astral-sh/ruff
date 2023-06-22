@@ -127,8 +127,8 @@ impl<I: Idx, T> IndexMut<I> for IndexSlice<I, T> {
 }
 
 impl<'a, I: Idx, T> IntoIterator for &'a IndexSlice<I, T> {
-    type Item = &'a T;
     type IntoIter = std::slice::Iter<'a, T>;
+    type Item = &'a T;
 
     #[inline]
     fn into_iter(self) -> std::slice::Iter<'a, T> {
@@ -137,8 +137,8 @@ impl<'a, I: Idx, T> IntoIterator for &'a IndexSlice<I, T> {
 }
 
 impl<'a, I: Idx, T> IntoIterator for &'a mut IndexSlice<I, T> {
-    type Item = &'a mut T;
     type IntoIter = std::slice::IterMut<'a, T>;
+    type Item = &'a mut T;
 
     #[inline]
     fn into_iter(self) -> std::slice::IterMut<'a, T> {

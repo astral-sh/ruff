@@ -39,7 +39,7 @@ use crate::registry::{AsRule, Rule};
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
+/// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
     name: String,
@@ -96,7 +96,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
+/// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
     name: String,
@@ -168,8 +168,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    #[allow(deprecated)]
-                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                                    diagnostic.set_fix(Fix::suggested(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
                                     )));
@@ -193,8 +192,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    #[allow(deprecated)]
-                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                                    diagnostic.set_fix(Fix::suggested(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
                                     )));

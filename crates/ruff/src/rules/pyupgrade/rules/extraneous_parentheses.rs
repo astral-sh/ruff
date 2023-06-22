@@ -9,6 +9,22 @@ use ruff_python_ast::source_code::Locator;
 use crate::registry::Rule;
 use crate::settings::Settings;
 
+/// ## What it does
+/// Checks for extraneous parentheses.
+///
+/// ## Why is this bad?
+/// Extraneous parentheses are redundant, and can be removed to improve
+/// readability while retaining identical semantics.
+///
+/// ## Example
+/// ```python
+/// print(("Hello, world"))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world")
+/// ```
 #[violation]
 pub struct ExtraneousParentheses;
 
@@ -141,8 +157,7 @@ pub(crate) fn extraneous_parentheses(
                 if settings.rules.should_fix(Rule::ExtraneousParentheses) {
                     let contents =
                         locator.slice(TextRange::new(start_range.start(), end_range.end()));
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         start_range.start(),
                         end_range.end(),

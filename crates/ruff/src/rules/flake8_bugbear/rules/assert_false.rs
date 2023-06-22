@@ -1,12 +1,35 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of `assert False`.
+///
+/// ## Why is this bad?
+/// Python removes `assert` statements when running in optimized mode
+/// (`python -O`), making `assert False` an unreliable means of
+/// raising an `AssertionError`.
+///
+/// Instead, raise an `AssertionError` directly.
+///
+/// ## Example
+/// ```python
+/// assert False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// raise AssertionError
+/// ```
+///
+/// ## References
+/// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
 pub struct AssertFalse;
 
@@ -44,16 +67,12 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
 
 /// B011
 pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(false),
-        ..
-    } )= &test else {
+    if !is_const_false(test) {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().stmt(&assertion_error(msg)),
             stmt.range(),

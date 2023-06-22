@@ -11,7 +11,7 @@ UP025.py:2:5: UP025 [*] Remove unicode literals from strings
   |
   = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # These should change
 2   |-x = u"Hello"
   2 |+x = "Hello"
@@ -30,7 +30,7 @@ UP025.py:4:1: UP025 [*] Remove unicode literals from strings
   |
   = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # These should change
 2 2 | x = u"Hello"
 3 3 | 
@@ -51,7 +51,7 @@ UP025.py:6:7: UP025 [*] Remove unicode literals from strings
   |
   = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | 
 4 4 | u'world'
 5 5 | 
@@ -72,7 +72,7 @@ UP025.py:8:7: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 5 5 | 
 6 6 | print(u"Hello")
 7 7 | 
@@ -93,7 +93,7 @@ UP025.py:12:5: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | 
 10 10 | import foo
 11 11 | 
@@ -114,7 +114,7 @@ UP025.py:12:15: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | 
 10 10 | import foo
 11 11 | 
@@ -135,7 +135,7 @@ UP025.py:12:27: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | 
 10 10 | import foo
 11 11 | 
@@ -156,7 +156,7 @@ UP025.py:12:39: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | 
 10 10 | import foo
 11 11 | 
@@ -177,7 +177,7 @@ UP025.py:16:5: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 13 13 | 
 14 14 | # These should stay quoted they way they are
 15 15 | 
@@ -197,7 +197,7 @@ UP025.py:17:5: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 14 14 | # These should stay quoted they way they are
 15 15 | 
 16 16 | x = u'hello'
@@ -217,7 +217,7 @@ UP025.py:18:5: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 15 15 | 
 16 16 | x = u'hello'
 17 17 | x = u"""hello"""
@@ -238,7 +238,7 @@ UP025.py:19:5: UP025 [*] Remove unicode literals from strings
    |
    = help: Remove unicode prefix
 
-ℹ Suggested fix
+ℹ Fix
 16 16 | x = u'hello'
 17 17 | x = u"""hello"""
 18 18 | x = u'''hello'''

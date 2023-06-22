@@ -10,7 +10,7 @@ UP003.py:1:1: UP003 [*] Use `str` instead of `type(...)`
   |
   = help: Replace `type(...)` with `str`
 
-ℹ Suggested fix
+ℹ Fix
 1   |-type("")
   1 |+str
 2 2 | type(b"")
@@ -27,7 +27,7 @@ UP003.py:2:1: UP003 [*] Use `bytes` instead of `type(...)`
   |
   = help: Replace `type(...)` with `bytes`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | type("")
 2   |-type(b"")
   2 |+bytes
@@ -46,7 +46,7 @@ UP003.py:3:1: UP003 [*] Use `int` instead of `type(...)`
   |
   = help: Replace `type(...)` with `int`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | type("")
 2 2 | type(b"")
 3   |-type(0)
@@ -65,7 +65,7 @@ UP003.py:4:1: UP003 [*] Use `float` instead of `type(...)`
   |
   = help: Replace `type(...)` with `float`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | type("")
 2 2 | type(b"")
 3 3 | type(0)
@@ -86,7 +86,7 @@ UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
   |
   = help: Replace `type(...)` with `complex`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | type(b"")
 3 3 | type(0)
 4 4 | type(0.0)

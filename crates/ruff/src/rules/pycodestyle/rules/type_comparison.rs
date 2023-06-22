@@ -1,5 +1,5 @@
 use itertools::izip;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -41,18 +41,18 @@ impl Violation for TypeComparison {
 pub(crate) fn type_comparison(
     checker: &mut Checker,
     expr: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     for (op, right) in izip!(ops, comparators) {
-        if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
+        if !matches!(op, CmpOp::Is | CmpOp::IsNot | CmpOp::Eq | CmpOp::NotEq) {
             continue;
         }
         match right {
             Expr::Call(ast::ExprCall { func, args, .. }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     // Ex) `type(False)`
-                    if id == "type" && checker.semantic_model().is_builtin("type") {
+                    if id == "type" && checker.semantic().is_builtin("type") {
                         if let Some(arg) = args.first() {
                             // Allow comparison for types which are not obvious.
                             if !matches!(
@@ -76,12 +76,12 @@ pub(crate) fn type_comparison(
                 if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                     // Ex) `types.NoneType`
                     if id == "types"
-                        && checker.semantic_model().resolve_call_path(value).map_or(
-                            false,
-                            |call_path| {
+                        && checker
+                            .semantic()
+                            .resolve_call_path(value)
+                            .map_or(false, |call_path| {
                                 call_path.first().map_or(false, |module| *module == "types")
-                            },
-                        )
+                            })
                     {
                         checker
                             .diagnostics

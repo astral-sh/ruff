@@ -42,11 +42,9 @@ assert (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,58 +1,22 @@
- importA
+@@ -2,20 +2,10 @@
  (
--    ()
-+    (1, 2)
+     ()
      << 0
 -    ** 101234234242352525425252352352525234890264906820496920680926538059059209922523523525
 +    **101234234242352525425252352352525234890264906820496920680926538059059209922523523525
@@ -67,16 +65,16 @@ assert (
  
  importA
  0
- 0 ^ 0  #
+@@ -24,35 +14,15 @@
  
- 
--class A:
--    def foo(self):
+ class A:
+     def foo(self):
 -        for _ in range(10):
 -            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(
 -                xxxxxxxxxxxx
 -            )  # pylint: disable=no-member
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def test(self, othr):
@@ -98,8 +96,10 @@ assert (
 -        othr.parameters,
 -        othr.meta_data,
 -        othr.schedule,
--    )
-+    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++    return (
++        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+     )
  
  
 -assert a_function(
@@ -114,7 +114,7 @@ assert (
 ```py
 importA
 (
-    (1, 2)
+    ()
     << 0
     **101234234242352525425252352352525234890264906820496920680926538059059209922523523525
 )  #
@@ -126,11 +126,17 @@ importA
 0 ^ 0  #
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class A:
+    def foo(self):
+        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def test(self, othr):
-    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+    return (
+        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    )
 
 
 NOT_YET_IMPLEMENTED_StmtAssert

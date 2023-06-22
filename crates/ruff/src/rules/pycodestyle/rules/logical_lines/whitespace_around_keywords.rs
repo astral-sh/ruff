@@ -41,7 +41,6 @@ impl Violation for MultipleSpacesAfterKeyword {
 /// ## Example
 /// ```python
 /// True  and False
-///
 /// ```
 ///
 /// Use instead:
@@ -67,7 +66,6 @@ impl Violation for MultipleSpacesBeforeKeyword {
 /// ## Example
 /// ```python
 /// True and\tFalse
-///
 /// ```
 ///
 /// Use instead:
@@ -93,7 +91,6 @@ impl Violation for TabAfterKeyword {
 /// ## Example
 /// ```python
 /// True\tand False
-///
 /// ```
 ///
 /// Use instead:

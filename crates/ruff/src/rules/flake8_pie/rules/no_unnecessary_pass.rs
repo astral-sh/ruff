@@ -32,7 +32,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
+/// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
 #[violation]
 pub struct UnnecessaryPass;
 
@@ -67,13 +67,7 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.locator) {
                 Edit::range_deletion(stmt.range().add_end(index))
             } else {
-                autofix::edits::delete_stmt(
-                    stmt,
-                    None,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                )
+                autofix::edits::delete_stmt(stmt, None, checker.locator, checker.indexer)
             };
             diagnostic.set_fix(Fix::automatic(edit));
         }

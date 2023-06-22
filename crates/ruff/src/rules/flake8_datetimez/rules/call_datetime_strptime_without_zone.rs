@@ -28,10 +28,10 @@ pub(crate) fn call_datetime_strptime_without_zone(
     location: TextRange,
 ) {
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "strptime"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "strptime"])
         })
     {
         return;
@@ -49,7 +49,7 @@ pub(crate) fn call_datetime_strptime_without_zone(
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (checker.semantic_model().expr_grandparent(), checker.semantic_model().expr_parent()) else {
+    let (Some(grandparent), Some(parent)) = (checker.semantic().expr_grandparent(), checker.semantic().expr_parent()) else {
         checker.diagnostics.push(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone,
             location,

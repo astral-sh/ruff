@@ -219,298 +219,70 @@ impl Violation for SuspiciousFTPLibUsage {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) enum Reason {
-    Pickle,
-    Marshal,
-    InsecureHash,
-    InsecureCipher,
-    InsecureCipherMode,
-    Mktemp,
-    Eval,
-    MarkSafe,
-    URLOpen,
-    NonCryptographicRandom,
-    XMLCElementTree,
-    XMLElementTree,
-    XMLExpatReader,
-    XMLExpatBuilder,
-    XMLSax,
-    XMLMiniDOM,
-    XMLPullDOM,
-    XMLETree,
-    UnverifiedContext,
-    Telnet,
-    FTPLib,
-}
-
-struct SuspiciousMembers<'a> {
-    members: &'a [&'a [&'a str]],
-    reason: Reason,
-}
-
-impl<'a> SuspiciousMembers<'a> {
-    pub(crate) const fn new(members: &'a [&'a [&'a str]], reason: Reason) -> Self {
-        Self { members, reason }
-    }
-}
-
-struct SuspiciousModule<'a> {
-    name: &'a str,
-    reason: Reason,
-}
-
-impl<'a> SuspiciousModule<'a> {
-    pub(crate) const fn new(name: &'a str, reason: Reason) -> Self {
-        Self { name, reason }
-    }
-}
-
-const SUSPICIOUS_MEMBERS: &[SuspiciousMembers] = &[
-    SuspiciousMembers::new(
-        &[
-            &["pickle", "loads"],
-            &["pickle", "load"],
-            &["pickle", "Unpickler"],
-            &["dill", "loads"],
-            &["dill", "load"],
-            &["dill", "Unpickler"],
-            &["shelve", "open"],
-            &["shelve", "DbfilenameShelf"],
-            &["jsonpickle", "decode"],
-            &["jsonpickle", "unpickler", "decode"],
-            &["pandas", "read_pickle"],
-        ],
-        Reason::Pickle,
-    ),
-    SuspiciousMembers::new(
-        &[&["marshal", "loads"], &["marshal", "load"]],
-        Reason::Marshal,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["Crypto", "Hash", "MD5", "new"],
-            &["Crypto", "Hash", "MD4", "new"],
-            &["Crypto", "Hash", "MD3", "new"],
-            &["Crypto", "Hash", "MD2", "new"],
-            &["Crypto", "Hash", "SHA", "new"],
-            &["Cryptodome", "Hash", "MD5", "new"],
-            &["Cryptodome", "Hash", "MD4", "new"],
-            &["Cryptodome", "Hash", "MD3", "new"],
-            &["Cryptodome", "Hash", "MD2", "new"],
-            &["Cryptodome", "Hash", "SHA", "new"],
-            &["cryptography", "hazmat", "primitives", "hashes", "MD5"],
-            &["cryptography", "hazmat", "primitives", "hashes", "SHA1"],
-        ],
-        Reason::InsecureHash,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["Crypto", "Cipher", "ARC2", "new"],
-            &["Crypto", "Cipher", "ARC2", "new"],
-            &["Crypto", "Cipher", "Blowfish", "new"],
-            &["Crypto", "Cipher", "DES", "new"],
-            &["Crypto", "Cipher", "XOR", "new"],
-            &["Cryptodome", "Cipher", "ARC2", "new"],
-            &["Cryptodome", "Cipher", "ARC2", "new"],
-            &["Cryptodome", "Cipher", "Blowfish", "new"],
-            &["Cryptodome", "Cipher", "DES", "new"],
-            &["Cryptodome", "Cipher", "XOR", "new"],
-            &[
-                "cryptography",
-                "hazmat",
-                "primitives",
-                "ciphers",
-                "algorithms",
-                "ARC4",
-            ],
-            &[
-                "cryptography",
-                "hazmat",
-                "primitives",
-                "ciphers",
-                "algorithms",
-                "Blowfish",
-            ],
-            &[
-                "cryptography",
-                "hazmat",
-                "primitives",
-                "ciphers",
-                "algorithms",
-                "IDEA",
-            ],
-        ],
-        Reason::InsecureCipher,
-    ),
-    SuspiciousMembers::new(
-        &[&[
-            "cryptography",
-            "hazmat",
-            "primitives",
-            "ciphers",
-            "modes",
-            "ECB",
-        ]],
-        Reason::InsecureCipherMode,
-    ),
-    SuspiciousMembers::new(&[&["tempfile", "mktemp"]], Reason::Mktemp),
-    SuspiciousMembers::new(&[&["eval"]], Reason::Eval),
-    SuspiciousMembers::new(
-        &[&["django", "utils", "safestring", "mark_safe"]],
-        Reason::MarkSafe,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["urllib", "urlopen"],
-            &["urllib", "request", "urlopen"],
-            &["urllib", "urlretrieve"],
-            &["urllib", "request", "urlretrieve"],
-            &["urllib", "URLopener"],
-            &["urllib", "request", "URLopener"],
-            &["urllib", "FancyURLopener"],
-            &["urllib", "request", "FancyURLopener"],
-            &["urllib2", "urlopen"],
-            &["urllib2", "Request"],
-            &["six", "moves", "urllib", "request", "urlopen"],
-            &["six", "moves", "urllib", "request", "urlretrieve"],
-            &["six", "moves", "urllib", "request", "URLopener"],
-            &["six", "moves", "urllib", "request", "FancyURLopener"],
-        ],
-        Reason::URLOpen,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["random", "random"],
-            &["random", "randrange"],
-            &["random", "randint"],
-            &["random", "choice"],
-            &["random", "choices"],
-            &["random", "uniform"],
-            &["random", "triangular"],
-        ],
-        Reason::NonCryptographicRandom,
-    ),
-    SuspiciousMembers::new(
-        &[&["ssl", "_create_unverified_context"]],
-        Reason::UnverifiedContext,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["xml", "etree", "cElementTree", "parse"],
-            &["xml", "etree", "cElementTree", "iterparse"],
-            &["xml", "etree", "cElementTree", "fromstring"],
-            &["xml", "etree", "cElementTree", "XMLParser"],
-        ],
-        Reason::XMLCElementTree,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["xml", "etree", "ElementTree", "parse"],
-            &["xml", "etree", "ElementTree", "iterparse"],
-            &["xml", "etree", "ElementTree", "fromstring"],
-            &["xml", "etree", "ElementTree", "XMLParser"],
-        ],
-        Reason::XMLElementTree,
-    ),
-    SuspiciousMembers::new(
-        &[&["xml", "sax", "expatreader", "create_parser"]],
-        Reason::XMLExpatReader,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["xml", "dom", "expatbuilder", "parse"],
-            &["xml", "dom", "expatbuilder", "parseString"],
-        ],
-        Reason::XMLExpatBuilder,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["xml", "sax", "parse"],
-            &["xml", "sax", "parseString"],
-            &["xml", "sax", "make_parser"],
-        ],
-        Reason::XMLSax,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["xml", "dom", "minidom", "parse"],
-            &["xml", "dom", "minidom", "parseString"],
-        ],
-        Reason::XMLMiniDOM,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["xml", "dom", "pulldom", "parse"],
-            &["xml", "dom", "pulldom", "parseString"],
-        ],
-        Reason::XMLPullDOM,
-    ),
-    SuspiciousMembers::new(
-        &[
-            &["lxml", "etree", "parse"],
-            &["lxml", "etree", "fromstring"],
-            &["lxml", "etree", "RestrictedElement"],
-            &["lxml", "etree", "GlobalParserTLS"],
-            &["lxml", "etree", "getDefaultParser"],
-            &["lxml", "etree", "check_docinfo"],
-        ],
-        Reason::XMLETree,
-    ),
-];
-
-const SUSPICIOUS_MODULES: &[SuspiciousModule] = &[
-    SuspiciousModule::new("telnetlib", Reason::Telnet),
-    SuspiciousModule::new("ftplib", Reason::FTPLib),
-];
-
 /// S001
 pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return;
     };
 
-    let Some(reason) = checker.semantic_model().resolve_call_path(func).and_then(|call_path| {
-        for module in SUSPICIOUS_MEMBERS {
-            for member in module.members {
-                if call_path.as_slice() == *member {
-                    return Some(module.reason);
-                }
-            }
+    let Some(diagnostic_kind) = checker.semantic().resolve_call_path(func).and_then(|call_path| {
+        match call_path.as_slice() {
+            // Pickle
+            ["pickle" | "dill", "load" | "loads" | "Unpickler"] |
+            ["shelve", "open" | "DbfilenameShelf"] |
+            ["jsonpickle", "decode"] |
+            ["jsonpickle", "unpickler", "decode"] |
+            ["pandas", "read_pickle"]  => Some(SuspiciousPickleUsage.into()),
+            // Marshal
+            ["marshal", "load" | "loads"] => Some(SuspiciousMarshalUsage.into()),
+            // InsecureHash
+            ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"] |
+            ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => Some(SuspiciousInsecureHashUsage.into()),
+            // InsecureCipher
+            ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish"  | "DES" | "XOR", "new"] |
+            ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA" ] => Some(SuspiciousInsecureCipherUsage.into()),
+            // InsecureCipherMode
+            ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => Some(SuspiciousInsecureCipherModeUsage.into()),
+            // Mktemp
+            ["tempfile", "mktemp"] => Some(SuspiciousMktempUsage.into()),
+            // Eval
+            ["eval"] => Some(SuspiciousEvalUsage.into()),
+            // MarkSafe
+            ["django", "utils", "safestring", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
+            // URLOpen
+            ["urllib", "urlopen" | "urlretrieve" | "URLopener" | "FancyURLopener" | "Request"] |
+            ["urllib", "request", "urlopen" | "urlretrieve" | "URLopener" | "FancyURLopener"] |
+            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" | "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
+            // NonCryptographicRandom
+            ["random", "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
+            // UnverifiedContext
+            ["ssl", "_create_unverified_context"] => Some(SuspiciousUnverifiedContextUsage.into()),
+            // XMLCElementTree
+            ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => Some(SuspiciousXMLCElementTreeUsage.into()),
+            // XMLElementTree
+            ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => Some(SuspiciousXMLElementTreeUsage.into()),
+            // XMLExpatReader
+            ["xml", "sax", "expatreader", "create_parser"] => Some(SuspiciousXMLExpatReaderUsage.into()),
+            // XMLExpatBuilder
+            ["xml", "dom", "expatbuilder", "parse" | "parseString"] => Some(SuspiciousXMLExpatBuilderUsage.into()),
+            // XMLSax
+            ["xml", "sax", "parse" | "parseString" | "make_parser"] => Some(SuspiciousXMLSaxUsage.into()),
+            // XMLMiniDOM
+            ["xml", "dom", "minidom", "parse" | "parseString"] => Some(SuspiciousXMLMiniDOMUsage.into()),
+            // XMLPullDOM
+            ["xml", "dom", "pulldom", "parse" | "parseString"] => Some(SuspiciousXMLPullDOMUsage.into()),
+            // XMLETree
+            ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser" | "check_docinfo"] => Some(SuspiciousXMLETreeUsage.into()),
+            // Telnet
+            ["telnetlib", ..] => Some(SuspiciousTelnetUsage.into()),
+            // FTPLib
+            ["ftplib", ..] => Some(SuspiciousFTPLibUsage.into()),
+            _ => None
         }
-        for module in SUSPICIOUS_MODULES {
-            if call_path.first() == Some(&module.name) {
-                return Some(module.reason);
-            }
-        }
-        None
     }) else {
         return;
     };
 
-    let diagnostic_kind = match reason {
-        Reason::Pickle => SuspiciousPickleUsage.into(),
-        Reason::Marshal => SuspiciousMarshalUsage.into(),
-        Reason::InsecureHash => SuspiciousInsecureHashUsage.into(),
-        Reason::InsecureCipher => SuspiciousInsecureCipherUsage.into(),
-        Reason::InsecureCipherMode => SuspiciousInsecureCipherModeUsage.into(),
-        Reason::Mktemp => SuspiciousMktempUsage.into(),
-        Reason::Eval => SuspiciousEvalUsage.into(),
-        Reason::MarkSafe => SuspiciousMarkSafeUsage.into(),
-        Reason::URLOpen => SuspiciousURLOpenUsage.into(),
-        Reason::NonCryptographicRandom => SuspiciousNonCryptographicRandomUsage.into(),
-        Reason::XMLCElementTree => SuspiciousXMLCElementTreeUsage.into(),
-        Reason::XMLElementTree => SuspiciousXMLElementTreeUsage.into(),
-        Reason::XMLExpatReader => SuspiciousXMLExpatReaderUsage.into(),
-        Reason::XMLExpatBuilder => SuspiciousXMLExpatBuilderUsage.into(),
-        Reason::XMLSax => SuspiciousXMLSaxUsage.into(),
-        Reason::XMLMiniDOM => SuspiciousXMLMiniDOMUsage.into(),
-        Reason::XMLPullDOM => SuspiciousXMLPullDOMUsage.into(),
-        Reason::XMLETree => SuspiciousXMLETreeUsage.into(),
-        Reason::UnverifiedContext => SuspiciousUnverifiedContextUsage.into(),
-        Reason::Telnet => SuspiciousTelnetUsage.into(),
-        Reason::FTPLib => SuspiciousFTPLibUsage.into(),
-    };
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, expr.range());
     if checker.enabled(diagnostic.kind.rule()) {
         checker.diagnostics.push(diagnostic);

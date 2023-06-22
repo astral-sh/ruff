@@ -60,15 +60,9 @@ pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtI
     let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
         // Delete the entire type-checking block.
-        let stmt = checker.semantic_model().stmt();
-        let parent = checker.semantic_model().stmt_parent();
-        let edit = autofix::edits::delete_stmt(
-            stmt,
-            parent,
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        );
+        let stmt = checker.semantic().stmt();
+        let parent = checker.semantic().stmt_parent();
+        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator, checker.indexer);
         diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
     }
     checker.diagnostics.push(diagnostic);

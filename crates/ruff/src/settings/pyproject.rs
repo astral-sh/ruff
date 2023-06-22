@@ -152,12 +152,6 @@ mod tests {
 
     use crate::codes::{self, RuleCodePrefix};
     use crate::line_width::LineLength;
-    use crate::rules::flake8_quotes::settings::Quote;
-    use crate::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
-    use crate::rules::{
-        flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_import_conventions,
-        flake8_pytest_style, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
-    };
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
@@ -300,95 +294,16 @@ other-attribute = 1
         assert_eq!(
             config,
             Options {
-                allowed_confusables: Some(vec!['−', 'ρ', '∗']),
                 line_length: Some(LineLength::from(88)),
                 extend_exclude: Some(vec![
                     "excluded_file.py".to_string(),
                     "migrations".to_string(),
                     "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
-                external: Some(vec!["V101".to_string()]),
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
                     vec![RuleCodePrefix::Pyflakes(codes::Pyflakes::_401).into()]
                 )])),
-                flake8_bugbear: Some(flake8_bugbear::settings::Options {
-                    extend_immutable_calls: Some(vec![
-                        "fastapi.Depends".to_string(),
-                        "fastapi.Query".to_string(),
-                    ]),
-                }),
-                flake8_builtins: Some(flake8_builtins::settings::Options {
-                    builtins_ignorelist: Some(vec!["id".to_string(), "dir".to_string(),]),
-                }),
-                flake8_errmsg: Some(flake8_errmsg::settings::Options {
-                    max_string_length: Some(20),
-                }),
-                flake8_pytest_style: Some(flake8_pytest_style::settings::Options {
-                    fixture_parentheses: Some(false),
-                    parametrize_names_type: Some(
-                        flake8_pytest_style::types::ParametrizeNameType::Csv
-                    ),
-                    parametrize_values_type: Some(
-                        flake8_pytest_style::types::ParametrizeValuesType::Tuple,
-                    ),
-                    parametrize_values_row_type: Some(
-                        flake8_pytest_style::types::ParametrizeValuesRowType::List,
-                    ),
-                    raises_require_match_for: Some(vec![
-                        "Exception".to_string(),
-                        "TypeError".to_string(),
-                        "KeyError".to_string(),
-                    ]),
-                    raises_extend_require_match_for: Some(vec![
-                        "requests.RequestException".to_string(),
-                    ]),
-                    mark_parentheses: Some(false),
-                }),
-                flake8_implicit_str_concat: None,
-                flake8_quotes: Some(flake8_quotes::settings::Options {
-                    inline_quotes: Some(Quote::Single),
-                    multiline_quotes: Some(Quote::Double),
-                    docstring_quotes: Some(Quote::Double),
-                    avoid_escape: Some(true),
-                }),
-                flake8_tidy_imports: Some(flake8_tidy_imports::options::Options {
-                    ban_relative_imports: Some(Strictness::Parents),
-                    banned_api: Some(FxHashMap::from_iter([
-                        (
-                            "cgi".to_string(),
-                            ApiBan {
-                                msg: "The cgi module is deprecated.".to_string()
-                            }
-                        ),
-                        (
-                            "typing.TypedDict".to_string(),
-                            ApiBan {
-                                msg: "Use typing_extensions.TypedDict instead.".to_string()
-                            }
-                        )
-                    ]))
-                }),
-                flake8_import_conventions: Some(flake8_import_conventions::settings::Options {
-                    aliases: Some(FxHashMap::from_iter([(
-                        "pandas".to_string(),
-                        "pd".to_string(),
-                    )])),
-                    extend_aliases: Some(FxHashMap::from_iter([(
-                        "dask.dataframe".to_string(),
-                        "dd".to_string(),
-                    )])),
-                    banned_aliases: None,
-                    banned_from: None,
-                }),
-                mccabe: Some(mccabe::settings::Options {
-                    max_complexity: Some(10),
-                }),
-                pep8_naming: Some(pep8_naming::settings::Options {
-                    ignore_names: None,
-                    classmethod_decorators: Some(vec!["pydantic.validator".to_string()]),
-                    staticmethod_decorators: None,
-                }),
                 ..Options::default()
             }
         );

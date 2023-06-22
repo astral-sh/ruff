@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Check for multiple imports on one line.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "imports should usually be on separate lines."
+/// According to [PEP 8], "imports should usually be on separate lines."
 ///
 /// ## Example
 /// ```python
@@ -23,8 +23,7 @@ use crate::checkers::ast::Checker;
 /// import sys
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
+/// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
 pub struct MultipleImportsOnOneLine;
 
@@ -39,7 +38,7 @@ impl Violation for MultipleImportsOnOneLine {
 /// Checks for imports that are not at the top of the file.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "imports are always put at the top of the file, just after any
+/// According to [PEP 8], "imports are always put at the top of the file, just after any
 /// module comments and docstrings, and before module globals and constants."
 ///
 /// ## Example
@@ -61,8 +60,7 @@ impl Violation for MultipleImportsOnOneLine {
 /// a = 1
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
+/// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
 pub struct ModuleImportNotAtTopOfFile;
 
@@ -88,8 +86,7 @@ pub(crate) fn module_import_not_at_top_of_file(
     stmt: &Stmt,
     locator: &Locator,
 ) {
-    if checker.semantic_model().seen_import_boundary() && locator.is_at_start_of_line(stmt.start())
-    {
+    if checker.semantic().seen_import_boundary() && locator.is_at_start_of_line(stmt.start()) {
         checker
             .diagnostics
             .push(Diagnostic::new(ModuleImportNotAtTopOfFile, stmt.range()));

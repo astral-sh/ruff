@@ -3,7 +3,7 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;

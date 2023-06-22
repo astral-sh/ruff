@@ -63,7 +63,7 @@ pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
     }
     if cli.print_comments {
         println!(
-            "{:?}",
+            "{:#?}",
             formatted.context().comments().debug(SourceCode::new(input))
         );
     }

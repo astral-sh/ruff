@@ -16,6 +16,25 @@ pub(crate) enum Reason {
     DefaultArgument,
 }
 
+/// ## What it does
+/// Checks for unnecessary calls to `encode` as UTF-8.
+///
+/// ## Why is this bad?
+/// UTF-8 is the default encoding in Python, so there is no need to call
+/// `encode` when UTF-8 is the desired encoding. Instead, use a bytes literal.
+///
+/// ## Example
+/// ```python
+/// "foo".encode("utf-8")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// b"foo"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
 #[violation]
 pub struct UnnecessaryEncodeUTF8 {
     reason: Reason,
@@ -124,8 +143,8 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
         }
         prev = range.end();
     }
-    #[allow(deprecated)]
-    Fix::unspecified(Edit::range_replacement(replacement, expr.range()))
+
+    Fix::automatic(Edit::range_replacement(replacement, expr.range()))
 }
 
 /// UP012
@@ -168,8 +187,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -178,6 +196,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -190,8 +209,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -200,6 +218,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -219,8 +238,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -229,6 +247,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -241,8 +260,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -251,6 +269,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 kwargs,
                                 false,
                             )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);

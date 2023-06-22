@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
@@ -102,8 +102,8 @@ pub(crate) fn shell_injection(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let call_kind = get_call_kind(func, checker.semantic_model());
-    let shell_keyword = find_shell_keyword(checker.semantic_model(), keywords);
+    let call_kind = get_call_kind(func, checker.semantic());
+    let shell_keyword = find_shell_keyword(keywords, checker.semantic());
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
@@ -227,8 +227,8 @@ enum CallKind {
 }
 
 /// Return the [`CallKind`] of the given function call.
-fn get_call_kind(func: &Expr, model: &SemanticModel) -> Option<CallKind> {
-    model
+fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
+    semantic
         .resolve_call_path(func)
         .and_then(|call_path| match call_path.as_slice() {
             &[module, submodule] => match module {
@@ -269,14 +269,14 @@ struct ShellKeyword<'a> {
 
 /// Return the `shell` keyword argument to the given function call, if any.
 fn find_shell_keyword<'a>(
-    model: &SemanticModel,
     keywords: &'a [Keyword],
+    semantic: &SemanticModel,
 ) -> Option<ShellKeyword<'a>> {
     keywords
         .iter()
         .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "shell"))
         .map(|keyword| ShellKeyword {
-            truthiness: Truthiness::from_expr(&keyword.value, |id| model.is_builtin(id)),
+            truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.is_builtin(id)),
             keyword,
         })
 }

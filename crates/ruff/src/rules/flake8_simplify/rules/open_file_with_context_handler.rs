@@ -2,12 +2,12 @@ use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of the builtin `open()` function without an associated context
+/// Checks for uses of the builtin `open()` function without an associated context
 /// manager.
 ///
 /// ## Why is this bad?
@@ -29,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// # References
-/// - [Python documentation](https://docs.python.org/3/library/functions.html#open)
+/// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct OpenFileWithContextHandler;
 
@@ -42,8 +42,8 @@ impl Violation for OpenFileWithContextHandler {
 
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.
-fn match_async_exit_stack(model: &SemanticModel) -> bool {
-    let Some(expr) = model.expr_grandparent() else {
+fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
+    let Some(expr) = semantic.expr_grandparent() else {
         return false;
     };
     let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
@@ -58,12 +58,12 @@ fn match_async_exit_stack(model: &SemanticModel) -> bool {
     if attr != "enter_async_context" {
         return false;
     }
-    for parent in model.parents() {
+    for parent in semantic.parents() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if model.resolve_call_path(func).map_or(false, |call_path| {
-                        call_path.as_slice() == ["contextlib", "AsyncExitStack"]
+                    if semantic.resolve_call_path(func).map_or(false, |call_path| {
+                        matches!(call_path.as_slice(), ["contextlib", "AsyncExitStack"])
                     }) {
                         return true;
                     }
@@ -76,8 +76,8 @@ fn match_async_exit_stack(model: &SemanticModel) -> bool {
 
 /// Return `true` if the current expression is nested in an
 /// `exit_stack.enter_context` call.
-fn match_exit_stack(model: &SemanticModel) -> bool {
-    let Some(expr) = model.expr_parent() else {
+fn match_exit_stack(semantic: &SemanticModel) -> bool {
+    let Some(expr) = semantic.expr_parent() else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func,  .. }) = expr else {
@@ -89,12 +89,12 @@ fn match_exit_stack(model: &SemanticModel) -> bool {
     if attr != "enter_context" {
         return false;
     }
-    for parent in model.parents() {
+    for parent in semantic.parents() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if model.resolve_call_path(func).map_or(false, |call_path| {
-                        call_path.as_slice() == ["contextlib", "ExitStack"]
+                    if semantic.resolve_call_path(func).map_or(false, |call_path| {
+                        matches!(call_path.as_slice(), ["contextlib", "ExitStack"])
                     }) {
                         return true;
                     }
@@ -108,23 +108,25 @@ fn match_exit_stack(model: &SemanticModel) -> bool {
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["", "open"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["", "open"])
+        })
     {
-        if checker.semantic_model().is_builtin("open") {
+        if checker.semantic().is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.semantic_model().stmt(), Stmt::With(_)) {
+            if matches!(checker.semantic().stmt(), Stmt::With(_)) {
                 return;
             }
 
             // Ex) `with contextlib.ExitStack() as exit_stack: ...`
-            if match_exit_stack(checker.semantic_model()) {
+            if match_exit_stack(checker.semantic()) {
                 return;
             }
 
             // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
-            if match_async_exit_stack(checker.semantic_model()) {
+            if match_async_exit_stack(checker.semantic()) {
                 return;
             }
 

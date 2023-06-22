@@ -7,6 +7,26 @@ use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for the use of `__metaclass__ = type` in class definitions.
+///
+/// ## Why is this bad?
+/// Since Python 3, `__metaclass__ = type` is implied and can thus be omitted.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     __metaclass__ = type
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
 #[violation]
 pub struct UselessMetaclassType;
 
@@ -46,15 +66,9 @@ pub(crate) fn useless_metaclass_type(
 
     let mut diagnostic = Diagnostic::new(UselessMetaclassType, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic_model().stmt();
-        let parent = checker.semantic_model().stmt_parent();
-        let edit = autofix::edits::delete_stmt(
-            stmt,
-            parent,
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        );
+        let stmt = checker.semantic().stmt();
+        let parent = checker.semantic().stmt_parent();
+        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator, checker.indexer);
         diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
     }
     checker.diagnostics.push(diagnostic);

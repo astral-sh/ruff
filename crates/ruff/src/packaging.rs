@@ -78,7 +78,7 @@ fn detect_package_root_with_cache<'a>(
     current
 }
 
-/// Return a mapping from Python file to its package root.
+/// Return a mapping from Python package to its package root.
 pub fn detect_package_roots<'a>(
     files: &[&'a Path],
     resolver: &'a Resolver,

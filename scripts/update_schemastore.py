@@ -4,6 +4,7 @@ This script will clone astral-sh/schemastore, update the schema and push the cha
 to a new branch tagged with the ruff git hash. You should see a URL to create the PR
 to schemastore in the CLI.
 """
+from __future__ import annotations
 
 import json
 from pathlib import Path

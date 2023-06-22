@@ -103,13 +103,8 @@ pub(crate) fn useless_return<'a>(
 
     let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let edit = autofix::edits::delete_stmt(
-            last_stmt,
-            Some(stmt),
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        );
+        let edit =
+            autofix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator, checker.indexer);
         diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(stmt))));
     }
     checker.diagnostics.push(diagnostic);

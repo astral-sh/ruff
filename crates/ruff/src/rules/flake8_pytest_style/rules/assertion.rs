@@ -3,13 +3,12 @@ use std::borrow::Cow;
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
-    Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace, ParenthesizedNode,
-    SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace, UnaryOp,
-    UnaryOperation,
+    self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace,
+    ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
+    TrailingWhitespace, UnaryOperation,
 };
-use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
+use rustpython_parser::ast::{self, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, Truthiness};
@@ -17,6 +16,7 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
 
+use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
@@ -194,9 +194,9 @@ pub(crate) fn unittest_assertion(
                 if checker.patch(diagnostic.kind.rule()) {
                     // We're converting an expression to a statement, so avoid applying the fix if
                     // the assertion is part of a larger expression.
-                    if checker.semantic_model().stmt().is_expr_stmt()
-                        && checker.semantic_model().expr_parent().is_none()
-                        && !checker.semantic_model().scope().kind.is_lambda()
+                    if checker.semantic().stmt().is_expr_stmt()
+                        && checker.semantic().expr_parent().is_none()
+                        && !checker.semantic().scope().kind.is_lambda()
                         && !has_comments_in(expr.range(), checker.locator)
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
@@ -219,7 +219,7 @@ pub(crate) fn unittest_assertion(
 
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if Truthiness::from_expr(test, |id| checker.semantic_model().is_builtin(id)).is_falsey() {
+    if Truthiness::from_expr(test, |id| checker.semantic().is_builtin(id)).is_falsey() {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
@@ -227,11 +227,11 @@ pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
+pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Diagnostic> {
     handlers
         .iter()
         .flat_map(|handler| match handler {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 name, body, ..
             }) => {
                 if let Some(name) = name {
@@ -262,17 +262,17 @@ enum CompositionKind {
 fn is_composite_condition(test: &Expr) -> CompositionKind {
     match test {
         Expr::BoolOp(ast::ExprBoolOp {
-            op: Boolop::And, ..
+            op: BoolOp::And, ..
         }) => {
             return CompositionKind::Simple;
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::Not,
+            op: UnaryOp::Not,
             operand,
             range: _,
         }) => {
             if let Expr::BoolOp(ast::ExprBoolOp {
-                op: Boolop::Or,
+                op: BoolOp::Or,
                 values,
                 range: _,
             }) = operand.as_ref()
@@ -282,7 +282,7 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
                     !matches!(
                         expr,
                         Expr::BoolOp(ast::ExprBoolOp {
-                            op: Boolop::And,
+                            op: BoolOp::And,
                             ..
                         })
                     )
@@ -301,18 +301,66 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
 /// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
 fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
     if let Expression::UnaryOperation(ref expression) = expression {
-        if matches!(expression.operator, UnaryOp::Not { .. }) {
+        if matches!(expression.operator, libcst_native::UnaryOp::Not { .. }) {
             return *expression.expression.clone();
         }
     }
     Expression::UnaryOperation(Box::new(UnaryOperation {
-        operator: UnaryOp::Not {
+        operator: libcst_native::UnaryOp::Not {
             whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
         },
         expression: Box::new(expression.clone()),
         lpar: vec![],
         rpar: vec![],
     }))
+}
+
+/// Propagate parentheses from a parent to a child expression, if necessary.
+///
+/// For example, when splitting:
+/// ```python
+/// assert (a and b ==
+///     """)
+/// ```
+///
+/// The parentheses need to be propagated to the right-most expression:
+/// ```python
+/// assert a
+/// assert (b ==
+///     "")
+/// ```
+fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expression<'a> {
+    if matches!(
+        expression,
+        Expression::Comparison(_)
+            | Expression::UnaryOperation(_)
+            | Expression::BinaryOperation(_)
+            | Expression::BooleanOperation(_)
+            | Expression::Attribute(_)
+            | Expression::Tuple(_)
+            | Expression::Call(_)
+            | Expression::GeneratorExp(_)
+            | Expression::ListComp(_)
+            | Expression::SetComp(_)
+            | Expression::DictComp(_)
+            | Expression::List(_)
+            | Expression::Set(_)
+            | Expression::Dict(_)
+            | Expression::Subscript(_)
+            | Expression::StarredElement(_)
+            | Expression::IfExp(_)
+            | Expression::Lambda(_)
+            | Expression::Yield(_)
+            | Expression::Await(_)
+            | Expression::ConcatenatedString(_)
+            | Expression::FormattedString(_)
+            | Expression::NamedExpr(_)
+    ) {
+        if let (Some(left), Some(right)) = (parent.lpar().first(), parent.rpar().first()) {
+            return expression.with_parens(left.clone(), right.clone());
+        }
+    }
+    expression
 }
 
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
@@ -363,19 +411,15 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         bail!("Expected simple statement to be an assert")
     };
 
-    if !(assert_statement.test.lpar().is_empty() && assert_statement.test.rpar().is_empty()) {
-        bail!("Unable to split parenthesized condition");
-    }
-
     // Extract the individual conditions.
     let mut conditions: Vec<Expression> = Vec::with_capacity(2);
     match &assert_statement.test {
         Expression::UnaryOperation(op) => {
-            if matches!(op.operator, UnaryOp::Not { .. }) {
+            if matches!(op.operator, libcst_native::UnaryOp::Not { .. }) {
                 if let Expression::BooleanOperation(op) = &*op.expression {
                     if matches!(op.operator, BooleanOp::Or { .. }) {
-                        conditions.push(negate(&op.left));
-                        conditions.push(negate(&op.right));
+                        conditions.push(parenthesize(negate(&op.left), &assert_statement.test));
+                        conditions.push(parenthesize(negate(&op.right), &assert_statement.test));
                     } else {
                         bail!("Expected assert statement to be a composite condition");
                     }
@@ -386,8 +430,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }
         Expression::BooleanOperation(op) => {
             if matches!(op.operator, BooleanOp::And { .. }) {
-                conditions.push(*op.left.clone());
-                conditions.push(*op.right.clone());
+                conditions.push(parenthesize(*op.left.clone(), &assert_statement.test));
+                conditions.push(parenthesize(*op.right.clone(), &assert_statement.test));
             } else {
                 bail!("Expected assert statement to be a composite condition");
             }

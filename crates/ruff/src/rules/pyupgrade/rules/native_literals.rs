@@ -24,6 +24,26 @@ impl fmt::Display for LiteralType {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary calls to `str` and `bytes`.
+///
+/// ## Why is this bad?
+/// The `str` and `bytes` constructors can be replaced with string and bytes
+/// literals, which are more readable and idiomatic.
+///
+/// ## Example
+/// ```python
+/// str("foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "foo"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `str`](https://docs.python.org/3/library/stdtypes.html#str)
+/// - [Python documentation: `bytes`](https://docs.python.org/3/library/stdtypes.html#bytes)
 #[violation]
 pub struct NativeLiterals {
     literal_type: LiteralType,
@@ -62,11 +82,11 @@ pub(crate) fn native_literals(
     }
 
     // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
-    if checker.semantic_model().in_nested_f_string() {
+    if checker.semantic().in_nested_f_string() {
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.semantic_model().is_builtin(id) {
+    if (id == "str" || id == "bytes") && checker.semantic().is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str
@@ -80,8 +100,7 @@ pub(crate) fn native_literals(
                     Constant::Str(String::new())
                 };
                 let content = checker.generator().constant(&constant);
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     content,
                     expr.range(),
                 )));
@@ -133,8 +152,7 @@ pub(crate) fn native_literals(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 arg_code.to_string(),
                 expr.range(),
             )));

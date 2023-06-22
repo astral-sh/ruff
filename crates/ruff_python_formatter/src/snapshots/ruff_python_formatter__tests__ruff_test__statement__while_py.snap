@@ -61,14 +61,16 @@ while (
 else:
     ...
 
-while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:  # comment
-    NOT_IMPLEMENTED_call()
+while NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and anotherCondition or aThirdCondition:  # comment
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 while (
-    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2  # trailing third condition
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # trailing some condition
+    and anotherCondition
+    or aThirdCondition  # trailing third condition
 ):  # comment
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 

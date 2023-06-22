@@ -14,6 +14,30 @@ use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 
+/// ## What it does
+/// Checks for unnecessary positional indices in format strings.
+///
+/// ## Why is this bad?
+/// In Python 3.1 and later, format strings can use implicit positional
+/// references. For example, `"{0}, {1}".format("Hello", "World")` can be
+/// rewritten as `"{}, {}".format("Hello", "World")`.
+///
+/// If the positional indices appear exactly in-order, they can be omitted
+/// in favor of automatic indices to improve readability.
+///
+/// ## Example
+/// ```python
+/// "{0}, {1}".format("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "{}, {}".format("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// ## References
+/// - [Python documentation: Format String Syntax](https://docs.python.org/3/library/string.html#format-string-syntax)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct FormatLiterals;
 

@@ -13,7 +13,7 @@ singles_multiline_string.py:1:5: Q001 [*] Single quote multiline found but doubl
   |
   = help: Replace single multiline quotes with double quotes
 
-ℹ Suggested fix
+ℹ Fix
 1   |-s = ''' This 'should'
   1 |+s = """ This 'should'
 2 2 | be

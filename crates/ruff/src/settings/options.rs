@@ -8,8 +8,8 @@ use ruff_macros::ConfigurationOptions;
 use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
-    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint,
@@ -288,7 +288,7 @@ pub struct Options {
     /// re-exported with a redundant alias (e.g., `import os as os`).
     pub ignore_init_module_imports: Option<bool>,
     #[option(
-        default = r#"["*.py", "*.pyi"]"#,
+        default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -297,7 +297,9 @@ pub struct Options {
     /// A list of file patterns to include when linting.
     ///
     /// Inclusion are based on globs, and should be single-path patterns, like
-    /// `*.pyw`, to include any file with the `.pyw` extension.
+    /// `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is
+    /// included here not for configuration but because we lint whether e.g. the
+    /// `[project]` matches the schema.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub include: Option<Vec<String>>,
@@ -431,7 +433,7 @@ pub struct Options {
     pub namespace_packages: Option<Vec<String>>,
     #[option(
         default = r#""py310""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -497,7 +499,7 @@ pub struct Options {
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     #[option_group]
     /// Options for the `copyright` plugin.
-    pub copyright: Option<copyright::settings::Options>,
+    pub flake8_copyright: Option<flake8_copyright::settings::Options>,
     #[option_group]
     /// Options for the `flake8-errmsg` plugin.
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,

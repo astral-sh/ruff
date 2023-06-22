@@ -68,7 +68,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, clap::Args)]
+#[derive(Clone, Debug, clap::Args)]
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
 pub struct CheckArgs {
     /// List of files or directories to check.
@@ -107,6 +107,9 @@ pub struct CheckArgs {
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
+    /// Specify file to write the linter output to (default: stdout).
+    #[arg(short, long)]
+    pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
@@ -399,6 +402,7 @@ impl CheckArgs {
                 ignore_noqa: self.ignore_noqa,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
+                output_file: self.output_file,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
                 statistics: self.statistics,
@@ -465,6 +469,7 @@ pub struct Arguments {
     pub ignore_noqa: bool,
     pub isolated: bool,
     pub no_cache: bool,
+    pub output_file: Option<PathBuf>,
     pub show_files: bool,
     pub show_settings: bool,
     pub statistics: bool,

@@ -10,7 +10,7 @@ future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Suggested fix
+ℹ Possible fix
 37 37 |     return y
 38 38 | 
 39 39 | 

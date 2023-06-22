@@ -17,9 +17,9 @@ use crate::model::SemanticModel;
 /// # This is detected to be a logger candidate
 /// bar.error()
 /// ```
-pub fn is_logger_candidate(func: &Expr, model: &SemanticModel) -> bool {
+pub fn is_logger_candidate(func: &Expr, semantic: &SemanticModel) -> bool {
     if let Expr::Attribute(ast::ExprAttribute { value, .. }) = func {
-        let Some(call_path) = (if let Some(call_path) = model.resolve_call_path(value) {
+        let Some(call_path) = (if let Some(call_path) = semantic.resolve_call_path(value) {
             if call_path.first().map_or(false, |module| *module == "logging") || call_path.as_slice() == ["flask", "current_app", "logger"] {
                 Some(call_path)
             } else {
@@ -41,7 +41,7 @@ pub fn is_logger_candidate(func: &Expr, model: &SemanticModel) -> bool {
 
 /// If the keywords to a  logging call contain `exc_info=True` or `exc_info=sys.exc_info()`,
 /// return the `Keyword` for `exc_info`.
-pub fn exc_info<'a>(keywords: &'a [Keyword], model: &SemanticModel) -> Option<&'a Keyword> {
+pub fn exc_info<'a>(keywords: &'a [Keyword], semantic: &SemanticModel) -> Option<&'a Keyword> {
     let exc_info = find_keyword(keywords, "exc_info")?;
 
     // Ex) `logging.error("...", exc_info=True)`
@@ -57,8 +57,8 @@ pub fn exc_info<'a>(keywords: &'a [Keyword], model: &SemanticModel) -> Option<&'
 
     // Ex) `logging.error("...", exc_info=sys.exc_info())`
     if let Expr::Call(ast::ExprCall { func, .. }) = &exc_info.value {
-        if model.resolve_call_path(func).map_or(false, |call_path| {
-            call_path.as_slice() == ["sys", "exc_info"]
+        if semantic.resolve_call_path(func).map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["sys", "exc_info"])
         }) {
             return Some(exc_info);
         }

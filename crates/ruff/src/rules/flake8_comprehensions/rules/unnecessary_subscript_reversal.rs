@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -58,7 +58,7 @@ pub(crate) fn unnecessary_subscript_reversal(
     if !(id == "set" || id == "sorted" || id == "reversed") {
         return;
     }
-    if !checker.semantic_model().is_builtin(id) {
+    if !checker.semantic().is_builtin(id) {
         return;
     }
     let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {
@@ -74,7 +74,7 @@ pub(crate) fn unnecessary_subscript_reversal(
         return;
     };
     let Expr::UnaryOp(ast::ExprUnaryOp {
-        op: Unaryop::USub,
+        op: UnaryOp::USub,
         operand,
         range: _,
     }) = step.as_ref() else {

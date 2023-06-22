@@ -1,6 +1,6 @@
 use anyhow::{bail, Ok, Result};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Excepthandler, Expr, Ranged};
+use rustpython_parser::ast::{ExceptHandler, Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -90,17 +90,17 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.
 pub(crate) fn remove_exception_handler_assignment(
-    excepthandler: &Excepthandler,
+    except_handler: &ExceptHandler,
     locator: &Locator,
 ) -> Result<Edit> {
-    let contents = locator.slice(excepthandler.range());
+    let contents = locator.slice(except_handler.range());
     let mut fix_start = None;
     let mut fix_end = None;
 
     // End of the token just before the `as` to the semicolon.
     let mut prev = None;
     for (tok, range) in
-        lexer::lex_starts_at(contents, Mode::Module, excepthandler.start()).flatten()
+        lexer::lex_starts_at(contents, Mode::Module, except_handler.start()).flatten()
     {
         if matches!(tok, Tok::As) {
             fix_start = prev;

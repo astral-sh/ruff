@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{self, Excepthandler, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
 /// Checks for functions or methods with too many statements.
@@ -123,7 +122,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 }
                 for handler in handlers {
                     count += 1;
-                    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) = handler;
                     count += num_statements(body);
@@ -149,7 +148,6 @@ pub(crate) fn too_many_statements(
     stmt: &Stmt,
     body: &[Stmt],
     max_statements: usize,
-    locator: &Locator,
 ) -> Option<Diagnostic> {
     let statements = num_statements(body);
     if statements > max_statements {
@@ -158,7 +156,7 @@ pub(crate) fn too_many_statements(
                 statements,
                 max_statements,
             },
-            identifier_range(stmt, locator),
+            stmt.identifier(),
         ))
     } else {
         None

@@ -96,13 +96,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // the leading comment. This is why the suite handling counts the lines before the
                 // start of the next statement or before the first leading comments for compound statements.
                 let separator = format_with(|f| {
-                    let start = if let Some(first_leading) =
-                        comments.leading_comments(statement.into()).first()
-                    {
-                        first_leading.slice().start()
-                    } else {
-                        statement.start()
-                    };
+                    let start =
+                        if let Some(first_leading) = comments.leading_comments(statement).first() {
+                            first_leading.slice().start()
+                        } else {
+                            statement.start()
+                        };
 
                     match lines_before(start, source) {
                         0 | 1 => hard_line_break().fmt(f),
@@ -178,6 +177,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
     type Format = FormatOwnedWithRule<Suite, FormatSuite, PyFormatContext<'ast>>;
+
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
     }
@@ -252,7 +252,8 @@ one_leading_newline = 10
 no_leading_newline = 30
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class InTheMiddle:
+    pass
 
 
 trailing_statement = 1
@@ -283,7 +284,8 @@ two_leading_newlines = 20
 one_leading_newline = 10
 no_leading_newline = 30
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class InTheMiddle:
+    pass
 
 trailing_statement = 1
 

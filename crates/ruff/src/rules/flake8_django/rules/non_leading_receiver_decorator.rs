@@ -61,7 +61,7 @@ where
         let is_receiver = match &decorator.expression {
             Expr::Call(ast::ExprCall { func, .. }) => resolve_call_path(func)
                 .map_or(false, |call_path| {
-                    call_path.as_slice() == ["django", "dispatch", "receiver"]
+                    matches!(call_path.as_slice(), ["django", "dispatch", "receiver"])
                 }),
             _ => false,
         };

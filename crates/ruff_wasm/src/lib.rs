@@ -9,8 +9,8 @@ use ruff::line_width::{LineLength, TabSize};
 use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::rules::{
-    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint,
@@ -138,11 +138,8 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_bugbear: Some(flake8_bugbear::settings::Settings::default().into()),
         flake8_builtins: Some(flake8_builtins::settings::Settings::default().into()),
         flake8_comprehensions: Some(flake8_comprehensions::settings::Settings::default().into()),
-        copyright: Some(copyright::settings::Settings::default().into()),
+        flake8_copyright: Some(flake8_copyright::settings::Settings::default().into()),
         flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
-        flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
-        flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
-        flake8_self: Some(flake8_self::settings::Settings::default().into()),
         flake8_gettext: Some(flake8_gettext::settings::Settings::default().into()),
         flake8_implicit_str_concat: Some(
             flake8_implicit_str_concat::settings::Settings::default().into(),
@@ -150,6 +147,9 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_import_conventions: Some(
             flake8_import_conventions::settings::Settings::default().into(),
         ),
+        flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
+        flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
+        flake8_self: Some(flake8_self::settings::Settings::default().into()),
         flake8_tidy_imports: Some(flake8_tidy_imports::settings::Settings::default().into()),
         flake8_type_checking: Some(flake8_type_checking::settings::Settings::default().into()),
         flake8_unused_arguments: Some(
@@ -204,6 +204,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &directives,
         &settings,
         flags::Noqa::Enabled,
+        None,
     );
 
     let source_code = locator.to_source_code();

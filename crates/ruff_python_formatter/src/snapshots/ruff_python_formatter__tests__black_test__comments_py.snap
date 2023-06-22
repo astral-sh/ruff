@@ -109,38 +109,35 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -4,24 +4,15 @@
+@@ -4,21 +4,15 @@
  #
  # Has many lines. Many, many lines.
  # Many, many, many lines.
 -"""Module docstring.
--
++"NOT_YET_IMPLEMENTED_STRING"
+ 
 -Possibly also many, many lines.
 -"""
--
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
+ 
 -import os.path
 -import sys
 -
 -import a
 -from b.c import X  # some noqa comment
-+"NOT_YET_IMPLEMENTED_STRING"
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
  
 -try:
 -    import fast
 -except ImportError:
 -    import slow as fast
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
- 
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
- 
--# Some comment before a function.
 +NOT_YET_IMPLEMENTED_StmtTry
- y = 1
- (
-     # some strings
-@@ -30,67 +21,46 @@
+ 
+ 
+ # Some comment before a function.
+@@ -30,25 +24,26 @@
  
  
  def function(default=None):
@@ -168,39 +165,44 @@ async def wat():
  
  # Explains why we use global state.
 -GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
-+GLOBAL_STATE = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++GLOBAL_STATE = {
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++}
  
  
  # Another comment!
- # This time two lines.
+@@ -56,7 +51,7 @@
  
  
--class Foo:
+ class Foo:
 -    """Docstring for class Foo.  Example from Sphinx docs."""
--
--    #: Doc comment for class attribute Foo.bar.
--    #: It can have multiple lines.
--    bar = 1
--
--    flox = 1.5  #: Doc comment for Foo.flox. One line only.
--
--    baz = 2
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+     #: Doc comment for class attribute Foo.bar.
+     #: It can have multiple lines.
+@@ -65,32 +60,31 @@
+     flox = 1.5  #: Doc comment for Foo.flox. One line only.
+ 
+     baz = 2
 -    """Docstring for class attribute Foo.baz."""
--
--    def __init__(self):
--        #: Doc comment for instance attribute qux.
--        self.qux = 3
--
--        self.spam = 4
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+     def __init__(self):
+         #: Doc comment for instance attribute qux.
+         self.qux = 3
+ 
+         self.spam = 4
 -        """Docstring for instance attribute spam."""
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        "NOT_YET_IMPLEMENTED_STRING"
  
  
  #' <h1>This is pweave!</h1>
  
  
 -@fast(really=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  async def wat():
      # This comment, for some reason \
      # contains a trailing backslash.
@@ -210,7 +212,7 @@ async def wat():
      # Comment after ending a block.
      if result:
 -        print("A OK", file=sys.stdout)
-+        NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
          # Comment between things.
 -        print()
 +        NOT_IMPLEMENTED_call()
@@ -241,6 +243,9 @@ NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
 
 NOT_YET_IMPLEMENTED_StmtTry
+
+
+# Some comment before a function.
 y = 1
 (
     # some strings
@@ -264,27 +269,48 @@ def function(default=None):
 
 
 # Explains why we use global state.
-GLOBAL_STATE = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+GLOBAL_STATE = {
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+}
 
 
 # Another comment!
 # This time two lines.
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Foo:
+    "NOT_YET_IMPLEMENTED_STRING"
+
+    #: Doc comment for class attribute Foo.bar.
+    #: It can have multiple lines.
+    bar = 1
+
+    flox = 1.5  #: Doc comment for Foo.flox. One line only.
+
+    baz = 2
+    "NOT_YET_IMPLEMENTED_STRING"
+
+    def __init__(self):
+        #: Doc comment for instance attribute qux.
+        self.qux = 3
+
+        self.spam = 4
+        "NOT_YET_IMPLEMENTED_STRING"
 
 
 #' <h1>This is pweave!</h1>
 
 
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 async def wat():
     # This comment, for some reason \
     # contains a trailing backslash.
     NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
     # Comment after ending a block.
     if result:
-        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         # Comment between things.
         NOT_IMPLEMENTED_call()
 

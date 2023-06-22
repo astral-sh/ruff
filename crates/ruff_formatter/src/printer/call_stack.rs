@@ -1,7 +1,7 @@
 use crate::format_element::tag::TagKind;
 use crate::format_element::PrintMode;
 use crate::printer::stack::{Stack, StackedStack};
-use crate::printer::Indention;
+use crate::printer::{Indention, MeasureMode};
 use crate::{IndentStyle, InvalidDocumentError, PrintError, PrintResult};
 use std::fmt::Debug;
 use std::num::NonZeroU8;
@@ -28,6 +28,7 @@ pub(super) struct StackFrame {
 pub(super) struct PrintElementArgs {
     indent: Indention,
     mode: PrintMode,
+    measure_mode: MeasureMode,
 }
 
 impl PrintElementArgs {
@@ -40,6 +41,10 @@ impl PrintElementArgs {
 
     pub(super) fn mode(&self) -> PrintMode {
         self.mode
+    }
+
+    pub(super) fn measure_mode(&self) -> MeasureMode {
+        self.measure_mode
     }
 
     pub(super) fn indention(&self) -> Indention {
@@ -70,6 +75,11 @@ impl PrintElementArgs {
         self.mode = mode;
         self
     }
+
+    pub(crate) fn with_measure_mode(mut self, mode: MeasureMode) -> Self {
+        self.measure_mode = mode;
+        self
+    }
 }
 
 impl Default for PrintElementArgs {
@@ -77,6 +87,7 @@ impl Default for PrintElementArgs {
         Self {
             indent: Indention::Level(0),
             mode: PrintMode::Expanded,
+            measure_mode: MeasureMode::FirstLine,
         }
     }
 }

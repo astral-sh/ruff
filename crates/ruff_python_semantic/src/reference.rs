@@ -1,6 +1,7 @@
 use ruff_text_size::TextRange;
+use std::ops::Deref;
 
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{newtype_index, IndexSlice, IndexVec};
 
 use crate::context::ExecutionContext;
 use crate::scope::ScopeId;
@@ -35,11 +36,11 @@ pub struct ReferenceId;
 
 /// The references of a program indexed by [`ReferenceId`].
 #[derive(Debug, Default)]
-pub struct References(IndexVec<ReferenceId, Reference>);
+pub(crate) struct References(IndexVec<ReferenceId, Reference>);
 
 impl References {
-    /// Pushes a new read reference and returns its unique id.
-    pub fn push(
+    /// Pushes a new [`Reference`] and returns its [`ReferenceId`].
+    pub(crate) fn push(
         &mut self,
         scope_id: ScopeId,
         range: TextRange,
@@ -51,9 +52,12 @@ impl References {
             context,
         })
     }
+}
 
-    /// Returns the [`Reference`] with the given id.
-    pub fn resolve(&self, id: ReferenceId) -> &Reference {
-        &self.0[id]
+impl Deref for References {
+    type Target = IndexSlice<ReferenceId, Reference>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

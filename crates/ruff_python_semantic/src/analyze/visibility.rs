@@ -14,45 +14,45 @@ pub enum Visibility {
 }
 
 /// Returns `true` if a function is a "static method".
-pub fn is_staticmethod(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
-        model
+        semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["", "staticmethod"]
+                matches!(call_path.as_slice(), ["", "staticmethod"])
             })
     })
 }
 
 /// Returns `true` if a function is a "class method".
-pub fn is_classmethod(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
-        model
+        semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["", "classmethod"]
+                matches!(call_path.as_slice(), ["", "classmethod"])
             })
     })
 }
 
 /// Returns `true` if a function definition is an `@overload`.
-pub fn is_overload(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
-    decorator_list
-        .iter()
-        .any(|decorator| model.match_typing_expr(map_callable(&decorator.expression), "overload"))
+pub fn is_overload(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+    decorator_list.iter().any(|decorator| {
+        semantic.match_typing_expr(map_callable(&decorator.expression), "overload")
+    })
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
-pub fn is_override(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
-    decorator_list
-        .iter()
-        .any(|decorator| model.match_typing_expr(map_callable(&decorator.expression), "override"))
+pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+    decorator_list.iter().any(|decorator| {
+        semantic.match_typing_expr(map_callable(&decorator.expression), "override")
+    })
 }
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
-pub fn is_abstract(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
-        model
+        semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
                 matches!(
@@ -73,28 +73,29 @@ pub fn is_abstract(model: &SemanticModel, decorator_list: &[Decorator]) -> bool 
 /// `extra_properties` can be used to check additional non-standard
 /// `@property`-like decorators.
 pub fn is_property(
-    model: &SemanticModel,
     decorator_list: &[Decorator],
     extra_properties: &[CallPath],
+    semantic: &SemanticModel,
 ) -> bool {
     decorator_list.iter().any(|decorator| {
-        model
+        semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["", "property"]
-                    || call_path.as_slice() == ["functools", "cached_property"]
-                    || extra_properties
-                        .iter()
-                        .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
+                matches!(
+                    call_path.as_slice(),
+                    ["", "property"] | ["functools", "cached_property"]
+                ) || extra_properties
+                    .iter()
+                    .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
             })
     })
 }
 
 /// Returns `true` if a class is an `final`.
-pub fn is_final(model: &SemanticModel, decorator_list: &[Decorator]) -> bool {
+pub fn is_final(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list
         .iter()
-        .any(|decorator| model.match_typing_expr(map_callable(&decorator.expression), "final"))
+        .any(|decorator| semantic.match_typing_expr(map_callable(&decorator.expression), "final"))
 }
 
 /// Returns `true` if a function is a "magic method".

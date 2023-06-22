@@ -4,8 +4,7 @@ use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::str::is_implicit_concatenation;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
 use ruff_python_whitespace::UniversalNewlines;
 
 /// Return the index of the first logical line in a string.
@@ -41,9 +40,9 @@ pub(super) fn ends_with_backslash(line: &str) -> bool {
 
 /// Check decorator list to see if function should be ignored.
 pub(crate) fn should_ignore_definition(
-    model: &SemanticModel,
     definition: &Definition,
     ignore_decorators: &BTreeSet<String>,
+    semantic: &SemanticModel,
 ) -> bool {
     if ignore_decorators.is_empty() {
         return false;
@@ -56,7 +55,8 @@ pub(crate) fn should_ignore_definition(
     }) = definition
     {
         for decorator in cast::decorator_list(stmt) {
-            if let Some(call_path) = model.resolve_call_path(map_callable(&decorator.expression)) {
+            if let Some(call_path) = semantic.resolve_call_path(map_callable(&decorator.expression))
+            {
                 if ignore_decorators
                     .iter()
                     .any(|decorator| from_qualified_name(decorator) == call_path)

@@ -35,7 +35,7 @@ use super::super::format::FormatSummary;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatInvalidFormat {
     pub(crate) message: String,
@@ -74,7 +74,7 @@ impl Violation for PercentFormatInvalidFormat {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatExpectedMapping;
 
@@ -110,7 +110,7 @@ impl Violation for PercentFormatExpectedMapping {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatExpectedSequence;
 
@@ -139,7 +139,7 @@ impl Violation for PercentFormatExpectedSequence {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
@@ -179,7 +179,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatMissingArgument {
     missing: Vec<String>,
@@ -219,7 +219,7 @@ impl Violation for PercentFormatMissingArgument {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatMixedPositionalAndNamed;
 
@@ -249,7 +249,7 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatPositionalCountMismatch {
     wanted: usize,
@@ -287,7 +287,7 @@ impl Violation for PercentFormatPositionalCountMismatch {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatStarRequiresSequence;
 
@@ -317,7 +317,7 @@ impl Violation for PercentFormatStarRequiresSequence {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatUnsupportedFormatCharacter {
     pub(crate) char: char,
@@ -348,7 +348,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatInvalidFormat {
     pub(crate) message: String,
@@ -380,7 +380,7 @@ impl Violation for StringDotFormatInvalidFormat {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatExtraNamedArguments {
     missing: Vec<String>,
@@ -421,7 +421,7 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
@@ -464,7 +464,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatMissingArguments {
     missing: Vec<String>,
@@ -502,7 +502,7 @@ impl Violation for StringDotFormatMissingArguments {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatMixingAutomatic;
 
@@ -514,14 +514,13 @@ impl Violation for StringDotFormatMixingAutomatic {
 }
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
-    keywords.iter().any(|k| {
-        let Keyword { arg, .. } = &k;
-        arg.is_none()
-    })
+    keywords
+        .iter()
+        .any(|keyword| matches!(keyword, Keyword { arg: None, .. }))
 }
 
 fn has_star_args(args: &[Expr]) -> bool {
-    args.iter().any(|arg| matches!(&arg, Expr::Starred(_)))
+    args.iter().any(Expr::is_starred_expr)
 }
 
 /// F502
@@ -805,9 +804,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         .iter()
         .enumerate()
         .filter(|(i, arg)| {
-            !(matches!(arg, Expr::Starred(_))
-                || summary.autos.contains(i)
-                || summary.indices.contains(i))
+            !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
         })
         .map(|(i, _)| i)
         .collect();

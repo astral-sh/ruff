@@ -49,6 +49,9 @@ use crate::checkers::ast::Checker;
 /// def func(obj: dict[str, int | None]) -> None:
 ///     ...
 /// ```
+///
+/// ## Options
+/// - `target-version`
 #[violation]
 pub struct FutureRewritableTypeAnnotation {
     name: String,
@@ -65,7 +68,7 @@ impl Violation for FutureRewritableTypeAnnotation {
 /// FA100
 pub(crate) fn future_rewritable_type_annotation(checker: &mut Checker, expr: &Expr) {
     let name = checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(expr)
         .map(|binding| format_call_path(&binding));
 

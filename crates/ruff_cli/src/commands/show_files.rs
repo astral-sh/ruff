@@ -1,4 +1,4 @@
-use std::io::{self, BufWriter, Write};
+use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -14,6 +14,7 @@ pub(crate) fn show_files(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
+    writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
     let (paths, _resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
@@ -24,13 +25,12 @@ pub(crate) fn show_files(
     }
 
     // Print the list of files.
-    let mut stdout = BufWriter::new(io::stdout().lock());
     for entry in paths
         .iter()
         .flatten()
         .sorted_by(|a, b| a.path().cmp(b.path()))
     {
-        writeln!(stdout, "{}", entry.path().to_string_lossy())?;
+        writeln!(writer, "{}", entry.path().to_string_lossy())?;
     }
 
     Ok(())

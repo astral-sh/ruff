@@ -1,12 +1,38 @@
 use std::collections::VecDeque;
 
-use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for exception handlers that catch non-exception classes.
+///
+/// ## Why is this bad?
+/// Catching classes that do not inherit from `BaseException` will raise a
+/// `TypeError`.
+///
+/// ## Example
+/// ```python
+/// try:
+///     1 / 0
+/// except 1:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     1 / 0
+/// except ZeroDivisionError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
+/// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
 #[violation]
 pub struct ExceptWithNonExceptionClasses;
 
@@ -44,9 +70,10 @@ fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
 /// B030
 pub(crate) fn except_with_non_exception_classes(
     checker: &mut Checker,
-    excepthandler: &Excepthandler,
+    except_handler: &ExceptHandler,
 ) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
+    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
+        except_handler;
     let Some(type_) = type_ else {
         return;
     };

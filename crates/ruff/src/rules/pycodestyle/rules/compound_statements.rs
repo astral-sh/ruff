@@ -5,6 +5,8 @@ use rustpython_parser::Tok;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::source_code::{Indexer, Locator};
 
 use crate::registry::Rule;
 use crate::settings::Settings;
@@ -13,7 +15,7 @@ use crate::settings::Settings;
 /// Checks for compound statements (multiple statements on the same line).
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "compound statements are generally discouraged".
+/// According to [PEP 8], "compound statements are generally discouraged".
 ///
 /// ## Example
 /// ```python
@@ -25,9 +27,8 @@ use crate::settings::Settings;
 /// if foo == "blah":
 ///     do_blah_thing()
 /// ```
-///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct MultipleStatementsOnOneLineColon;
 
@@ -42,7 +43,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// Checks for multiline statements on one line.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, including multi-clause statements on the same line is
+/// According to [PEP 8], including multi-clause statements on the same line is
 /// discouraged.
 ///
 /// ## Example
@@ -57,8 +58,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// do_three()
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct MultipleStatementsOnOneLineSemicolon;
 
@@ -99,7 +99,12 @@ impl AlwaysAutofixableViolation for UselessSemicolon {
 }
 
 /// E701, E702, E703
-pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn compound_statements(
+    lxr: &[LexResult],
+    locator: &Locator,
+    indexer: &Indexer,
+    settings: &Settings,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Track the last seen instance of a variety of tokens.
@@ -147,6 +152,12 @@ pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec
             Tok::Rbrace => {
                 brace_count = brace_count.saturating_sub(1);
             }
+            Tok::Ellipsis => {
+                if allow_ellipsis {
+                    allow_ellipsis = false;
+                    continue;
+                }
+            }
             _ => {}
         }
 
@@ -160,8 +171,11 @@ pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec
                     let mut diagnostic =
                         Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
                     if settings.rules.should_fix(Rule::UselessSemicolon) {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::deletion(start, end)));
+                        diagnostic.set_fix(Fix::automatic(Edit::deletion(
+                            helpers::preceded_by_continuations(start, locator, indexer)
+                                .unwrap_or(start),
+                            end,
+                        )));
                     };
                     diagnostics.push(diagnostic);
                 }
@@ -197,17 +211,15 @@ pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec
                     || with.is_some()
                 {
                     colon = Some((range.start(), range.end()));
-                    allow_ellipsis = true;
+
+                    // Allow `class C: ...`-style definitions in stubs.
+                    allow_ellipsis = class.is_some();
                 }
             }
             Tok::Semi => {
                 semi = Some((range.start(), range.end()));
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
-            Tok::Ellipsis if allow_ellipsis => {
-                // Allow `class C: ...`-style definitions in stubs.
-                allow_ellipsis = false;
-            }
             _ => {
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(

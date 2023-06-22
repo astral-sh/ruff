@@ -1,14 +1,34 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{Binding, BindingKind, Bindings};
-use ruff_python_semantic::scope::Scope;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for classes that inherit from `object`.
+///
+/// ## Why is this bad?
+/// Since Python 3, all classes inherit from `object` by default, so `object` can
+/// be omitted from the list of base classes.
+///
+/// ## Example
+/// ```python
+/// class Foo(object):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
 #[violation]
 pub struct UselessObjectInheritance {
     name: String,
@@ -26,62 +46,40 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
     }
 }
 
-fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Option<Diagnostic> {
-    for expr in bases {
+/// UP004
+pub(crate) fn useless_object_inheritance(
+    checker: &mut Checker,
+    class_def: &ast::StmtClassDef,
+    stmt: &Stmt,
+) {
+    for expr in &class_def.bases {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             continue;
         };
         if id != "object" {
             continue;
         }
-        if !matches!(
-            scope
-                .get(id.as_str())
-                .map(|binding_id| &bindings[binding_id]),
-            None | Some(Binding {
-                kind: BindingKind::Builtin,
-                ..
-            })
-        ) {
+        if !checker.semantic().is_builtin("object") {
             continue;
         }
-        return Some(Diagnostic::new(
+
+        let mut diagnostic = Diagnostic::new(
             UselessObjectInheritance {
-                name: name.to_string(),
+                name: class_def.name.to_string(),
             },
             expr.range(),
-        ));
-    }
-
-    None
-}
-
-/// UP004
-pub(crate) fn useless_object_inheritance(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    name: &str,
-    bases: &[Expr],
-    keywords: &[Keyword],
-) {
-    if let Some(mut diagnostic) = rule(
-        name,
-        bases,
-        checker.semantic_model().scope(),
-        &checker.semantic_model().bindings,
-    ) {
+        );
         if checker.patch(diagnostic.kind.rule()) {
-            let expr_range = diagnostic.range();
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
-                remove_argument(
+            diagnostic.try_set_fix(|| {
+                let edit = remove_argument(
                     checker.locator,
-                    stmt.start(),
-                    expr_range,
-                    bases,
-                    keywords,
+                    stmt.identifier().start(),
+                    expr.range(),
+                    &class_def.bases,
+                    &class_def.keywords,
                     true,
-                )
+                )?;
+                Ok(Fix::automatic(edit))
             });
         }
         checker.diagnostics.push(diagnostic);

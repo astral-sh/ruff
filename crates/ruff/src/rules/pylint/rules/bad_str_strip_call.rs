@@ -17,18 +17,32 @@ use crate::settings::types::PythonVersion;
 /// trailing ends of the string. Including duplicate characters in the call
 /// is redundant and often indicative of a mistake.
 ///
+/// In Python 3.9 and later, you can use `str#removeprefix` and
+/// `str#removesuffix` to remove an exact prefix or suffix from a string,
+/// respectively, which should be preferred when possible.
+///
 /// ## Example
 /// ```python
-/// "bar foo baz".strip("bar baz ")  # "foo"
+/// # Evaluates to "foo".
+/// "bar foo baz".strip("bar baz ")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// # Evaluates to "foo".
 /// "bar foo baz".strip("abrz ")  # "foo"
 /// ```
 ///
+/// Or:
+/// ```python
+/// # Evaluates to "foo".
+/// "bar foo baz".removeprefix("bar ").removesuffix(" baz")
+///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
+/// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[violation]
 pub struct BadStrStripCall {
     strip: StripKind,

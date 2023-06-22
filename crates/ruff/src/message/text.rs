@@ -11,10 +11,12 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 
 use crate::fs::relativize_path;
+use crate::jupyter::Notebook;
 use crate::line_width::{LineWidth, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use crate::source_kind::SourceKind;
 
 bitflags! {
     #[derive(Default)]
@@ -72,25 +74,32 @@ impl Emitter for TextEmitter {
             let start_location = message.compute_start_location();
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location =
-                if let Some(jupyter_index) = context.jupyter_index(message.filename()) {
-                    write!(
-                        writer,
-                        "cell {cell}{sep}",
-                        cell = jupyter_index.row_to_cell[start_location.row.get()],
-                        sep = ":".cyan(),
-                    )?;
+            let diagnostic_location = if let Some(jupyter_index) = context
+                .source_kind(message.filename())
+                .and_then(SourceKind::notebook)
+                .map(Notebook::index)
+            {
+                write!(
+                    writer,
+                    "cell {cell}{sep}",
+                    cell = jupyter_index
+                        .cell(start_location.row.get())
+                        .unwrap_or_default(),
+                    sep = ":".cyan(),
+                )?;
 
-                    SourceLocation {
-                        row: OneIndexed::new(
-                            jupyter_index.row_to_row_in_cell[start_location.row.get()] as usize,
-                        )
-                        .unwrap(),
-                        column: start_location.column,
-                    }
-                } else {
-                    start_location
-                };
+                SourceLocation {
+                    row: OneIndexed::new(
+                        jupyter_index
+                            .cell_row(start_location.row.get())
+                            .unwrap_or(1) as usize,
+                    )
+                    .unwrap(),
+                    column: start_location.column,
+                }
+            } else {
+                start_location
+            };
 
             writeln!(
                 writer,

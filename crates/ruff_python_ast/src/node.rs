@@ -75,7 +75,7 @@ pub enum AnyNode {
     ExprList(ExprList<TextRange>),
     ExprTuple(ExprTuple<TextRange>),
     ExprSlice(ExprSlice<TextRange>),
-    ExcepthandlerExceptHandler(ExcepthandlerExceptHandler<TextRange>),
+    ExceptHandlerExceptHandler(ExceptHandlerExceptHandler<TextRange>),
     PatternMatchValue(PatternMatchValue<TextRange>),
     PatternMatchSingleton(PatternMatchSingleton<TextRange>),
     PatternMatchSequence(PatternMatchSequence<TextRange>),
@@ -88,9 +88,10 @@ pub enum AnyNode {
     Comprehension(Comprehension<TextRange>),
     Arguments(Arguments<TextRange>),
     Arg(Arg<TextRange>),
+    ArgWithDefault(ArgWithDefault<TextRange>),
     Keyword(Keyword<TextRange>),
     Alias(Alias<TextRange>),
-    Withitem(Withitem<TextRange>),
+    WithItem(WithItem<TextRange>),
     MatchCase(MatchCase<TextRange>),
     Decorator(Decorator<TextRange>),
 }
@@ -157,7 +158,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -170,9 +171,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -239,7 +241,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -252,9 +254,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -321,7 +324,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -334,9 +337,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -411,22 +415,23 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
     }
 
-    pub fn except_handler(self) -> Option<Excepthandler> {
+    pub fn except_handler(self) -> Option<ExceptHandler> {
         match self {
-            AnyNode::ExcepthandlerExceptHandler(node) => Some(Excepthandler::ExceptHandler(node)),
+            AnyNode::ExceptHandlerExceptHandler(node) => Some(ExceptHandler::ExceptHandler(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModInteractive(_)
@@ -498,9 +503,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -576,13 +582,14 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -672,7 +679,7 @@ impl AnyNode {
             Self::ExprList(node) => AnyNodeRef::ExprList(node),
             Self::ExprTuple(node) => AnyNodeRef::ExprTuple(node),
             Self::ExprSlice(node) => AnyNodeRef::ExprSlice(node),
-            Self::ExcepthandlerExceptHandler(node) => AnyNodeRef::ExcepthandlerExceptHandler(node),
+            Self::ExceptHandlerExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
             Self::PatternMatchValue(node) => AnyNodeRef::PatternMatchValue(node),
             Self::PatternMatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
             Self::PatternMatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
@@ -685,9 +692,10 @@ impl AnyNode {
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
             Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Arg(node) => AnyNodeRef::Arg(node),
+            Self::ArgWithDefault(node) => AnyNodeRef::ArgWithDefault(node),
             Self::Keyword(node) => AnyNodeRef::Keyword(node),
             Self::Alias(node) => AnyNodeRef::Alias(node),
-            Self::Withitem(node) => AnyNodeRef::Withitem(node),
+            Self::WithItem(node) => AnyNodeRef::WithItem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
             Self::Decorator(node) => AnyNodeRef::Decorator(node),
         }
@@ -2323,12 +2331,12 @@ impl AstNode for ExprSlice<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExcepthandlerExceptHandler<TextRange> {
+impl AstNode for ExceptHandlerExceptHandler<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExcepthandlerExceptHandler(node) = kind {
+        if let AnyNode::ExceptHandlerExceptHandler(node) = kind {
             Some(node)
         } else {
             None
@@ -2336,7 +2344,7 @@ impl AstNode for ExcepthandlerExceptHandler<TextRange> {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExcepthandlerExceptHandler(node) = kind {
+        if let AnyNodeRef::ExceptHandlerExceptHandler(node) = kind {
             Some(node)
         } else {
             None
@@ -2688,6 +2696,34 @@ impl AstNode for Arg<TextRange> {
         AnyNode::from(self)
     }
 }
+impl AstNode for ArgWithDefault<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ArgWithDefault(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ArgWithDefault(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for Keyword<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -2744,12 +2780,12 @@ impl AstNode for Alias<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for Withitem<TextRange> {
+impl AstNode for WithItem<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::Withitem(node) = kind {
+        if let AnyNode::WithItem(node) = kind {
             Some(node)
         } else {
             None
@@ -2757,7 +2793,7 @@ impl AstNode for Withitem<TextRange> {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Withitem(node) = kind {
+        if let AnyNodeRef::WithItem(node) = kind {
             Some(node)
         } else {
             None
@@ -2924,10 +2960,10 @@ impl From<Pattern> for AnyNode {
     }
 }
 
-impl From<Excepthandler> for AnyNode {
-    fn from(handler: Excepthandler) -> Self {
+impl From<ExceptHandler> for AnyNode {
+    fn from(handler: ExceptHandler) -> Self {
         match handler {
-            Excepthandler::ExceptHandler(handler) => AnyNode::ExcepthandlerExceptHandler(handler),
+            ExceptHandler::ExceptHandler(handler) => AnyNode::ExceptHandlerExceptHandler(handler),
         }
     }
 }
@@ -3288,9 +3324,9 @@ impl From<ExprSlice> for AnyNode {
     }
 }
 
-impl From<ExcepthandlerExceptHandler> for AnyNode {
-    fn from(node: ExcepthandlerExceptHandler) -> Self {
-        AnyNode::ExcepthandlerExceptHandler(node)
+impl From<ExceptHandlerExceptHandler> for AnyNode {
+    fn from(node: ExceptHandlerExceptHandler) -> Self {
+        AnyNode::ExceptHandlerExceptHandler(node)
     }
 }
 
@@ -3363,6 +3399,11 @@ impl From<Arg> for AnyNode {
         AnyNode::Arg(node)
     }
 }
+impl From<ArgWithDefault> for AnyNode {
+    fn from(node: ArgWithDefault) -> Self {
+        AnyNode::ArgWithDefault(node)
+    }
+}
 impl From<Keyword> for AnyNode {
     fn from(node: Keyword) -> Self {
         AnyNode::Keyword(node)
@@ -3373,9 +3414,9 @@ impl From<Alias> for AnyNode {
         AnyNode::Alias(node)
     }
 }
-impl From<Withitem> for AnyNode {
-    fn from(node: Withitem) -> Self {
-        AnyNode::Withitem(node)
+impl From<WithItem> for AnyNode {
+    fn from(node: WithItem) -> Self {
+        AnyNode::WithItem(node)
     }
 }
 impl From<MatchCase> for AnyNode {
@@ -3450,7 +3491,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprList(node) => node.range(),
             AnyNode::ExprTuple(node) => node.range(),
             AnyNode::ExprSlice(node) => node.range(),
-            AnyNode::ExcepthandlerExceptHandler(node) => node.range(),
+            AnyNode::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNode::PatternMatchValue(node) => node.range(),
             AnyNode::PatternMatchSingleton(node) => node.range(),
             AnyNode::PatternMatchSequence(node) => node.range(),
@@ -3463,9 +3504,10 @@ impl Ranged for AnyNode {
             AnyNode::Comprehension(node) => node.range(),
             AnyNode::Arguments(node) => node.range(),
             AnyNode::Arg(node) => node.range(),
+            AnyNode::ArgWithDefault(node) => node.range(),
             AnyNode::Keyword(node) => node.range(),
             AnyNode::Alias(node) => node.range(),
-            AnyNode::Withitem(node) => node.range(),
+            AnyNode::WithItem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
             AnyNode::Decorator(node) => node.range(),
         }
@@ -3532,7 +3574,7 @@ pub enum AnyNodeRef<'a> {
     ExprList(&'a ExprList<TextRange>),
     ExprTuple(&'a ExprTuple<TextRange>),
     ExprSlice(&'a ExprSlice<TextRange>),
-    ExcepthandlerExceptHandler(&'a ExcepthandlerExceptHandler<TextRange>),
+    ExceptHandlerExceptHandler(&'a ExceptHandlerExceptHandler<TextRange>),
     PatternMatchValue(&'a PatternMatchValue<TextRange>),
     PatternMatchSingleton(&'a PatternMatchSingleton<TextRange>),
     PatternMatchSequence(&'a PatternMatchSequence<TextRange>),
@@ -3545,9 +3587,10 @@ pub enum AnyNodeRef<'a> {
     Comprehension(&'a Comprehension<TextRange>),
     Arguments(&'a Arguments<TextRange>),
     Arg(&'a Arg<TextRange>),
+    ArgWithDefault(&'a ArgWithDefault<TextRange>),
     Keyword(&'a Keyword<TextRange>),
     Alias(&'a Alias<TextRange>),
-    Withitem(&'a Withitem<TextRange>),
+    WithItem(&'a WithItem<TextRange>),
     MatchCase(&'a MatchCase<TextRange>),
     Decorator(&'a Decorator<TextRange>),
 }
@@ -3613,7 +3656,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExcepthandlerExceptHandler(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExceptHandlerExceptHandler(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchValue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSingleton(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSequence(node) => NonNull::from(*node).cast(),
@@ -3626,9 +3669,10 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arg(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ArgWithDefault(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Keyword(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Alias(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::Withitem(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
         }
@@ -3636,7 +3680,7 @@ impl AnyNodeRef<'_> {
 
     /// Compares two any node refs by their pointers (referential equality).
     pub fn ptr_eq(self, other: AnyNodeRef) -> bool {
-        self.as_ptr().eq(&other.as_ptr())
+        self.as_ptr().eq(&other.as_ptr()) && self.kind() == other.kind()
     }
 
     /// Returns the node's [`kind`](NodeKind) that has no data associated and is [`Copy`].
@@ -3700,7 +3744,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(_) => NodeKind::ExprList,
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
-            AnyNodeRef::ExcepthandlerExceptHandler(_) => NodeKind::ExcepthandlerExceptHandler,
+            AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
             AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
             AnyNodeRef::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
@@ -3713,9 +3757,10 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
             AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Arg(_) => NodeKind::Arg,
+            AnyNodeRef::ArgWithDefault(_) => NodeKind::ArgWithDefault,
             AnyNodeRef::Keyword(_) => NodeKind::Keyword,
             AnyNodeRef::Alias(_) => NodeKind::Alias,
-            AnyNodeRef::Withitem(_) => NodeKind::Withitem,
+            AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
             AnyNodeRef::Decorator(_) => NodeKind::Decorator,
         }
@@ -3782,7 +3827,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -3795,9 +3840,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -3864,7 +3910,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -3877,9 +3923,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -3946,7 +3993,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -3959,9 +4006,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -4036,14 +4084,15 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -4051,7 +4100,7 @@ impl AnyNodeRef<'_> {
 
     pub const fn is_except_handler(self) -> bool {
         match self {
-            AnyNodeRef::ExcepthandlerExceptHandler(_) => true,
+            AnyNodeRef::ExceptHandlerExceptHandler(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModInteractive(_)
@@ -4123,9 +4172,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -4201,16 +4251,33 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
+    }
+
+    pub const fn is_node_with_body(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::StmtIf(_)
+                | AnyNodeRef::StmtFor(_)
+                | AnyNodeRef::StmtAsyncFor(_)
+                | AnyNodeRef::StmtWhile(_)
+                | AnyNodeRef::StmtWith(_)
+                | AnyNodeRef::StmtAsyncWith(_)
+                | AnyNodeRef::StmtMatch(_)
+                | AnyNodeRef::StmtFunctionDef(_)
+                | AnyNodeRef::StmtAsyncFunctionDef(_)
+                | AnyNodeRef::StmtClassDef(_)
+        )
     }
 }
 
@@ -4562,9 +4629,9 @@ impl<'a> From<&'a ExprSlice> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ExcepthandlerExceptHandler> for AnyNodeRef<'a> {
-    fn from(node: &'a ExcepthandlerExceptHandler) -> Self {
-        AnyNodeRef::ExcepthandlerExceptHandler(node)
+impl<'a> From<&'a ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
+    fn from(node: &'a ExceptHandlerExceptHandler) -> Self {
+        AnyNodeRef::ExceptHandlerExceptHandler(node)
     }
 }
 
@@ -4722,11 +4789,11 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a Excepthandler> for AnyNodeRef<'a> {
-    fn from(handler: &'a Excepthandler) -> Self {
+impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
+    fn from(handler: &'a ExceptHandler) -> Self {
         match handler {
-            Excepthandler::ExceptHandler(handler) => {
-                AnyNodeRef::ExcepthandlerExceptHandler(handler)
+            ExceptHandler::ExceptHandler(handler) => {
+                AnyNodeRef::ExceptHandlerExceptHandler(handler)
             }
         }
     }
@@ -4755,6 +4822,11 @@ impl<'a> From<&'a Arg> for AnyNodeRef<'a> {
         AnyNodeRef::Arg(node)
     }
 }
+impl<'a> From<&'a ArgWithDefault> for AnyNodeRef<'a> {
+    fn from(node: &'a ArgWithDefault) -> Self {
+        AnyNodeRef::ArgWithDefault(node)
+    }
+}
 impl<'a> From<&'a Keyword> for AnyNodeRef<'a> {
     fn from(node: &'a Keyword) -> Self {
         AnyNodeRef::Keyword(node)
@@ -4765,9 +4837,9 @@ impl<'a> From<&'a Alias> for AnyNodeRef<'a> {
         AnyNodeRef::Alias(node)
     }
 }
-impl<'a> From<&'a Withitem> for AnyNodeRef<'a> {
-    fn from(node: &'a Withitem) -> Self {
-        AnyNodeRef::Withitem(node)
+impl<'a> From<&'a WithItem> for AnyNodeRef<'a> {
+    fn from(node: &'a WithItem) -> Self {
+        AnyNodeRef::WithItem(node)
     }
 }
 impl<'a> From<&'a MatchCase> for AnyNodeRef<'a> {
@@ -4837,7 +4909,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => node.range(),
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
-            AnyNodeRef::ExcepthandlerExceptHandler(node) => node.range(),
+            AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::PatternMatchValue(node) => node.range(),
             AnyNodeRef::PatternMatchSingleton(node) => node.range(),
             AnyNodeRef::PatternMatchSequence(node) => node.range(),
@@ -4850,9 +4922,10 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::Comprehension(node) => node.range(),
             AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Arg(node) => node.range(),
+            AnyNodeRef::ArgWithDefault(node) => node.range(),
             AnyNodeRef::Keyword(node) => node.range(),
             AnyNodeRef::Alias(node) => node.range(),
-            AnyNodeRef::Withitem(node) => node.range(),
+            AnyNodeRef::WithItem(node) => node.range(),
             AnyNodeRef::MatchCase(node) => node.range(),
             AnyNodeRef::Decorator(node) => node.range(),
         }
@@ -4919,7 +4992,7 @@ pub enum NodeKind {
     ExprList,
     ExprTuple,
     ExprSlice,
-    ExcepthandlerExceptHandler,
+    ExceptHandlerExceptHandler,
     PatternMatchValue,
     PatternMatchSingleton,
     PatternMatchSequence,
@@ -4932,9 +5005,10 @@ pub enum NodeKind {
     Comprehension,
     Arguments,
     Arg,
+    ArgWithDefault,
     Keyword,
     Alias,
-    Withitem,
+    WithItem,
     MatchCase,
     Decorator,
 }

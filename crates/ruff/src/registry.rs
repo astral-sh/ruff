@@ -191,6 +191,9 @@ pub enum Linter {
     /// [Airflow](https://pypi.org/project/apache-airflow/)
     #[prefix = "AIR"]
     Airflow,
+    /// [Perflint](https://pypi.org/project/perflint/)
+    #[prefix = "PERF"]
+    Perflint,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
@@ -343,6 +346,13 @@ impl Rule {
             | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
             _ => LintSource::Ast,
         }
+    }
+
+    /// Return the URL for the rule documentation, if it exists.
+    pub fn url(&self) -> Option<String> {
+        self.explanation()
+            .is_some()
+            .then(|| format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.as_ref()))
     }
 }
 

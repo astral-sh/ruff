@@ -276,45 +276,10 @@ last_call()
  Name
  None
  True
-@@ -7,294 +8,236 @@
- 1
- 1.0
- 1j
--True or False
--True or False or None
--True and False
--True and False and None
--(Name1 and Name2) or Name3
--Name1 and Name2 or Name3
--Name1 or (Name2 and Name3)
--Name1 or Name2 and Name3
--(Name1 and Name2) or (Name3 and Name4)
--Name1 and Name2 or Name3 and Name4
--Name1 or (Name2 and Name3) or Name4
--Name1 or Name2 and Name3 or Name4
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
- v1 << 2
- 1 >> v2
- 1 % finished
- 1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
- ((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
--not great
--~great
--+value
---1
--~int and not v1 ^ 123 + v2 | True
--(~int) and (not ((v1 ^ (123 + v2)) | True))
+@@ -30,98 +31,90 @@
+ -1
+ ~int and not v1 ^ 123 + v2 | True
+ (~int) and (not ((v1 ^ (123 + v2)) | True))
 -+(really ** -(confusing ** ~(operator**-precedence)))
 -flags & ~select.EPOLLIN and waiters.write_task is not None
 -lambda arg: None
@@ -339,19 +304,8 @@ last_call()
 -)
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
--{**a, **b, **c}
--{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
--({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
--()
--(1,)
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+++really ** -confusing ** ~operator**-precedence
++flags & ~select.EPOLLIN and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +lambda x: True
 +lambda x: True
 +lambda x: True
@@ -365,9 +319,18 @@ last_call()
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 +NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 +(NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++{
++    "NOT_YET_IMPLEMENTED_STRING": dead,
++    "NOT_YET_IMPLEMENTED_STRING": (long_live or die_hard),
++}
++{
++    "NOT_YET_IMPLEMENTED_STRING": dead,
++    "NOT_YET_IMPLEMENTED_STRING": (long_live or die_hard),
++    **{"NOT_YET_IMPLEMENTED_STRING": verygood},
++}
+ {**a, **b, **c}
+-{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
+-({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 +{
 +    "NOT_YET_IMPLEMENTED_STRING",
 +    "NOT_YET_IMPLEMENTED_STRING",
@@ -376,44 +339,42 @@ last_call()
 +    "NOT_YET_IMPLEMENTED_STRING",
 +    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 +}
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+(1, 2)
-+(1, 2)
-+(1, 2)
++(
++    {"NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING"},
++    (True or False),
++    (+value),
++    "NOT_YET_IMPLEMENTED_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++) or None
+ ()
+ (1,)
  (1, 2)
--(1, 2, 3)
+ (1, 2, 3)
  []
--[1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
- [
-     1,
-     2,
-     3,
+ [1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
+-[
+-    1,
+-    2,
+-    3,
 -]
 -[*a]
 -[*range(10)]
 -[
 -    *a,
-     4,
-     5,
--]
--[
 -    4,
--    *a,
 -    5,
-+    6,
-+    7,
-+    8,
-+    9,
-+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
-+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
-+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
- ]
+-]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
 +[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
  [
+-    4,
+-    *a,
+-    5,
+-]
+-[
      this_is_a_very_long_variable_which_will_force_a_delimiter_split,
      element,
      another,
@@ -432,83 +393,10 @@ last_call()
 -{i: j for i, j in ((1, "a"), (2, "b"), (3, "c"))}
 -{a: b * 2 for a, b in dictionary.items()}
 -{a: b * -2 for a, b in dictionary.items()}
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+[i for i in []]
-+[i for i in []]
-+[i for i in []]
-+[i for i in []]
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()  # note: no trailing comma pre-3.6
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-+NOT_IMPLEMENTED_call()
-+1 .NOT_IMPLEMENTED_attr
-+1.0 .NOT_IMPLEMENTED_attr
-+....NOT_IMPLEMENTED_attr
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
- {
+-{
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
- }
+-}
 -Python3 > Python2 > COBOL
 -Life is Life
 -call()
@@ -527,33 +415,51 @@ last_call()
 -call(a, *gidgets[:2])
 -call(**self.screen_kwargs)
 -call(b, **self.screen_kwargs)
--lukasz.langa.pl
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++[i for i in []]
++[i for i in []]
++[i for i in []]
++[i for i in []]
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # note: no trailing comma pre-3.6
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ lukasz.langa.pl
 -call.me(maybe)
--(1).real
--(1.0).real
--....__class__
--list[str]
--dict[str, int]
--tuple[str, ...]
--tuple[str, int, float, dict[str, int]]
--tuple[
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ (1).real
+ (1.0).real
+ ....__class__
+@@ -130,34 +123,28 @@
+ tuple[str, ...]
+ tuple[str, int, float, dict[str, int]]
+ tuple[
 -    str,
 -    int,
 -    float,
 -    dict[str, int],
-+[
-+    1,
-+    2,
-+    3,
-+    4,
-+    5,
-+    6,
-+    7,
-+    8,
-+    9,
-+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
-+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
-+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
++    (
++        str,
++        int,
++        float,
++        dict[str, int],
++    )
  ]
 -very_long_variable_name_filters: t.List[
 -    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
@@ -567,84 +473,101 @@ last_call()
 -xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)  # type: ignore
--slice[0]
--slice[0:1]
--slice[0:1:2]
--slice[:]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
+ slice[0]
+ slice[0:1]
+ slice[0:1:2]
+ slice[:]
 -slice[:-1]
--slice[1:]
++slice[ : -1]
+ slice[1:]
 -slice[::-1]
--slice[d :: d + 1]
--slice[:c, c - 1]
--numpy[:, 0:1]
++slice[ :: -1]
+ slice[d :: d + 1]
+ slice[:c, c - 1]
+ numpy[:, 0:1]
 -numpy[:, :-1]
--numpy[0, :]
--numpy[:, i]
--numpy[0, :2]
--numpy[:N, 0]
--numpy[:2, :4]
--numpy[2:4, 1:5]
--numpy[4:, 2:]
--numpy[:, (0, 1, 2, 5)]
--numpy[0, [0]]
--numpy[:, [i]]
--numpy[1 : c + 1, c]
--numpy[-(c + 1) :, d]
--numpy[:, l[-2]]
++numpy[:,  : -1]
+ numpy[0, :]
+ numpy[:, i]
+ numpy[0, :2]
+@@ -171,62 +158,59 @@
+ numpy[1 : c + 1, c]
+ numpy[-(c + 1) :, d]
+ numpy[:, l[-2]]
 -numpy[:, ::-1]
--numpy[np.newaxis, :]
++numpy[:,  :: -1]
+ numpy[np.newaxis, :]
 -(str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
 -{"2.7": dead, "3.7": long_live or die_hard}
 -{"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
--[1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
++NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++{
++    "NOT_YET_IMPLEMENTED_STRING": dead,
++    "NOT_YET_IMPLEMENTED_STRING": long_live or die_hard,
++}
++{
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++}
+ [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
  (SomeName)
  SomeName
--(Good, Bad, Ugly)
+ (Good, Bad, Ugly)
 -(i for i in (1, 2, 3))
 -((i**2) for i in (1, 2, 3))
 -((i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c")))
 -(((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3))
 -(*starred,)
--{
++(i for i in [])
++(i for i in [])
++(i for i in [])
++(i for i in [])
++(NOT_YET_IMPLEMENTED_ExprStarred,)
+ {
 -    "id": "1",
 -    "type": "type",
 -    "started_at": now(),
 -    "ended_at": now() + timedelta(days=10),
 -    "priority": 1,
 -    "import_session_id": 1,
--    **kwargs,
--}
--a = (1,)
--b = (1,)
-+(1, 2)
-+(i for i in [])
-+(i for i in [])
-+(i for i in [])
-+(i for i in [])
-+(1, 2)
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+a = (1, 2)
-+b = (1, 2)
++    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
++    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
++    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    "NOT_YET_IMPLEMENTED_STRING": 1,
++    "NOT_YET_IMPLEMENTED_STRING": 1,
+     **kwargs,
+ }
+ a = (1,)
+ b = (1,)
  c = 1
--d = (1,) + a + (2,)
+ d = (1,) + a + (2,)
 -e = (1,).count(1)
 -f = 1, *range(10)
 -g = 1, *"ten"
 -what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
 -    vars_to_remove
-+d = (1, 2) + a + (1, 2)
-+e = NOT_IMPLEMENTED_call()
-+f = (1, 2)
-+g = (1, 2)
++e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++f = 1, NOT_YET_IMPLEMENTED_ExprStarred
++g = 1, NOT_YET_IMPLEMENTED_ExprStarred
 +what_is_up_with_those_new_coord_names = (
-+    (coord_names + NOT_IMPLEMENTED_call())
-+    + NOT_IMPLEMENTED_call()
++    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  )
 -what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
 -    vars_to_remove
 +what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call())
-+    - NOT_IMPLEMENTED_call()
++    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  )
 -result = (
 -    session.query(models.Customer.id)
@@ -666,17 +589,14 @@ last_call()
 -)
 -Ø = set()
 -authors.łukasz.say_thanks()
--mapping = {
--    A: 0.25 * (10.0 / 12),
--    B: 0.1 * (10.0 / 12),
--    C: 0.1 * (10.0 / 12),
--    D: 0.1 * (10.0 / 12),
--}
 +result = NOT_IMPLEMENTED_call()
 +result = NOT_IMPLEMENTED_call()
 +Ø = NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
-+mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+ mapping = {
+     A: 0.25 * (10.0 / 12),
+     B: 0.1 * (10.0 / 12),
+@@ -236,31 +220,29 @@
  
  
  def gen():
@@ -692,7 +612,7 @@ last_call()
  
  async def f():
 -    await some.complicated[0].call(with_args=(True or (1 is not 1)))
-+    await NOT_IMPLEMENTED_call()
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -print(*[] or [1])
@@ -703,38 +623,31 @@ last_call()
 -    force=False
 -), "Short message"
 -assert parens is TooMany
--for (x,) in (1,), (2,), (3,):
--    ...
--for y in ():
--    ...
--for z in (i for i in (1, 2, 3)):
--    ...
--for i in call():
--    ...
--for j in 1 + (2 + 3):
--    ...
--while this and that:
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+ for (x,) in (1,), (2,), (3,):
      ...
--for (
--    addr_family,
--    addr_type,
--    addr_proto,
--    addr_canonname,
--    addr_sockaddr,
+ for y in ():
+     ...
+-for z in (i for i in (1, 2, 3)):
++for z in (i for i in []):
+     ...
+-for i in call():
++for i in NOT_IMPLEMENTED_call():
+     ...
+ for j in 1 + (2 + 3):
+     ...
+@@ -272,28 +254,16 @@
+     addr_proto,
+     addr_canonname,
+     addr_sockaddr,
 -) in socket.getaddrinfo("google.com", "http"):
--    pass
++) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+     pass
 -a = (
 -    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
 -    in qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
@@ -751,84 +664,54 @@ last_call()
 -    aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
 -    is not qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
 -)
--if (
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+ if (
 -    threading.current_thread() != threading.main_thread()
 -    and threading.current_thread() != threading.main_thread()
 -    or signal.getsignal(signal.SIGINT) != signal.default_int_handler
--):
-+NOT_YET_IMPLEMENTED_StmtFor
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+ ):
      return True
  if (
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-@@ -327,24 +270,44 @@
+@@ -327,13 +297,18 @@
  ):
      return True
  if (
 -    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
--    | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
-+    NOT_YET_IMPLEMENTED_ExprUnaryOp
-+    + aaaa.NOT_IMPLEMENTED_attr
-+    - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
-+    | aaaa.NOT_IMPLEMENTED_attr
-+    & aaaa.NOT_IMPLEMENTED_attr % aaaa.NOT_IMPLEMENTED_attr
-+    ^ aaaa.NOT_IMPLEMENTED_attr
-+    << aaaa.NOT_IMPLEMENTED_attr
-+    >> aaaa.NOT_IMPLEMENTED_attr**aaaa.NOT_IMPLEMENTED_attr // aaaa.NOT_IMPLEMENTED_attr
++    ~aaaa.a
++    + aaaa.b
++    - aaaa.c * aaaa.d / aaaa.e
+     | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
  ):
      return True
  if (
 -    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
 -    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
--    ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
-+    NOT_YET_IMPLEMENTED_ExprUnaryOp
-+    + aaaaaaaa.NOT_IMPLEMENTED_attr
-+    - aaaaaaaa.NOT_IMPLEMENTED_attr
-+    @ aaaaaaaa.NOT_IMPLEMENTED_attr
-+    / aaaaaaaa.NOT_IMPLEMENTED_attr
-+    | aaaaaaaa.NOT_IMPLEMENTED_attr
-+    & aaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaa.NOT_IMPLEMENTED_attr
-+    ^ aaaaaaaa.NOT_IMPLEMENTED_attr
-+    << aaaaaaaa.NOT_IMPLEMENTED_attr
-+    >> aaaaaaaa.NOT_IMPLEMENTED_attr
-+    **aaaaaaaa.NOT_IMPLEMENTED_attr
-+    // aaaaaaaa.NOT_IMPLEMENTED_attr
++    ~aaaaaaaa.a
++    + aaaaaaaa.b
++    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
++    | aaaaaaaa.f
++    & aaaaaaaa.g % aaaaaaaa.h
+     ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
- if (
--    ~aaaaaaaaaaaaaaaa.a
--    + aaaaaaaaaaaaaaaa.b
--    - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
+@@ -341,7 +316,8 @@
+     ~aaaaaaaaaaaaaaaa.a
+     + aaaaaaaaaaaaaaaa.b
+     - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
 -    | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
--    ^ aaaaaaaaaaaaaaaa.i
--    << aaaaaaaaaaaaaaaa.k
--    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
-+    NOT_YET_IMPLEMENTED_ExprUnaryOp
-+    + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    @ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    | aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    & aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    ^ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    << aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    >> aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    **aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-+    // aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
- ):
-     return True
- (
-@@ -363,8 +326,9 @@
- bbbb >> bbbb * bbbb
- (
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-+    ^ bbbb.NOT_IMPLEMENTED_attr
-+    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
++    | aaaaaaaaaaaaaaaa.f
++    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
+     ^ aaaaaaaaaaaaaaaa.i
+     << aaaaaaaaaaaaaaaa.k
+     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
+@@ -366,5 +342,5 @@
+     ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
      ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  )
 -last_call()
@@ -849,31 +732,31 @@ False
 1
 1.0
 1j
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+True or False
+True or False or None
+True and False
+True and False and None
+(Name1 and Name2) or Name3
+Name1 and Name2 or Name3
+Name1 or (Name2 and Name3)
+Name1 or Name2 and Name3
+(Name1 and Name2) or (Name3 and Name4)
+Name1 and Name2 or Name3 and Name4
+Name1 or (Name2 and Name3) or Name4
+Name1 or Name2 and Name3 or Name4
 v1 << 2
 1 >> v2
 1 % finished
 1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
 ((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+not great
+~great
++value
+-1
+~int and not v1 ^ 123 + v2 | True
+(~int) and (not ((v1 ^ (123 + v2)) | True))
++really ** -confusing ** ~operator**-precedence
+flags & ~select.EPOLLIN and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 lambda x: True
 lambda x: True
 lambda x: True
@@ -887,9 +770,16 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    "NOT_YET_IMPLEMENTED_STRING": dead,
+    "NOT_YET_IMPLEMENTED_STRING": (long_live or die_hard),
+}
+{
+    "NOT_YET_IMPLEMENTED_STRING": dead,
+    "NOT_YET_IMPLEMENTED_STRING": (long_live or die_hard),
+    **{"NOT_YET_IMPLEMENTED_STRING": verygood},
+}
+{**a, **b, **c}
 {
     "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING",
@@ -898,26 +788,19 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
     "NOT_YET_IMPLEMENTED_STRING",
     (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 }
-NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+(
+    {"NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING"},
+    (True or False),
+    (+value),
+    "NOT_YET_IMPLEMENTED_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+) or None
+()
+(1,)
 (1, 2)
-(1, 2)
-(1, 2)
-(1, 2)
+(1, 2, 3)
 []
-[
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
-    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
-    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
-]
+[1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
 [1, 2, 3]
 [NOT_YET_IMPLEMENTED_ExprStarred]
 [NOT_YET_IMPLEMENTED_ExprStarred]
@@ -945,57 +828,67 @@ NOT_YET_IMPLEMENTED_ExprSetComp
 NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()  # note: no trailing comma pre-3.6
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-NOT_IMPLEMENTED_call()
-1 .NOT_IMPLEMENTED_attr
-1.0 .NOT_IMPLEMENTED_attr
-....NOT_IMPLEMENTED_attr
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # note: no trailing comma pre-3.6
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+lukasz.langa.pl
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+(1).real
+(1.0).real
+....__class__
+list[str]
+dict[str, int]
+tuple[str, ...]
+tuple[str, int, float, dict[str, int]]
+tuple[
+    (
+        str,
+        int,
+        float,
+        dict[str, int],
+    )
+]
 NOT_YET_IMPLEMENTED_StmtAnnAssign
 NOT_YET_IMPLEMENTED_StmtAnnAssign
 NOT_YET_IMPLEMENTED_StmtAnnAssign
 NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+slice[0]
+slice[0:1]
+slice[0:1:2]
+slice[:]
+slice[ : -1]
+slice[1:]
+slice[ :: -1]
+slice[d :: d + 1]
+slice[:c, c - 1]
+numpy[:, 0:1]
+numpy[:,  : -1]
+numpy[0, :]
+numpy[:, i]
+numpy[0, :2]
+numpy[:N, 0]
+numpy[:2, :4]
+numpy[2:4, 1:5]
+numpy[4:, 2:]
+numpy[:, (0, 1, 2, 5)]
+numpy[0, [0]]
+numpy[:, [i]]
+numpy[1 : c + 1, c]
+numpy[-(c + 1) :, d]
+numpy[:, l[-2]]
+numpy[:,  :: -1]
+numpy[np.newaxis, :]
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    "NOT_YET_IMPLEMENTED_STRING": dead,
+    "NOT_YET_IMPLEMENTED_STRING": long_live or die_hard,
+}
 {
     "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING",
@@ -1004,49 +897,50 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
     "NOT_YET_IMPLEMENTED_STRING",
     NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 }
-[
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
-    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
-    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
-]
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
 (SomeName)
 SomeName
-(1, 2)
+(Good, Bad, Ugly)
 (i for i in [])
 (i for i in [])
 (i for i in [])
 (i for i in [])
-(1, 2)
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-a = (1, 2)
-b = (1, 2)
+(NOT_YET_IMPLEMENTED_ExprStarred,)
+{
+    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call(),
+    "NOT_YET_IMPLEMENTED_STRING": NOT_IMPLEMENTED_call()
+    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "NOT_YET_IMPLEMENTED_STRING": 1,
+    "NOT_YET_IMPLEMENTED_STRING": 1,
+    **kwargs,
+}
+a = (1,)
+b = (1,)
 c = 1
-d = (1, 2) + a + (1, 2)
-e = NOT_IMPLEMENTED_call()
-f = (1, 2)
-g = (1, 2)
+d = (1,) + a + (2,)
+e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+f = 1, NOT_YET_IMPLEMENTED_ExprStarred
+g = 1, NOT_YET_IMPLEMENTED_ExprStarred
 what_is_up_with_those_new_coord_names = (
-    (coord_names + NOT_IMPLEMENTED_call())
-    + NOT_IMPLEMENTED_call()
+    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 )
 what_is_up_with_those_new_coord_names = (
-    (coord_names | NOT_IMPLEMENTED_call())
-    - NOT_IMPLEMENTED_call()
+    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 )
 result = NOT_IMPLEMENTED_call()
 result = NOT_IMPLEMENTED_call()
 Ø = NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
-mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+mapping = {
+    A: 0.25 * (10.0 / 12),
+    B: 0.1 * (10.0 / 12),
+    C: 0.1 * (10.0 / 12),
+    D: 0.1 * (10.0 / 12),
+}
 
 
 def gen():
@@ -1057,28 +951,44 @@ def gen():
 
 
 async def f():
-    await NOT_IMPLEMENTED_call()
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
-NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtFor
-while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+for (x,) in (1,), (2,), (3,):
     ...
-NOT_YET_IMPLEMENTED_StmtFor
+for y in ():
+    ...
+for z in (i for i in []):
+    ...
+for i in NOT_IMPLEMENTED_call():
+    ...
+for j in 1 + (2 + 3):
+    ...
+while this and that:
+    ...
+for (
+    addr_family,
+    addr_type,
+    addr_proto,
+    addr_canonname,
+    addr_sockaddr,
+) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+    pass
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+if (
+    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    or NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+):
     return True
 if (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -1111,44 +1021,30 @@ if (
 ):
     return True
 if (
-    NOT_YET_IMPLEMENTED_ExprUnaryOp
-    + aaaa.NOT_IMPLEMENTED_attr
-    - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
-    | aaaa.NOT_IMPLEMENTED_attr
-    & aaaa.NOT_IMPLEMENTED_attr % aaaa.NOT_IMPLEMENTED_attr
-    ^ aaaa.NOT_IMPLEMENTED_attr
-    << aaaa.NOT_IMPLEMENTED_attr
-    >> aaaa.NOT_IMPLEMENTED_attr**aaaa.NOT_IMPLEMENTED_attr // aaaa.NOT_IMPLEMENTED_attr
+    ~aaaa.a
+    + aaaa.b
+    - aaaa.c * aaaa.d / aaaa.e
+    | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
 ):
     return True
 if (
-    NOT_YET_IMPLEMENTED_ExprUnaryOp
-    + aaaaaaaa.NOT_IMPLEMENTED_attr
-    - aaaaaaaa.NOT_IMPLEMENTED_attr
-    @ aaaaaaaa.NOT_IMPLEMENTED_attr
-    / aaaaaaaa.NOT_IMPLEMENTED_attr
-    | aaaaaaaa.NOT_IMPLEMENTED_attr
-    & aaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaa.NOT_IMPLEMENTED_attr
-    ^ aaaaaaaa.NOT_IMPLEMENTED_attr
-    << aaaaaaaa.NOT_IMPLEMENTED_attr
-    >> aaaaaaaa.NOT_IMPLEMENTED_attr
-    **aaaaaaaa.NOT_IMPLEMENTED_attr
-    // aaaaaaaa.NOT_IMPLEMENTED_attr
+    ~aaaaaaaa.a
+    + aaaaaaaa.b
+    - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
+    | aaaaaaaa.f
+    & aaaaaaaa.g % aaaaaaaa.h
+    ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
 ):
     return True
 if (
-    NOT_YET_IMPLEMENTED_ExprUnaryOp
-    + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    @ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    | aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    & aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    ^ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    << aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    >> aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    **aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
-    // aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    ~aaaaaaaaaaaaaaaa.a
+    + aaaaaaaaaaaaaaaa.b
+    - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
+    | aaaaaaaaaaaaaaaa.f
+    & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h
+    ^ aaaaaaaaaaaaaaaa.i
+    << aaaaaaaaaaaaaaaa.k
+    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 ):
     return True
 (
@@ -1167,8 +1063,7 @@ aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
 bbbb >> bbbb * bbbb
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    ^ bbbb.NOT_IMPLEMENTED_attr
-    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 )
 NOT_IMPLEMENTED_call()

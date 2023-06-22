@@ -2,19 +2,20 @@ use std::fmt;
 
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::collect_arg_names;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::prelude::Decorator;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{helpers, visitor};
 use ruff_python_semantic::analyze::visibility::is_abstract;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
@@ -233,7 +234,7 @@ where
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
                 if collect_call_path(func).map_or(false, |call_path| {
-                    call_path.as_slice() == ["request", "addfinalizer"]
+                    matches!(call_path.as_slice(), ["request", "addfinalizer"])
                 }) {
                     self.addfinalizer_call = Some(expr);
                 };
@@ -245,11 +246,11 @@ where
 }
 
 fn get_fixture_decorator<'a>(
-    model: &SemanticModel,
     decorators: &'a [Decorator],
+    semantic: &SemanticModel,
 ) -> Option<&'a Decorator> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(model, decorator) || is_pytest_yield_fixture(model, decorator)
+        is_pytest_fixture(decorator, semantic) || is_pytest_yield_fixture(decorator, semantic)
     })
 }
 
@@ -378,7 +379,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestIncorrectFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            helpers::identifier_range(stmt, checker.locator),
+            stmt.identifier(),
         ));
     } else if checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
         && !visitor.has_return_with_value
@@ -389,7 +390,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestMissingFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            helpers::identifier_range(stmt, checker.locator),
+            stmt.identifier(),
         ));
     }
 
@@ -420,23 +421,34 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
 }
 
 /// PT019
-fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
-    args.args.iter().chain(&args.kwonlyargs).for_each(|arg| {
-        let name = &arg.arg;
-        if name.starts_with('_') {
-            checker.diagnostics.push(Diagnostic::new(
-                PytestFixtureParamWithoutValue {
-                    name: name.to_string(),
-                },
-                arg.range(),
-            ));
-        }
-    });
+fn check_test_function_args(checker: &mut Checker, arguments: &Arguments) {
+    arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+        .for_each(
+            |ArgWithDefault {
+                 def,
+                 default: _,
+                 range: _,
+             }| {
+                let name = &def.arg;
+                if name.starts_with('_') {
+                    checker.diagnostics.push(Diagnostic::new(
+                        PytestFixtureParamWithoutValue {
+                            name: name.to_string(),
+                        },
+                        def.range(),
+                    ));
+                }
+            },
+        );
 }
 
 /// PT020
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
-    if is_pytest_yield_fixture(checker.semantic_model(), decorator) {
+    if is_pytest_yield_fixture(decorator, checker.semantic()) {
         checker.diagnostics.push(Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
@@ -504,7 +516,7 @@ pub(crate) fn fixture(
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
-    let decorator = get_fixture_decorator(checker.semantic_model(), decorators);
+    let decorator = get_fixture_decorator(decorators, checker.semantic());
     if let Some(decorator) = decorator {
         if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
             || checker.enabled(Rule::PytestFixturePositionalArgs)
@@ -522,7 +534,7 @@ pub(crate) fn fixture(
         if (checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
             || checker.enabled(Rule::PytestIncorrectFixtureNameUnderscore)
             || checker.enabled(Rule::PytestUselessYieldFixture))
-            && !is_abstract(checker.semantic_model(), decorators)
+            && !is_abstract(decorators, checker.semantic())
         {
             check_fixture_returns(checker, stmt, name, body);
         }

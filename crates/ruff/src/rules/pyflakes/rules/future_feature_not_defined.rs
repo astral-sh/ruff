@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// a `SyntaxError`.
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/__future__.html)
+/// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html)
 #[violation]
 pub struct FutureFeatureNotDefined {
     name: String,

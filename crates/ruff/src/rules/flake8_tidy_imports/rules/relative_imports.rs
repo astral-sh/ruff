@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Int, Ranged, Stmt};
+use rustpython_parser::ast::{self, Identifier, Int, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -31,9 +31,6 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// > from .sibling import example
 /// > ```
 ///
-/// ## Options
-/// - `flake8-tidy-imports.ban-relative-imports`
-///
 /// ## Example
 /// ```python
 /// from .. import foo
@@ -43,6 +40,9 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// ```python
 /// from mypkg import foo
 /// ```
+///
+/// ## Options
+/// - `flake8-tidy-imports.ban-relative-imports`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
@@ -94,14 +94,16 @@ fn fix_banned_relative_import(
         panic!("Expected Stmt::ImportFrom");
     };
     let node = ast::StmtImportFrom {
-        module: Some(module_path.to_string().into()),
+        module: Some(Identifier::new(
+            module_path.to_string(),
+            TextRange::default(),
+        )),
         names: names.clone(),
         level: Some(Int::new(0)),
         range: TextRange::default(),
     };
     let content = generator.stmt(&node.into());
-    #[allow(deprecated)]
-    Some(Fix::unspecified(Edit::range_replacement(
+    Some(Fix::suggested(Edit::range_replacement(
         content,
         stmt.range(),
     )))

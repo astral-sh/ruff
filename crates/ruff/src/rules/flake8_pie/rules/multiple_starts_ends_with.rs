@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 
 use ruff_text_size::TextRange;
 
-use rustpython_parser::ast::{self, Boolop, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, BoolOp, Expr, ExprContext, Identifier, Ranged};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -38,8 +38,8 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.startswith)
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.endswith)
+/// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
+/// - [Python documentation: `str.endswith`](https://docs.python.org/3/library/stdtypes.html#str.endswith)
 #[violation]
 pub struct MultipleStartsEndsWith {
     attr: String,
@@ -60,7 +60,7 @@ impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
 
 /// PIE810
 pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ }) = expr else {
         return;
     };
 
@@ -140,7 +140,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
                 let node2 = Expr::Attribute(ast::ExprAttribute {
                     value: Box::new(node1),
-                    attr: attr_name.into(),
+                    attr: Identifier::new(attr_name.to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 });
@@ -155,7 +155,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 // Generate the combined `BoolOp`.
                 let mut call = Some(call);
                 let node = Expr::BoolOp(ast::ExprBoolOp {
-                    op: Boolop::Or,
+                    op: BoolOp::Or,
                     values: values
                         .iter()
                         .enumerate()

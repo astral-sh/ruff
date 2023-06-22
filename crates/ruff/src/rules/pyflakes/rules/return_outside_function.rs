@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::scope::ScopeKind;
+use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
@@ -33,7 +33,7 @@ impl Violation for ReturnOutsideFunction {
 
 pub(crate) fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
     if matches!(
-        checker.semantic_model().scope().kind,
+        checker.semantic().scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         checker

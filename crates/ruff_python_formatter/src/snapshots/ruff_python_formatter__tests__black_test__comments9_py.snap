@@ -152,65 +152,43 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -30,8 +30,7 @@
+@@ -44,7 +44,7 @@
  
  
- # This comment should be split from the statement above by two lines.
--class MyClass:
--    pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
- 
- some = statement
-@@ -39,17 +38,14 @@
- 
- 
- # This should be split from the above by two lines
--class MyClassWithComplexLeadingComments:
--    pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
- 
--class ClassWithDocstring:
+ class ClassWithDocstring:
 -    """A docstring."""
-+NOT_YET_IMPLEMENTED_StmtClassDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
  # Leading comment after a class with just a docstring
--class MyClassAfterAnotherClassWithDocstring:
--    pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
- 
- some = statement
-@@ -59,7 +55,7 @@
+@@ -59,7 +59,7 @@
  @deco1
  # leading 2
  # leading 2 extra
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # leading 3
  @deco3
  # leading 4
-@@ -73,7 +69,7 @@
+@@ -73,7 +73,7 @@
  # leading 1
  @deco1
  # leading 2
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  # leading 3 that already has an empty line
  @deco3
-@@ -88,7 +84,7 @@
+@@ -88,7 +88,7 @@
  # leading 1
  @deco1
  # leading 2
 -@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # leading 3
  @deco3
  
-@@ -106,7 +102,6 @@
+@@ -106,7 +106,6 @@
          # Another leading comment
          def another_inline():
              pass
@@ -218,7 +196,7 @@ def bar():
      else:
          # More leading comments
          def inline_after_else():
-@@ -121,18 +116,13 @@
+@@ -121,7 +120,6 @@
      # Another leading comment
      def another_top_level_quote_inline_inline():
          pass
@@ -226,18 +204,6 @@ def bar():
  else:
      # More leading comments
      def top_level_quote_inline_after_else():
-         pass
- 
- 
--class MyClass:
--    # First method has no empty lines between bare class def.
--    # More comments.
--    def first_method(self):
--        pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
- 
- # Regression test for https://github.com/psf/black/issues/3454.
 ```
 
 ## Ruff Output
@@ -275,7 +241,8 @@ some = statement
 
 
 # This comment should be split from the statement above by two lines.
-NOT_YET_IMPLEMENTED_StmtClassDef
+class MyClass:
+    pass
 
 
 some = statement
@@ -283,14 +250,17 @@ some = statement
 
 
 # This should be split from the above by two lines
-NOT_YET_IMPLEMENTED_StmtClassDef
+class MyClassWithComplexLeadingComments:
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class ClassWithDocstring:
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
 # Leading comment after a class with just a docstring
-NOT_YET_IMPLEMENTED_StmtClassDef
+class MyClassAfterAnotherClassWithDocstring:
+    pass
 
 
 some = statement
@@ -300,7 +270,7 @@ some = statement
 @deco1
 # leading 2
 # leading 2 extra
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # leading 3
 @deco3
 # leading 4
@@ -314,7 +284,7 @@ some = statement
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 # leading 3 that already has an empty line
 @deco3
@@ -329,7 +299,7 @@ some = statement
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # leading 3
 @deco3
 
@@ -367,7 +337,11 @@ else:
         pass
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class MyClass:
+    # First method has no empty lines between bare class def.
+    # More comments.
+    def first_method(self):
+        pass
 
 
 # Regression test for https://github.com/psf/black/issues/3454.

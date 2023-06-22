@@ -2,10 +2,34 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for docstrings that are written via f-strings.
+///
+/// ## Why is this bad?
+/// Python will interpret the f-string as a joined string, rather than as a
+/// docstring. As such, the "docstring" will not be accessible via the
+/// `__doc__` attribute, nor will it be picked up by any automated
+/// documentation tooling.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     f"""Not a docstring."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     """A docstring."""
+/// ```
+///
+/// ## References
+/// - [PEP 257](https://peps.python.org/pep-0257/)
+/// - [Python documentation: Formatted string literals](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct FStringDocstring;
 
@@ -29,8 +53,7 @@ pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let Expr::JoinedStr ( _) = value.as_ref() else {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
-        FStringDocstring,
-        helpers::identifier_range(stmt, checker.locator),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(FStringDocstring, stmt.identifier()));
 }

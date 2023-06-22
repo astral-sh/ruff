@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::UniversalNewlines;
 
 use crate::checkers::ast::Checker;

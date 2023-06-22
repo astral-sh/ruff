@@ -108,9 +108,11 @@ pub(crate) fn bad_file_permissions(
     keywords: &[Keyword],
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["os", "chmod"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["os", "chmod"])
+        })
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(mode_arg) = call_args.argument("mode", 1) {

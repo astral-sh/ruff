@@ -2,10 +2,10 @@ use rustpython_parser::ast::{self, Arguments, Decorator, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{identifier_range, map_subscript};
+use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
-use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::ScopeKind;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::checkers::ast::Checker;
 
@@ -119,7 +119,7 @@ pub(crate) fn non_self_return_type(
     args: &Arguments,
     async_: bool,
 ) {
-    let ScopeKind::Class(class_def) = checker.semantic_model().scope().kind else {
+    let ScopeKind::Class(class_def) = checker.semantic().scope().kind else {
         return;
     };
 
@@ -132,8 +132,8 @@ pub(crate) fn non_self_return_type(
     };
 
     // Skip any abstract or overloaded methods.
-    if is_abstract(checker.semantic_model(), decorator_list)
-        || is_overload(checker.semantic_model(), decorator_list)
+    if is_abstract(decorator_list, checker.semantic())
+        || is_overload(decorator_list, checker.semantic())
     {
         return;
     }
@@ -141,14 +141,14 @@ pub(crate) fn non_self_return_type(
     if async_ {
         if name == "__aenter__"
             && is_name(returns, &class_def.name)
-            && !is_final(checker.semantic_model(), &class_def.decorator_list)
+            && !is_final(&class_def.decorator_list, checker.semantic())
         {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -156,13 +156,13 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if INPLACE_BINOP_METHODS.contains(&name) {
-        if !is_self(returns, checker.semantic_model()) {
+        if !is_self(returns, checker.semantic()) {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -170,14 +170,14 @@ pub(crate) fn non_self_return_type(
 
     if is_name(returns, &class_def.name) {
         if matches!(name, "__enter__" | "__new__")
-            && !is_final(checker.semantic_model(), &class_def.decorator_list)
+            && !is_final(&class_def.decorator_list, checker.semantic())
         {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -185,28 +185,28 @@ pub(crate) fn non_self_return_type(
 
     match name {
         "__iter__" => {
-            if is_iterable(returns, checker.semantic_model())
-                && is_iterator(&class_def.bases, checker.semantic_model())
+            if is_iterable(returns, checker.semantic())
+                && is_iterator(&class_def.bases, checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    identifier_range(stmt, checker.locator),
+                    stmt.identifier(),
                 ));
             }
         }
         "__aiter__" => {
-            if is_async_iterable(returns, checker.semantic_model())
-                && is_async_iterator(&class_def.bases, checker.semantic_model())
+            if is_async_iterable(returns, checker.semantic())
+                && is_async_iterator(&class_def.bases, checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    identifier_range(stmt, checker.locator),
+                    stmt.identifier(),
                 ));
             }
         }
@@ -239,14 +239,14 @@ fn is_name(expr: &Expr, name: &str) -> bool {
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &Expr, model: &SemanticModel) -> bool {
-    model.match_typing_expr(expr, "Self")
+fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.match_typing_expr(expr, "Self")
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
-fn is_iterator(bases: &[Expr], model: &SemanticModel) -> bool {
+fn is_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
     bases.iter().any(|expr| {
-        model
+        semantic
             .resolve_call_path(map_subscript(expr))
             .map_or(false, |call_path| {
                 matches!(
@@ -258,8 +258,8 @@ fn is_iterator(bases: &[Expr], model: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.Iterable`.
-fn is_iterable(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(map_subscript(expr))
         .map_or(false, |call_path| {
             matches!(
@@ -271,9 +271,9 @@ fn is_iterable(expr: &Expr, model: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
-fn is_async_iterator(bases: &[Expr], model: &SemanticModel) -> bool {
+fn is_async_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
     bases.iter().any(|expr| {
-        model
+        semantic
             .resolve_call_path(map_subscript(expr))
             .map_or(false, |call_path| {
                 matches!(
@@ -285,8 +285,8 @@ fn is_async_iterator(bases: &[Expr], model: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.AsyncIterable`.
-fn is_async_iterable(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(map_subscript(expr))
         .map_or(false, |call_path| {
             matches!(

@@ -8,6 +8,30 @@ use ruff_python_semantic::analyze::typing::Pep604Operator;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Check for type annotations that can be rewritten based on [PEP 604] syntax.
+///
+/// ## Why is this bad?
+/// [PEP 604] introduced a new syntax for union type annotations based on the
+/// `|` operator. This syntax is more concise and readable than the previous
+/// `typing.Union` and `typing.Optional` syntaxes.
+///
+/// ## Example
+/// ```python
+/// from typing import Union
+///
+/// foo: Union[int, str] = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: int | str = 1
+/// ```
+///
+/// ## Options
+/// - `target-version`
+///
+/// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
 pub struct NonPEP604Annotation;
 
@@ -58,14 +82,13 @@ pub(crate) fn use_pep604_annotation(
     operator: Pep604Operator,
 ) {
     // Avoid fixing forward references, or types not in an annotation.
-    let fixable = checker.semantic_model().in_type_definition()
-        && !checker.semantic_model().in_complex_string_type_definition();
+    let fixable = checker.semantic().in_type_definition()
+        && !checker.semantic().in_complex_string_type_definition();
     match operator {
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                     checker.generator().expr(&optional(slice)),
                     expr.range(),
                 )));
@@ -80,16 +103,14 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                             checker.generator().expr(&union(elts)),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                             checker.generator().expr(slice),
                             expr.range(),
                         )));

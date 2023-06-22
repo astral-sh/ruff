@@ -1,5 +1,6 @@
 use crate::comments::Comments;
 use crate::context::NodeLevel;
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, Parentheses, Parenthesize};
 use crate::prelude::*;
 use ruff_formatter::{
@@ -7,6 +8,7 @@ use ruff_formatter::{
 };
 use rustpython_parser::ast::Expr;
 
+mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
@@ -59,7 +61,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         );
 
         let format_expr = format_with(|f| match item {
-            Expr::BoolOp(expr) => expr.format().fmt(f),
+            Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::NamedExpr(expr) => expr.format().fmt(f),
             Expr::BinOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::UnaryOp(expr) => expr.format().fmt(f),
@@ -84,7 +86,10 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Starred(expr) => expr.format().fmt(f),
             Expr::Name(expr) => expr.format().fmt(f),
             Expr::List(expr) => expr.format().fmt(f),
-            Expr::Tuple(expr) => expr.format().fmt(f),
+            Expr::Tuple(expr) => expr
+                .format()
+                .with_options(TupleParentheses::Expr(parentheses))
+                .fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
         });
 
@@ -163,6 +168,7 @@ impl NeedsParentheses for Expr {
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
     type Format<'a> = FormatRefWithRule<'a, Expr, FormatExpr, PyFormatContext<'ast>>;
+
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatExpr::default())
     }
@@ -170,6 +176,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
     type Format = FormatOwnedWithRule<Expr, FormatExpr, PyFormatContext<'ast>>;
+
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatExpr::default())
     }

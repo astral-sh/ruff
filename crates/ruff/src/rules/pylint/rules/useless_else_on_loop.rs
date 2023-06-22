@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{self, Excepthandler, MatchCase, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
+use ruff_python_ast::identifier;
 
 use crate::checkers::ast::Checker;
 
@@ -37,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
+/// - [Python documentation: `break` and `continue` Statements, and `else` Clauses on Loops](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
 #[violation]
 pub struct UselessElseOnLoop;
 
@@ -79,7 +79,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
                 || loop_exits_early(orelse)
                 || loop_exits_early(finalbody)
                 || handlers.iter().any(|handler| match handler {
-                    Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) => loop_exits_early(body),
                 })
@@ -102,7 +102,7 @@ pub(crate) fn useless_else_on_loop(
     if !orelse.is_empty() && !loop_exits_early(body) {
         checker.diagnostics.push(Diagnostic::new(
             UselessElseOnLoop,
-            helpers::else_range(stmt, checker.locator).unwrap(),
+            identifier::else_(stmt, checker.locator).unwrap(),
         ));
     }
 }

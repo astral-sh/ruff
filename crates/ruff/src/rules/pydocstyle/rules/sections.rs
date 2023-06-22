@@ -3,16 +3,16 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Stmt};
+use rustpython_parser::ast::{self, ArgWithDefault, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::NewlineWithTrailingNewline;
 use ruff_textwrap::dedent;
 
@@ -713,20 +713,24 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
-    for arg in arguments
+    for ArgWithDefault {
+        def,
+        default: _,
+        range: _,
+    } in arguments
         .posonlyargs
         .iter()
-        .chain(arguments.args.iter())
-        .chain(arguments.kwonlyargs.iter())
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 docstring.definition.is_method()
-                    && !is_staticmethod(checker.semantic_model(), cast::decorator_list(stmt)),
+                    && !is_staticmethod(cast::decorator_list(stmt), checker.semantic()),
             ),
         )
     {
-        let arg_name = arg.arg.as_str();
+        let arg_name = def.arg.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -759,7 +763,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
             UndocumentedParam { names },
-            identifier_range(stmt, checker.locator),
+            stmt.identifier(),
         ));
     }
 }

@@ -25,8 +25,8 @@ impl Debug for CommentRanges {
 }
 
 impl<'a> IntoIterator for &'a CommentRanges {
-    type Item = &'a TextRange;
     type IntoIter = std::slice::Iter<'a, TextRange>;
+    type Item = &'a TextRange;
 
     fn into_iter(self) -> Self::IntoIter {
         self.raw.iter()

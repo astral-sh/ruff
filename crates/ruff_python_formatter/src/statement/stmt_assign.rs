@@ -7,7 +7,6 @@ use ruff_formatter::{write, Buffer, Format, FormatResult};
 use ruff_python_ast::prelude::Expr;
 use rustpython_parser::ast::StmtAssign;
 
-//
 // Note: This currently does wrap but not the black way so the types below likely need to be
 // replaced entirely
 //

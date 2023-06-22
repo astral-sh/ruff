@@ -25,10 +25,10 @@ pub(crate) fn call_datetime_without_tzinfo(
     location: TextRange,
 ) {
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime"]
+            matches!(call_path.as_slice(), ["datetime", "datetime"])
         })
     {
         return;

@@ -10,7 +10,7 @@ UP009_0.py:1:1: UP009 [*] UTF-8 encoding declaration is unnecessary
   |
   = help: Remove unnecessary coding comment
 
-ℹ Suggested fix
+ℹ Fix
 1   |-# coding=utf8
 2 1 | 
 3 2 | print("Hello world")

@@ -1,17 +1,49 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::source_code::Generator;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `TypedDict` declarations that use functional syntax.
+///
+/// ## Why is this bad?
+/// `TypedDict` subclasses can be defined either through a functional syntax
+/// (`Foo = TypedDict(...)`) or a class syntax (`class Foo(TypedDict): ...`).
+///
+/// The class syntax is more readable and generally preferred over the
+/// functional syntax.
+///
+/// ## Example
+/// ```python
+/// from typing import TypedDict
+///
+/// Foo = TypedDict("Foo", {"a": int, "b": str})
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import TypedDict
+///
+///
+/// class Foo(TypedDict):
+///     a: int
+///     b: str
+/// ```
+///
+/// ## References
+/// - [Python documentation: `typing.TypedDict`](https://docs.python.org/3/library/typing.html#typing.TypedDict)
 #[violation]
 pub struct ConvertTypedDictFunctionalToClass {
     name: String,
@@ -35,9 +67,9 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
 fn match_typed_dict_assign<'a>(
-    model: &SemanticModel,
     targets: &'a [Expr],
     value: &'a Expr,
+    semantic: &SemanticModel,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
     let Expr::Name(ast::ExprName { id: class_name, .. }) = target else {
@@ -51,9 +83,7 @@ fn match_typed_dict_assign<'a>(
     }) = value else {
         return None;
     };
-    if !model.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypedDict"]
-    }) {
+    if !semantic.match_typing_expr(func, "TypedDict") {
         return None;
     }
     Some((class_name, args, keywords, func))
@@ -62,20 +92,21 @@ fn match_typed_dict_assign<'a>(
 /// Generate a `Stmt::AnnAssign` representing the provided property
 /// definition.
 fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
-    let node = annotation.clone();
-    let node1 = ast::ExprName {
-        id: property.into(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-    };
-    let node2 = ast::StmtAnnAssign {
-        target: Box::new(node1.into()),
-        annotation: Box::new(node),
+    ast::StmtAnnAssign {
+        target: Box::new(
+            ast::ExprName {
+                id: property.into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }
+            .into(),
+        ),
+        annotation: Box::new(annotation.clone()),
         value: None,
         simple: true,
         range: TextRange::default(),
-    };
-    node2.into()
+    }
+    .into()
 }
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body,
@@ -90,15 +121,15 @@ fn create_class_def_stmt(
         Some(keyword) => vec![keyword.clone()],
         None => vec![],
     };
-    let node = ast::StmtClassDef {
-        name: class_name.into(),
+    ast::StmtClassDef {
+        name: Identifier::new(class_name.to_string(), TextRange::default()),
         bases: vec![base_class.clone()],
         keywords,
         body,
         decorator_list: vec![],
         range: TextRange::default(),
-    };
-    node.into()
+    }
+    .into()
 }
 
 fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
@@ -116,11 +147,13 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
                 value: Constant::Str(property),
                 ..
             })) => {
-                if is_identifier(property) {
-                    Ok(create_property_assignment_stmt(property, value))
-                } else {
-                    bail!("Property name is not valid identifier: {}", property)
+                if !is_identifier(property) {
+                    bail!("Invalid property name: {}", property)
                 }
+                if is_dunder(property) {
+                    bail!("Cannot use dunder property name: {}", property)
+                }
+                Ok(create_property_assignment_stmt(property, value))
             }
             _ => bail!("Expected `key` to be `Constant::Str`"),
         })
@@ -170,12 +203,12 @@ fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
 // TypedDict('name', {'a': int}, total=True)
 // ```
 fn match_total_from_only_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
-    let keyword = keywords.get(0)?;
-    let arg = &keyword.arg.as_ref()?;
-    match arg.as_str() {
-        "total" => Some(keyword),
-        _ => None,
-    }
+    keywords.iter().find(|keyword| {
+        let Some(arg) = &keyword.arg else {
+           return  false
+        };
+        arg.as_str() == "total"
+    })
 }
 
 fn match_properties_and_total<'a>(
@@ -219,8 +252,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    #[allow(deprecated)]
-    Fix::unspecified(Edit::range_replacement(
+    Fix::suggested(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(
             class_name,
             body,
@@ -239,7 +271,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     value: &Expr,
 ) {
     let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(checker.semantic_model(), targets, value) else
+        match_typed_dict_assign(targets, value, checker.semantic()) else
     {
         return;
     };

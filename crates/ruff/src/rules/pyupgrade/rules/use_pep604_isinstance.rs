@@ -34,6 +34,33 @@ impl CallKind {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `isinstance` and `issubclass` that take a tuple
+/// of types for comparison.
+///
+/// ## Why is this bad?
+/// Since Python 3.10, `isinstance` and `issubclass` can be passed a
+/// `|`-separated union of types, which is more concise and consistent
+/// with the union operator introduced in [PEP 604].
+///
+/// ## Example
+/// ```python
+/// isinstance(x, (int, float))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// isinstance(x, int | float)
+/// ```
+///
+/// ## Options
+/// - `target-version`
+///
+/// ## References
+/// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
+/// - [Python documentation: `issubclass`](https://docs.python.org/3/library/functions.html#issubclass)
+///
+/// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
 pub struct NonPEP604Isinstance {
     kind: CallKind,
@@ -74,7 +101,7 @@ pub(crate) fn use_pep604_isinstance(
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
-        if !checker.semantic_model().is_builtin(id) {
+        if !checker.semantic().is_builtin(id) {
             return;
         };
         if let Some(types) = args.get(1) {
@@ -85,14 +112,13 @@ pub(crate) fn use_pep604_isinstance(
                 }
 
                 // Ex) `(*args,)`
-                if elts.iter().any(|elt| matches!(elt, Expr::Starred(_))) {
+                if elts.iter().any(Expr::is_starred_expr) {
                     return;
                 }
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                         checker.generator().expr(&union(elts)),
                         types.range(),
                     )));

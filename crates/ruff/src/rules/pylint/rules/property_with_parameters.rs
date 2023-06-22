@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Arguments, Decorator, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 
@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/functions.html#property)
+/// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
 #[violation]
 pub struct PropertyWithParameters;
 
@@ -59,18 +59,17 @@ pub(crate) fn property_with_parameters(
     {
         return;
     }
-    if checker.semantic_model().is_builtin("property")
-        && args
-            .args
-            .iter()
-            .chain(args.posonlyargs.iter())
-            .chain(args.kwonlyargs.iter())
-            .count()
-            > 1
+    if args
+        .posonlyargs
+        .iter()
+        .chain(&args.args)
+        .chain(&args.kwonlyargs)
+        .count()
+        > 1
+        && checker.semantic().is_builtin("property")
     {
-        checker.diagnostics.push(Diagnostic::new(
-            PropertyWithParameters,
-            identifier_range(stmt, checker.locator),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));
     }
 }

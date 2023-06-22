@@ -22,7 +22,7 @@ use ruff_python_ast::source_code::Locator;
 /// regex = r"\.png$"
 /// ```
 #[violation]
-pub struct InvalidEscapeSequence(pub char);
+pub struct InvalidEscapeSequence(char);
 
 impl AlwaysAutofixableViolation for InvalidEscapeSequence {
     #[derive_message_formats]
@@ -108,8 +108,7 @@ pub(crate) fn invalid_escape_sequence(
             let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
             let mut diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
             if autofix {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     r"\".to_string(),
                     range.start() + TextSize::from(1),
                 )));

@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -73,7 +74,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#dict.get)
+/// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[violation]
 pub struct DictGetWithNoneDefault {
     expected: String,
@@ -112,11 +113,13 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     };
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["os", "environ", "get"]
-                || call_path.as_slice() == ["os", "getenv"]
+            matches!(
+                call_path.as_slice(),
+                ["os", "environ", "get"] | ["os", "getenv"]
+            )
         })
     {
         return;
@@ -206,15 +209,9 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Some(default) = args.get(1) else {
         return;
     };
-    if !matches!(
-        default,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        })
-    ) {
+    if !is_const_none(default) {
         return;
-    };
+    }
 
     let expected = format!(
         "{}({})",

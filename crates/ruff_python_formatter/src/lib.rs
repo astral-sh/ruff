@@ -1,3 +1,7 @@
+use crate::comments::{
+    dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
+};
+use crate::context::PyFormatContext;
 use anyhow::{anyhow, Context, Result};
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write};
@@ -9,11 +13,6 @@ use rustpython_parser::ast::{Mod, Ranged};
 use rustpython_parser::lexer::lex;
 use rustpython_parser::{parse_tokens, Mode};
 use std::borrow::Cow;
-
-use crate::comments::{
-    dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
-};
-use crate::context::PyFormatContext;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -29,6 +28,10 @@ pub(crate) mod statement;
 mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
+
+/// TODO(konstin): hook this up to the settings by replacing `SimpleFormatOptions` with a python
+/// specific struct.
+pub(crate) const USE_MAGIC_TRAILING_COMMA: bool = true;
 
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
@@ -244,12 +247,12 @@ mod tests {
         let input = r#"
 # preceding
 if    True:
-    print( "hi" )
+    pass
 # trailing
 "#;
         let expected = r#"# preceding
 if True:
-    NOT_IMPLEMENTED_call()
+    pass
 # trailing
 "#;
         let actual = format_module(input)?.as_code().to_string();
@@ -270,36 +273,7 @@ if True:
 
         let formatted_code = printed.as_code();
 
-        let reformatted = match format_module(formatted_code) {
-            Ok(reformatted) => reformatted,
-            Err(err) => {
-                panic!(
-                    "Expected formatted code to be valid syntax: {err}:\
-                    \n---\n{formatted_code}---\n",
-                );
-            }
-        };
-
-        if reformatted.as_code() != formatted_code {
-            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
-                .unified_diff()
-                .header("Formatted once", "Formatted twice")
-                .to_string();
-            panic!(
-                r#"Reformatting the formatted code a second time resulted in formatting changes.
----
-{diff}---
-
-Formatted once:
----
-{formatted_code}---
-
-Formatted twice:
----
-{}---"#,
-                reformatted.as_code()
-            );
-        }
+        ensure_stability_when_formatting_twice(formatted_code);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -371,6 +345,8 @@ Formatted twice:
         let reformatted =
             format_module(formatted_code).unwrap_or_else(|err| panic!("Expected formatted code to be valid syntax but it contains syntax errors: {err}\n{formatted_code}"));
 
+        ensure_stability_when_formatting_twice(formatted_code);
+
         if reformatted.as_code() != formatted_code {
             let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
                 .unified_diff()
@@ -403,15 +379,50 @@ Formatted twice:
         Ok(())
     }
 
+    /// Format another time and make sure that there are no changes anymore
+    fn ensure_stability_when_formatting_twice(formatted_code: &str) {
+        let reformatted = match format_module(formatted_code) {
+            Ok(reformatted) => reformatted,
+            Err(err) => {
+                panic!(
+                    "Expected formatted code to be valid syntax: {err}:\
+                    \n---\n{formatted_code}---\n",
+                );
+            }
+        };
+
+        if reformatted.as_code() != formatted_code {
+            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
+                .unified_diff()
+                .header("Formatted once", "Formatted twice")
+                .to_string();
+            panic!(
+                r#"Reformatting the formatted code a second time resulted in formatting changes.
+---
+{diff}---
+
+Formatted once:
+---
+{formatted_code}---
+
+Formatted twice:
+---
+{}---"#,
+                reformatted.as_code()
+            );
+        }
+    }
+
     /// Use this test to debug the formatting of some snipped
     #[ignore]
     #[test]
     fn quick_test() {
         let src = r#"
-def test(): ...
-
-# Comment
-def with_leading_comment(): ...
+if [
+    aaaaaa,
+    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
+] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
+    ...
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -433,10 +444,11 @@ def with_leading_comment(): ...
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
+        // use ruff_formatter::FormatContext;
         // dbg!(formatted
         //     .document()
         //     .display(formatted.context().source_code()));
-
+        //
         // dbg!(formatted
         //     .context()
         //     .comments()

@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Check code snippets in docs are formatted by black."""
+from __future__ import annotations
+
 import argparse
 import os
 import re
 import textwrap
-from collections.abc import Sequence
 from pathlib import Path
 from re import Match
+from typing import TYPE_CHECKING
 
 import black
 from black.mode import Mode, TargetVersion
 from black.parsing import InvalidInput
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 TARGET_VERSIONS = ["py37", "py38", "py39", "py310", "py311"]
 SNIPPED_RE = re.compile(
@@ -44,9 +49,12 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "no-space-after-inline-comment",
     "over-indented",
     "prohibited-trailing-comma",
+    "shebang-leading-whitespace",
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
     "unexpected-indentation-comment",
+    "unicode-kind-prefix",
+    "unnecessary-class-parentheses",
     "useless-semicolon",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",

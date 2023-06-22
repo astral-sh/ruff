@@ -1,11 +1,11 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::CmpopExt;
+use crate::rules::pylint::helpers::CmpOpExt;
 
 /// ## What it does
 /// Checks for comparisons between constants.
@@ -26,11 +26,11 @@ use crate::rules::pylint::helpers::CmpopExt;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#comparisons)
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct ComparisonOfConstant {
     left_constant: String,
-    op: Cmpop,
+    op: CmpOp,
     right_constant: String,
 }
 
@@ -45,7 +45,7 @@ impl Violation for ComparisonOfConstant {
 
         format!(
             "Two constants compared in a comparison, consider replacing `{left_constant} {} {right_constant}`",
-            CmpopExt::from(op)
+            CmpOpExt::from(op)
         )
     }
 }
@@ -54,7 +54,7 @@ impl Violation for ComparisonOfConstant {
 pub(crate) fn comparison_of_constant(
     checker: &mut Checker,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     for ((left, right), op) in std::iter::once(left)

@@ -10,7 +10,7 @@ multiline_docstring.py:1:1: I002 [*] Missing required import: `from __future__ i
   |
   = help: Insert required import: `from future import annotations`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """a
 2 2 | b"""
 3 3 | # b

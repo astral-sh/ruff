@@ -95,8 +95,8 @@ impl Debug for LogicalLines<'_> {
 }
 
 impl<'a> IntoIterator for &'a LogicalLines<'a> {
-    type Item = LogicalLine<'a>;
     type IntoIter = LogicalLinesIter<'a>;
+    type Item = LogicalLine<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         LogicalLinesIter {

@@ -1,7 +1,7 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,7 +9,7 @@ use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, Comparable
 use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
@@ -449,7 +449,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
             && !has_comments(stmt, checker.locator)
-            && (test.is_compare_expr() || checker.semantic_model().is_builtin("bool"))
+            && (test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
             if test.is_compare_expr() {
                 // If the condition is a comparison, we can replace it with the condition.
@@ -508,9 +508,9 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-fn contains_call_path(model: &SemanticModel, expr: &Expr, target: &[&str]) -> bool {
+fn contains_call_path(expr: &Expr, target: &[&str], semantic: &SemanticModel) -> bool {
     any_over_expr(expr, &|expr| {
-        model
+        semantic
             .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == target)
     })
@@ -544,13 +544,13 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(checker.semantic_model(), test, &["sys", "version_info"]) {
+    if contains_call_path(test, &["sys", "version_info"], checker.semantic()) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(checker.semantic_model(), test, &["sys", "platform"]) {
+    if contains_call_path(test, &["sys", "platform"], checker.semantic()) {
         return;
     }
 
@@ -734,7 +734,7 @@ pub(crate) fn manual_dict_lookup(
     if orelse.len() != 1 {
         return;
     }
-    if !(ops.len() == 1 && ops[0] == Cmpop::Eq) {
+    if !(ops.len() == 1 && ops[0] == CmpOp::Eq) {
         return;
     }
     if comparators.len() != 1 {
@@ -747,7 +747,7 @@ pub(crate) fn manual_dict_lookup(
         return;
     };
     if value.as_ref().map_or(false, |value| {
-        contains_effect(value, |id| checker.semantic_model().is_builtin(id))
+        contains_effect(value, |id| checker.semantic().is_builtin(id))
     }) {
         return;
     }
@@ -807,7 +807,7 @@ pub(crate) fn manual_dict_lookup(
         let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
             return;
         };
-        if !(id == target && ops.len() == 1 && ops[0] == Cmpop::Eq) {
+        if !(id == target && ops.len() == 1 && ops[0] == CmpOp::Eq) {
             return;
         }
         if comparators.len() != 1 {
@@ -820,7 +820,7 @@ pub(crate) fn manual_dict_lookup(
             return;
         };
         if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.semantic_model().is_builtin(id))
+            contains_effect(value, |id| checker.semantic().is_builtin(id))
         }) {
             return;
         };
@@ -882,8 +882,8 @@ pub(crate) fn use_dict_get_with_default(
         return;
     }
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [Cmpop::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
-        [Cmpop::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
+        [CmpOp::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
+        [CmpOp::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
         _ => {
             return;
         }
@@ -903,7 +903,7 @@ pub(crate) fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic_model().is_builtin(id)) {
+    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
         return;
     }
 
@@ -941,7 +941,7 @@ pub(crate) fn use_dict_get_with_default(
     let node1 = *test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
-        attr: "get".into(),
+        attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };

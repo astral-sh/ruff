@@ -26,7 +26,7 @@ pub(crate) fn attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &
     };
 
     // Avoid flagging on function calls (e.g., `df.values()`).
-    if let Some(parent) = checker.semantic_model().expr_parent() {
+    if let Some(parent) = checker.semantic().expr_parent() {
         if matches!(parent, Expr::Call(_)) {
             return;
         }
@@ -35,7 +35,7 @@ pub(crate) fn attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`), and on irrelevant bindings
     // (like imports).
     if !matches!(
-        test_expression(value, checker.semantic_model()),
+        test_expression(value, checker.semantic()),
         Resolution::RelevantLocal
     ) {
         return;

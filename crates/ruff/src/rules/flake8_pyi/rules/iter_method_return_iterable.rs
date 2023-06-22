@@ -4,7 +4,7 @@ use rustpython_parser::ast::{Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::prelude::Expr;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
 
@@ -101,7 +101,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
     };
 
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(annotation)
         .map_or(false, |call_path| {
             if async_ {

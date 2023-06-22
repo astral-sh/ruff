@@ -1,11 +1,13 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Excepthandler, MatchCase, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Ranged, Stmt};
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::directives::IsortDirectives;
+use crate::jupyter::Notebook;
 use crate::rules::isort::helpers;
+use crate::source_kind::SourceKind;
 
 /// A block of imports within a Python module.
 #[derive(Debug, Default)]
@@ -29,6 +31,7 @@ pub(crate) struct BlockBuilder<'a> {
     is_stub: bool,
     blocks: Vec<Block<'a>>,
     splits: &'a [TextSize],
+    cell_offsets: Option<&'a [TextSize]>,
     exclusions: &'a [TextRange],
     nested: bool,
 }
@@ -38,6 +41,7 @@ impl<'a> BlockBuilder<'a> {
         locator: &'a Locator<'a>,
         directives: &'a IsortDirectives,
         is_stub: bool,
+        source_kind: Option<&'a SourceKind>,
     ) -> Self {
         Self {
             locator,
@@ -46,6 +50,9 @@ impl<'a> BlockBuilder<'a> {
             splits: &directives.splits,
             exclusions: &directives.exclusions,
             nested: false,
+            cell_offsets: source_kind
+                .and_then(SourceKind::notebook)
+                .map(Notebook::cell_offsets),
         }
     }
 
@@ -126,6 +133,22 @@ where
                 self.splits = &self.splits[index + 1..];
             } else {
                 break;
+            }
+        }
+
+        // Track Jupyter notebook cell offsets as splits. This will make sure
+        // that each cell is considered as an individual block to organize the
+        // imports in. Thus, not creating an edit which spans across multiple
+        // cells.
+        if let Some(cell_offsets) = self.cell_offsets {
+            for (index, split) in cell_offsets.iter().enumerate() {
+                if stmt.start() >= *split {
+                    // We don't want any extra newlines between cells.
+                    self.finalize(None);
+                    self.cell_offsets = Some(&cell_offsets[index + 1..]);
+                } else {
+                    break;
+                }
             }
         }
 
@@ -244,8 +267,8 @@ where
                 finalbody,
                 range: _,
             }) => {
-                for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler);
+                for except_handler in handlers {
+                    self.visit_except_handler(except_handler);
                 }
 
                 for stmt in body {
@@ -268,12 +291,12 @@ where
         self.nested = prev_nested;
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
+    fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
         let prev_nested = self.nested;
         self.nested = true;
 
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-            excepthandler;
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
+            except_handler;
         for stmt in body {
             self.visit_stmt(stmt);
         }

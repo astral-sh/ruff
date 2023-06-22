@@ -2,7 +2,8 @@ use rustpython_parser::ast::{Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{identifier_range, map_subscript};
+use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -52,20 +53,19 @@ impl Violation for NoSlotsInTupleSubclass {
 pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
     if class.bases.iter().any(|base| {
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(map_subscript(base))
             .map_or(false, |call_path| {
                 matches!(call_path.as_slice(), ["" | "builtins", "tuple"])
                     || checker
-                        .semantic_model()
+                        .semantic()
                         .match_typing_call_path(&call_path, "Tuple")
             })
     }) {
         if !has_slots(&class.body) {
-            checker.diagnostics.push(Diagnostic::new(
-                NoSlotsInTupleSubclass,
-                identifier_range(stmt, checker.locator),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(NoSlotsInTupleSubclass, stmt.identifier()));
         }
     }
 }

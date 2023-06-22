@@ -8,6 +8,27 @@ use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary imports of builtins.
+///
+/// ## Why is this bad?
+/// Builtins are always available. Importing them is unnecessary and should be
+/// removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// from builtins import str
+///
+/// str(1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// str(1)
+/// ```
+///
+/// ## References
+/// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[violation]
 pub struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
@@ -105,8 +126,8 @@ pub(crate) fn unnecessary_builtin_import(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let stmt = checker.semantic_model().stmt();
-            let parent = checker.semantic_model().stmt_parent();
+            let stmt = checker.semantic().stmt();
+            let parent = checker.semantic().stmt_parent();
             let unused_imports: Vec<String> = unused_imports
                 .iter()
                 .map(|alias| format!("{module}.{}", alias.name))
@@ -116,8 +137,8 @@ pub(crate) fn unnecessary_builtin_import(
                 stmt,
                 parent,
                 checker.locator,
-                checker.indexer,
                 checker.stylist,
+                checker.indexer,
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });

@@ -4,6 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::pep8_naming::helpers;
+use crate::settings::types::IdentifierPattern;
 
 /// ## What it does
 /// Checks for `CamelCase` imports that are aliased to lowercase names.
@@ -48,8 +49,16 @@ pub(crate) fn camelcase_imported_as_lowercase(
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
+    ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
-    if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_lower(asname) {
+    if ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name.matches(asname))
+    {
+        return None;
+    }
+
+    if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_cased_lowercase(asname) {
         let mut diagnostic = Diagnostic::new(
             CamelcaseImportedAsLowercase {
                 name: name.to_string(),

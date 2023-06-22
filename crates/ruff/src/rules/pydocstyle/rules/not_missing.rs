@@ -3,11 +3,11 @@ use ruff_text_size::TextRange;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
 };
-use ruff_python_semantic::definition::{Definition, Member, MemberKind, Module, ModuleKind};
+use ruff_python_semantic::{Definition, Member, MemberKind, Module, ModuleKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -133,10 +133,9 @@ pub(crate) fn not_missing(
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicClass) {
-                checker.diagnostics.push(Diagnostic::new(
-                    UndocumentedPublicClass,
-                    identifier_range(stmt, checker.locator),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(UndocumentedPublicClass, stmt.identifier()));
             }
             false
         }
@@ -148,7 +147,7 @@ pub(crate) fn not_missing(
             if checker.enabled(Rule::UndocumentedPublicNestedClass) {
                 checker.diagnostics.push(Diagnostic::new(
                     UndocumentedPublicNestedClass,
-                    identifier_range(stmt, checker.locator),
+                    stmt.identifier(),
                 ));
             }
             false
@@ -158,13 +157,13 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(checker.semantic_model(), cast::decorator_list(stmt)) {
+            if is_overload(cast::decorator_list(stmt), checker.semantic()) {
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicFunction) {
                     checker.diagnostics.push(Diagnostic::new(
                         UndocumentedPublicFunction,
-                        identifier_range(stmt, checker.locator),
+                        stmt.identifier(),
                     ));
                 }
                 false
@@ -175,40 +174,36 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(checker.semantic_model(), cast::decorator_list(stmt))
-                || is_override(checker.semantic_model(), cast::decorator_list(stmt))
+            if is_overload(cast::decorator_list(stmt), checker.semantic())
+                || is_override(cast::decorator_list(stmt), checker.semantic())
             {
                 true
             } else if is_init(cast::name(stmt)) {
                 if checker.enabled(Rule::UndocumentedPublicInit) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedPublicInit,
-                        identifier_range(stmt, checker.locator),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UndocumentedPublicInit, stmt.identifier()));
                 }
                 true
             } else if is_new(cast::name(stmt)) || is_call(cast::name(stmt)) {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedPublicMethod,
-                        identifier_range(stmt, checker.locator),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UndocumentedPublicMethod, stmt.identifier()));
                 }
                 true
             } else if is_magic(cast::name(stmt)) {
                 if checker.enabled(Rule::UndocumentedMagicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedMagicMethod,
-                        identifier_range(stmt, checker.locator),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UndocumentedMagicMethod, stmt.identifier()));
                 }
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedPublicMethod,
-                        identifier_range(stmt, checker.locator),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UndocumentedPublicMethod, stmt.identifier()));
                 }
                 true
             }

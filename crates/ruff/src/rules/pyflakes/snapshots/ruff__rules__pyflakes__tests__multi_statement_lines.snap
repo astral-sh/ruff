@@ -1,257 +1,325 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-multi_statement_lines.py:3:12: F401 [*] `foo1` imported but unused
+multi_statement_lines.py:2:12: F401 [*] `foo1` imported but unused
   |
-2 | if True:
-3 |     import foo1; x = 1
+1 | if True:
+2 |     import foo1; x = 1
   |            ^^^^ F401
-4 |     import foo2;     x = 1
+3 |     import foo2;     x = 1
   |
   = help: Remove unused import: `foo1`
 
 ℹ Fix
-1 1 | 
-2 2 | if True:
-3   |-    import foo1; x = 1
-  3 |+    x = 1
-4 4 |     import foo2;     x = 1
-5 5 | 
-6 6 | if True:
+1 1 | if True:
+2   |-    import foo1; x = 1
+  2 |+    x = 1
+3 3 |     import foo2;     x = 1
+4 4 | 
+5 5 | if True:
 
-multi_statement_lines.py:4:12: F401 [*] `foo2` imported but unused
+multi_statement_lines.py:3:12: F401 [*] `foo2` imported but unused
   |
-2 | if True:
-3 |     import foo1; x = 1
-4 |     import foo2;     x = 1
+1 | if True:
+2 |     import foo1; x = 1
+3 |     import foo2;     x = 1
   |            ^^^^ F401
-5 | 
-6 | if True:
+4 | 
+5 | if True:
   |
   = help: Remove unused import: `foo2`
 
 ℹ Fix
-1 1 | 
-2 2 | if True:
-3 3 |     import foo1; x = 1
-4   |-    import foo2;     x = 1
-  4 |+    x = 1
-5 5 | 
-6 6 | if True:
-7 7 |     import foo3; \
+1 1 | if True:
+2 2 |     import foo1; x = 1
+3   |-    import foo2;     x = 1
+  3 |+    x = 1
+4 4 | 
+5 5 | if True:
+6 6 |     import foo3; \
 
-multi_statement_lines.py:7:12: F401 [*] `foo3` imported but unused
+multi_statement_lines.py:6:12: F401 [*] `foo3` imported but unused
   |
-6 | if True:
-7 |     import foo3; \
+5 | if True:
+6 |     import foo3; \
   |            ^^^^ F401
-8 | x = 1
+7 | x = 1
   |
   = help: Remove unused import: `foo3`
 
 ℹ Fix
-4 4 |     import foo2;     x = 1
-5 5 | 
-6 6 | if True:
-7   |-    import foo3; \
-8   |-x = 1
-  7 |+    x = 1
-9 8 | 
-10 9 | if True:
-11 10 |     import foo4 \
+3 3 |     import foo2;     x = 1
+4 4 | 
+5 5 | if True:
+6   |-    import foo3; \
+7   |-x = 1
+  6 |+    x = 1
+8 7 | 
+9 8 | if True:
+10 9 |     import foo4 \
 
-multi_statement_lines.py:11:12: F401 [*] `foo4` imported but unused
+multi_statement_lines.py:10:12: F401 [*] `foo4` imported but unused
    |
-10 | if True:
-11 |     import foo4 \
+ 9 | if True:
+10 |     import foo4 \
    |            ^^^^ F401
-12 |         ; x = 1
+11 |         ; x = 1
    |
    = help: Remove unused import: `foo4`
 
 ℹ Fix
-8  8  | x = 1
-9  9  | 
-10 10 | if True:
-11    |-    import foo4 \
-12    |-        ; x = 1
-   11 |+    x = 1
-13 12 | 
-14 13 | 
-15 14 | if True:
+7  7  | x = 1
+8  8  | 
+9  9  | if True:
+10    |-    import foo4 \
+11    |-        ; x = 1
+   10 |+    x = 1
+12 11 | 
+13 12 | if True:
+14 13 |     x = 1; import foo5
 
-multi_statement_lines.py:16:19: F401 [*] `foo5` imported but unused
+multi_statement_lines.py:14:19: F401 [*] `foo5` imported but unused
    |
-15 | if True:
-16 |     x = 1; import foo5
+13 | if True:
+14 |     x = 1; import foo5
    |                   ^^^^ F401
    |
    = help: Remove unused import: `foo5`
 
 ℹ Fix
-13 13 | 
-14 14 | 
-15 15 | if True:
-16    |-    x = 1; import foo5
-   16 |+    x = 1; 
-17 17 | 
-18 18 | 
-19 19 | if True:
+11 11 |         ; x = 1
+12 12 | 
+13 13 | if True:
+14    |-    x = 1; import foo5
+   14 |+    x = 1; 
+15 15 | 
+16 16 | 
+17 17 | if True:
 
-multi_statement_lines.py:21:17: F401 [*] `foo6` imported but unused
+multi_statement_lines.py:19:17: F401 [*] `foo6` imported but unused
    |
-19 | if True:
-20 |     x = 1; \
-21 |          import foo6
+17 | if True:
+18 |     x = 1; \
+19 |          import foo6
    |                 ^^^^ F401
+20 | 
+21 | if True:
    |
    = help: Remove unused import: `foo6`
 
 ℹ Fix
-18 18 | 
-19 19 | if True:
-20 20 |     x = 1; \
-21    |-         import foo6
-   21 |+         
-22 22 | 
-23 23 | 
-24 24 | if True:
+15 15 | 
+16 16 | 
+17 17 | if True:
+18    |-    x = 1; \
+19    |-         import foo6
+   18 |+    x = 1; 
+20 19 | 
+21 20 | if True:
+22 21 |     x = 1 \
 
-multi_statement_lines.py:26:18: F401 [*] `foo7` imported but unused
+multi_statement_lines.py:23:18: F401 [*] `foo7` imported but unused
    |
-24 | if True:
-25 |     x = 1 \
-26 |         ; import foo7
+21 | if True:
+22 |     x = 1 \
+23 |         ; import foo7
    |                  ^^^^ F401
+24 | 
+25 | if True:
    |
    = help: Remove unused import: `foo7`
 
 ℹ Fix
-23 23 | 
-24 24 | if True:
-25 25 |     x = 1 \
-26    |-        ; import foo7
-   26 |+        ; 
-27 27 | 
-28 28 | 
-29 29 | if True:
+20 20 | 
+21 21 | if True:
+22 22 |     x = 1 \
+23    |-        ; import foo7
+   23 |+        ; 
+24 24 | 
+25 25 | if True:
+26 26 |     x = 1; import foo8; x = 1
 
-multi_statement_lines.py:30:19: F401 [*] `foo8` imported but unused
+multi_statement_lines.py:26:19: F401 [*] `foo8` imported but unused
    |
-29 | if True:
-30 |     x = 1; import foo8; x = 1
+25 | if True:
+26 |     x = 1; import foo8; x = 1
    |                   ^^^^ F401
-31 |     x = 1;     import foo9;     x = 1
+27 |     x = 1;     import foo9;     x = 1
    |
    = help: Remove unused import: `foo8`
 
 ℹ Fix
-27 27 | 
+23 23 |         ; import foo7
+24 24 | 
+25 25 | if True:
+26    |-    x = 1; import foo8; x = 1
+   26 |+    x = 1; x = 1
+27 27 |     x = 1;     import foo9;     x = 1
 28 28 | 
 29 29 | if True:
-30    |-    x = 1; import foo8; x = 1
-   30 |+    x = 1; x = 1
-31 31 |     x = 1;     import foo9;     x = 1
-32 32 | 
-33 33 | if True:
 
-multi_statement_lines.py:31:23: F401 [*] `foo9` imported but unused
+multi_statement_lines.py:27:23: F401 [*] `foo9` imported but unused
    |
-29 | if True:
-30 |     x = 1; import foo8; x = 1
-31 |     x = 1;     import foo9;     x = 1
+25 | if True:
+26 |     x = 1; import foo8; x = 1
+27 |     x = 1;     import foo9;     x = 1
    |                       ^^^^ F401
-32 | 
-33 | if True:
+28 | 
+29 | if True:
    |
    = help: Remove unused import: `foo9`
 
 ℹ Fix
+24 24 | 
+25 25 | if True:
+26 26 |     x = 1; import foo8; x = 1
+27    |-    x = 1;     import foo9;     x = 1
+   27 |+    x = 1;     x = 1
 28 28 | 
 29 29 | if True:
-30 30 |     x = 1; import foo8; x = 1
-31    |-    x = 1;     import foo9;     x = 1
-   31 |+    x = 1;     x = 1
-32 32 | 
-33 33 | if True:
-34 34 |     x = 1; \
+30 30 |     x = 1; \
 
-multi_statement_lines.py:35:16: F401 [*] `foo10` imported but unused
+multi_statement_lines.py:31:16: F401 [*] `foo10` imported but unused
    |
-33 | if True:
-34 |     x = 1; \
-35 |         import foo10; \
+29 | if True:
+30 |     x = 1; \
+31 |         import foo10; \
    |                ^^^^^ F401
-36 |     x = 1
+32 |     x = 1
    |
    = help: Remove unused import: `foo10`
 
 ℹ Fix
-32 32 | 
-33 33 | if True:
-34 34 |     x = 1; \
-35    |-        import foo10; \
-36    |-    x = 1
-   35 |+        x = 1
-37 36 | 
-38 37 | if True:
-39 38 |     x = 1 \
+28 28 | 
+29 29 | if True:
+30 30 |     x = 1; \
+31    |-        import foo10; \
+32    |-    x = 1
+   31 |+        x = 1
+33 32 | 
+34 33 | if True:
+35 34 |     x = 1 \
 
-multi_statement_lines.py:40:17: F401 [*] `foo11` imported but unused
+multi_statement_lines.py:36:17: F401 [*] `foo11` imported but unused
    |
-38 | if True:
-39 |     x = 1 \
-40 |         ;import foo11 \
+34 | if True:
+35 |     x = 1 \
+36 |         ;import foo11 \
    |                 ^^^^^ F401
-41 |         ;x = 1
+37 |         ;x = 1
    |
    = help: Remove unused import: `foo11`
 
 ℹ Fix
-37 37 | 
-38 38 | if True:
-39 39 |     x = 1 \
-40    |-        ;import foo11 \
-41 40 |         ;x = 1
-42 41 | 
-43 42 | 
+33 33 | 
+34 34 | if True:
+35 35 |     x = 1 \
+36    |-        ;import foo11 \
+37 36 |         ;x = 1
+38 37 | 
+39 38 | if True:
 
-multi_statement_lines.py:46:8: F401 [*] `foo12` imported but unused
+multi_statement_lines.py:42:16: F401 [*] `foo12` imported but unused
    |
-44 | # Continuation, but not as the last content in the file.
-45 | x = 1; \
-46 | import foo12
-   |        ^^^^^ F401
-47 | 
-48 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
+40 |     x = 1; \
+41 |         \
+42 |         import foo12
+   |                ^^^^^ F401
+43 | 
+44 | if True:
    |
    = help: Remove unused import: `foo12`
 
 ℹ Fix
-43 43 | 
-44 44 | # Continuation, but not as the last content in the file.
-45 45 | x = 1; \
-46    |-import foo12
-47 46 | 
-   47 |+
-48 48 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
-49 49 | # error.)
-50 50 | x = 1; \
+37 37 |         ;x = 1
+38 38 | 
+39 39 | if True:
+40    |-    x = 1; \
+41    |-        \
+42    |-        import foo12
+   40 |+    x = 1; 
+43 41 | 
+44 42 | if True:
+45 43 |     x = 1; \
 
-multi_statement_lines.py:51:8: F401 [*] `foo13` imported but unused
+multi_statement_lines.py:47:12: F401 [*] `foo13` imported but unused
    |
-49 | # error.)
-50 | x = 1; \
-51 | import foo13
-   |        ^^^^^ F401
+45 |     x = 1; \
+46 | \
+47 |     import foo13
+   |            ^^^^^ F401
    |
    = help: Remove unused import: `foo13`
 
 ℹ Fix
-48 48 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
-49 49 | # error.)
-50 50 | x = 1; \
-51    |-import foo13
-   51 |+
+42 42 |         import foo12
+43 43 | 
+44 44 | if True:
+45    |-    x = 1; \
+46    |-\
+47    |-    import foo13
+   45 |+    x = 1; 
+48 46 | 
+49 47 | 
+50 48 | if True:
+
+multi_statement_lines.py:53:12: F401 [*] `foo14` imported but unused
+   |
+51 |     x = 1; \
+52 |     #    \
+53 |     import foo14
+   |            ^^^^^ F401
+54 | 
+55 | # Continuation, but not as the last content in the file.
+   |
+   = help: Remove unused import: `foo14`
+
+ℹ Fix
+50 50 | if True:
+51 51 |     x = 1; \
+52 52 |     #    \
+53    |-    import foo14
+54 53 | 
+55 54 | # Continuation, but not as the last content in the file.
+56 55 | x = 1; \
+
+multi_statement_lines.py:57:8: F401 [*] `foo15` imported but unused
+   |
+55 | # Continuation, but not as the last content in the file.
+56 | x = 1; \
+57 | import foo15
+   |        ^^^^^ F401
+58 | 
+59 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
+   |
+   = help: Remove unused import: `foo15`
+
+ℹ Fix
+53 53 |     import foo14
+54 54 | 
+55 55 | # Continuation, but not as the last content in the file.
+56    |-x = 1; \
+57    |-import foo15
+   56 |+x = 1; 
+58 57 | 
+59 58 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
+60 59 | # error.)
+
+multi_statement_lines.py:62:8: F401 [*] `foo16` imported but unused
+   |
+60 | # error.)
+61 | x = 1; \
+62 | import foo16
+   |        ^^^^^ F401
+   |
+   = help: Remove unused import: `foo16`
+
+ℹ Fix
+58 58 | 
+59 59 | # Continuation, followed by end-of-file. (Removing `import foo` would cause a syntax
+60 60 | # error.)
+61    |-x = 1; \
+62    |-import foo16
+   61 |+x = 1; 
 
 

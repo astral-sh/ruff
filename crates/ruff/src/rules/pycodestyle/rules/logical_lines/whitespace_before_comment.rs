@@ -59,8 +59,7 @@ impl Violation for TooFewSpacesBeforeInlineComment {
 /// x = x + 1    # Increment x
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
+/// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[violation]
 pub struct NoSpaceAfterInlineComment;
 
@@ -92,8 +91,7 @@ impl Violation for NoSpaceAfterInlineComment {
 /// # \xa0- Block comment list
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
+/// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[violation]
 pub struct NoSpaceAfterBlockComment;
 
@@ -116,7 +114,6 @@ impl Violation for NoSpaceAfterBlockComment {
 /// ## Example
 /// ```python
 /// ### Block comment
-///
 /// ```
 ///
 /// Use instead:
@@ -126,8 +123,7 @@ impl Violation for NoSpaceAfterBlockComment {
 /// # \xa0- Block comment list
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
+/// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[violation]
 pub struct MultipleLeadingHashesForBlockComment;
 

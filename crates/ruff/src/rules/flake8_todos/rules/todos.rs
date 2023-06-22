@@ -236,8 +236,8 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 
 pub(crate) fn todos(
     todo_comments: &[TodoComment],
-    indexer: &Indexer,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];

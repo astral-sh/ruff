@@ -13,6 +13,27 @@ use ruff_python_ast::source_code::Locator;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for redundant `open` mode parameters.
+///
+/// ## Why is this bad?
+/// Redundant `open` mode parameters are unnecessary and should be removed to
+/// avoid confusion.
+///
+/// ## Example
+/// ```python
+/// with open("foo.txt", "r") as f:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with open("foo.txt") as f:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct RedundantOpenModes {
     pub replacement: Option<String>,
@@ -117,14 +138,14 @@ fn create_check(
     );
     if patch {
         if let Some(content) = replacement_value {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 content.to_string(),
                 mode_param.range(),
             )));
         } else {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| create_remove_param_fix(locator, expr, mode_param));
+            diagnostic.try_set_fix(|| {
+                create_remove_param_fix(locator, expr, mode_param).map(Fix::automatic)
+            });
         }
     }
     diagnostic
@@ -173,7 +194,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
 /// UP015
 pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
-    if !checker.semantic_model().is_builtin(OPEN_FUNC_NAME) {
+    if !checker.semantic().is_builtin(OPEN_FUNC_NAME) {
         return;
     }
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);

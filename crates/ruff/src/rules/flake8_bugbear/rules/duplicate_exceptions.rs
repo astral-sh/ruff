@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -12,6 +12,33 @@ use ruff_python_ast::call_path::CallPath;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for `try-except` blocks with duplicate exception handlers.
+///
+/// ## Why is this bad?
+/// Duplicate exception handlers are redundant, as the first handler will catch
+/// the exception, making the second handler unreachable.
+///
+/// ## Example
+/// ```python
+/// try:
+///     ...
+/// except ValueError:
+///     ...
+/// except ValueError:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     ...
+/// except ValueError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[violation]
 pub struct DuplicateTryBlockException {
     name: String,
@@ -24,6 +51,36 @@ impl Violation for DuplicateTryBlockException {
         format!("try-except block with duplicate exception `{name}`")
     }
 }
+
+/// ## What it does
+/// Checks for exception handlers that catch duplicate exceptions.
+///
+/// ## Why is this bad?
+/// Including the same exception multiple times in the same handler is redundant,
+/// as the first exception will catch the exception, making the second exception
+/// unreachable. The same applies to exception hierarchies, as a handler for a
+/// parent exception (like `Exception`) will also catch child exceptions (like
+/// `ValueError`).
+///
+/// ## Example
+/// ```python
+/// try:
+///     ...
+/// except (Exception, ValueError):  # `Exception` includes `ValueError`.
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     ...
+/// except Exception:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
+/// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[violation]
 pub struct DuplicateHandlerException {
     pub names: Vec<String>,
@@ -89,8 +146,7 @@ fn duplicate_handler_exceptions<'a>(
                 expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     if unique_elts.len() == 1 {
                         checker.generator().expr(unique_elts[0])
                     } else {
@@ -106,11 +162,11 @@ fn duplicate_handler_exceptions<'a>(
     seen
 }
 
-pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
     let mut seen: FxHashSet<CallPath> = FxHashSet::default();
     let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = handler else {
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_: Some(type_), .. }) = handler else {
             continue;
         };
         match type_.as_ref() {

@@ -1,8 +1,8 @@
-use rustpython_parser::ast::Constant::Bool;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_true;
 
 use crate::checkers::ast::Checker;
 
@@ -84,7 +84,7 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
         return None;
     };
 
-    let Some(valid_field_name) = helpers::get_model_field_name(checker.semantic_model(), func) else {
+    let Some(valid_field_name) = helpers::get_model_field_name(func, checker.semantic()) else {
         return None;
     };
 
@@ -96,12 +96,12 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
     let mut blank_key = false;
     let mut unique_key = false;
     for keyword in keywords.iter() {
-        let Expr::Constant(ast::ExprConstant {value: Bool(true), ..}) = &keyword.value else {
-            continue
-        };
         let Some(argument) = &keyword.arg else {
             continue
         };
+        if !is_const_true(&keyword.value) {
+            continue;
+        }
         match argument.as_str() {
             "blank" => blank_key = true,
             "null" => null_key = true,

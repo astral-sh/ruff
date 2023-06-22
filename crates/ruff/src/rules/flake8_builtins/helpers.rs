@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{Excepthandler, Expr, Ranged, Stmt};
-
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
-use ruff_python_stdlib::builtins::BUILTINS;
 use ruff_text_size::TextRange;
+use rustpython_parser::ast::{ExceptHandler, Expr, Ranged, Stmt};
+
+use ruff_python_ast::identifier::{Identifier, TryIdentifier};
+use ruff_python_stdlib::builtins::BUILTINS;
 
 pub(super) fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
     BUILTINS.contains(&name) && ignorelist.iter().all(|ignore| ignore != name)
@@ -13,15 +12,15 @@ pub(super) fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
 pub(crate) enum AnyShadowing<'a> {
     Expression(&'a Expr),
     Statement(&'a Stmt),
-    ExceptHandler(&'a Excepthandler),
+    ExceptHandler(&'a ExceptHandler),
 }
 
-impl AnyShadowing<'_> {
-    pub(crate) fn range(self, locator: &Locator) -> TextRange {
+impl Identifier for AnyShadowing<'_> {
+    fn identifier(&self) -> TextRange {
         match self {
             AnyShadowing::Expression(expr) => expr.range(),
-            AnyShadowing::Statement(stmt) => identifier_range(stmt, locator),
-            AnyShadowing::ExceptHandler(handler) => handler.range(),
+            AnyShadowing::Statement(stmt) => stmt.identifier(),
+            AnyShadowing::ExceptHandler(handler) => handler.try_identifier().unwrap(),
         }
     }
 }
@@ -38,8 +37,8 @@ impl<'a> From<&'a Expr> for AnyShadowing<'a> {
     }
 }
 
-impl<'a> From<&'a Excepthandler> for AnyShadowing<'a> {
-    fn from(value: &'a Excepthandler) -> Self {
+impl<'a> From<&'a ExceptHandler> for AnyShadowing<'a> {
+    fn from(value: &'a ExceptHandler) -> Self {
         AnyShadowing::ExceptHandler(value)
     }
 }

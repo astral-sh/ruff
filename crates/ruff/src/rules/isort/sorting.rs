@@ -32,7 +32,7 @@ fn prefix(
     } else if variables.contains(name) {
         // Ex) `variable`
         Prefix::Variables
-    } else if name.len() > 1 && str::is_upper(name) {
+    } else if name.len() > 1 && str::is_cased_uppercase(name) {
         // Ex) `CONSTANT`
         Prefix::Constants
     } else if name.chars().next().map_or(false, char::is_uppercase) {

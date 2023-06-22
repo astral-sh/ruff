@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Decorator, Expr, Ranged};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
@@ -64,7 +64,7 @@ use crate::rules::flake8_boolean_trap::helpers::FUNC_DEF_NAME_ALLOWLIST;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[violation]
 pub struct BooleanPositionalArgInFunctionDefinition;
@@ -93,11 +93,16 @@ pub(crate) fn check_positional_boolean_in_def(
         return;
     }
 
-    for arg in arguments.posonlyargs.iter().chain(arguments.args.iter()) {
-        if arg.annotation.is_none() {
+    for ArgWithDefault {
+        def,
+        default: _,
+        range: _,
+    } in arguments.posonlyargs.iter().chain(&arguments.args)
+    {
+        if def.annotation.is_none() {
             continue;
         }
-        let Some(expr) = &arg.annotation else {
+        let Some(expr) = &def.annotation else {
             continue;
         };
 
@@ -115,7 +120,7 @@ pub(crate) fn check_positional_boolean_in_def(
         }
         checker.diagnostics.push(Diagnostic::new(
             BooleanPositionalArgInFunctionDefinition,
-            arg.range(),
+            def.range(),
         ));
     }
 }

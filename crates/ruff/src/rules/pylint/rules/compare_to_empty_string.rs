@@ -1,54 +1,11 @@
 use anyhow::bail;
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum EmptyStringCmpop {
-    Is,
-    IsNot,
-    Eq,
-    NotEq,
-}
-
-impl TryFrom<&Cmpop> for EmptyStringCmpop {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &Cmpop) -> Result<Self, Self::Error> {
-        match value {
-            Cmpop::Is => Ok(Self::Is),
-            Cmpop::IsNot => Ok(Self::IsNot),
-            Cmpop::Eq => Ok(Self::Eq),
-            Cmpop::NotEq => Ok(Self::NotEq),
-            _ => bail!("{value:?} cannot be converted to EmptyStringCmpop"),
-        }
-    }
-}
-
-impl EmptyStringCmpop {
-    pub(crate) fn into_unary(self) -> &'static str {
-        match self {
-            Self::Is | Self::Eq => "not ",
-            Self::IsNot | Self::NotEq => "",
-        }
-    }
-}
-
-impl std::fmt::Display for EmptyStringCmpop {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let repr = match self {
-            Self::Is => "is",
-            Self::IsNot => "is not",
-            Self::Eq => "==",
-            Self::NotEq => "!=",
-        };
-        write!(f, "{repr}")
-    }
-}
 
 /// ## What it does
 /// Checks for comparisons to empty strings.
@@ -73,7 +30,7 @@ impl std::fmt::Display for EmptyStringCmpop {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
+/// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct CompareToEmptyString {
     existing: String,
@@ -83,25 +40,29 @@ pub struct CompareToEmptyString {
 impl Violation for CompareToEmptyString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`{}` can be simplified to `{}` as an empty string is falsey",
-            self.existing, self.replacement,
-        )
+        let CompareToEmptyString {
+            existing,
+            replacement,
+        } = self;
+        format!("`{existing}` can be simplified to `{replacement}` as an empty string is falsey",)
     }
 }
 
+/// PLC1901
 pub(crate) fn compare_to_empty_string(
     checker: &mut Checker,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     // Omit string comparison rules within subscripts. This is mostly commonly used within
     // DataFrame and np.ndarray indexing.
-    for parent in checker.semantic_model().expr_ancestors() {
-        if matches!(parent, Expr::Subscript(_)) {
-            return;
-        }
+    if checker
+        .semantic()
+        .expr_ancestors()
+        .any(|parent| parent.is_subscript_expr())
+    {
+        return;
     }
 
     let mut first = true;
@@ -110,7 +71,7 @@ pub(crate) fn compare_to_empty_string(
         .tuple_windows::<(&Expr<_>, &Expr<_>)>()
         .zip(ops)
     {
-        if let Ok(op) = EmptyStringCmpop::try_from(op) {
+        if let Ok(op) = EmptyStringCmpOp::try_from(op) {
             if std::mem::take(&mut first) {
                 // Check the left-most expression.
                 if let Expr::Constant(ast::ExprConstant { value, .. }) = &lhs {
@@ -151,5 +112,48 @@ pub(crate) fn compare_to_empty_string(
                 }
             }
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum EmptyStringCmpOp {
+    Is,
+    IsNot,
+    Eq,
+    NotEq,
+}
+
+impl TryFrom<&CmpOp> for EmptyStringCmpOp {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &CmpOp) -> Result<Self, Self::Error> {
+        match value {
+            CmpOp::Is => Ok(Self::Is),
+            CmpOp::IsNot => Ok(Self::IsNot),
+            CmpOp::Eq => Ok(Self::Eq),
+            CmpOp::NotEq => Ok(Self::NotEq),
+            _ => bail!("{value:?} cannot be converted to EmptyStringCmpOp"),
+        }
+    }
+}
+
+impl EmptyStringCmpOp {
+    fn into_unary(self) -> &'static str {
+        match self {
+            Self::Is | Self::Eq => "not ",
+            Self::IsNot | Self::NotEq => "",
+        }
+    }
+}
+
+impl std::fmt::Display for EmptyStringCmpOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let repr = match self {
+            Self::Is => "is",
+            Self::IsNot => "is not",
+            Self::Eq => "==",
+            Self::NotEq => "!=",
+        };
+        write!(f, "{repr}")
     }
 }

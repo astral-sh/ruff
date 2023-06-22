@@ -234,18 +234,19 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,219 +1,149 @@
--class MyClass:
+@@ -1,219 +1,154 @@
+ class MyClass:
 -    """Multiline
 -    class docstring
 -    """
--
--    def method(self):
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+     def method(self):
 -        """Multiline
 -        method docstring
 -        """
--        pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        "NOT_YET_IMPLEMENTED_STRING"
+         pass
  
  
  def foo():
@@ -396,12 +397,12 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -        tab at start of line and then a tab	separated	value
 -                                multiple tabs at the beginning	and	inline
 -                        mixed tabs and spaces at beginning. next line has mixed tabs and spaces only.
--
--    line ends with some tabs
--    """
 +    "NOT_YET_IMPLEMENTED_STRING"
  
+-    line ends with some tabs
+-    """
  
+-
  def docstring_with_inline_tabs_and_tab_indentation():
 -    """hey
 -
@@ -494,7 +495,12 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtClassDef
+class MyClass:
+    "NOT_YET_IMPLEMENTED_STRING"
+
+    def method(self):
+        "NOT_YET_IMPLEMENTED_STRING"
+        pass
 
 
 def foo():

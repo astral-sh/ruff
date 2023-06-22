@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -24,7 +25,7 @@ mod commands;
 mod diagnostics;
 mod panic;
 mod printer;
-mod resolve;
+pub mod resolve;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -159,7 +160,7 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
     Ok(ExitStatus::Success)
 }
 
-fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -171,12 +172,26 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         cli.stdin_filename.as_deref(),
     )?;
 
+    let mut writer: Box<dyn Write> = match cli.output_file {
+        Some(path) if !cli.watch => {
+            colored::control::set_override(false);
+            let file = File::create(path)?;
+            Box::new(BufWriter::new(file))
+        }
+        _ => Box::new(BufWriter::new(io::stdout())),
+    };
+
     if cli.show_settings {
-        commands::show_settings::show_settings(&cli.files, &pyproject_config, &overrides)?;
+        commands::show_settings::show_settings(
+            &cli.files,
+            &pyproject_config,
+            &overrides,
+            &mut writer,
+        )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides)?;
+        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -192,23 +207,17 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     } = pyproject_config.settings.cli;
 
     // Autofix rules are as follows:
+    // - By default, generate all fixes, but don't apply them to the filesystem.
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
-    // - Otherwise, if `--format json` is set, generate the fixes (so we print them
-    //   out as part of the JSON payload), but don't write them to disk.
     // - If `--diff` or `--fix-only` are set, don't print any violations (only
     //   fixes).
-    // TODO(charlie): Consider adding ESLint's `--fix-dry-run`, which would generate
-    // but not apply fixes. That would allow us to avoid special-casing JSON
-    // here.
     let autofix = if cli.diff {
         flags::FixMode::Diff
     } else if fix || fix_only {
         flags::FixMode::Apply
-    } else if matches!(format, SerializationFormat::Json) {
-        flags::FixMode::Generate
     } else {
-        flags::FixMode::None
+        flags::FixMode::Generate
     };
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
@@ -238,7 +247,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     }
 
     if cli.add_noqa {
-        if !matches!(autofix, flags::FixMode::None) {
+        if !autofix.is_generate() {
             warn_user_once!("--fix is incompatible with --add-noqa.");
         }
         let modifications =
@@ -282,7 +291,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             noqa.into(),
             autofix,
         )?;
-        printer.write_continuously(&messages)?;
+        printer.write_continuously(&mut writer, &messages)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -314,7 +323,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                         noqa.into(),
                         autofix,
                     )?;
-                    printer.write_continuously(&messages)?;
+                    printer.write_continuously(&mut writer, &messages)?;
                 }
                 Err(err) => return Err(err.into()),
             }
@@ -347,10 +356,9 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
             if cli.statistics {
-                printer.write_statistics(&diagnostics)?;
+                printer.write_statistics(&diagnostics, &mut writer)?;
             } else {
-                let mut stdout = BufWriter::new(io::stdout().lock());
-                printer.write_once(&diagnostics, &mut stdout)?;
+                printer.write_once(&diagnostics, &mut writer)?;
             }
         }
 

@@ -35,7 +35,7 @@ use ruff_python_ast::source_code::Locator;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
+/// - [Python documentation: `if` Statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
 #[violation]
 pub struct CollapsibleElseIf;
 

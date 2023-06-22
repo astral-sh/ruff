@@ -23,6 +23,28 @@ pub(crate) enum MockReference {
     Attribute,
 }
 
+/// ## What it does
+/// Checks for imports of the `mock` module that should be replaced with
+/// `unittest.mock`.
+///
+/// ## Why is this bad?
+/// Since Python 3.3, `mock` has been a part of the standard library as
+/// `unittest.mock`. The `mock` package is deprecated; use `unittest.mock`
+/// instead.
+///
+/// ## Example
+/// ```python
+/// import mock
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from unittest import mock
+/// ```
+///
+/// ## References
+/// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
+/// - [PyPI: `mock`](https://pypi.org/project/mock/)
 #[violation]
 pub struct DeprecatedMockImport {
     reference_type: MockReference,
@@ -228,9 +250,9 @@ fn format_import_from(
 /// UP026
 pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let Expr::Attribute(ast::ExprAttribute { value, .. }) = expr {
-        if collect_call_path(value)
-            .map_or(false, |call_path| call_path.as_slice() == ["mock", "mock"])
-        {
+        if collect_call_path(value).map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["mock", "mock"])
+        }) {
             let mut diagnostic = Diagnostic::new(
                 DeprecatedMockImport {
                     reference_type: MockReference::Attribute,
@@ -238,8 +260,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 value.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     "mock".to_string(),
                     value.range(),
                 )));
@@ -285,8 +306,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             name.range(),
                         );
                         if let Some(content) = content.as_ref() {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 content.clone(),
                                 stmt.range(),
                             )));

@@ -11,7 +11,7 @@ G010.py:4:9: G010 [*] Logging statement uses `warn` instead of `warning`
   |
   = help: Convert to `warn`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | import logging
 2 2 | from distutils import log
 3 3 | 

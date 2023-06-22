@@ -48,7 +48,7 @@ pub use buffer::{
     Buffer, BufferExtensions, BufferSnapshot, Inspect, PreambleBuffer, RemoveSoftLinesBuffer,
     VecBuffer,
 };
-pub use builders::FormatBestFitting;
+pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
@@ -721,7 +721,6 @@ where
 /// # Ok(())
 /// # }
 /// ```
-///
 #[inline(always)]
 pub fn write<Context>(
     output: &mut dyn Buffer<Context = Context>,

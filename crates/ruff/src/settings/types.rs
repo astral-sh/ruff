@@ -30,6 +30,7 @@ pub enum PythonVersion {
     Py39,
     Py310,
     Py311,
+    Py312,
 }
 
 impl From<PythonVersion> for Pep440Version {
@@ -47,6 +48,7 @@ impl PythonVersion {
             Self::Py39 => (3, 9),
             Self::Py310 => (3, 10),
             Self::Py311 => (3, 11),
+            Self::Py312 => (3, 12),
         }
     }
 
@@ -214,6 +216,7 @@ impl FromStr for PatternPrefixPair {
 pub enum SerializationFormat {
     Text,
     Json,
+    JsonLines,
     Junit,
     Grouped,
     Github,
@@ -248,3 +251,16 @@ impl Deref for Version {
         &self.0
     }
 }
+
+/// Pattern to match an identifier.
+///
+/// # Notes
+///
+/// [`glob::Pattern`] matches a little differently than we ideally want to.
+/// Specifically it uses `**` to match an arbitrary number of subdirectories,
+/// luckily this not relevant since identifiers don't contains slashes.
+///
+/// For reference pep8-naming uses
+/// [`fnmatch`](https://docs.python.org/3.11/library/fnmatch.html) for
+/// pattern matching.
+pub type IdentifierPattern = glob::Pattern;
