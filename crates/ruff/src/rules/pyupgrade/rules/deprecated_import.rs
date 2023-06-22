@@ -171,7 +171,6 @@ const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Literal",
     "OrderedDict",
     "Protocol",
-    "SupportsIndex",
     "runtime_checkable",
 ];
 
@@ -268,7 +267,6 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "assert_never",
     "assert_type",
     "clear_overloads",
-    "dataclass_transform",
     "final",
     "get_overloads",
     "overload",

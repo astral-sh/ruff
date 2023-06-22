@@ -48,3 +48,9 @@ if True: from collections import (
 
 # OK
 from a import b
+
+from typing_extensions import SupportsIndex
+
+isinstance(42, SupportsIndex)  # this check is much faster than the `typing` version
+
+from typing_extensions import dataclass_transform  # `typing` version won't have `frozen_default` arg until 3.12
