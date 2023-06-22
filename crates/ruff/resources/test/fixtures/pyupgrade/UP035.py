@@ -49,8 +49,11 @@ if True: from collections import (
 # OK
 from a import b
 
+# Ok: `typing_extensions` contains backported improvements.
 from typing_extensions import SupportsIndex
 
-isinstance(42, SupportsIndex)  # this check is much faster than the `typing` version
+# Ok: `typing_extensions` contains backported improvements.
+from typing_extensions import NamedTuple
 
-from typing_extensions import dataclass_transform  # `typing` version won't have `frozen_default` arg until 3.12
+# Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+from typing_extensions import dataclass_transform
