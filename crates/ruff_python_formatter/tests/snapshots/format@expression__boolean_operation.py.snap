@@ -70,8 +70,6 @@ if (
     pass
 ```
 
-
-
 ## Output
 ```py
 if (
@@ -139,5 +137,6 @@ if (
 ):
     pass
 ```
+
 
 

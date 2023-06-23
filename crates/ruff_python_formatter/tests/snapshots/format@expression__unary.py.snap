@@ -144,8 +144,6 @@ if not \
     pass
 ```
 
-
-
 ## Output
 ```py
 if (
@@ -298,5 +296,6 @@ if (
 if not a:
     pass
 ```
+
 
 

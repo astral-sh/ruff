@@ -11,8 +11,6 @@ while True:  # block comment
     # post comment
 ```
 
-
-
 ## Output
 ```py
 # leading comment
@@ -21,5 +19,6 @@ while True:  # block comment
     break  # break comment
     # post comment
 ```
+
 
 

@@ -79,8 +79,6 @@ else:  # Comment
     pass
 ```
 
-
-
 ## Output
 ```py
 if x == y:  # trailing if condition
@@ -156,5 +154,6 @@ else:  # Comment
         pass
     pass
 ```
+
 
 

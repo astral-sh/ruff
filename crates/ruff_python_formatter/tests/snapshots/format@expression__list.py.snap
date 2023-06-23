@@ -16,8 +16,6 @@ a3 = [
 ]
 ```
 
-
-
 ## Output
 ```py
 # Dangling comment placement in empty lists
@@ -31,5 +29,6 @@ a3 = [
     # b
 ]
 ```
+
 
 

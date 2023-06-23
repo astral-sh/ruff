@@ -220,7 +220,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         if let Some(last_end) = self.last_end.take() {
             if_group_breaks(&text(",")).fmt(self.fmt)?;
 
-            if self.fmt.options().magic_trailing_comma().is_preserve()
+            if self.fmt.options().magic_trailing_comma().is_respect()
                 && matches!(
                     first_non_trivia_token(last_end, self.fmt.context().contents()),
                     Some(Token {

@@ -2,6 +2,11 @@ use ruff_formatter::printer::{LineEnding, PrinterOptions};
 use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
 
 #[derive(Clone, Debug)]
+#[cfg_attr(
+    any(feature = "serde", test),
+    derive(serde::Serialize, serde::Deserialize),
+    serde(default)
+)]
 pub struct PyFormatOptions {
     /// Specifies the indent style:
     /// * Either a tab
@@ -34,6 +39,16 @@ impl PyFormatOptions {
 
     pub fn with_magic_trailing_comma(&mut self, trailing_comma: MagicTrailingComma) -> &mut Self {
         self.magic_trailing_comma = trailing_comma;
+        self
+    }
+
+    pub fn with_indent_style(&mut self, indent_style: IndentStyle) -> &mut Self {
+        self.indent_style = indent_style;
+        self
+    }
+
+    pub fn with_line_width(&mut self, line_width: LineWidth) -> &mut Self {
+        self.line_width = line_width;
         self
     }
 }
@@ -69,6 +84,10 @@ impl Default for PyFormatOptions {
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[cfg_attr(
+    any(feature = "serde", test),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum QuoteStyle {
     Single,
     #[default]
@@ -105,14 +124,18 @@ impl TryFrom<char> for QuoteStyle {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
+#[cfg_attr(
+    any(feature = "serde", test),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum MagicTrailingComma {
     #[default]
-    Preserve,
-    Skip,
+    Respect,
+    Ignore,
 }
 
 impl MagicTrailingComma {
-    pub const fn is_preserve(self) -> bool {
-        matches!(self, Self::Preserve)
+    pub const fn is_respect(self) -> bool {
+        matches!(self, Self::Respect)
     }
 }

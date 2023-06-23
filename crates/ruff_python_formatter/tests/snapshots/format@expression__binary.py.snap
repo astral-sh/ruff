@@ -200,8 +200,6 @@ for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     updates.append(UserPresenceState.default(user_id))
 ```
 
-
-
 ## Output
 ```py
 (
@@ -445,5 +443,6 @@ for (
 ) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) - {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}:
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
+
 
 
