@@ -182,8 +182,7 @@ impl Cache {
             return None;
         }
 
-        file.last_seen
-            .store(self.last_seen_cache, Ordering::Release);
+        file.last_seen.store(self.last_seen_cache, Ordering::SeqCst);
 
         Some(file)
     }
