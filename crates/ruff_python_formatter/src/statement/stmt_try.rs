@@ -62,11 +62,19 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 
         let mut last_node = body.last();
 
+        let mut first_handler = true;
+
         for handler in handlers {
-            let handler_comments_start =
-                dangling_comments.partition_point(|comment| comment.slice().end() <= handler.end());
-            let (handler_comments, rest) = dangling_comments.split_at(handler_comments_start);
-            dangling_comments = rest;
+            let handler_comments = if first_handler {
+                first_handler = false;
+                comments_info.leading_comments(handler)
+            } else {
+                let handler_comments_start = dangling_comments
+                    .partition_point(|comment| comment.slice().end() <= handler.end());
+                let (handler_comments, rest) = dangling_comments.split_at(handler_comments_start);
+                dangling_comments = rest;
+                handler_comments
+            };
 
             write!(
                 f,
