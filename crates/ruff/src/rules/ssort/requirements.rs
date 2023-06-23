@@ -5,17 +5,17 @@ use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 use std::collections::HashSet;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(super) struct Requirement<'a> {
-    name: &'a str,
-    deferred: bool,
-    scope: RequirementScope,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) enum RequirementScope {
     Local,
     NonLocal,
     Global,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(super) struct Requirement<'a> {
+    name: &'a str,
+    deferred: bool,
+    scope: RequirementScope,
 }
 
 pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
