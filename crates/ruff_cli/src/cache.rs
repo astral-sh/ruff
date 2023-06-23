@@ -569,7 +569,7 @@ mod test {
         // Storing the cache should remove the old (`old.py`) file.
         cache.store().unwrap();
         // So we when we open the cache again it shouldn't contain `old.py`.
-        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        let cache = Cache::open(&cache_dir, package_root, &settings.lib);
 
         assert_eq!(cache.package.files.len(), 1, "didn't remove the old file");
         assert!(
