@@ -287,7 +287,7 @@ async def main(
     # Otherwise doing 3k repositories can take >8GB RAM
     semaphore = asyncio.Semaphore(50)
 
-    async def limited_parallelism(coroutine):  # noqa: ANN
+    async def limited_parallelism(coroutine):  # noqa: ANN  # Used once and immediately.
         async with semaphore:
             return await coroutine
 
@@ -363,7 +363,7 @@ async def main(
 
                     if matches is None:
                         # Handle case where there are no regex matches e.g.
-                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001  # Document long code excerpt.
+                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001  # Long code excerpt.
                         # Which was found in local testing
                         continue
 
