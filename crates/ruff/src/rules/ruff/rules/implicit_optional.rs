@@ -161,8 +161,9 @@ impl<'a> Iterator for PEP604UnionIterator<'a> {
 /// or a type from the `typing_extensions` module.
 fn is_known_type(call_path: &CallPath, target_version: PythonVersion) -> bool {
     match call_path.as_slice() {
-        ["" | "builtins" | "typing_extensions", _] => true,
-        _ => is_known_standard_library(target_version.minor(), call_path.first().unwrap()),
+        ["" | "typing_extensions", ..] => true,
+        [module, ..] => is_known_standard_library(target_version.minor(), module),
+        _ => false,
     }
 }
 
