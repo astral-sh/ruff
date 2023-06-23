@@ -1,5 +1,5 @@
 use crate::rules::ssort::bindings::{
-    arguments_bindings, decorator_bindings, expr_bindings, stmt_bindings,
+    arguments_bindings, decorator_bindings, expr_bindings, keyword_bindings, stmt_bindings,
 };
 use crate::rules::ssort::builtins::CLASS_BUILTINS;
 use ruff_python_ast::prelude::*;
@@ -93,6 +93,7 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 }
             }
             Stmt::ClassDef(StmtClassDef {
+                name,
                 bases,
                 keywords,
                 body,
@@ -113,6 +114,9 @@ impl<'a> Visitor<'a> for Requirements<'a> {
 
                 let mut scope = Scope::with_class_builtins();
                 scope.add_decorator_list(decorator_list);
+                scope.add_exprs(bases);
+                scope.add_keywords(keywords);
+                scope.add_name(name);
 
                 for stmt in body {
                     let requirements = std::mem::take(&mut self.requirements);
@@ -290,9 +294,19 @@ impl<'a> Scope<'a> {
         self.scope.extend(expr_bindings(expr));
     }
 
+    fn add_exprs<I: IntoIterator<Item = &'a Expr>>(&mut self, exprs: I) {
+        for expr in exprs {
+            self.add_expr(expr);
+        }
+    }
+
+    fn add_decorator(&mut self, decorator: &'a Decorator) {
+        self.scope.extend(decorator_bindings(decorator));
+    }
+
     fn add_decorator_list<I: IntoIterator<Item = &'a Decorator>>(&mut self, decorator_list: I) {
         for decorator in decorator_list {
-            self.scope.extend(decorator_bindings(decorator));
+            self.add_decorator(decorator);
         }
     }
 
@@ -310,9 +324,23 @@ impl<'a> Scope<'a> {
             .extend(arguments.kwarg.iter().map(|arg| arg.arg.as_str()));
     }
 
+    fn add_keyword(&mut self, keyword: &'a Keyword) {
+        self.scope.extend(keyword_bindings(keyword))
+    }
+
+    fn add_keywords<I: IntoIterator<Item = &'a Keyword>>(&mut self, keywords: I) {
+        for keyword in keywords {
+            self.add_keyword(keyword);
+        }
+    }
+
+    fn add_comprehension(&mut self, comprehension: &'a Comprehension) {
+        self.scope.extend(expr_bindings(&comprehension.target));
+    }
+
     fn add_comprehensions<I: IntoIterator<Item = &'a Comprehension>>(&mut self, comprehensions: I) {
         for comprehension in comprehensions {
-            self.scope.extend(expr_bindings(&comprehension.target));
+            self.add_comprehension(comprehension);
         }
     }
 }
@@ -845,6 +873,38 @@ mod tests {
                     deferred: false,
                     scope: RequirementScope::Local
                 }
+            ]
+        );
+    }
+
+    #[test]
+    fn class_def_with_bindings() {
+        let stmt = parse(
+            r#"
+                @(a := b)
+                class c((d := e), f=(g := h)):
+                    _ = a, c, d, g
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "e",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
             ]
         );
     }

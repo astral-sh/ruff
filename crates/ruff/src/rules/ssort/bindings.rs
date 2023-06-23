@@ -19,6 +19,12 @@ pub(super) fn arguments_bindings(arguments: &Arguments) -> Vec<&str> {
     bindings.bindings
 }
 
+pub(super) fn keyword_bindings(keyword: &Keyword) -> Vec<&str> {
+    let mut bindings = Bindings::default();
+    bindings.visit_keyword(keyword);
+    bindings.bindings
+}
+
 pub(super) fn decorator_bindings(decorator: &Decorator) -> Vec<&str> {
     let mut bindings = Bindings::default();
     bindings.visit_decorator(decorator);
