@@ -37,9 +37,9 @@ impl Violation for SlowDictCreation {
 
 /// PERF404
 pub(crate) fn slow_dict_creation(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
-    if body.len() != 1 {
-        return;
-    }
+    let [stmt] = body else {
+		return;
+	};
 
     // For a dict comprehension to make sense the for loop must have both an index and a value
     // so the target must be a tuple
@@ -55,40 +55,37 @@ pub(crate) fn slow_dict_creation(checker: &mut Checker, target: &Expr, body: &[S
         names.push(id);
     }
 
+    if names.is_empty() {
+        return;
+    }
+
     // Check 1: Dict assignment
-    let stmt = &body[0];
     check_for_slow_dict_creation(checker, names.as_slice(), stmt);
 
     // Check 2: Dict assignment in an if statement
-    let Stmt::If(ast::StmtIf { body: if_body, .. }) = stmt else {
-        return
+    if let Stmt::If(ast::StmtIf { body: if_body, .. }) = stmt {
+        for stmt in if_body {
+            check_for_slow_dict_creation(checker, names.as_slice(), stmt);
+        }
     };
-
-    for if_stmt in if_body {
-        check_for_slow_dict_creation(checker, names.as_slice(), if_stmt);
-    }
 }
 
 fn check_for_slow_dict_creation(checker: &mut Checker, names: &[&String], stmt: &Stmt) {
     let Stmt::Assign(ast::StmtAssign { targets, value, range, .. })= stmt else {
-            return;
-        };
-
-    if targets.len() != 1 {
         return;
-    }
+    };
 
-    let Expr::Subscript(ast::ExprSubscript { slice, .. }) = &targets[0] else {
+    let [Expr::Subscript(ast::ExprSubscript { slice, .. })] = targets.as_slice() else {
             return
-        };
+     };
 
     let Expr::Name(ast::ExprName { id: id_index, .. }) = slice.as_ref() else {
-            return
-        };
+        return
+    };
 
     let Expr::Name(ast::ExprName { id: id_value, .. }) = value.as_ref() else {
-            return
-        };
+        return
+    };
 
     if names.contains(&id_value) && names.contains(&id_index) {
         checker
