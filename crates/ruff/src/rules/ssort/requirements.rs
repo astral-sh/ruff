@@ -4,13 +4,14 @@ use ruff_python_ast::prelude::*;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 use std::collections::HashSet;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) struct Requirement<'a> {
     name: &'a str,
     deferred: bool,
     scope: RequirementScope,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) enum RequirementScope {
     Local,
     NonLocal,
@@ -241,4 +242,961 @@ fn comprehensions_scope(comprehensions: &[Comprehension]) -> HashSet<&str> {
         scope.extend(expr_bindings(&comprehension.target));
     }
     scope
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use rustpython_parser::lexer::lex;
+    use rustpython_parser::{parse_tokens, Mode};
+    use unindent::unindent;
+
+    #[test]
+    fn function_def() {
+        let stmt = parse(
+            r#"
+                @a
+                def b(c: d = e, /, f: g = h, *i: j, k: l = m, **n: o) -> p:
+                    q = r
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(
+            requirements,
+            [Requirement {
+                name: "a",
+                deferred: false,
+                scope: RequirementScope::Local
+            },]
+        );
+    }
+
+    #[test]
+    fn function_def_with_walrus() {
+        let stmt = parse(
+            r#"
+                @(a := b)
+                def c(
+                    d: (e := f) = (g := h),
+                    /,
+                    i: (j := k) = (l := m),
+                    *n: (o := p),
+                    q: (r := s) = (t := u),
+                    **v: (w := x)
+                ) -> (y := z):
+                    aa = ab
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn async_function_def() {
+        let stmt = parse(
+            r#"
+                @a
+                async def b(c: d = e, /, f: g = h, *i: j, k: l = m, **n: o) -> p:
+                    q = r
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn async_function_def_with_walrus() {
+        let stmt = parse(
+            r#"
+                @(a := b)
+                async def c(
+                    d: (e := f) = (g := h),
+                    /,
+                    i: (j := k) = (l := m),
+                    *n: (o := p),
+                    q: (r := s) = (t := u),
+                    **v: (w := x)
+                ) -> (y := z):
+                    aa = ab
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn class_def() {
+        let stmt = parse(
+            r#"
+                @a
+                class b(c, d=f):
+                    g = h
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn class_def_with_walrus() {
+        let stmt = parse(
+            r#"
+                @(a := b)
+                class c((d := e), f=(g := h)):
+                    i = j
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn return_() {
+        let stmt = parse(r#"return a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn return_with_walrus() {
+        let stmt = parse(r#"return (a := b)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn delete() {
+        let stmt = parse(r#"del a, b.c, d[e:f:g]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn delete_with_walrus() {
+        let stmt = parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn assign() {
+        let stmt = parse(r#"a, b.c, [d, *e], *f = g"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn assign_with_walrus() {
+        let stmt = parse(r#"a, (b := c).d, [e, *f], *g = (h := i)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn aug_assign() {
+        let stmt = parse(r#"a += b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn aug_assign_with_walrus() {
+        let stmt = parse(r#"a += (b := c)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn ann_assign() {
+        let stmt = parse(r#"a: b = c"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn ann_assign_with_walrus() {
+        let stmt = parse(r#"a: (b := c) = (d := e)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn for_() {
+        let stmt = parse(
+            r#"
+                for a in b:
+                    c = d
+                else:
+                    e = f
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn for_with_walrus() {
+        let stmt = parse(
+            r#"
+                for a in (b := c):
+                    d = e
+                else:
+                    f = g
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn async_for() {
+        let stmt = parse(
+            r#"
+                async for a in b:
+                    c = d
+                else:
+                    e = f
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn async_for_with_walrus() {
+        let stmt = parse(
+            r#"
+                async for a in (b := c):
+                    d = e
+                else:
+                    f = g
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn while_() {
+        let stmt = parse(
+            r#"
+                while a:
+                    b = c
+                else:
+                    d = e
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn while_with_walrus() {
+        let stmt = parse(
+            r#"
+                while (a := b):
+                    c = d
+                else:
+                    e = f
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn if_() {
+        let stmt = parse(
+            r#"
+                if a:
+                    b = c
+                elif d:
+                    e = f
+                else:
+                    g = h
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn if_with_walrus() {
+        let stmt = parse(
+            r#"
+                if (a := b):
+                    c = d
+                elif (e := f):
+                    g = h
+                else:
+                    i = j
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn with() {
+        let stmt = parse(
+            r#"
+                with a as b, c as (d, e):
+                    f = g
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn with_with_walrus() {
+        let stmt = parse(
+            r#"
+                with (a := b) as c, (d := e) as (f, g):
+                    h = i
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn async_with() {
+        let stmt = parse(
+            r#"
+                async with a as b, c as (d, e):
+                    f = g
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn async_with_with_walrus() {
+        let stmt = parse(
+            r#"
+                async with (a := b) as c, (d := e) as (f, g):
+                    h = i
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn raise() {
+        let stmt = parse(r#"raise a from b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn raise_with_walrus() {
+        let stmt = parse(r#"raise (a := b) from (c := d)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn try_() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except c as d:
+                    e = f
+                else:
+                    g = h
+                finally:
+                    i = j
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn try_with_walrus() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except (c := d) as e:
+                    f = g
+                else:
+                    h = i
+                finally:
+                    j = k
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn try_star() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* c as d:
+                    e = f
+                else:
+                    g = h
+                finally:
+                    i = j
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn try_star_with_walrus() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* (c := d) as e:
+                    f = g
+                else:
+                    h = i
+                finally:
+                    j = k
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn assert() {
+        let stmt = parse(r#"assert a, b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn assert_with_walrus() {
+        let stmt = parse(r#"assert (a := b), (c := d)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn import() {
+        let stmt = parse(r#"import a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn import_with_submodule() {
+        let stmt = parse(r#"import a.b.c"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn import_with_alias() {
+        let stmt = parse(r#"import a as b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn import_from() {
+        let stmt = parse(r#"from a import b, c"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn import_from_with_alias() {
+        let stmt = parse(r#"from a import b as c, d as e"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn global() {
+        let stmt = parse(r#"global a, b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn nonlocal() {
+        let stmt = parse(r#"nonlocal a, b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn pass() {
+        let stmt = parse(r#"pass"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn break_() {
+        let stmt = parse(r#"break"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn continue_() {
+        let stmt = parse(r#"continue"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn bool_op() {
+        let stmt = parse(r#"a and b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn bool_op_with_walrus() {
+        let stmt = parse(r#"(a := b) and (c := d)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn named_expr() {
+        let stmt = parse(r#"(a := b)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn bin_op() {
+        let stmt = parse(r#"a + b"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn bin_op_with_walrus() {
+        let stmt = parse(r#"(a := b) + (c := d)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn unary_op() {
+        let stmt = parse(r#"-a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn unary_op_with_walrus() {
+        let stmt = parse(r#"-(a := b)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn lambda() {
+        let stmt = parse(r#"lambda a = b, /, c = d, *e, f = g, **h: i"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn lambda_with_walrus() {
+        let stmt =
+            parse(r#"lambda a = (b := c), /, d = (e := f), *g, h = (i := j), **k: (l := m)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn if_exp() {
+        let stmt = parse(r#"a if b else c"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn if_exp_with_walrus() {
+        let stmt = parse(r#"(a := b) if (c := d) else (e := f)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn dict() {
+        let stmt = parse(r#"{a: b, **c}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn dict_with_walrus() {
+        let stmt = parse(r#"{(a := b): (c := d), **(e := f)}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn set() {
+        let stmt = parse(r#"{a, *b}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn set_with_walrus() {
+        let stmt = parse(r#"{(a := b), *(c := d)}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn list_comp() {
+        let stmt = parse(r#"[a for b in c if d]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn list_comp_with_walrus() {
+        let stmt = parse(r#"[(a := b) for c in (d := f) if (g := h)]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn set_comp() {
+        let stmt = parse(r#"{a for b in c if d}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn set_comp_with_walrus() {
+        let stmt = parse(r#"{(a := b) for c in (d := f) if (g := h)}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn dict_comp() {
+        let stmt = parse(r#"{a: b for c in d if e}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn dict_comp_with_walrus() {
+        let stmt = parse(r#"{(a := b): (c := d) for e in (f := g) if (h := i)}"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn generator_exp() {
+        let stmt = parse(r#"(a for b in c if d)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn generator_exp_with_walrus() {
+        let stmt = parse(r#"((a := b) for c in (d := f) if (g := h))"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn await_() {
+        let stmt = parse(r#"await a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn await_with_walrus() {
+        let stmt = parse(r#"await (a := b)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn yield_() {
+        let stmt = parse(r#"yield a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn yield_with_walrus() {
+        let stmt = parse(r#"yield (a := b)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn yield_from() {
+        let stmt = parse(r#"yield from a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn yield_from_with_walrus() {
+        let stmt = parse(r#"yield from (a := b)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn compare() {
+        let stmt = parse(r#"a < b < c"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn compare_with_walrus() {
+        let stmt = parse(r#"(a := b) < (c := d) < (e := f)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn call() {
+        let stmt = parse(r#"a(b, *c, d=e, **f)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn call_with_walrus() {
+        let stmt = parse(r#"(a := b)((c := d), *(e := f), g=(h := i), **(j := k))"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn formatted_value() {
+        let stmt = parse(r#"f"{a:b}""#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn formatted_value_with_walrus() {
+        let stmt = parse(r#"f"{(a := b):{(c := d)}}""#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn joined_str() {
+        let stmt = parse(r#"f"{a:b} {c:d}""#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn joined_str_with_walrus() {
+        let stmt = parse(r#"f"{(a := b):{(c := d)}} {(e := f):{(g := h)}}""#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn constant() {
+        let stmt = parse(r#"1"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn attribute() {
+        let stmt = parse(r#"a.b.c"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn attribute_with_walrus() {
+        let stmt = parse(r#"(a := b).c.d"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn subscript() {
+        let stmt = parse(r#"a[b:c:d]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn subscript_with_walrus() {
+        let stmt = parse(r#"(a := b)[(c := d):(e := f):(g := h)]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn starred() {
+        let stmt = parse(r#"*a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn starred_with_walrus() {
+        let stmt = parse(r#"*(a := b)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn name() {
+        let stmt = parse(r#"a"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn list() {
+        let stmt = parse(r#"[a, b, *c]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn list_with_walrus() {
+        let stmt = parse(r#"[(a := b), (c := d), *(e := f)]"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn tuple() {
+        let stmt = parse(r#"(a, b, *c)"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn tuple_with_walrus() {
+        let stmt = parse(r#"((a := b), (c := d), *(e := f))"#);
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn match_value() {
+        let stmt = parse(
+            r#"
+                match a:
+                    case "" as b if c:
+                        d = e
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn match_singleton() {
+        let stmt = parse(
+            r#"
+                match a:
+                    case None as b if c:
+                        d = e
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn match_sequence() {
+        let stmt = parse(
+            r#"
+                match a:
+                    case [b, *c, _] as e if f:
+                        g = h
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn match_mapping() {
+        let stmt = parse(
+            r#"
+                match a:
+                    case {"b": c, "d": _, **e} as f if g:
+                        h = i
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn match_class() {
+        let stmt = parse(
+            r#"
+                match a:
+                    case b(c, d=e, f=_):
+                        g=h
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn match_star() {
+        let stmt = parse(
+            r#"
+                match a:
+                    case [*_] as b:
+                        c = d
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    #[test]
+    fn match_or() {
+        let stmt = parse(
+            r#"
+                match a:
+                    case [b] | (c) as d if e:
+                        f = g
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(requirements, [] as [Requirement; 0]);
+    }
+
+    fn parse(source: &str) -> Stmt {
+        let source = unindent(source);
+        let tokens = lex(&source, Mode::Module);
+        let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
+        match parsed {
+            Mod::Module(ModModule { body, .. }) => body.into_iter().next().unwrap(),
+            _ => panic!("Unsupported module type"),
+        }
+    }
 }
