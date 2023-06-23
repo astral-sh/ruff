@@ -72,7 +72,7 @@ use crate::settings::types::PythonVersion;
 ///
 ///
 /// def foo(arg: Text = None):
-///    pass
+///     pass
 /// ```
 ///
 /// ## Options
