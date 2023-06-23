@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,61 +1,40 @@
+@@ -1,40 +1,22 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -133,29 +133,10 @@ if True:
 +nested = {(1, 2, 3), (4, 5, 6)}
  nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
  nested_long_lines = [
--    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
--    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
--    "cccccccccccccccccccccccccccccccccccccccc",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-     (1, 2, 3),
--    "dddddddddddddddddddddddddddddddddddddddd",
-+    "NOT_YET_IMPLEMENTED_STRING",
- ]
- {
--    "oneple": (1,),
-+    "NOT_YET_IMPLEMENTED_STRING": (1,),
- }
--{"oneple": (1,)}
--["ls", "lsoneple/%s" % (foo,)]
--x = {"oneple": (1,)}
-+{"NOT_YET_IMPLEMENTED_STRING": (1,)}
-+["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
-+x = {"NOT_YET_IMPLEMENTED_STRING": (1,)}
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+@@ -52,10 +34,7 @@
  y = {
--    "oneple": (1,),
-+    "NOT_YET_IMPLEMENTED_STRING": (1,),
+     "oneple": (1,),
  }
 -assert False, (
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
@@ -233,20 +214,20 @@ y = (NOT_IMPLEMENTED_call(),)
 nested = {(1, 2, 3), (4, 5, 6)}
 nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
 nested_long_lines = [
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cccccccccccccccccccccccccccccccccccccccc",
     (1, 2, 3),
-    "NOT_YET_IMPLEMENTED_STRING",
+    "dddddddddddddddddddddddddddddddddddddddd",
 ]
 {
-    "NOT_YET_IMPLEMENTED_STRING": (1,),
+    "oneple": (1,),
 }
-{"NOT_YET_IMPLEMENTED_STRING": (1,)}
-["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
-x = {"NOT_YET_IMPLEMENTED_STRING": (1,)}
+{"oneple": (1,)}
+["ls", "lsoneple/%s" % (foo,)]
+x = {"oneple": (1,)}
 y = {
-    "NOT_YET_IMPLEMENTED_STRING": (1,),
+    "oneple": (1,),
 }
 NOT_YET_IMPLEMENTED_StmtAssert
 

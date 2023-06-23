@@ -105,23 +105,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,11 +1,11 @@
--"""Docstring."""
-+"NOT_YET_IMPLEMENTED_STRING"
- 
- 
- # leading comment
- def f():
--    NO = ""
--    SPACE = " "
--    DOUBLESPACE = "  "
-+    NO = "NOT_YET_IMPLEMENTED_STRING"
-+    SPACE = "NOT_YET_IMPLEMENTED_STRING"
-+    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
- 
-     t = leaf.type
-     p = leaf.parent  # trailing comment
-@@ -16,44 +16,51 @@
+@@ -16,32 +16,40 @@
      if t == token.COMMENT:  # another trailing comment
          return DOUBLESPACE
  
@@ -178,21 +162,14 @@ def g():
                  return NO
  
  
- ###############################################################################
+@@ -49,7 +57,6 @@
  # SECTION BECAUSE SECTIONS
  ###############################################################################
+ 
 -
- 
  def g():
--    NO = ""
--    SPACE = " "
--    DOUBLESPACE = "  "
-+    NO = "NOT_YET_IMPLEMENTED_STRING"
-+    SPACE = "NOT_YET_IMPLEMENTED_STRING"
-+    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
- 
-     t = leaf.type
-     p = leaf.parent
+     NO = ""
+     SPACE = " "
 @@ -67,11 +74,11 @@
          return DOUBLESPACE
  
@@ -235,14 +212,14 @@ def g():
 ## Ruff Output
 
 ```py
-"NOT_YET_IMPLEMENTED_STRING"
+"""Docstring."""
 
 
 # leading comment
 def f():
-    NO = "NOT_YET_IMPLEMENTED_STRING"
-    SPACE = "NOT_YET_IMPLEMENTED_STRING"
-    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
+    NO = ""
+    SPACE = " "
+    DOUBLESPACE = "  "
 
     t = leaf.type
     p = leaf.parent  # trailing comment
@@ -295,9 +272,9 @@ def f():
 ###############################################################################
 
 def g():
-    NO = "NOT_YET_IMPLEMENTED_STRING"
-    SPACE = "NOT_YET_IMPLEMENTED_STRING"
-    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
+    NO = ""
+    SPACE = " "
+    DOUBLESPACE = "  "
 
     t = leaf.type
     p = leaf.parent

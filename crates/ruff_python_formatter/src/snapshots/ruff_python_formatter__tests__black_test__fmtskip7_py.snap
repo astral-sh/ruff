@@ -18,22 +18,20 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 --- Black
 +++ Ruff
 @@ -1,4 +1,4 @@
--a = "this is some code"
+ a = "this is some code"
 -b =     5  # fmt:skip
-+a = "NOT_YET_IMPLEMENTED_STRING"
 +b = 5  # fmt:skip
  c = 9  # fmt: skip
--d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
-+d = "NOT_YET_IMPLEMENTED_STRING"  # fmt:skip
+ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
 ```
 
 ## Ruff Output
 
 ```py
-a = "NOT_YET_IMPLEMENTED_STRING"
+a = "this is some code"
 b = 5  # fmt:skip
 c = 9  # fmt: skip
-d = "NOT_YET_IMPLEMENTED_STRING"  # fmt:skip
+d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
 ```
 
 ## Black Output

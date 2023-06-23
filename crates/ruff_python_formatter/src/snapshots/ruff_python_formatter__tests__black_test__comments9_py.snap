@@ -152,15 +152,6 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -44,7 +44,7 @@
- 
- 
- class ClassWithDocstring:
--    """A docstring."""
-+    "NOT_YET_IMPLEMENTED_STRING"
- 
- 
- # Leading comment after a class with just a docstring
 @@ -59,7 +59,7 @@
  @deco1
  # leading 2
@@ -255,7 +246,7 @@ class MyClassWithComplexLeadingComments:
 
 
 class ClassWithDocstring:
-    "NOT_YET_IMPLEMENTED_STRING"
+    """A docstring."""
 
 
 # Leading comment after a class with just a docstring

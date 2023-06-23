@@ -74,27 +74,7 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -2,7 +2,7 @@
-     a,
- ):
-     d = {
--        "key": "value",
-+        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
-     }
-     tup = (1,)
- 
-@@ -12,8 +12,8 @@
-     b,
- ):
-     d = {
--        "key": "value",
--        "key2": "value2",
-+        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
-+        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
-     }
-     tup = (
-         1,
-@@ -24,45 +24,37 @@
+@@ -24,18 +24,14 @@
  def f(
      a: int = 1,
  ):
@@ -109,36 +89,22 @@ some_module.some_function(
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      x = {
--        "a": 1,
--        "b": 2,
+         "a": 1,
+         "b": 2,
 -    }["a"]
-+        "NOT_YET_IMPLEMENTED_STRING": 1,
-+        "NOT_YET_IMPLEMENTED_STRING": 2,
 +    }[
-+        "NOT_YET_IMPLEMENTED_STRING"
++        "a"
 +    ]
      if (
          a
          == {
--            "a": 1,
--            "b": 2,
--            "c": 3,
--            "d": 4,
--            "e": 5,
--            "f": 6,
--            "g": 7,
--            "h": 8,
+@@ -47,23 +43,17 @@
+             "f": 6,
+             "g": 7,
+             "h": 8,
 -        }["a"]
-+            "NOT_YET_IMPLEMENTED_STRING": 1,
-+            "NOT_YET_IMPLEMENTED_STRING": 2,
-+            "NOT_YET_IMPLEMENTED_STRING": 3,
-+            "NOT_YET_IMPLEMENTED_STRING": 4,
-+            "NOT_YET_IMPLEMENTED_STRING": 5,
-+            "NOT_YET_IMPLEMENTED_STRING": 6,
-+            "NOT_YET_IMPLEMENTED_STRING": 7,
-+            "NOT_YET_IMPLEMENTED_STRING": 8,
 +        }[
-+            "NOT_YET_IMPLEMENTED_STRING"
++            "a"
 +        ]
      ):
          pass
@@ -147,8 +113,7 @@ some_module.some_function(
 -def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
 -    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
 -):
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set["NOT_YET_IMPLEMENTED_STRING"]:
-     json = {
+-    json = {
 -        "k": {
 -            "k2": {
 -                "k3": [
@@ -156,13 +121,15 @@ some_module.some_function(
 -                ]
 -            }
 -        }
-+        "NOT_YET_IMPLEMENTED_STRING": {
-+            "NOT_YET_IMPLEMENTED_STRING": {"NOT_YET_IMPLEMENTED_STRING": [1]},
-+        },
-     }
+-    }
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]:
++    json = {"k": {"k2": {"k3": [1]}}}
  
  
-@@ -80,35 +72,16 @@
+ # The type annotation shouldn't get a trailing comma since that would change its type.
+@@ -80,35 +70,16 @@
      pass
  
  
@@ -211,7 +178,7 @@ def f(
     a,
 ):
     d = {
-        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+        "key": "value",
     }
     tup = (1,)
 
@@ -221,8 +188,8 @@ def f2(
     b,
 ):
     d = {
-        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING": "NOT_YET_IMPLEMENTED_STRING",
+        "key": "value",
+        "key2": "value2",
     }
     tup = (
         1,
@@ -236,35 +203,33 @@ def f(
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     x = {
-        "NOT_YET_IMPLEMENTED_STRING": 1,
-        "NOT_YET_IMPLEMENTED_STRING": 2,
+        "a": 1,
+        "b": 2,
     }[
-        "NOT_YET_IMPLEMENTED_STRING"
+        "a"
     ]
     if (
         a
         == {
-            "NOT_YET_IMPLEMENTED_STRING": 1,
-            "NOT_YET_IMPLEMENTED_STRING": 2,
-            "NOT_YET_IMPLEMENTED_STRING": 3,
-            "NOT_YET_IMPLEMENTED_STRING": 4,
-            "NOT_YET_IMPLEMENTED_STRING": 5,
-            "NOT_YET_IMPLEMENTED_STRING": 6,
-            "NOT_YET_IMPLEMENTED_STRING": 7,
-            "NOT_YET_IMPLEMENTED_STRING": 8,
+            "a": 1,
+            "b": 2,
+            "c": 3,
+            "d": 4,
+            "e": 5,
+            "f": 6,
+            "g": 7,
+            "h": 8,
         }[
-            "NOT_YET_IMPLEMENTED_STRING"
+            "a"
         ]
     ):
         pass
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set["NOT_YET_IMPLEMENTED_STRING"]:
-    json = {
-        "NOT_YET_IMPLEMENTED_STRING": {
-            "NOT_YET_IMPLEMENTED_STRING": {"NOT_YET_IMPLEMENTED_STRING": [1]},
-        },
-    }
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    json = {"k": {"k2": {"k3": [1]}}}
 
 
 # The type annotation shouldn't get a trailing comma since that would change its type.

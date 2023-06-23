@@ -31,8 +31,8 @@ if True:
 -                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
 -            ) % {"reported_username": reported_username, "report_reason": report_reason}
 +            return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
-+                "NOT_YET_IMPLEMENTED_STRING": reported_username,
-+                "NOT_YET_IMPLEMENTED_STRING": report_reason,
++                "reported_username": reported_username,
++                "report_reason": report_reason,
 +            }
 ```
 
@@ -43,8 +43,8 @@ if True:
     if True:
         if True:
             return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
-                "NOT_YET_IMPLEMENTED_STRING": reported_username,
-                "NOT_YET_IMPLEMENTED_STRING": report_reason,
+                "reported_username": reported_username,
+                "report_reason": report_reason,
             }
 ```
 

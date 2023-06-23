@@ -32,7 +32,7 @@ def function(a:int=42):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,23 +1,15 @@
+@@ -1,22 +1,17 @@
 -from .config import (
 -    ConfigTypeAttributes,
 -    Int,
@@ -54,11 +54,12 @@ def function(a:int=42):
 -    """This docstring is already formatted
 -    a
 -    b
--    """
-+    "NOT_YET_IMPLEMENTED_STRING"
++    """ This docstring is already formatted
++       a
++       b
+     """
      #    There's a NBSP + 3 spaces before
      #    And 4 spaces on the next line
-     pass
 ```
 
 ## Ruff Output
@@ -75,7 +76,10 @@ square = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  #  type: Optional[Square]
 
 
 def function(a: int = 42):
-    "NOT_YET_IMPLEMENTED_STRING"
+    """ This docstring is already formatted
+       a
+       b
+    """
     #    There's a NBSP + 3 spaces before
     #    And 4 spaces on the next line
     pass

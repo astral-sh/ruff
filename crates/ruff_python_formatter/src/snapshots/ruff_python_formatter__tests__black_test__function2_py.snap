@@ -66,7 +66,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -2,64 +2,41 @@
+@@ -2,17 +2,9 @@
      a,
      **kwargs,
  ) -> A:
@@ -87,9 +87,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
  
  
  def g():
--    "Docstring."
-+    "NOT_YET_IMPLEMENTED_STRING"
- 
+@@ -21,45 +13,30 @@
      def inner():
          pass
  
@@ -105,15 +103,14 @@ with hmm_but_this_should_get_two_preceding_newlines():
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
--if os.name == "posix":
+ if os.name == "posix":
 -    import termios
-+if os.name == "NOT_YET_IMPLEMENTED_STRING":
 +    NOT_YET_IMPLEMENTED_StmtImport
  
      def i_should_be_followed_by_only_one_newline():
          pass
 -
--elif os.name == "nt":
+ elif os.name == "nt":
 -    try:
 -        import msvcrt
 -
@@ -124,7 +121,6 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -
 -        def i_should_be_followed_by_only_one_newline():
 -            pass
-+elif os.name == "NOT_YET_IMPLEMENTED_STRING":
 +    NOT_YET_IMPLEMENTED_StmtTry
  
  elif False:
@@ -158,7 +154,7 @@ def f(
 
 
 def g():
-    "NOT_YET_IMPLEMENTED_STRING"
+    "Docstring."
 
     def inner():
         pass
@@ -173,12 +169,12 @@ def h():
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-if os.name == "NOT_YET_IMPLEMENTED_STRING":
+if os.name == "posix":
     NOT_YET_IMPLEMENTED_StmtImport
 
     def i_should_be_followed_by_only_one_newline():
         pass
-elif os.name == "NOT_YET_IMPLEMENTED_STRING":
+elif os.name == "nt":
     NOT_YET_IMPLEMENTED_StmtTry
 
 elif False:

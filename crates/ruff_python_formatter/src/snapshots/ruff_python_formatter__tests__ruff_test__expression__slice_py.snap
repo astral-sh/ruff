@@ -93,13 +93,13 @@ e210 = "e"[a() : 1 :]
 ## Output
 ```py
 # Handle comments both when lower and upper exist and when they don't
-a1 = "NOT_YET_IMPLEMENTED_STRING"[
+a1 = "a"[
     # a
     1  # b
     :  # c
     2  # d
 ]
-a2 = "NOT_YET_IMPLEMENTED_STRING"[
+a2 = "a"[
     # a
     # b
     :  # c
@@ -107,7 +107,7 @@ a2 = "NOT_YET_IMPLEMENTED_STRING"[
 ]
 
 # Check all places where comments can exist
-b1 = "NOT_YET_IMPLEMENTED_STRING"[  # a
+b1 = "b"[  # a
     # b
     1  # c
     # d
@@ -122,33 +122,33 @@ b1 = "NOT_YET_IMPLEMENTED_STRING"[  # a
 ]
 
 # Handle the spacing from the colon correctly with upper leading comments
-c1 = "NOT_YET_IMPLEMENTED_STRING"[
+c1 = "c"[
     1:  # e
     # f
     2
 ]
-c2 = "NOT_YET_IMPLEMENTED_STRING"[
+c2 = "c"[
     1:  # e
     2
 ]
-c3 = "NOT_YET_IMPLEMENTED_STRING"[
+c3 = "c"[
     1:
     # f
     2
 ]
-c4 = "NOT_YET_IMPLEMENTED_STRING"[
+c4 = "c"[
     1:  # f
     2
 ]
 
 # End of line comments
-d1 = "NOT_YET_IMPLEMENTED_STRING"[  # comment
+d1 = "d"[  # comment
     :
 ]
-d2 = "NOT_YET_IMPLEMENTED_STRING"[  # comment
+d2 = "d"[  # comment
     1:
 ]
-d3 = "NOT_YET_IMPLEMENTED_STRING"[
+d3 = "d"[
     1  # comment
     :
 ]
@@ -159,19 +159,19 @@ def a():
     ...
 
 
-e00 = "NOT_YET_IMPLEMENTED_STRING"[:]
-e01 = "NOT_YET_IMPLEMENTED_STRING"[:1]
-e02 = "NOT_YET_IMPLEMENTED_STRING"[ : NOT_IMPLEMENTED_call()]
-e10 = "NOT_YET_IMPLEMENTED_STRING"[1:]
-e11 = "NOT_YET_IMPLEMENTED_STRING"[1:1]
-e12 = "NOT_YET_IMPLEMENTED_STRING"[1 : NOT_IMPLEMENTED_call()]
-e20 = "NOT_YET_IMPLEMENTED_STRING"[NOT_IMPLEMENTED_call() :]
-e21 = "NOT_YET_IMPLEMENTED_STRING"[NOT_IMPLEMENTED_call() : 1]
-e22 = "NOT_YET_IMPLEMENTED_STRING"[NOT_IMPLEMENTED_call() : NOT_IMPLEMENTED_call()]
-e200 = "NOT_YET_IMPLEMENTED_STRING"[NOT_IMPLEMENTED_call() : :]
-e201 = "NOT_YET_IMPLEMENTED_STRING"[NOT_IMPLEMENTED_call() :: 1]
-e202 = "NOT_YET_IMPLEMENTED_STRING"[NOT_IMPLEMENTED_call() :: NOT_IMPLEMENTED_call()]
-e210 = "NOT_YET_IMPLEMENTED_STRING"[NOT_IMPLEMENTED_call() : 1 :]
+e00 = "e"[:]
+e01 = "e"[:1]
+e02 = "e"[ : NOT_IMPLEMENTED_call()]
+e10 = "e"[1:]
+e11 = "e"[1:1]
+e12 = "e"[1 : NOT_IMPLEMENTED_call()]
+e20 = "e"[NOT_IMPLEMENTED_call() :]
+e21 = "e"[NOT_IMPLEMENTED_call() : 1]
+e22 = "e"[NOT_IMPLEMENTED_call() : NOT_IMPLEMENTED_call()]
+e200 = "e"[NOT_IMPLEMENTED_call() : :]
+e201 = "e"[NOT_IMPLEMENTED_call() :: 1]
+e202 = "e"[NOT_IMPLEMENTED_call() :: NOT_IMPLEMENTED_call()]
+e210 = "e"[NOT_IMPLEMENTED_call() : 1 :]
 ```
 
 

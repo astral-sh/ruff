@@ -226,6 +226,41 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum QuoteStyle {
+    Single,
+    Double,
+}
+
+impl QuoteStyle {
+    pub const fn as_char(self) -> char {
+        match self {
+            QuoteStyle::Single => '\'',
+            QuoteStyle::Double => '"',
+        }
+    }
+
+    #[must_use]
+    pub const fn opposite(self) -> QuoteStyle {
+        match self {
+            QuoteStyle::Single => QuoteStyle::Double,
+            QuoteStyle::Double => QuoteStyle::Single,
+        }
+    }
+}
+
+impl TryFrom<char> for QuoteStyle {
+    type Error = ();
+
+    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
+        match value {
+            '\'' => Ok(QuoteStyle::Single),
+            '"' => Ok(QuoteStyle::Double),
+            _ => Err(()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
@@ -342,28 +377,7 @@ if True:
         let printed = format_module(&content)?;
         let formatted_code = printed.as_code();
 
-        let reformatted =
-            format_module(formatted_code).unwrap_or_else(|err| panic!("Expected formatted code to be valid syntax but it contains syntax errors: {err}\n{formatted_code}"));
-
         ensure_stability_when_formatting_twice(formatted_code);
-
-        if reformatted.as_code() != formatted_code {
-            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
-                .unified_diff()
-                .header("Formatted once", "Formatted twice")
-                .to_string();
-            panic!(
-                r#"Reformatting the formatted code a second time resulted in formatting changes.
-{diff}
-
-Formatted once:
-{formatted_code}
-
-Formatted twice:
-{}"#,
-                reformatted.as_code()
-            );
-        }
 
         let snapshot = format!(
             r#"## Input

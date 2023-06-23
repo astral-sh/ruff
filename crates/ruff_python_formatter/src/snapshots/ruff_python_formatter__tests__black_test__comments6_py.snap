@@ -180,7 +180,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -result = (  # aaa
 -    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -)
-+result = "NOT_YET_IMPLEMENTED_STRING"  # aaa
++result = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # aaa
  
 -AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA  # type: ignore
 +AAAAAAAAAAAAA = (
@@ -297,7 +297,7 @@ def func(
     c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-result = "NOT_YET_IMPLEMENTED_STRING"  # aaa
+result = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # aaa
 
 AAAAAAAAAAAAA = (
     [AAAAAAAAAAAAA]

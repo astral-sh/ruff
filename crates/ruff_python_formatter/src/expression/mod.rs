@@ -37,6 +37,7 @@ pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
 pub(crate) mod parentheses;
+mod string;
 
 #[derive(Default)]
 pub struct FormatExpr {
