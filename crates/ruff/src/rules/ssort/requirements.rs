@@ -794,7 +794,6 @@ mod tests {
     #[test]
     fn aug_assign() {
         let stmt = parse(r#"a += b"#);
-        println!("{:?}", stmt);
         let requirements = stmt_requirements(&stmt);
         assert_eq!(
             requirements,
