@@ -26,6 +26,7 @@ pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
     requirements.requirements
 }
 
+#[derive(Default)]
 struct Requirements<'a> {
     requirements: Vec<Requirement<'a>>,
 }

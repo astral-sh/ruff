@@ -2,17 +2,18 @@ use ruff_python_ast::prelude::*;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 
 pub(super) fn stmt_bindings(stmt: &Stmt) -> Vec<&str> {
-    let mut bindings = Bindings { bindings: vec![] };
+    let mut bindings = Bindings::default();
     bindings.visit_stmt(stmt);
     bindings.bindings
 }
 
 pub(super) fn expr_bindings(expr: &Expr) -> Vec<&str> {
-    let mut bindings = Bindings { bindings: vec![] };
+    let mut bindings = Bindings::default();
     bindings.visit_expr(expr);
     bindings.bindings
 }
 
+#[derive(Default)]
 struct Bindings<'a> {
     bindings: Vec<&'a str>,
 }
