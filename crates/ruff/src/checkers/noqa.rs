@@ -16,7 +16,7 @@ use ruff_python_ast::source_code::Locator;
 
 static NOQA_EXPLANATION_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<noqa>(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)(?P<explanation>(?i:#.*)?)",
+        r"(?P<noqa>(?::(?P<leading_spaces>\s*)?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)(?P<explanation>(?i:#.*)?)",
     )
         .unwrap()
 });
