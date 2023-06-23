@@ -295,16 +295,16 @@ mod tests {
 
     #[test]
     fn assign() {
-        let stmt = parse(r#"a, b.c, [d, *e], *f = g"#);
+        let stmt = parse(r#"a = b, c.d, [e, *f], *g = h"#);
         let bindings = stmt_bindings(&stmt);
-        assert_eq!(bindings, ["a", "d", "e", "f"]);
+        assert_eq!(bindings, ["a", "b", "e", "f", "g"]);
     }
 
     #[test]
     fn assign_with_walrus() {
-        let stmt = parse(r#"a, (b := c).d, [e, *f], *g = (h := i)"#);
+        let stmt = parse(r#"a = b, (c := d).e, [f, *g], *h = (i := j)"#);
         let bindings = stmt_bindings(&stmt);
-        assert_eq!(bindings, ["h", "a", "b", "e", "f", "g"]);
+        assert_eq!(bindings, ["i", "a", "b", "c", "f", "g", "h"]);
     }
 
     #[test]
