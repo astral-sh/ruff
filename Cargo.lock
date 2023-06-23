@@ -2102,7 +2102,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=f60e204b73b95bdb6ce87ccd0de34081b4a17c11#f60e204b73b95bdb6ce87ccd0de34081b4a17c11"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "schemars",
  "serde",
@@ -2180,7 +2180,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=f60e204b73b95bdb6ce87ccd0de34081b4a17c11#f60e204b73b95bdb6ce87ccd0de34081b4a17c11"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -2191,7 +2191,7 @@ dependencies = [
 [[package]]
 name = "rustpython-format"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=f60e204b73b95bdb6ce87ccd0de34081b4a17c11#f60e204b73b95bdb6ce87ccd0de34081b4a17c11"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "bitflags 2.3.1",
  "itertools",
@@ -2203,7 +2203,7 @@ dependencies = [
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=f60e204b73b95bdb6ce87ccd0de34081b4a17c11#f60e204b73b95bdb6ce87ccd0de34081b4a17c11"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "hexf-parse",
  "is-macro",
@@ -2215,7 +2215,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=f60e204b73b95bdb6ce87ccd0de34081b4a17c11#f60e204b73b95bdb6ce87ccd0de34081b4a17c11"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "anyhow",
  "is-macro",
@@ -2238,7 +2238,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=f60e204b73b95bdb6ce87ccd0de34081b4a17c11#f60e204b73b95bdb6ce87ccd0de34081b4a17c11"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "is-macro",
  "memchr",
