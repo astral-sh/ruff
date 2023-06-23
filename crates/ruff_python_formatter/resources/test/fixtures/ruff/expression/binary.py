@@ -187,3 +187,8 @@ if (
     a + b
 ):
     ...
+
+
+# Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
+for user_id in set(target_user_ids) - {u.user_id for u in updates}:
+    updates.append(UserPresenceState.default(user_id))

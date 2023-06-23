@@ -386,10 +386,10 @@ last_call()
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 -}
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 +[i for i in []]
 +[i for i in []]
 +[i for i in []]
@@ -767,10 +767,10 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
     another,
     NOT_YET_IMPLEMENTED_ExprStarred,
 ]
-NOT_YET_IMPLEMENTED_ExprSetComp
-NOT_YET_IMPLEMENTED_ExprSetComp
-NOT_YET_IMPLEMENTED_ExprSetComp
-NOT_YET_IMPLEMENTED_ExprSetComp
+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 [i for i in []]
 [i for i in []]
 [i for i in []]
