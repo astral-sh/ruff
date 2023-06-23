@@ -2072,10 +2072,6 @@ dependencies = [
 [[package]]
 name = "ruff_python_stdlib"
 version = "0.0.0"
-dependencies = [
- "once_cell",
- "rustc-hash",
-]
 
 [[package]]
 name = "ruff_python_whitespace"

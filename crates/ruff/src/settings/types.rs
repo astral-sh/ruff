@@ -52,6 +52,14 @@ impl PythonVersion {
         }
     }
 
+    pub const fn major(&self) -> u32 {
+        self.as_tuple().0
+    }
+
+    pub const fn minor(&self) -> u32 {
+        self.as_tuple().1
+    }
+
     pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
         let mut minimum_version = None;
         for python_version in PythonVersion::iter() {

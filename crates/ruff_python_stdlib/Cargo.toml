@@ -13,5 +13,3 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-once_cell = { workspace = true }
-rustc-hash = { workspace = true }
