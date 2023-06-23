@@ -193,6 +193,11 @@ if (
     a + b
 ):
     ...
+
+
+# Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
+for user_id in set(target_user_ids) - {u.user_id for u in updates}:
+    updates.append(UserPresenceState.default(user_id))
 ```
 
 
@@ -241,7 +246,7 @@ aaaaaaaaaaaaaa + {
 }
 aaaaaaaaaaaaaa + [i for i in []]
 aaaaaaaaaaaaaa + (i for i in [])
-aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp
+aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 
 # Wraps it in parentheses if it needs to break both left and right
 (
@@ -251,7 +256,7 @@ aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp
 
 
 # But only for expressions that have a statement parent.
-not (aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp)
+not (aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set})
 [
     a
     + [
@@ -432,6 +437,13 @@ if (
     + b
 ):
     ...
+
+
+# Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
+for (
+    user_id
+) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) - {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}:
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 
