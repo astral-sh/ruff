@@ -174,8 +174,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             range: TextRange::default(),
         };
         let new_env_var = node.into();
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&new_env_var),
             slice.range(),
         )));
@@ -229,8 +228,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             expected,
             expr.range(),
         )));

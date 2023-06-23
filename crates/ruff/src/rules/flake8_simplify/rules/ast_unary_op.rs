@@ -178,8 +178,7 @@ pub(crate) fn negation_with_equal_op(
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             checker.generator().expr(&node.into()),
             expr.range(),
         )));
@@ -231,8 +230,7 @@ pub(crate) fn negation_with_not_equal_op(
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&node.into()),
             expr.range(),
         )));
@@ -260,8 +258,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     );
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().in_boolean_test() {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 checker.generator().expr(operand),
                 expr.range(),
             )));
@@ -277,8 +274,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
                 keywords: vec![],
                 range: TextRange::default(),
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 checker.generator().expr(&node1.into()),
                 expr.range(),
             )));

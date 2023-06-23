@@ -148,8 +148,7 @@ pub(crate) fn multiple_with_statements(
                                     <= checker.settings.line_length
                             })
                         {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(edit));
+                            diagnostic.set_fix(Fix::suggested(edit));
                         }
                     }
                     Err(err) => error!("Failed to fix nested with: {err}"),
