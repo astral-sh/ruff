@@ -20,7 +20,7 @@ pub trait Visitor<'a> {
         walk_stmt(self, stmt);
     }
     fn visit_annotation(&mut self, expr: &'a Expr) {
-        walk_expr(self, expr);
+        self.visit_expr(expr);
     }
     fn visit_decorator(&mut self, decorator: &'a Decorator) {
         walk_decorator(self, decorator);
@@ -53,7 +53,7 @@ pub trait Visitor<'a> {
         walk_except_handler(self, except_handler);
     }
     fn visit_format_spec(&mut self, format_spec: &'a Expr) {
-        walk_expr(self, format_spec);
+        self.visit_expr(format_spec);
     }
     fn visit_arguments(&mut self, arguments: &'a Arguments) {
         walk_arguments(self, arguments);
