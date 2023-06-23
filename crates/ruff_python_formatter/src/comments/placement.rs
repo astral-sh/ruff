@@ -335,7 +335,52 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
             return CommentPlacement::Default(comment);
         }
 
-        if !locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
+        if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
+            // The `elif` or except handlers have their own body to which we can attach the trailing comment
+            // ```python
+            // if test:
+            //     a
+            // elif c: # comment
+            //     b
+            // ```
+            if following.is_except_handler() {
+                return CommentPlacement::trailing(following, comment);
+            } else if following.is_stmt_if() {
+                // We have to exclude for following if statements that are not elif by checking the
+                // indentation
+                // ```python
+                // if True:
+                //     pass
+                // else:  # Comment
+                //     if False:
+                //         pass
+                //     pass
+                // ```
+                let base_if_indent =
+                    whitespace::indentation_at_offset(locator, following.range().start());
+                let maybe_elif_indent = whitespace::indentation_at_offset(
+                    locator,
+                    comment.enclosing_node().range().start(),
+                );
+                if base_if_indent == maybe_elif_indent {
+                    return CommentPlacement::trailing(following, comment);
+                }
+            }
+            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
+            // This means, there's no good place to attach the comments to.
+            // Make this a dangling comments and manually format the comment in
+            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
+            // to correctly identify the comments for the `finally` and `orelse` block by looking
+            // at the comment's range.
+            //
+            // ```python
+            // while x == y:
+            //     pass
+            // else: # trailing
+            //     print("nooop")
+            // ```
+            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        } else {
             // Trailing comment of the preceding statement
             // ```python
             // while test:
@@ -357,30 +402,6 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
             } else {
                 CommentPlacement::trailing(preceding, comment)
             }
-        } else if following.is_stmt_if() || following.is_except_handler() {
-            // The `elif` or except handlers have their own body to which we can attach the trailing comment
-            // ```python
-            // if test:
-            //     a
-            // elif c: # comment
-            //     b
-            // ```
-            CommentPlacement::trailing(following, comment)
-        } else {
-            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
-            // This means, there's no good place to attach the comments to.
-            // Make this a dangling comments and manually format the comment in
-            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
-            // to correctly identify the comments for the `finally` and `orelse` block by looking
-            // at the comment's range.
-            //
-            // ```python
-            // while x == y:
-            //     pass
-            // else: # trailing
-            //     print("nooop")
-            // ```
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
         }
     } else {
         CommentPlacement::Default(comment)
