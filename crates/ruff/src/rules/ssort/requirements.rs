@@ -264,11 +264,63 @@ mod tests {
         let requirements = stmt_requirements(&stmt);
         assert_eq!(
             requirements,
-            [Requirement {
-                name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
-            },]
+            [
+                Requirement {
+                    name: "a",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "e",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "m",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "d",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "g",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "j",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "l",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "o",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "p",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "r",
+                    deferred: true,
+                    scope: RequirementScope::Local
+                },
+            ]
         );
     }
 
@@ -289,7 +341,66 @@ mod tests {
             "#,
         );
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "m",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "u",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "f",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "k",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "p",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "s",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "x",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "z",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "ab",
+                    deferred: true,
+                    scope: RequirementScope::Local
+                },
+            ]
+        );
     }
 
     #[test]
@@ -302,7 +413,66 @@ mod tests {
             "#,
         );
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "a",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "e",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "m",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "d",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "g",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "j",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "l",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "o",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "p",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "r",
+                    deferred: true,
+                    scope: RequirementScope::Local
+                },
+            ]
+        );
     }
 
     #[test]
@@ -322,7 +492,66 @@ mod tests {
             "#,
         );
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "m",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "u",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "f",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "k",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "p",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "s",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "x",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "z",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "ab",
+                    deferred: true,
+                    scope: RequirementScope::Local
+                },
+            ]
+        );
     }
 
     #[test]
@@ -335,7 +564,31 @@ mod tests {
             "#,
         );
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "a",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "c",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "f",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
@@ -348,63 +601,226 @@ mod tests {
             "#,
         );
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "e",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "j",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
     fn return_() {
         let stmt = parse(r#"return a"#);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [Requirement {
+                name: "a",
+                deferred: false,
+                scope: RequirementScope::Local
+            }]
+        );
     }
 
     #[test]
     fn return_with_walrus() {
         let stmt = parse(r#"return (a := b)"#);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [Requirement {
+                name: "b",
+                deferred: false,
+                scope: RequirementScope::Local
+            }]
+        );
     }
 
     #[test]
     fn delete() {
         let stmt = parse(r#"del a, b.c, d[e:f:g]"#);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "a",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "d",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "e",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "f",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "g",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
     fn delete_with_walrus() {
         let stmt = parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)]"#);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "a",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "c",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "f",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "j",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "l",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
     fn assign() {
-        let stmt = parse(r#"a, b.c, [d, *e], *f = g"#);
+        let stmt = parse(r#"a = b, c.d, [e, *f], *g = h"#);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "c",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
     fn assign_with_walrus() {
-        let stmt = parse(r#"a, (b := c).d, [e, *f], *g = (h := i)"#);
+        let stmt = parse(r#"a = b, (c := d).e, [f, *g], *h = (i := j)"#);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "j",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "d",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
     fn aug_assign() {
         let stmt = parse(r#"a += b"#);
+        println!("{:?}", stmt);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "a",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
     fn aug_assign_with_walrus() {
         let stmt = parse(r#"a += (b := c)"#);
         let requirements = stmt_requirements(&stmt);
-        assert_eq!(requirements, [] as [Requirement; 0]);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "c",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "a",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                }
+            ]
+        );
     }
 
     #[test]
