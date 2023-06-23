@@ -1,11 +1,10 @@
-use crate::builders::use_magic_trailing_comma;
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::trivia::{SimpleTokenizer, TokenKind};
 use ruff_formatter::{format_args, write};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Keyword, Ranged, StmtClassDef};
+use rustpython_parser::ast::{Ranged, StmtClassDef};
 
 #[derive(Default)]
 pub struct FormatStmtClassDef;
@@ -80,10 +79,9 @@ impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
             ..
         } = self.class_definition;
 
-        let separator = format_with(|f| write!(f, [text(","), soft_line_break_or_space()]));
         let source = f.context().contents();
 
-        let mut joiner = f.join_with(&separator);
+        let mut joiner = f.join_comma_separated();
 
         if let Some((first, rest)) = bases.split_first() {
             // Manually handle parentheses for the first expression because the logic in `FormatExpr`
@@ -107,23 +105,10 @@ impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
                 Parenthesize::Never
             };
 
-            joiner.entry(&first.format().with_options(parenthesize));
-            joiner.entries(rest.iter().formatted());
+            joiner.entry(first, &first.format().with_options(parenthesize));
+            joiner.nodes(rest.iter());
         }
 
-        joiner.entries(keywords.iter().formatted()).finish()?;
-
-        if_group_breaks(&text(",")).fmt(f)?;
-
-        let last = keywords
-            .last()
-            .map(Keyword::range)
-            .or_else(|| bases.last().map(Expr::range))
-            .unwrap();
-        if use_magic_trailing_comma(f, last) {
-            hard_line_break().fmt(f)?;
-        }
-
-        Ok(())
+        joiner.nodes(keywords.iter()).finish()
     }
 }
