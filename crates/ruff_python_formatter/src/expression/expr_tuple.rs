@@ -1,11 +1,10 @@
+use crate::builders::use_magic_trailing_comma;
 use crate::comments::{dangling_node_comments, Comments};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::trivia::Token;
-use crate::trivia::{first_non_trivia_token, TokenKind};
-use crate::{AsFormat, FormatNodeRule, FormattedIterExt, PyFormatter, USE_MAGIC_TRAILING_COMMA};
+use crate::{AsFormat, FormatNodeRule, FormattedIterExt, PyFormatter};
 use ruff_formatter::formatter::Formatter;
 use ruff_formatter::prelude::{
     block_indent, group, if_group_breaks, soft_block_indent, soft_line_break_or_space, text,
@@ -88,14 +87,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             [.., last] => last,
         };
 
-        let magic_trailing_comma = USE_MAGIC_TRAILING_COMMA
-            && matches!(
-                first_non_trivia_token(last.range().end(), f.context().contents()),
-                Some(Token {
-                    kind: TokenKind::Comma,
-                    ..
-                })
-            );
+        let magic_trailing_comma = use_magic_trailing_comma(f, last.range());
 
         if magic_trailing_comma {
             // A magic trailing comma forces us to print in expanded mode since we have more than
