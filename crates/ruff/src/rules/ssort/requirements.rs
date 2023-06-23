@@ -189,7 +189,7 @@ impl<'a> Visitor<'a> for Requirements<'a> {
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
                     self.requirements.push(Requirement {
-                        name: name.as_str(),
+                        name,
                         deferred: false,
                         scope: RequirementScope::Global,
                     });
@@ -198,7 +198,7 @@ impl<'a> Visitor<'a> for Requirements<'a> {
             Stmt::Nonlocal(StmtNonlocal { names, .. }) => {
                 for name in names {
                     self.requirements.push(Requirement {
-                        name: name.as_str(),
+                        name,
                         deferred: false,
                         scope: RequirementScope::NonLocal,
                     });

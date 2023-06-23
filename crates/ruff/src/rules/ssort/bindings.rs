@@ -58,7 +58,7 @@ impl<'a> Visitor<'a> for Bindings<'a> {
                     self.visit_annotation(expr);
                 }
 
-                self.bindings.push(name.as_str());
+                self.bindings.push(name);
             }
             Stmt::ClassDef(StmtClassDef {
                 name,
@@ -80,7 +80,7 @@ impl<'a> Visitor<'a> for Bindings<'a> {
                     self.visit_keyword(keyword);
                 }
 
-                self.bindings.push(name.as_str());
+                self.bindings.push(name);
             }
             Stmt::Global(StmtGlobal { names, .. }) | Stmt::Nonlocal(StmtNonlocal { names, .. }) => {
                 self.bindings.extend(names.iter().map(Identifier::as_str));
@@ -121,7 +121,7 @@ impl<'a> Visitor<'a> for Bindings<'a> {
                     self.visit_expr(expr);
                 }
                 if let Some(name) = name {
-                    self.bindings.push(name.as_str());
+                    self.bindings.push(name);
                 }
                 self.visit_body(body);
             }
@@ -130,10 +130,10 @@ impl<'a> Visitor<'a> for Bindings<'a> {
 
     fn visit_alias(&mut self, alias: &'a Alias) {
         match &alias.asname {
-            Some(asname) => self.bindings.push(asname.as_str()),
+            Some(asname) => self.bindings.push(asname),
             None => match alias.name.split_once('.') {
                 Some((prefix, _)) => self.bindings.push(prefix),
-                _ => self.bindings.push(alias.name.as_str()),
+                _ => self.bindings.push(&alias.name),
             },
         }
     }
@@ -142,7 +142,7 @@ impl<'a> Visitor<'a> for Bindings<'a> {
         match pattern {
             Pattern::MatchStar(PatternMatchStar { name, .. }) => {
                 if let Some(name) = name {
-                    self.bindings.push(name.as_str());
+                    self.bindings.push(name);
                 }
             }
             Pattern::MatchMapping(PatternMatchMapping {
@@ -156,7 +156,7 @@ impl<'a> Visitor<'a> for Bindings<'a> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.bindings.push(rest.as_str());
+                    self.bindings.push(rest);
                 }
             }
             Pattern::MatchAs(PatternMatchAs { pattern, name, .. }) => {
@@ -164,7 +164,7 @@ impl<'a> Visitor<'a> for Bindings<'a> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(name) = name {
-                    self.bindings.push(name.as_str());
+                    self.bindings.push(name);
                 }
             }
             pattern => walk_pattern(self, pattern),
