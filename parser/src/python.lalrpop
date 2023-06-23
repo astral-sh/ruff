@@ -10,7 +10,7 @@ use crate::{
     context::set_context,
     string::parse_strings,
     token::{self, StringKind},
-    text_size::TextSize, parser::optional_range
+    text_size::TextSize
 };
 
 grammar;
@@ -19,9 +19,9 @@ grammar;
 // For each public entry point, a full parse table is generated.
 // By having only a single pub function, we reduce this to one.
 pub Top: ast::Mod = {
-    <start:@L> StartModule <body:Program> <end:@R> => ast::ModModule { body, type_ignores: vec![], range: optional_range(start, end) }.into(),
-    <start:@L> StartInteractive <body:Program> <end:@R> => ast::ModInteractive { body, range: optional_range(start, end) }.into(),
-    <start:@L> StartExpression <body:TestList> ("\n")* <end:@R> => ast::ModExpression { body: Box::new(body), range: optional_range(start, end) }.into()
+    <start:@L> StartModule <body:Program> <end:@R> => ast::ModModule { body, type_ignores: vec![], range: (start..end).into() }.into(),
+    <start:@L> StartInteractive <body:Program> <end:@R> => ast::ModInteractive { body, range: (start..end).into() }.into(),
+    <start:@L> StartExpression <body:TestList> ("\n")* <end:@R> => ast::ModExpression { body: Box::new(body), range: (start..end).into() }.into()
 };
 
 Program: ast::Suite = {
@@ -393,7 +393,7 @@ MatchCase: ast::MatchCase = {
             pattern,
             guard: guard.map(Box::new),
             body,
-            range: optional_range(start, end)
+            range: (start..end).into()
         }
     },
 }
@@ -952,15 +952,15 @@ WithItems: Vec<ast::WithItem> = {
 #[inline]
 WithItemsNoAs: Vec<ast::WithItem> = {
     <location:@L> <all:OneOrMore<Test<"all">>> <end_location:@R> => {
-        all.into_iter().map(|context_expr| ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }).collect()
+        all.into_iter().map(|context_expr| ast::WithItem { context_expr, optional_vars: None, range: (location..end_location).into() }).collect()
     },
 }
 
 WithItem<Goal>: ast::WithItem = {
-    <location:@L> <context_expr: Test<Goal>> <end_location:@R> if Goal != "as" => ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) },
+    <location:@L> <context_expr: Test<Goal>> <end_location:@R> if Goal != "as" => ast::WithItem { context_expr, optional_vars: None, range: (location..end_location).into() },
     <location:@L> <context_expr:Test<"all">> "as" <vars:Expression<"all">> <end_location:@R> => {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: (location..end_location).into() }
     },
 };
 
@@ -982,7 +982,7 @@ Parameters: ast::Arguments = {
     <location:@L> "(" <a: (ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>)?> ")" <end_location:@R> =>? {
         a.as_ref().map(validate_arguments).transpose()?;
 
-        let range = optional_range(location, end_location);
+        let range = (location..end_location).into();
         let args = a
             .map(|mut arguments| {
                 arguments.range = range;
@@ -1010,7 +1010,7 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         })
     },
     <location:@L> <param1:ParameterDefs<ArgType>> <kw:("," <KwargParameter<DoubleStarArgType>>)> ","? <end_location:@R> =>? {
@@ -1028,7 +1028,7 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         })
     },
     <location:@L> <params:ParameterListStarArgs<ArgType, StarArgType, DoubleStarArgType>> ","? <end_location:@R> => {
@@ -1039,7 +1039,7 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     },
     <location:@L> <kwarg:KwargParameter<DoubleStarArgType>> ","? <end_location:@R> => {
@@ -1049,7 +1049,7 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
             kwonlyargs: vec![],
             vararg: None,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     },
 };
@@ -1069,10 +1069,7 @@ ParameterDef<ArgType>: ast::ArgWithDefault = {
     <i:ArgType> => i,
     <mut i:ArgType> "=" <e:Test<"all">> <end_location:@R> => {
         i.default = Some(Box::new(e));
-        #[cfg(feature = "all-nodes-with-ranges")]
-        {
-            i.range = optional_range(i.range.start(), end_location);
-        }
+        i.range = (i.range.start()..end_location).into();
         i
     },
 };
@@ -1080,7 +1077,7 @@ ParameterDef<ArgType>: ast::ArgWithDefault = {
 UntypedParameter: ast::ArgWithDefault = {
     <location:@L> <arg:Identifier> <end_location:@R> => {
         let def = ast::Arg { arg, annotation: None, type_comment: None, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: optional_range(location, end_location) }
+        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     },
 };
 StarUntypedParameter: ast::Arg = {
@@ -1091,7 +1088,7 @@ TypedParameter: ast::ArgWithDefault = {
     <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
         let def = ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: optional_range(location, end_location) }
+        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     },
 };
 
@@ -1157,7 +1154,7 @@ ClassDef: ast::Stmt = {
 // Decorators:
 Decorator: ast::Decorator = {
     <location:@L> "@" <p:NamedExpressionTest> <end_location:@R> "\n" => {
-        ast::Decorator { range: optional_range(location, end_location), expression: p }
+        ast::Decorator { range: (location..end_location).into(), expression: p }
     },
 };
 
@@ -1206,7 +1203,7 @@ LambdaDef: ast::Expr = {
     <location:@L> "lambda" <p:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> ":" <body:Test<"all">> <end_location:@R> =>? {
         p.as_ref().map(validate_arguments).transpose()?;
         let p = p
-            .unwrap_or_else(|| ast::Arguments::empty(optional_range(location, end_location)));
+            .unwrap_or_else(|| ast::Arguments::empty((location..end_location).into()));
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
@@ -1570,7 +1567,7 @@ SingleForComprehension: ast::Comprehension = {
             iter,
             ifs,
             is_async,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     }
 };

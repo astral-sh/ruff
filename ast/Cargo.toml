@@ -9,7 +9,6 @@ license = "MIT"
 
 [features]
 default = ["malachite-bigint"]
-all-nodes-with-ranges = []
 
 [dependencies]
 rustpython-parser-core = { workspace = true }

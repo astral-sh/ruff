@@ -1,6 +1,6 @@
 use crate::{Constant, Expr};
 
-impl<R> Expr<R> {
+impl Expr {
     /// Returns a short name for the node suitable for use in error messages.
     pub fn python_name(&self) -> &'static str {
         match self {

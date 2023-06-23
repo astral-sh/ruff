@@ -11,7 +11,6 @@ edition = "2021"
 [features]
 default = ["malachite-bigint"]
 serde = ["dep:serde", "rustpython-parser-core/serde"]
-all-nodes-with-ranges = ["rustpython-ast/all-nodes-with-ranges"]
 full-lexer = []
 malachite-bigint = ["dep:malachite-bigint", "rustpython-ast/malachite-bigint"]
 num-bigint = ["dep:num-bigint", "rustpython-ast/num-bigint"]

@@ -66,7 +66,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_assign_list() {
         let source = "[x, y] = (1, 2, 3)";
         let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
@@ -102,7 +101,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_assign_list_comp() {
         let source = "x = [y for y in (1, 2, 3)]";
         let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
@@ -110,7 +108,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_assign_set_comp() {
         let source = "x = {y for y in (1, 2, 3)}";
         let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
@@ -118,7 +115,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_assign_with() {
         let source = "with 1 as x: pass";
         let parse_ast = ast::Suite::parse(source, "<test>").unwrap();

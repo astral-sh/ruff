@@ -286,13 +286,6 @@ class TypeInfoMixin:
     def has_user_data(self, typ):
         return self.type_info[typ].has_user_data
 
-    def apply_generics(self, typ, *generics):
-        needs_generics = not self.type_info[typ].is_simple
-        if needs_generics:
-            return [f"<{g}>" for g in generics]
-        else:
-            return ["" for g in generics]
-
 
 class EmitVisitor(asdl.VisitorBase, TypeInfoMixin):
     """Visit that emits lines"""
@@ -393,17 +386,14 @@ class StructVisitor(EmitVisitor):
         self.emit("#[derive(Clone, Debug, PartialEq)]", depth)
 
     def emit_range(self, has_attributes, depth):
-        if has_attributes:
-            self.emit("pub range: R,", depth + 1)
-        else:
-            self.emit("pub range: OptionalRange<R>,", depth + 1)
+        self.emit("pub range: TextRange,", depth + 1)
 
     def visitModule(self, mod):
         self.emit_attrs(0)
         self.emit(
             """
         #[derive(is_macro::Is)]
-        pub enum Ast<R=TextRange> {
+        pub enum Ast {
         """,
             0,
         )
@@ -411,7 +401,6 @@ class StructVisitor(EmitVisitor):
             info = self.customized_type_info(dfn.name)
             dfn = info.custom
             rust_name = info.full_type_name
-            generics = "" if self.type_info[dfn.name].is_simple else "<R>"
             if dfn.name == "mod":
                 # This is exceptional rule to other enums.
                 # Unlike other enums, this is justified because `Mod` is only used as
@@ -419,11 +408,11 @@ class StructVisitor(EmitVisitor):
                 # Because it will be very rarely used in very particular applications,
                 # "ast_" prefix to everywhere seems less useful.
                 self.emit('#[is(name = "module")]', 1)
-            self.emit(f"{rust_name}({rust_name}{generics}),", 1)
+            self.emit(f"{rust_name}({rust_name}),", 1)
         self.emit(
             """
             }
-            impl<R> Node for Ast<R> {
+            impl Node for Ast {
                 const NAME: &'static str = "AST";
                 const FIELD_NAMES: &'static [&'static str] = &[];
             }
@@ -433,11 +422,10 @@ class StructVisitor(EmitVisitor):
         for dfn in mod.dfns:
             info = self.customized_type_info(dfn.name)
             rust_name = info.full_type_name
-            generics = "" if self.type_info[dfn.name].is_simple else "<R>"
             self.emit(
                 f"""
-            impl<R> From<{rust_name}{generics}> for Ast<R> {{
-                fn from(node: {rust_name}{generics}) -> Self {{
+            impl From<{rust_name}> for Ast {{
+                fn from(node: {rust_name}) -> Self {{
                     Ast::{rust_name}(node)
                 }}
             }}
@@ -462,10 +450,9 @@ class StructVisitor(EmitVisitor):
         else:
             self.sum_with_constructors(sum, type, depth)
 
-        (generics_applied,) = self.apply_generics(type.name, "R")
         self.emit(
             f"""
-            impl{generics_applied} Node for {rust_type_name(type.name)}{generics_applied} {{
+            impl Node for {rust_type_name(type.name)} {{
                 const NAME: &'static str = "{type.name}";
                 const FIELD_NAMES: &'static [&'static str] = &[];
             }}
@@ -512,7 +499,7 @@ class StructVisitor(EmitVisitor):
                         {rust_name}::{cons.name}
                     }}
                 }}
-                impl<R> From<{rust_name}{cons.name}> for Ast<R> {{
+                impl From<{rust_name}{cons.name}> for Ast {{
                     fn from(_: {rust_name}{cons.name}) -> Self {{
                         {rust_name}::{cons.name}.into()
                     }}
@@ -537,7 +524,7 @@ class StructVisitor(EmitVisitor):
 
         self.emit_attrs(depth)
         self.emit("#[derive(is_macro::Is)]", depth)
-        self.emit(f"pub enum {rust_name}<R = TextRange> {{", depth)
+        self.emit(f"pub enum {rust_name} {{", depth)
         needs_escape = any(rust_field_name(t.name) in RUST_KEYWORDS for t in sum.types)
         for t in sum.types:
             if needs_escape:
@@ -545,7 +532,7 @@ class StructVisitor(EmitVisitor):
                     f'#[is(name = "{rust_field_name(t.name)}_{rust_name.lower()}")]',
                     depth + 1,
                 )
-            self.emit(f"{t.name}({rust_name}{t.name}<R>),", depth + 1)
+            self.emit(f"{t.name}({rust_name}{t.name}),", depth + 1)
         self.emit("}", depth)
         self.emit("", depth)
 
@@ -559,7 +546,7 @@ class StructVisitor(EmitVisitor):
         )
         self.emit_attrs(depth)
         payload_name = f"{rust_name}{t.name}"
-        self.emit(f"pub struct {payload_name}<R = TextRange> {{", depth)
+        self.emit(f"pub struct {payload_name} {{", depth)
         self.emit_range(sum_type_info.has_attributes, depth)
         for f in t.fields:
             self.visit(f, sum_type_info, "pub ", depth + 1, t.name)
@@ -572,17 +559,17 @@ class StructVisitor(EmitVisitor):
         field_names = [f'"{f.name}"' for f in t.fields]
         self.emit(
             f"""
-            impl<R> Node for {payload_name}<R> {{
+            impl Node for {payload_name} {{
                 const NAME: &'static str = "{t.name}";
                 const FIELD_NAMES: &'static [&'static str] = &[{', '.join(field_names)}];
             }}
-            impl<R> From<{payload_name}<R>> for {rust_name}<R> {{
-                fn from(payload: {payload_name}<R>) -> Self {{
+            impl From<{payload_name}> for {rust_name} {{
+                fn from(payload: {payload_name}) -> Self {{
                     {rust_name}::{t.name}(payload)
                 }}
             }}
-            impl<R> From<{payload_name}<R>> for Ast<R> {{
-                fn from(payload: {payload_name}<R>) -> Self {{
+            impl From<{payload_name}> for Ast {{
+                fn from(payload: {payload_name}) -> Self {{
                     {rust_name}::from(payload).into()
                 }}
             }}
@@ -609,7 +596,7 @@ class StructVisitor(EmitVisitor):
             field_type = None
             typ = rust_type_name(field.type)
         if field_type and not field_type.is_simple:
-            typ = f"{typ}<R>"
+            typ = f"{typ}"
         # don't box if we're doing Vec<T>, but do box if we're doing Vec<Option<Box<T>>>
         if (
             field_type
@@ -642,7 +629,7 @@ class StructVisitor(EmitVisitor):
         type_info = self.type_info[type.name]
         product_name = type_info.full_type_name
         self.emit_attrs(depth)
-        self.emit(f"pub struct {product_name}<R = TextRange> {{", depth)
+        self.emit(f"pub struct {product_name} {{", depth)
         self.emit_range(product.attributes, depth + 1)
         for f in product.fields:
             self.visit(f, type_info, "pub ", depth + 1)
@@ -652,7 +639,7 @@ class StructVisitor(EmitVisitor):
         field_names = [f'"{f.name}"' for f in product.fields]
         self.emit(
             f"""
-            impl<R> Node for {product_name}<R>  {{
+            impl Node for {product_name}  {{
                 const NAME: &'static str = "{type.name}";
                 const FIELD_NAMES: &'static [&'static str] = &[
                 {', '.join(field_names)}
@@ -692,8 +679,6 @@ class RangedDefVisitor(EmitVisitor):
             self.emit_type_alias(variant_info)
             self.emit_ranged_impl(variant_info)
 
-        if not info.no_cfg(self.type_info):
-            self.emit('#[cfg(feature = "all-nodes-with-ranges")]', 0)
 
         self.emit(
             f"""
@@ -716,21 +701,16 @@ class RangedDefVisitor(EmitVisitor):
 
     def emit_type_alias(self, info):
         return  # disable
-        generics = "" if info.is_simple else "::<TextRange>"
-
         self.emit(
-            f"pub type {info.full_type_name} = crate::generic::{info.full_type_name}{generics};",
+            f"pub type {info.full_type_name} = crate::generic::{info.full_type_name};",
             0,
         )
         self.emit("", 0)
 
     def emit_ranged_impl(self, info):
-        if not info.no_cfg(self.type_info):
-            self.emit('#[cfg(feature = "all-nodes-with-ranges")]', 0)
-
         self.file.write(
             f"""
-            impl Ranged for crate::generic::{info.full_type_name}::<TextRange> {{
+            impl Ranged for crate::generic::{info.full_type_name} {{
                 fn range(&self) -> TextRange {{
                     self.range
                 }}

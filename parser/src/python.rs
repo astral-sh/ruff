@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 4caf54d50e2859da942dd4db1d0d538083a10c1a232b8619e44f266f1ae25384
+// sha3: 0fa2bdb02350fa071c24cfc111835a73b754cc5d1f240b2105cea9d59431bf4e
 use crate::{
     ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
@@ -7,7 +7,7 @@ use crate::{
     context::set_context,
     string::parse_strings,
     token::{self, StringKind},
-    text_size::TextSize, parser::optional_range
+    text_size::TextSize
 };
 #[allow(unused_extern_crates)]
 extern crate lalrpop_util as __lalrpop_util;
@@ -27,7 +27,7 @@ mod __parse__Top {
     context::set_context,
     string::parse_strings,
     token::{self, StringKind},
-    text_size::TextSize, parser::optional_range
+    text_size::TextSize
 };
     #[allow(unused_extern_crates)]
     extern crate lalrpop_util as __lalrpop_util;
@@ -28748,7 +28748,7 @@ fn __action1<
     (_, end, _): (TextSize, TextSize, TextSize),
 ) -> ast::Mod
 {
-    ast::ModModule { body, type_ignores: vec![], range: optional_range(start, end) }.into()
+    ast::ModModule { body, type_ignores: vec![], range: (start..end).into() }.into()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -28760,7 +28760,7 @@ fn __action2<
     (_, end, _): (TextSize, TextSize, TextSize),
 ) -> ast::Mod
 {
-    ast::ModInteractive { body, range: optional_range(start, end) }.into()
+    ast::ModInteractive { body, range: (start..end).into() }.into()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -28773,7 +28773,7 @@ fn __action3<
     (_, end, _): (TextSize, TextSize, TextSize),
 ) -> ast::Mod
 {
-    ast::ModExpression { body: Box::new(body), range: optional_range(start, end) }.into()
+    ast::ModExpression { body: Box::new(body), range: (start..end).into() }.into()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -29788,7 +29788,7 @@ fn __action82<
             pattern,
             guard: guard.map(Box::new),
             body,
-            range: optional_range(start, end)
+            range: (start..end).into()
         }
     }
 }
@@ -31071,7 +31071,7 @@ fn __action156<
 ) -> Vec<ast::WithItem>
 {
     {
-        all.into_iter().map(|context_expr| ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }).collect()
+        all.into_iter().map(|context_expr| ast::WithItem { context_expr, optional_vars: None, range: (location..end_location).into() }).collect()
     }
 }
 
@@ -31115,7 +31115,7 @@ fn __action158<
     {
         a.as_ref().map(validate_arguments).transpose()?;
 
-        let range = optional_range(location, end_location);
+        let range = (location..end_location).into();
         let args = a
             .map(|mut arguments| {
                 arguments.range = range;
@@ -31137,7 +31137,7 @@ fn __action159<
 {
     {
         let def = ast::Arg { arg, annotation: None, type_comment: None, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: optional_range(location, end_location) }
+        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     }
 }
 
@@ -31164,7 +31164,7 @@ fn __action161<
     {
         let annotation = a.map(Box::new);
         let def = ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: optional_range(location, end_location) }
+        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     }
 }
 
@@ -31240,7 +31240,7 @@ fn __action165<
 ) -> ast::Decorator
 {
     {
-        ast::Decorator { range: optional_range(location, end_location), expression: p }
+        ast::Decorator { range: (location..end_location).into(), expression: p }
     }
 }
 
@@ -31328,7 +31328,7 @@ fn __action171<
     {
         p.as_ref().map(validate_arguments).transpose()?;
         let p = p
-            .unwrap_or_else(|| ast::Arguments::empty(optional_range(location, end_location)));
+            .unwrap_or_else(|| ast::Arguments::empty((location..end_location).into()));
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
@@ -31775,7 +31775,7 @@ fn __action213<
             iter,
             ifs,
             is_async,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     }
 }
@@ -32232,7 +32232,7 @@ fn __action250<
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         })
     }
 }
@@ -32262,7 +32262,7 @@ fn __action251<
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         })
     }
 }
@@ -32284,7 +32284,7 @@ fn __action252<
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     }
 }
@@ -32305,7 +32305,7 @@ fn __action253<
             kwonlyargs: vec![],
             vararg: None,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     }
 }
@@ -32449,7 +32449,7 @@ fn __action266<
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         })
     }
 }
@@ -32479,7 +32479,7 @@ fn __action267<
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         })
     }
 }
@@ -32501,7 +32501,7 @@ fn __action268<
             kwonlyargs,
             vararg,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     }
 }
@@ -32522,7 +32522,7 @@ fn __action269<
             kwonlyargs: vec![],
             vararg: None,
             kwarg,
-            range: optional_range(location, end_location)
+            range: (location..end_location).into()
         }
     }
 }
@@ -32625,7 +32625,7 @@ fn __action279<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::WithItem
 {
-    ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }
+    ast::WithItem { context_expr, optional_vars: None, range: (location..end_location).into() }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -32640,7 +32640,7 @@ fn __action280<
 {
     {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: (location..end_location).into() }
     }
 }
 
@@ -32681,7 +32681,7 @@ fn __action284<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::WithItem
 {
-    ast::WithItem { context_expr, optional_vars: None, range: optional_range(location, end_location) }
+    ast::WithItem { context_expr, optional_vars: None, range: (location..end_location).into() }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -32696,7 +32696,7 @@ fn __action285<
 {
     {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: (location..end_location).into() }
     }
 }
 
@@ -32712,7 +32712,7 @@ fn __action286<
 {
     {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
-        ast::WithItem { context_expr, optional_vars, range: optional_range(location, end_location) }
+        ast::WithItem { context_expr, optional_vars, range: (location..end_location).into() }
     }
 }
 
@@ -34376,10 +34376,7 @@ fn __action443<
 {
     {
         i.default = Some(Box::new(e));
-        #[cfg(feature = "all-nodes-with-ranges")]
-        {
-            i.range = optional_range(i.range.start(), end_location);
-        }
+        i.range = (i.range.start()..end_location).into();
         i
     }
 }
@@ -34494,10 +34491,7 @@ fn __action454<
 {
     {
         i.default = Some(Box::new(e));
-        #[cfg(feature = "all-nodes-with-ranges")]
-        {
-            i.range = optional_range(i.range.start(), end_location);
-        }
+        i.range = (i.range.start()..end_location).into();
         i
     }
 }
