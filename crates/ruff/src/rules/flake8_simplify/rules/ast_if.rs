@@ -385,8 +385,7 @@ pub(crate) fn nested_if_statements(
                                 <= checker.settings.line_length
                         })
                     {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(edit));
+                        diagnostic.set_fix(Fix::suggested(edit));
                     }
                 }
                 Err(err) => error!("Failed to fix nested if: {err}"),
@@ -457,8 +456,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(test.clone()),
                     range: TextRange::default(),
                 };
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node.into()),
                     stmt.range(),
                 )));
@@ -480,8 +478,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(Box::new(node1.into())),
                     range: TextRange::default(),
                 };
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node2.into()),
                     stmt.range(),
                 )));
@@ -621,8 +618,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !has_comments(stmt, checker.locator) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));
@@ -978,8 +974,7 @@ pub(crate) fn use_dict_get_with_default(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !has_comments(stmt, checker.locator) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));

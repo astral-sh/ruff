@@ -9,7 +9,7 @@ SIM101.py:1:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
   |
   = help: Merge `isinstance` calls for `a`
 
-ℹ Suggested fix
+ℹ Possible fix
 1   |-if isinstance(a, int) or isinstance(a, float):  # SIM101
   1 |+if isinstance(a, (int, float)):  # SIM101
 2 2 |     pass
@@ -26,7 +26,7 @@ SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
   |
   = help: Merge `isinstance` calls for `a`
 
-ℹ Suggested fix
+ℹ Possible fix
 1 1 | if isinstance(a, int) or isinstance(a, float):  # SIM101
 2 2 |     pass
 3 3 | 
@@ -46,7 +46,7 @@ SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
   |
   = help: Merge `isinstance` calls for `a`
 
-ℹ Suggested fix
+ℹ Possible fix
 4 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 5 5 |     pass
 6 6 | 
@@ -66,7 +66,7 @@ SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-ℹ Suggested fix
+ℹ Possible fix
 7  7  | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 8  8  |     pass
 9  9  | 
@@ -86,7 +86,7 @@ SIM101.py:13:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-ℹ Suggested fix
+ℹ Possible fix
 10 10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
 11 11 |     pass
 12 12 | 
@@ -106,7 +106,7 @@ SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-ℹ Suggested fix
+ℹ Possible fix
 13 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
 14 14 |     pass
 15 15 | 
@@ -126,7 +126,7 @@ SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge int
    |
    = help: Merge `isinstance` calls
 
-ℹ Suggested fix
+ℹ Possible fix
 16 16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 17 17 |     pass
 18 18 | 
