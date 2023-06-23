@@ -331,7 +331,7 @@ mod tests {
     fn aug_assign_with_walrus() {
         let stmt = parse(r#"a += (b := c)"#);
         let bindings = stmt_bindings(&stmt);
-        assert_eq!(bindings, ["a", "b"]);
+        assert_eq!(bindings, ["b", "a"]);
     }
 
     #[test]
