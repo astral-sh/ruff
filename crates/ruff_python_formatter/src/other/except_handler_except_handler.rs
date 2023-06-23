@@ -45,4 +45,13 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
             ]
         )
     }
+
+    fn fmt_dangling_comments(
+        &self,
+        _node: &ExceptHandlerExceptHandler,
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // dangling comments are formatted as part of fmt_fields
+        Ok(())
+    }
 }
