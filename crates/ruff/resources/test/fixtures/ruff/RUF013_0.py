@@ -221,3 +221,23 @@ def f(arg: Union["No" "ne", "int"] = None):
 # Avoid flagging when there's a parse error in the forward reference
 def f(arg: Union["<>", "int"] = None):
     pass
+
+
+# Type aliases
+
+Text = str | bytes
+
+
+def f(arg: Text = None):
+    pass
+
+
+def f(arg: "Text" = None):
+    pass
+
+
+from custom_typing import MaybeInt
+
+
+def f(arg: MaybeInt = None):
+    pass

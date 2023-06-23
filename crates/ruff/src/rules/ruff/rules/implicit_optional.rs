@@ -6,10 +6,15 @@ use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Expr, Op
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_stdlib::typing::{
+    is_immutable_generic_type, is_immutable_non_generic_type, is_pep_593_generic_type,
+    is_standard_library_generic,
+};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -56,6 +61,18 @@ use crate::settings::types::PythonVersion;
 ///
 /// def foo(arg: int | None = None):
 ///     pass
+/// ```
+///
+/// ## Limitations
+///
+/// Type aliases are not supported and could result in false negatives.
+/// For example, the following code will not be flagged:
+/// ```python
+/// Text = str | bytes
+///
+///
+/// def foo(arg: Text = None):
+///    pass
 /// ```
 ///
 /// ## Options
@@ -141,6 +158,18 @@ impl<'a> Iterator for PEP604UnionIterator<'a> {
     }
 }
 
+fn is_known_type(call_path: &CallPath) -> bool {
+    match call_path.as_slice() {
+        ["typing" | "typing_extensions" | "types", _] => true,
+        _ => {
+            is_standard_library_generic(call_path)
+                || is_pep_593_generic_type(call_path)
+                || is_immutable_non_generic_type(call_path)
+                || is_immutable_generic_type(call_path)
+        }
+    }
+}
+
 #[derive(Debug)]
 enum TypingTarget<'a> {
     None,
@@ -170,7 +199,20 @@ impl<'a> TypingTarget<'a> {
                 } else if semantic.match_typing_expr(value, "Annotated") {
                     elements.first().map(TypingTarget::Annotated)
                 } else {
-                    None
+                    semantic.resolve_call_path(value).map_or(
+                        // If we can't resolve the call path, it must be defined
+                        // in the same file, so we assume it's `Any` as it could
+                        // be a type alias.
+                        Some(TypingTarget::Any),
+                        |call_path| {
+                            if is_known_type(&call_path) {
+                                None
+                            } else {
+                                // If it's not a known type, we assume it's `Any`.
+                                Some(TypingTarget::Any)
+                            }
+                        },
+                    )
                 }
             }
             Expr::BinOp(..) => Some(TypingTarget::Union(
@@ -189,15 +231,23 @@ impl<'a> TypingTarget<'a> {
                 .map_or(Some(TypingTarget::Any), |(expr, _)| {
                     Some(TypingTarget::ForwardReference(expr))
                 }),
-            _ => semantic.resolve_call_path(expr).and_then(|call_path| {
-                if semantic.match_typing_call_path(&call_path, "Any") {
-                    Some(TypingTarget::Any)
-                } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
-                    Some(TypingTarget::Object)
-                } else {
-                    None
-                }
-            }),
+            _ => semantic.resolve_call_path(expr).map_or(
+                // If we can't resolve the call path, it must be defined in the
+                // same file, so we assume it's `Any` as it could be a type alias.
+                Some(TypingTarget::Any),
+                |call_path| {
+                    if semantic.match_typing_call_path(&call_path, "Any") ||
+                    // If it's not a known type, we assume it's `Any`.
+                    !is_known_type(&call_path)
+                    {
+                        Some(TypingTarget::Any)
+                    } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
+                        Some(TypingTarget::Object)
+                    } else {
+                        None
+                    }
+                },
+            ),
         }
     }
 
