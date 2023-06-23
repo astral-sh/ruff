@@ -11,8 +11,8 @@ from pathlib import Path
 from subprocess import check_call, check_output
 from tempfile import TemporaryDirectory
 
-schemastore_fork = "https://github.com/astral-sh/schemastore"
-schemastore_upstream = "https://github.com/SchemaStore/schemastore"
+schemastore_fork = "git@github.com:astral-sh/schemastore.git"
+schemastore_upstream = "git@github.com:SchemaStore/schemastore.git"
 ruff_repo = "https://github.com/astral-sh/ruff"
 root = Path(
     check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip(),
