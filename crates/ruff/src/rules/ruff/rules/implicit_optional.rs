@@ -11,7 +11,7 @@ use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_stdlib::sys::KNOWN_STANDARD_LIBRARY;
+use ruff_python_stdlib::sys::is_known_standard_library;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -162,10 +162,7 @@ impl<'a> Iterator for PEP604UnionIterator<'a> {
 fn is_known_type(call_path: &CallPath, target_version: PythonVersion) -> bool {
     match call_path.as_slice() {
         ["" | "builtins" | "typing_extensions", _] => true,
-        _ => KNOWN_STANDARD_LIBRARY
-            .get(&target_version.as_tuple())
-            .unwrap()
-            .contains(call_path.first().unwrap()),
+        _ => is_known_standard_library(target_version.minor(), call_path.first().unwrap()),
     }
 }
 
