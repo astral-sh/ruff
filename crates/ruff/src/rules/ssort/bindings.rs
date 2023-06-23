@@ -904,7 +904,7 @@ mod tests {
 
     #[test]
     fn formatted_value() {
-        let stmt = parse(r#"f"{a:b}""#);
+        let stmt = parse(r#"f"{a:{b}}""#);
         let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
@@ -918,7 +918,7 @@ mod tests {
 
     #[test]
     fn joined_str() {
-        let stmt = parse(r#"f"{a:b} {c:d}""#);
+        let stmt = parse(r#"f"{a:{b}} {c:{d}}""#);
         let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
