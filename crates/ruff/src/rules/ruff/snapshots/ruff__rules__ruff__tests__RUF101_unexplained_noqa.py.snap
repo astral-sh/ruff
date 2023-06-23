@@ -38,7 +38,16 @@ unexplained_noqa.py:14:14: RUF101 Unexplained `noqa` directive, consider adding 
 14 | assert False # noqa:              B011
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF101
 15 | 
-16 | # Non-errors.
+16 | def func():  # noqa: ANN
+   |
+
+unexplained_noqa.py:16:14: RUF101 Unexplained `noqa` directive, consider adding an explanation comment to `# noqa: ANN`
+   |
+14 | assert False # noqa:              B011
+15 | 
+16 | def func():  # noqa: ANN
+   |              ^^^^^^^^^^^ RUF101
+17 |     ...
    |
 
 
