@@ -8,6 +8,36 @@ use ruff_python_ast::helpers::has_comments;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of the `+` operator to concatenate collections.
+///
+/// ## Why is this bad?
+/// In Python, the `+` operator can be used to concatenate collections (e.g.,
+/// `x + y` to concatenate the lists `x` and `y`).
+///
+/// However, collections can be concatenated more efficiently using the
+/// unpacking operator (e.g., `[*x, *y]` to concatenate `x` and `y`).
+///
+/// Prefer the unpacking operator to concatenate collections, as it is more
+/// readable and flexible. The `*` operator can unpack any iterable, whereas
+///  `+` operates only on particular sequences which, in many cases, must be of
+/// the same type.
+///
+/// ## Example
+/// ```python
+/// foo = [2, 3, 4]
+/// bar = [1] + foo + [5, 6]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = [2, 3, 4]
+/// bar = [1, *foo, 5, 6]
+/// ```
+///
+/// ## References
+/// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
+/// - [Python docs: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 #[violation]
 pub struct CollectionLiteralConcatenation {
     expr: String,

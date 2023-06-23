@@ -32,7 +32,7 @@ def f(): pass
 -    1, 2,
 -    3, 4,
 -])
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # fmt: on
  def f():
      pass
@@ -46,7 +46,7 @@ def f(): pass
 -        4,
 -    ]
 -)
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  def f():
      pass
 ```
@@ -55,13 +55,13 @@ def f(): pass
 
 ```py
 # fmt: off
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # fmt: on
 def f():
     pass
 
 
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def f():
     pass
 ```

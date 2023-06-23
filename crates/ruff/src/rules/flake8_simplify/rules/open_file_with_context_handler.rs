@@ -7,7 +7,7 @@ use ruff_python_semantic::SemanticModel;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of the builtin `open()` function without an associated context
+/// Checks for uses of the builtin `open()` function without an associated context
 /// manager.
 ///
 /// ## Why is this bad?

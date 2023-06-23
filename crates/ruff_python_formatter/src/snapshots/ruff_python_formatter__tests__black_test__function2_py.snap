@@ -66,7 +66,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -2,64 +2,39 @@
+@@ -2,17 +2,9 @@
      a,
      **kwargs,
  ) -> A:
@@ -82,19 +82,17 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -        **kwargs,
 -    )
 +    NOT_YET_IMPLEMENTED_StmtWith
-+    NOT_IMPLEMENTED_call()  # negate top
-+    return NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # negate top
++    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def g():
--    "Docstring."
-+    "NOT_YET_IMPLEMENTED_STRING"
- 
+@@ -21,45 +13,30 @@
      def inner():
          pass
  
 -    print("Inner defs should breathe a little.")
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def h():
@@ -102,18 +100,17 @@ with hmm_but_this_should_get_two_preceding_newlines():
          pass
  
 -    print("Inner defs should breathe a little.")
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
--if os.name == "posix":
+ if os.name == "posix":
 -    import termios
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
 +    NOT_YET_IMPLEMENTED_StmtImport
  
      def i_should_be_followed_by_only_one_newline():
          pass
 -
--elif os.name == "nt":
+ elif os.name == "nt":
 -    try:
 -        import msvcrt
 -
@@ -124,22 +121,21 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -
 -        def i_should_be_followed_by_only_one_newline():
 -            pass
-+elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
 +    NOT_YET_IMPLEMENTED_StmtTry
  
  elif False:
 -
--    class IHopeYouAreHavingALovelyDay:
--        def __call__(self):
+     class IHopeYouAreHavingALovelyDay:
+         def __call__(self):
 -            print("i_should_be_followed_by_only_one_newline")
 -
-+    NOT_YET_IMPLEMENTED_StmtClassDef
++            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  else:
 -
      def foo():
          pass
- 
 -
+ 
 -with hmm_but_this_should_get_two_preceding_newlines():
 -    pass
 +NOT_YET_IMPLEMENTED_StmtWith
@@ -153,36 +149,38 @@ def f(
     **kwargs,
 ) -> A:
     NOT_YET_IMPLEMENTED_StmtWith
-    NOT_IMPLEMENTED_call()  # negate top
-    return NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # negate top
+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def g():
-    "NOT_YET_IMPLEMENTED_STRING"
+    "Docstring."
 
     def inner():
         pass
 
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def h():
     def inner():
         pass
 
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if os.name == "posix":
     NOT_YET_IMPLEMENTED_StmtImport
 
     def i_should_be_followed_by_only_one_newline():
         pass
-elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+elif os.name == "nt":
     NOT_YET_IMPLEMENTED_StmtTry
 
 elif False:
-    NOT_YET_IMPLEMENTED_StmtClassDef
+    class IHopeYouAreHavingALovelyDay:
+        def __call__(self):
+            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:
     def foo():
         pass

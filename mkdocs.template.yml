@@ -1,7 +1,7 @@
 site_name: Ruff
 theme:
   name: material
-  logo: assets/ruff.svg
+  logo: assets/bolt.svg
   favicon: assets/ruff-favicon.png
   features:
     - navigation.instant
@@ -14,14 +14,12 @@ theme:
     - content.code.copy
   palette:
     - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: red
+      scheme: astral-light
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: red
+      scheme: astral-dark
       toggle:
         icon: material/weather-night
         name: Switch to light mode
@@ -50,3 +48,5 @@ markdown_extensions:
       anchor_linenums: true
 plugins:
   - search
+extra_css:
+  - stylesheets/extra.css

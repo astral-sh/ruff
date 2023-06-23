@@ -445,7 +445,7 @@ impl Notebook {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::path::Path;
 
     use anyhow::Result;

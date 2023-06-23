@@ -18,19 +18,23 @@ class A:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,5 +1 @@
--class A:
--    def f(self):
+@@ -1,5 +1,5 @@
+ class A:
+     def f(self):
 -        for line in range(10):
--            if True:
--                pass  # fmt: skip
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        for line in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+             if True:
+                 pass  # fmt: skip
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtClassDef
+class A:
+    def f(self):
+        for line in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+            if True:
+                pass  # fmt: skip
 ```
 
 ## Black Output

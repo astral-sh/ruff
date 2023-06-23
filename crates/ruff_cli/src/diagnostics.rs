@@ -346,7 +346,7 @@ pub(crate) fn lint_stdin(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::path::Path;
 
     use crate::diagnostics::{load_jupyter_notebook, Diagnostics};

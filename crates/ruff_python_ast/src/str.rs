@@ -220,11 +220,15 @@ pub fn is_implicit_concatenation(content: &str) -> bool {
     let mut rest = &content[leading_quote_str.len()..content.len() - trailing_quote_str.len()];
     while let Some(index) = rest.find(trailing_quote_str) {
         let mut chars = rest[..index].chars().rev();
+
         if let Some('\\') = chars.next() {
-            // If the quote is double-escaped, then it's _not_ escaped, so the string is
-            // implicitly concatenated.
-            if let Some('\\') = chars.next() {
-                return true;
+            if chars.next() == Some('\\') {
+                // Either `\\'` or `\\\'` need to test one more character
+
+                // If the quote is preceded by `//` then it is not escaped, instead the backslash is escaped.
+                if chars.next() != Some('\\') {
+                    return true;
+                }
             }
         } else {
             // If the quote is _not_ escaped, then it's implicitly concatenated.
@@ -299,5 +303,6 @@ mod tests {
 
         // Negative cases with escaped quotes.
         assert!(!is_implicit_concatenation(r#""abc\"def""#));
+        assert!(!is_implicit_concatenation(r#"'\\\' ""'"#));
     }
 }

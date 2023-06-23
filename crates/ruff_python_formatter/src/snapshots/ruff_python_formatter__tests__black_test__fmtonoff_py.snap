@@ -203,14 +203,14 @@ d={'a':1,
  #!/usr/bin/env python3
 -import asyncio
 -import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
- 
+-
 -from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
  
 -from library import some_connection, some_decorator
--
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  # fmt: off
 -from third_party import (X,
@@ -222,7 +222,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,30 +16,51 @@
+@@ -18,30 +16,53 @@
  
  # fmt: off
  def func_no_args():
@@ -241,8 +241,10 @@ d={'a':1,
 +        NOT_YET_IMPLEMENTED_StmtRaise
 +    if False:
 +        ...
-+    NOT_YET_IMPLEMENTED_StmtFor
-+    NOT_IMPLEMENTED_call()
++    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        continue
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    return None
 +
 +
@@ -251,29 +253,28 @@ d={'a':1,
 - async with some_connection() as conn:
 -     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
 - await asyncio.sleep(1)
--@asyncio.coroutine
++    "Single-line docstring. Multiline is harder to reformat."
++    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++
++
+ @asyncio.coroutine
 -@some_decorator(
 -with_args=True,
 -many_args=[1,2,3]
 -)
 -def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
 - return text[number:-1]
-+    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith
-+    await NOT_IMPLEMENTED_call()
-+
-+
-+@asyncio.NOT_IMPLEMENTED_attr
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +def function_signature_stress_test(
 +    number: int,
 +    no_annotation=None,
-+    text: str = "NOT_YET_IMPLEMENTED_STRING",
++    text: str = "default",
 +    *,
 +    debug: bool = False,
 +    **kwargs,
 +) -> str:
-+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++    return text[number : -1]
 +
 +
  # fmt: on
@@ -288,50 +289,55 @@ d={'a':1,
 +    e=True,
 +    f=-1,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h="NOT_YET_IMPLEMENTED_STRING",
-+    i="NOT_YET_IMPLEMENTED_STRING",
++    h="",
++    i=r"",
 +):
-+    offset = NOT_IMPLEMENTED_call()
++    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-@@ -51,76 +70,61 @@
+@@ -51,68 +72,66 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
 -    g: int = 1 if False else 2,
--    h: str = "",
--    i: str = r"",
 +    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h: str = "NOT_YET_IMPLEMENTED_STRING",
-+    i: str = "NOT_YET_IMPLEMENTED_STRING",
+     h: str = "",
+     i: str = r"",
  ):
      ...
  
  
 -def spaces2(result=_core.Value(None)):
-+def spaces2(result=NOT_IMPLEMENTED_call()):
++def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
      ...
  
  
  something = {
      # fmt: off
 -    key: 'value',
-+    key: "NOT_YET_IMPLEMENTED_STRING",
++    key: "value",
  }
  
  
  def subscriptlist():
--    atom[
--        # fmt: off
+     atom[
+         # fmt: off
 -        'some big and',
 -        'complex subscript',
 -        # fmt: on
 -        goes + here,
 -        andhere,
--    ]
-+    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++        (
++            "some big and",
++            "complex subscript",
++            # fmt: on
++            goes
++            + here,
++            andhere,
++        )
+     ]
  
  
  def import_as_names():
@@ -339,7 +345,7 @@ d={'a':1,
 -    from hello import a,        b
 -    'unformatted'
 +    NOT_YET_IMPLEMENTED_StmtImportFrom
-+    "NOT_YET_IMPLEMENTED_STRING"
++    "unformatted"
      # fmt: on
  
  
@@ -348,7 +354,7 @@ d={'a':1,
 -    a , b = *hello
 -    'unformatted'
 +    a, b = NOT_YET_IMPLEMENTED_ExprStarred
-+    "NOT_YET_IMPLEMENTED_STRING"
++    "unformatted"
      # fmt: on
  
  
@@ -357,15 +363,14 @@ d={'a':1,
 -    yield hello
 -    'unformatted'
 +    NOT_YET_IMPLEMENTED_ExprYield
-+    "NOT_YET_IMPLEMENTED_STRING"
++    "unformatted"
      # fmt: on
--    "formatted"
-+    "NOT_YET_IMPLEMENTED_STRING"
+     "formatted"
      # fmt: off
 -    ( yield hello )
 -    'unformatted'
 +    (NOT_YET_IMPLEMENTED_ExprYield)
-+    "NOT_YET_IMPLEMENTED_STRING"
++    "unformatted"
      # fmt: on
  
  
@@ -381,21 +386,8 @@ d={'a':1,
      # fmt: on
  
  
- def off_and_on_without_data():
--    """All comments here are technically on the same prefix.
--
--    The comments between will be formatted. This is a known limitation.
--    """
-+    "NOT_YET_IMPLEMENTED_STRING"
-     # fmt: off
- 
-     # hey, that won't work
-@@ -130,13 +134,15 @@
- 
- 
- def on_and_off_broken():
--    """Another known limitation."""
-+    "NOT_YET_IMPLEMENTED_STRING"
+@@ -133,10 +152,10 @@
+     """Another known limitation."""
      # fmt: on
      # fmt: off
 -    this=should.not_be.formatted()
@@ -403,15 +395,13 @@ d={'a':1,
 -    because . the . handling . inside . generate_ignored_nodes()
 -    now . considers . multiple . fmt . directives . within . one . prefix
 +    this = NOT_IMPLEMENTED_call()
-+    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    and_ = indeed.it is not formatted
 +    NOT_IMPLEMENTED_call()
-+    (
-+        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-+    )
++    now.considers.multiple.fmt.directives.within.one.prefix
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,80 +151,21 @@
+@@ -145,43 +164,11 @@
  
  def long_lines():
      if True:
@@ -448,18 +438,17 @@ d={'a':1,
 -        )
 -        $
 -        """,
-+        NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
          # fmt: off
 -        re.MULTILINE|re.VERBOSE
 +        a = NOT_IMPLEMENTED_call()
          # fmt: on
 -    )
-+    _type_comment_re = NOT_IMPLEMENTED_call()
++    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def single_literal_yapf_disable():
--    """Black does not support this."""
-+    "NOT_YET_IMPLEMENTED_STRING"
+@@ -189,36 +176,9 @@
      BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
  
  
@@ -490,7 +479,7 @@ d={'a':1,
 -    # fmt: on
 -    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  # fmt: off
 -yield  'hello'
 +NOT_YET_IMPLEMENTED_ExprYield
@@ -499,7 +488,7 @@ d={'a':1,
 -d={'a':1,
 -   'b':2}
 +l = [1, 2, 3]
-+d = {"NOT_YET_IMPLEMENTED_STRING": 1, "NOT_YET_IMPLEMENTED_STRING": 2}
++d = {"a": 1, "b": 2}
 ```
 
 ## Ruff Output
@@ -530,28 +519,30 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    NOT_YET_IMPLEMENTED_StmtFor
-    NOT_IMPLEMENTED_call()
+    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        continue
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     return None
 
 
 async def coroutine(arg, exec=False):
-    "NOT_YET_IMPLEMENTED_STRING"
+    "Single-line docstring. Multiline is harder to reformat."
     NOT_YET_IMPLEMENTED_StmtAsyncWith
-    await NOT_IMPLEMENTED_call()
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-@asyncio.NOT_IMPLEMENTED_attr
-@NOT_IMPLEMENTED_call()
+@asyncio.coroutine
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
-    text: str = "NOT_YET_IMPLEMENTED_STRING",
+    text: str = "default",
     *,
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    return text[number : -1]
 
 
 # fmt: on
@@ -563,10 +554,10 @@ def spaces(
     e=True,
     f=-1,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h="NOT_YET_IMPLEMENTED_STRING",
-    i="NOT_YET_IMPLEMENTED_STRING",
+    h="",
+    i=r"",
 ):
-    offset = NOT_IMPLEMENTED_call()
+    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -578,49 +569,59 @@ def spaces_types(
     e: bool = True,
     f: int = -1,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h: str = "NOT_YET_IMPLEMENTED_STRING",
-    i: str = "NOT_YET_IMPLEMENTED_STRING",
+    h: str = "",
+    i: str = r"",
 ):
     ...
 
 
-def spaces2(result=NOT_IMPLEMENTED_call()):
+def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
     ...
 
 
 something = {
     # fmt: off
-    key: "NOT_YET_IMPLEMENTED_STRING",
+    key: "value",
 }
 
 
 def subscriptlist():
-    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    atom[
+        # fmt: off
+        (
+            "some big and",
+            "complex subscript",
+            # fmt: on
+            goes
+            + here,
+            andhere,
+        )
+    ]
 
 
 def import_as_names():
     # fmt: off
     NOT_YET_IMPLEMENTED_StmtImportFrom
-    "NOT_YET_IMPLEMENTED_STRING"
+    "unformatted"
     # fmt: on
 
 
 def testlist_star_expr():
     # fmt: off
     a, b = NOT_YET_IMPLEMENTED_ExprStarred
-    "NOT_YET_IMPLEMENTED_STRING"
+    "unformatted"
     # fmt: on
 
 
 def yield_expr():
     # fmt: off
     NOT_YET_IMPLEMENTED_ExprYield
-    "NOT_YET_IMPLEMENTED_STRING"
+    "unformatted"
     # fmt: on
-    "NOT_YET_IMPLEMENTED_STRING"
+    "formatted"
     # fmt: off
     (NOT_YET_IMPLEMENTED_ExprYield)
-    "NOT_YET_IMPLEMENTED_STRING"
+    "unformatted"
     # fmt: on
 
 
@@ -631,7 +632,10 @@ def example(session):
 
 
 def off_and_on_without_data():
-    "NOT_YET_IMPLEMENTED_STRING"
+    """All comments here are technically on the same prefix.
+
+    The comments between will be formatted. This is a known limitation.
+    """
     # fmt: off
 
     # hey, that won't work
@@ -641,15 +645,13 @@ def off_and_on_without_data():
 
 
 def on_and_off_broken():
-    "NOT_YET_IMPLEMENTED_STRING"
+    """Another known limitation."""
     # fmt: on
     # fmt: off
     this = NOT_IMPLEMENTED_call()
-    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    and_ = indeed.it is not formatted
     NOT_IMPLEMENTED_call()
-    (
-        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
-    )
+    now.considers.multiple.fmt.directives.within.one.prefix
     # fmt: on
     # fmt: off
     # ...but comments still get reformatted even though they should not be
@@ -658,24 +660,24 @@ def on_and_off_broken():
 
 def long_lines():
     if True:
-        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         # fmt: off
         a = NOT_IMPLEMENTED_call()
         # fmt: on
-    _type_comment_re = NOT_IMPLEMENTED_call()
+    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def single_literal_yapf_disable():
-    "NOT_YET_IMPLEMENTED_STRING"
+    """Black does not support this."""
     BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
 
 
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 # fmt: off
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file
 l = [1, 2, 3]
-d = {"NOT_YET_IMPLEMENTED_STRING": 1, "NOT_YET_IMPLEMENTED_STRING": 2}
+d = {"a": 1, "b": 2}
 ```
 
 ## Black Output

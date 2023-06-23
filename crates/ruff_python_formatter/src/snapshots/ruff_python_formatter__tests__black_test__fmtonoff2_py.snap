@@ -73,7 +73,7 @@ def test_calculate_fades():
 -        ('stuff', 'in')
 -    ],
 -])
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  def test_fader(test):
      pass
  
@@ -90,9 +90,8 @@ def test_calculate_fades():
  
 +
  def verify_fader(test):
--    """Hey, ho."""
+     """Hey, ho."""
 -    assert test.passed()
-+    "NOT_YET_IMPLEMENTED_STRING"
 +    NOT_YET_IMPLEMENTED_StmtAssert
 +
  
@@ -122,7 +121,7 @@ TmEx = 2
 # Test data:
 #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
 
-@NOT_IMPLEMENTED_call()
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def test_fader(test):
     pass
 
@@ -137,7 +136,7 @@ def verify_fader(test):
 
 
 def verify_fader(test):
-    "NOT_YET_IMPLEMENTED_STRING"
+    """Hey, ho."""
     NOT_YET_IMPLEMENTED_StmtAssert
 
 

@@ -1,23 +1,16 @@
-import typing
-from typing import ClassVar, Sequence
-
-KNOWINGLY_MUTABLE_DEFAULT = []
+from typing import ClassVar, Sequence, Final
 
 
 class A:
-    mutable_default: list[int] = []
-    immutable_annotation: typing.Sequence[int] = []
-    without_annotation = []
-    correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-    class_variable: typing.ClassVar[list[int]] = []
+    __slots__ = {
+        "mutable_default": "A mutable default value",
+    }
 
-
-class B:
     mutable_default: list[int] = []
     immutable_annotation: Sequence[int] = []
     without_annotation = []
-    correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []
 
 
 from dataclasses import dataclass, field
@@ -28,6 +21,17 @@ class C:
     mutable_default: list[int] = []
     immutable_annotation: Sequence[int] = []
     without_annotation = []
-    correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
     class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []
+
+
+from pydantic import BaseModel
+
+
+class D(BaseModel):
+    mutable_default: list[int] = []
+    immutable_annotation: Sequence[int] = []
+    without_annotation = []
+    class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []

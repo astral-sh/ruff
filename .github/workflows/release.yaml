@@ -423,8 +423,8 @@ jobs:
             echo "Releasing ${git_sha}"
           fi
 
-  release:
-    name: Release
+  upload-release:
+    name: Upload to PyPI
     runs-on: ubuntu-latest
     needs:
       - macos-universal
@@ -442,8 +442,6 @@ jobs:
     permissions:
       # For pypi trusted publishing
       id-token: write
-      # For GitHub release publishing
-      contents: write
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -455,10 +453,18 @@ jobs:
           skip-existing: true
           packages-dir: wheels
           verbose: true
-      - uses: actions/download-artifact@v3
-        with:
-          name: binaries
-          path: binaries
+
+  tag-release:
+    name: Tag release
+    runs-on: ubuntu-latest
+    needs: upload-release
+    # If you don't set an input tag, it's a dry run (no uploads).
+    if: ${{ inputs.tag }}
+    permissions:
+      # For git tag
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
       - name: git tag
         run: |
           git config user.email "hey@astral.sh"
@@ -467,6 +473,21 @@ jobs:
           # If there is duplicate tag, this will fail. The publish to pypi action will have been a noop (due to skip
           # existing), so we make a non-destructive exit here
           git push --tags
+
+  publish-release:
+    name: Publish to GitHub
+    runs-on: ubuntu-latest
+    needs: tag-release
+    # If you don't set an input tag, it's a dry run (no uploads).
+    if: ${{ inputs.tag }}
+    permissions:
+      # For GitHub release publishing
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: binaries
+          path: binaries
       - name: "Publish to GitHub"
         uses: softprops/action-gh-release@v1
         with:
@@ -477,9 +498,9 @@ jobs:
   # After the release has been published, we update downstream repositories
   # This is separate because if this fails the release is still fine, we just need to do some manual workflow triggers
   update-dependents:
-    name: Release
+    name: Update dependents
     runs-on: ubuntu-latest
-    needs: release
+    needs: publish-release
     steps:
       - name: "Update pre-commit mirror"
         uses: actions/github-script@v6

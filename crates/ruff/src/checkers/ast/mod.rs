@@ -1481,6 +1481,9 @@ where
                 if self.enabled(Rule::IncorrectDictIterator) {
                     perflint::rules::incorrect_dict_iterator(self, target, iter);
                 }
+                if self.enabled(Rule::UnnecessaryListCast) {
+                    perflint::rules::unnecessary_list_cast(self, iter);
+                }
             }
             Stmt::Try(ast::StmtTry {
                 body,
@@ -3852,6 +3855,9 @@ where
                             );
                         }
 
+                        // Store the existing binding, if any.
+                        let existing_id = self.semantic.lookup(name);
+
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(
                             name,
@@ -3861,14 +3867,6 @@ where
                         );
 
                         walk_except_handler(self, except_handler);
-
-                        // Remove it from the scope immediately after.
-                        self.add_binding(
-                            name,
-                            range,
-                            BindingKind::UnboundException,
-                            BindingFlags::empty(),
-                        );
 
                         // If the exception name wasn't used in the scope, emit a diagnostic.
                         if !self.semantic.is_used(binding_id) {
@@ -3889,6 +3887,13 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
+
+                        self.add_binding(
+                            name,
+                            range,
+                            BindingKind::UnboundException(existing_id),
+                            BindingFlags::empty(),
+                        );
                     }
                     None => walk_except_handler(self, except_handler),
                 }
@@ -4236,7 +4241,7 @@ impl<'a> Checker<'a> {
             let shadowed = &self.semantic.bindings[shadowed_id];
             if !matches!(
                 shadowed.kind,
-                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException,
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_),
             ) {
                 let references = shadowed.references.clone();
                 let is_global = shadowed.is_global();

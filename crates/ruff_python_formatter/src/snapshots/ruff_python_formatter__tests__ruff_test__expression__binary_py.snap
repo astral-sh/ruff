@@ -214,7 +214,7 @@ if (
 
 
 # Black breaks the right side first for the following expressions:
-aaaaaaaaaaaaaa + NOT_IMPLEMENTED_call()
+aaaaaaaaaaaaaa + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 aaaaaaaaaaaaaa + [
     bbbbbbbbbbbbbbbbbbbbbb,
     ccccccccccccccccccccc,
@@ -252,7 +252,13 @@ aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp
 
 # But only for expressions that have a statement parent.
 not (aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp)
-[NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right]
+[
+    a
+    + [
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+    ]
+    in c,
+]
 
 
 # leading comment

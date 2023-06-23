@@ -42,7 +42,7 @@ assert (
 ```diff
 --- Black
 +++ Ruff
-@@ -2,57 +2,24 @@
+@@ -2,20 +2,10 @@
  (
      ()
      << 0
@@ -65,16 +65,16 @@ assert (
  
  importA
  0
- 0 ^ 0  #
+@@ -24,35 +14,34 @@
  
- 
--class A:
--    def foo(self):
+ class A:
+     def foo(self):
 -        for _ in range(10):
 -            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(
 -                xxxxxxxxxxxx
 -            )  # pylint: disable=no-member
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def test(self, othr):
@@ -97,8 +97,27 @@ assert (
 -        othr.meta_data,
 -        othr.schedule,
 +    return (
-+        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++        1 == 2
++        and (
++            name,
++            description,
++            self.default,
++            self.selected,
++            self.auto_generated,
++            self.parameters,
++            self.meta_data,
++            self.schedule,
++        )
++        == (
++            name,
++            description,
++            othr.default,
++            othr.selected,
++            othr.auto_generated,
++            othr.parameters,
++            othr.meta_data,
++            othr.schedule,
++        )
      )
  
  
@@ -126,13 +145,35 @@ importA
 0 ^ 0  #
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class A:
+    def foo(self):
+        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def test(self, othr):
     return (
-        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        1 == 2
+        and (
+            name,
+            description,
+            self.default,
+            self.selected,
+            self.auto_generated,
+            self.parameters,
+            self.meta_data,
+            self.schedule,
+        )
+        == (
+            name,
+            description,
+            othr.default,
+            othr.selected,
+            othr.auto_generated,
+            othr.parameters,
+            othr.meta_data,
+            othr.schedule,
+        )
     )
 
 

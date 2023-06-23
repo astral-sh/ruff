@@ -5,6 +5,7 @@ Source:
 
 Only the generation of the file has been modified for use in this project.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

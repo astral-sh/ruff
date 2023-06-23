@@ -1,4 +1,4 @@
-from abc import ABCMeta
+import abc
 
 import pydantic
 
@@ -33,6 +33,23 @@ class Class:
     @pydantic.validator("my_field")
     def stillBad(cls, my_field: str) -> str:
         pass
+
+    @classmethod
+    def badAllowed(cls):
+        pass
+
+    @classmethod
+    def stillBad(cls):
+        pass
+
+    @abc.abstractclassmethod
+    def badAllowed(cls):
+        pass
+
+    @abc.abstractclassmethod
+    def stillBad(cls):
+        pass
+
 
 class PosOnlyClass:
     def badAllowed(this, blah, /, self, something: str):

@@ -2,6 +2,7 @@ use crate::comments::Comments;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
+use crate::expression::string::FormatString;
 use crate::prelude::*;
 use crate::{not_yet_implemented_custom_text, verbatim_text, FormatNodeRule};
 use ruff_formatter::write;
@@ -28,9 +29,7 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
             Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. } => {
                 write!(f, [verbatim_text(item)])
             }
-            Constant::Str(_) => {
-                not_yet_implemented_custom_text(r#""NOT_YET_IMPLEMENTED_STRING""#).fmt(f)
-            }
+            Constant::Str(_) => FormatString::new(item).fmt(f),
             Constant::Bytes(_) => {
                 not_yet_implemented_custom_text(r#"b"NOT_YET_IMPLEMENTED_BYTE_STRING""#).fmt(f)
             }

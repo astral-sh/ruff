@@ -30,6 +30,7 @@ pub enum PythonVersion {
     Py39,
     Py310,
     Py311,
+    Py312,
 }
 
 impl From<PythonVersion> for Pep440Version {
@@ -47,6 +48,7 @@ impl PythonVersion {
             Self::Py39 => (3, 9),
             Self::Py310 => (3, 10),
             Self::Py311 => (3, 11),
+            Self::Py312 => (3, 12),
         }
     }
 

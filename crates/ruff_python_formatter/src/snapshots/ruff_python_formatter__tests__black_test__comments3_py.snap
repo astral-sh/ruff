@@ -61,13 +61,10 @@ def func():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,46 +3,15 @@
- 
- # %%
- def func():
--    x = """
--    a really long string
--    """
+@@ -6,43 +6,16 @@
+     x = """
+     a really long string
+     """
 -    lcomp3 = [
 -        # This one is actually too long to fit in a single line.
 -        element.split("\n", 1)[0]
@@ -76,14 +73,13 @@ def func():
 -        # right
 -        if element is not None
 -    ]
-+    x = "NOT_YET_IMPLEMENTED_STRING"
 +    lcomp3 = [i for i in []]
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
 -    if isinstance(exc_value, MultiError):
-+    if NOT_IMPLEMENTED_call():
++    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
          embedded = []
--        for exc in exc_value.exceptions:
--            if exc not in _seen:
+         for exc in exc_value.exceptions:
+             if exc not in _seen:
 -                embedded.append(
 -                    # This should be left alone (before)
 -                    traceback.TracebackException.from_exception(
@@ -97,7 +93,7 @@ def func():
 -                    )
 -                    # This should be left alone (after)
 -                )
-+        NOT_YET_IMPLEMENTED_StmtFor
++                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
      # everything is fine if the expression isn't nested
 -    traceback.TracebackException.from_exception(
@@ -109,7 +105,7 @@ def func():
 -        # shared between sub-exceptions are not omitted
 -        _seen=set(_seen),
 -    )
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  # %%
@@ -123,15 +119,19 @@ def func():
 
 # %%
 def func():
-    x = "NOT_YET_IMPLEMENTED_STRING"
+    x = """
+    a really long string
+    """
     lcomp3 = [i for i in []]
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
-    if NOT_IMPLEMENTED_call():
+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
         embedded = []
-        NOT_YET_IMPLEMENTED_StmtFor
+        for exc in exc_value.exceptions:
+            if exc not in _seen:
+                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
     # everything is fine if the expression isn't nested
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 # %%

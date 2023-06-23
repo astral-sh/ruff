@@ -1,4 +1,6 @@
 """Generate the confusables.rs file from the VS Code ambiguous.json file."""
+from __future__ import annotations
+
 import json
 import subprocess
 from pathlib import Path

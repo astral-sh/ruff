@@ -153,12 +153,9 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  
      tup = (
          another_element,
-@@ -84,35 +85,22 @@
- 
- 
+@@ -86,33 +87,20 @@
  def func(
--    a=some_list[0],  # type: int
-+    a=NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: int
+     a=some_list[0],  # type: int
  ):  # type: () -> int
 -    c = call(
 -        0.0123,
@@ -172,18 +169,18 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -        0.0789,
 -        a[-1],  # type: ignore
 -    )
-+    c = NOT_IMPLEMENTED_call()
++    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -    c = call(
 -        "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa"  # type: ignore
 -    )
-+    c = NOT_IMPLEMENTED_call()
++    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -result = (  # aaa
 -    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -)
-+result = "NOT_YET_IMPLEMENTED_STRING"  # aaa
++result = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # aaa
  
 -AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA  # type: ignore
 +AAAAAAAAAAAAA = (
@@ -197,10 +194,10 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    foo,
 -    [AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, BBBBBBBBBBBB],  # type: ignore
 -)
-+NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-+aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
++aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
@@ -293,14 +290,14 @@ def f(
 
 
 def func(
-    a=NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: int
+    a=some_list[0],  # type: int
 ):  # type: () -> int
-    c = NOT_IMPLEMENTED_call()
+    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-    c = NOT_IMPLEMENTED_call()
+    c = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-result = "NOT_YET_IMPLEMENTED_STRING"  # aaa
+result = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # aaa
 
 AAAAAAAAAAAAA = (
     [AAAAAAAAAAAAA]
@@ -309,9 +306,9 @@ AAAAAAAAAAAAA = (
     + AAAAAAAAAAAAA
 )  # type: ignore
 
-NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call()  # type: ignore[arg-type]
+aaaaaaaaaaaaa, bbbbbbbbb = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # type: ignore[arg-type]
 ```
 
 ## Black Output

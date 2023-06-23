@@ -2,7 +2,7 @@
 
 pub mod preorder;
 
-use rustpython_ast::{ArgWithDefault, Decorator};
+use rustpython_ast::Decorator;
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr,
     ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
@@ -20,7 +20,7 @@ pub trait Visitor<'a> {
         walk_stmt(self, stmt);
     }
     fn visit_annotation(&mut self, expr: &'a Expr) {
-        walk_expr(self, expr);
+        walk_annotation(self, expr);
     }
     fn visit_decorator(&mut self, decorator: &'a Decorator) {
         walk_decorator(self, decorator);
@@ -53,16 +53,13 @@ pub trait Visitor<'a> {
         walk_except_handler(self, except_handler);
     }
     fn visit_format_spec(&mut self, format_spec: &'a Expr) {
-        walk_expr(self, format_spec);
+        walk_format_spec(self, format_spec);
     }
     fn visit_arguments(&mut self, arguments: &'a Arguments) {
         walk_arguments(self, arguments);
     }
     fn visit_arg(&mut self, arg: &'a Arg) {
         walk_arg(self, arg);
-    }
-    fn visit_arg_with_default(&mut self, arg_with_default: &'a ArgWithDefault) {
-        walk_arg_with_default(self, arg_with_default);
     }
     fn visit_keyword(&mut self, keyword: &'a Keyword) {
         walk_keyword(self, keyword);
@@ -99,10 +96,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             returns,
             ..
         }) => {
-            visitor.visit_arguments(args);
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
+            visitor.visit_arguments(args);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
@@ -115,10 +112,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             returns,
             ..
         }) => {
-            visitor.visit_arguments(args);
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
+            visitor.visit_arguments(args);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
@@ -131,14 +128,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             decorator_list,
             ..
         }) => {
+            for decorator in decorator_list {
+                visitor.visit_decorator(decorator);
+            }
             for expr in bases {
                 visitor.visit_expr(expr);
             }
             for keyword in keywords {
                 visitor.visit_keyword(keyword);
-            }
-            for decorator in decorator_list {
-                visitor.visit_decorator(decorator);
             }
             visitor.visit_body(body);
         }
@@ -180,10 +177,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             value,
             ..
         }) => {
-            visitor.visit_annotation(annotation);
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
+            visitor.visit_annotation(annotation);
             visitor.visit_expr(target);
         }
         Stmt::For(ast::StmtFor {
@@ -323,6 +320,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         }) => visitor.visit_expr(value),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => {}
     }
+}
+
+pub fn walk_annotation<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
+    visitor.visit_expr(expr);
 }
 
 pub fn walk_decorator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, decorator: &'a Decorator) {
@@ -605,18 +606,39 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
+pub fn walk_format_spec<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, format_spec: &'a Expr) {
+    visitor.visit_expr(format_spec);
+}
+
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
+    // Defaults are evaluated before annotations.
     for arg in &arguments.posonlyargs {
-        visitor.visit_arg_with_default(arg);
+        if let Some(default) = &arg.default {
+            visitor.visit_expr(default);
+        }
     }
     for arg in &arguments.args {
-        visitor.visit_arg_with_default(arg);
+        if let Some(default) = &arg.default {
+            visitor.visit_expr(default);
+        }
+    }
+    for arg in &arguments.kwonlyargs {
+        if let Some(default) = &arg.default {
+            visitor.visit_expr(default);
+        }
+    }
+
+    for arg in &arguments.posonlyargs {
+        visitor.visit_arg(&arg.def);
+    }
+    for arg in &arguments.args {
+        visitor.visit_arg(&arg.def);
     }
     if let Some(arg) = &arguments.vararg {
         visitor.visit_arg(arg);
     }
     for arg in &arguments.kwonlyargs {
-        visitor.visit_arg_with_default(arg);
+        visitor.visit_arg(&arg.def);
     }
     if let Some(arg) = &arguments.kwarg {
         visitor.visit_arg(arg);
@@ -626,16 +648,6 @@ pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &
 pub fn walk_arg<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arg: &'a Arg) {
     if let Some(expr) = &arg.annotation {
         visitor.visit_annotation(expr);
-    }
-}
-
-pub fn walk_arg_with_default<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    arg_with_default: &'a ArgWithDefault,
-) {
-    visitor.visit_arg(&arg_with_default.def);
-    if let Some(expr) = &arg_with_default.default {
-        visitor.visit_expr(expr);
     }
 }
 

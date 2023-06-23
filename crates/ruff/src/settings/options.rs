@@ -433,7 +433,7 @@ pub struct Options {
     pub namespace_packages: Option<Vec<String>>,
     #[option(
         default = r#""py310""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
