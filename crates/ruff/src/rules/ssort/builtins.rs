@@ -1,8 +1,6 @@
-use std::collections::HashSet;
+pub(super) const CLASS_BUILTINS: &[&str] = &["__module__", "__qualname__"];
 
-pub(super) const CLASS_BUILTINS: &'static [&'static str] = &["__module__", "__qualname__"];
-
-pub(super) const MODULE_BUILTINS: &'static [&'static str] = &[
+pub(super) const MODULE_BUILTINS: &[&str] = &[
     "_",
     "__annotations__",
     "__build_class__",
