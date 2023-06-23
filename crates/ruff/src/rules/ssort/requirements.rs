@@ -19,9 +19,7 @@ pub(super) enum RequirementScope {
 }
 
 pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
-    let mut requirements = Requirements {
-        requirements: vec![],
-    };
+    let mut requirements = Requirements::default();
     requirements.visit_stmt(stmt);
     requirements.requirements
 }
@@ -29,6 +27,7 @@ pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
 #[derive(Default)]
 struct Requirements<'a> {
     requirements: Vec<Requirement<'a>>,
+    is_store_requirement: bool,
 }
 
 impl<'a> Visitor<'a> for Requirements<'a> {
@@ -112,6 +111,16 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                     }
                     scope.extend(stmt_bindings(stmt));
                 }
+            }
+            Stmt::AugAssign(StmtAugAssign {
+                target, op, value, ..
+            }) => {
+                self.visit_expr(value);
+                self.visit_operator(op);
+                let is_store_requirement = self.is_store_requirement;
+                self.is_store_requirement = true;
+                self.visit_expr(target);
+                self.is_store_requirement = is_store_requirement;
             }
             Stmt::For(StmtFor {
                 target,
@@ -214,7 +223,7 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 }
             }
             Expr::Name(ExprName { id, ctx, .. }) => {
-                if ctx == &ExprContext::Load || ctx == &ExprContext::Del {
+                if self.is_store_requirement || ctx != &ExprContext::Store {
                     self.requirements.push(Requirement {
                         name: id,
                         deferred: false,
