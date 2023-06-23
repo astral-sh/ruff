@@ -15,10 +15,10 @@ assert False # noqa:              B011
 
 # Non-errors.
 
-something_evil()  # noqa  # This is explained.
+something_evil()  # noqa  # Works with blank noqa.
 
-foo == ""  # noqa: PLC1901  # Check for empty string, not just falsiness.
+foo == ""  # noqa: PLC1901  # Works with code after noqa.
 
-I = 1  # noqa: E741, F841  # This is also explained.
+I = 1  # noqa: E741, F841  # Works with multiple codes.
 
-assert False # noqa:              B011  # This is also explained.
+assert False # noqa:              B011  # Works with eading whitespace before code.

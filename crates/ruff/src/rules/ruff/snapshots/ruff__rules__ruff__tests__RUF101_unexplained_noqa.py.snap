@@ -8,17 +8,37 @@ unexplained_noqa.py:8:19: RUF101 Unexplained `noqa` directive, consider adding a
  8 | something_evil()  # noqa
    |                   ^^^^^^ RUF101
  9 | 
-10 | I = 1  # noqa: E741, F841
+10 | foo == ""  # noqa: PLC1901
    |
 
-unexplained_noqa.py:10:8: RUF101 Unexplained `noqa` directive, consider adding an explanation comment to `# noqa: E741, F841`
+unexplained_noqa.py:10:12: RUF101 Unexplained `noqa` directive, consider adding an explanation comment to `# noqa: PLC1901`
    |
  8 | something_evil()  # noqa
  9 | 
-10 | I = 1  # noqa: E741, F841
-   |        ^^^^^^^^^^^^^^^^^^ RUF101
+10 | foo == ""  # noqa: PLC1901
+   |            ^^^^^^^^^^^^^^^ RUF101
 11 | 
-12 | # Non-errors.
+12 | I = 1  # noqa: E741, F841
+   |
+
+unexplained_noqa.py:12:8: RUF101 Unexplained `noqa` directive, consider adding an explanation comment to `# noqa: E741, F841`
+   |
+10 | foo == ""  # noqa: PLC1901
+11 | 
+12 | I = 1  # noqa: E741, F841
+   |        ^^^^^^^^^^^^^^^^^^ RUF101
+13 | 
+14 | assert False # noqa:              B011
+   |
+
+unexplained_noqa.py:14:14: RUF101 Unexplained `noqa` directive, consider adding an explanation comment to `# noqa:              B011`
+   |
+12 | I = 1  # noqa: E741, F841
+13 | 
+14 | assert False # noqa:              B011
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF101
+15 | 
+16 | # Non-errors.
    |
 
 
