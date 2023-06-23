@@ -11,10 +11,7 @@ use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_stdlib::typing::{
-    is_immutable_generic_type, is_immutable_non_generic_type, is_pep_593_generic_type,
-    is_standard_library_generic,
-};
+use ruff_python_stdlib::sys::KNOWN_STANDARD_LIBRARY;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -158,15 +155,17 @@ impl<'a> Iterator for PEP604UnionIterator<'a> {
     }
 }
 
-fn is_known_type(call_path: &CallPath) -> bool {
+/// Returns `true` if the given call path is a known type.
+///
+/// A known type is either a builtin type, any object from the standard library,
+/// or a type from the `typing_extensions` module.
+fn is_known_type(call_path: &CallPath, target_version: PythonVersion) -> bool {
     match call_path.as_slice() {
-        ["typing" | "typing_extensions" | "types", _] => true,
-        _ => {
-            is_standard_library_generic(call_path)
-                || is_pep_593_generic_type(call_path)
-                || is_immutable_non_generic_type(call_path)
-                || is_immutable_generic_type(call_path)
-        }
+        ["" | "builtins" | "typing_extensions", _] => true,
+        _ => KNOWN_STANDARD_LIBRARY
+            .get(&target_version.as_tuple())
+            .unwrap()
+            .contains(call_path.first().unwrap()),
     }
 }
 
@@ -183,7 +182,12 @@ enum TypingTarget<'a> {
 }
 
 impl<'a> TypingTarget<'a> {
-    fn try_from_expr(expr: &'a Expr, semantic: &SemanticModel, locator: &Locator) -> Option<Self> {
+    fn try_from_expr(
+        expr: &'a Expr,
+        semantic: &SemanticModel,
+        locator: &Locator,
+        target_version: PythonVersion,
+    ) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if semantic.match_typing_expr(value, "Optional") {
@@ -205,7 +209,7 @@ impl<'a> TypingTarget<'a> {
                         // be a type alias.
                         Some(TypingTarget::Any),
                         |call_path| {
-                            if is_known_type(&call_path) {
+                            if is_known_type(&call_path, target_version) {
                                 None
                             } else {
                                 // If it's not a known type, we assume it's `Any`.
@@ -236,13 +240,13 @@ impl<'a> TypingTarget<'a> {
                 // same file, so we assume it's `Any` as it could be a type alias.
                 Some(TypingTarget::Any),
                 |call_path| {
-                    if semantic.match_typing_call_path(&call_path, "Any") ||
-                    // If it's not a known type, we assume it's `Any`.
-                    !is_known_type(&call_path)
-                    {
+                    if semantic.match_typing_call_path(&call_path, "Any") {
                         Some(TypingTarget::Any)
                     } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
                         Some(TypingTarget::Object)
+                    } else if !is_known_type(&call_path, target_version) {
+                        // If it's not a known type, we assume it's `Any`.
+                        Some(TypingTarget::Any)
                     } else {
                         None
                     }
@@ -252,41 +256,46 @@ impl<'a> TypingTarget<'a> {
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `None`.
-    fn contains_none(&self, semantic: &SemanticModel, locator: &Locator) -> bool {
+    fn contains_none(
+        &self,
+        semantic: &SemanticModel,
+        locator: &Locator,
+        target_version: PythonVersion,
+    ) -> bool {
         match self {
             TypingTarget::None
             | TypingTarget::Optional
             | TypingTarget::Any
             | TypingTarget::Object => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator, target_version) else {
                     return false;
                 };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match new_target {
                     TypingTarget::None => true,
-                    TypingTarget::Literal(_) => new_target.contains_none(semantic, locator),
+                    TypingTarget::Literal(_) => new_target.contains_none(semantic, locator, target_version),
                     _ => false,
                 }
             }),
             TypingTarget::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator, target_version) else {
                     return false;
                 };
-                new_target.contains_none(semantic, locator)
+                new_target.contains_none(semantic, locator, target_version)
             }),
             TypingTarget::Annotated(element) => {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator) else {
+                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator, target_version) else {
                     return false;
                 };
-                new_target.contains_none(semantic, locator)
+                new_target.contains_none(semantic, locator, target_version)
             }
             TypingTarget::ForwardReference(expr) => {
-                let Some(new_target) = TypingTarget::try_from_expr(expr, semantic, locator) else {
+                let Some(new_target) = TypingTarget::try_from_expr(expr, semantic, locator, target_version) else {
                     return false;
                 };
-                new_target.contains_none(semantic, locator)
+                new_target.contains_none(semantic, locator, target_version)
             }
         }
     }
@@ -303,8 +312,9 @@ fn type_hint_explicitly_allows_none<'a>(
     annotation: &'a Expr,
     semantic: &SemanticModel,
     locator: &Locator,
+    target_version: PythonVersion,
 ) -> Option<&'a Expr> {
-    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator) else {
+    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator, target_version) else {
         return Some(annotation);
     };
     match target {
@@ -314,9 +324,11 @@ fn type_hint_explicitly_allows_none<'a>(
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should
         // be returned.
-        TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(expr, semantic, locator),
+        TypingTarget::Annotated(expr) => {
+            type_hint_explicitly_allows_none(expr, semantic, locator, target_version)
+        }
         _ => {
-            if target.contains_none(semantic, locator) {
+            if target.contains_none(semantic, locator, target_version) {
                 None
             } else {
                 Some(annotation)
@@ -400,7 +412,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         {
             // Quoted annotation.
             if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator) {
-                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker.semantic(), checker.locator) else {
+                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker.semantic(), checker.locator, checker.settings.target_version) else {
                     continue;
                 };
                 let conversion_type = checker.settings.target_version.into();
@@ -416,7 +428,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             }
         } else {
             // Unquoted annotation.
-            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic(), checker.locator) else {
+            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic(), checker.locator, checker.settings.target_version) else {
                 continue;
             };
             let conversion_type = checker.settings.target_version.into();
@@ -428,5 +440,42 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             }
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_python_ast::call_path::CallPath;
+
+    use crate::settings::types::PythonVersion;
+
+    use super::is_known_type;
+
+    #[test]
+    fn test_is_known_type() {
+        assert!(is_known_type(
+            &CallPath::from_slice(&["", "int"]),
+            PythonVersion::Py311
+        ));
+        assert!(is_known_type(
+            &CallPath::from_slice(&["builtins", "int"]),
+            PythonVersion::Py311
+        ));
+        assert!(is_known_type(
+            &CallPath::from_slice(&["typing", "Optional"]),
+            PythonVersion::Py311
+        ));
+        assert!(is_known_type(
+            &CallPath::from_slice(&["typing_extensions", "Literal"]),
+            PythonVersion::Py311
+        ));
+        assert!(is_known_type(
+            &CallPath::from_slice(&["zoneinfo", "ZoneInfo"]),
+            PythonVersion::Py311
+        ));
+        assert!(!is_known_type(
+            &CallPath::from_slice(&["zoneinfo", "ZoneInfo"]),
+            PythonVersion::Py38
+        ));
     }
 }
