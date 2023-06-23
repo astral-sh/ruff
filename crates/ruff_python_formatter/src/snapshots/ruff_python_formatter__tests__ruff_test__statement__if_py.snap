@@ -74,12 +74,12 @@ x = 3
 
 ## Output
 ```py
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:  # trailing if condition
+if x == y:  # trailing if condition
     pass  # trailing `pass` comment
     # Root `if` trailing comment
 
 # Leading elif comment
-elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:  # trailing elif condition
+elif x < y:  # trailing elif condition
     pass
     # `elif` trailing comment
 
@@ -89,11 +89,11 @@ else:  # trailing else condition
     # `else` trailing comment
 
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if x == y:
+    if y == z:
         ...
 
-    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    if a == b:
         ...
     else:  # trailing comment
         ...

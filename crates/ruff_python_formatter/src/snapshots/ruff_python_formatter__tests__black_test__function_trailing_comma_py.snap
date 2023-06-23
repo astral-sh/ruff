@@ -94,7 +94,7 @@ some_module.some_function(
      }
      tup = (
          1,
-@@ -24,45 +24,23 @@
+@@ -24,45 +24,37 @@
  def f(
      a: int = 1,
  ):
@@ -112,9 +112,14 @@ some_module.some_function(
 -        "a": 1,
 -        "b": 2,
 -    }["a"]
--    if (
--        a
--        == {
++        "NOT_YET_IMPLEMENTED_STRING": 1,
++        "NOT_YET_IMPLEMENTED_STRING": 2,
++    }[
++        "NOT_YET_IMPLEMENTED_STRING"
++    ]
+     if (
+         a
+         == {
 -            "a": 1,
 -            "b": 2,
 -            "c": 3,
@@ -124,13 +129,18 @@ some_module.some_function(
 -            "g": 7,
 -            "h": 8,
 -        }["a"]
--    ):
-+        "NOT_YET_IMPLEMENTED_STRING": 1,
-+        "NOT_YET_IMPLEMENTED_STRING": 2,
-+    }[
-+        "NOT_YET_IMPLEMENTED_STRING"
-+    ]
-+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++            "NOT_YET_IMPLEMENTED_STRING": 1,
++            "NOT_YET_IMPLEMENTED_STRING": 2,
++            "NOT_YET_IMPLEMENTED_STRING": 3,
++            "NOT_YET_IMPLEMENTED_STRING": 4,
++            "NOT_YET_IMPLEMENTED_STRING": 5,
++            "NOT_YET_IMPLEMENTED_STRING": 6,
++            "NOT_YET_IMPLEMENTED_STRING": 7,
++            "NOT_YET_IMPLEMENTED_STRING": 8,
++        }[
++            "NOT_YET_IMPLEMENTED_STRING"
++        ]
+     ):
          pass
  
  
@@ -152,7 +162,7 @@ some_module.some_function(
      }
  
  
-@@ -80,35 +58,16 @@
+@@ -80,35 +72,16 @@
      pass
  
  
@@ -231,7 +241,21 @@ def f(
     }[
         "NOT_YET_IMPLEMENTED_STRING"
     ]
-    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    if (
+        a
+        == {
+            "NOT_YET_IMPLEMENTED_STRING": 1,
+            "NOT_YET_IMPLEMENTED_STRING": 2,
+            "NOT_YET_IMPLEMENTED_STRING": 3,
+            "NOT_YET_IMPLEMENTED_STRING": 4,
+            "NOT_YET_IMPLEMENTED_STRING": 5,
+            "NOT_YET_IMPLEMENTED_STRING": 6,
+            "NOT_YET_IMPLEMENTED_STRING": 7,
+            "NOT_YET_IMPLEMENTED_STRING": 8,
+        }[
+            "NOT_YET_IMPLEMENTED_STRING"
+        ]
+    ):
         pass
 
 

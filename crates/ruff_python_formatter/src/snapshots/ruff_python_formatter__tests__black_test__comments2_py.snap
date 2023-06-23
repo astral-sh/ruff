@@ -249,7 +249,7 @@ instruction()#comment with bad spacing
  
 -if "PYTHON" in os.environ:
 -    add_compiler(compiler_from_env())
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++if "NOT_YET_IMPLEMENTED_STRING" in os.environ:
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  else:
      # for compiler in compilers.values():
@@ -283,15 +283,13 @@ instruction()#comment with bad spacing
 +            parameters.children[-1],
 +        ]  # type: ignore
      if (
--        self._proc is not None
-+        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+         self._proc is not None
          # has the child process finished?
--        and self._returncode is None
-+        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+         and self._returncode is None
          # the child process has finished, but the
          # transport hasn't been notified yet?
 -        and self._proc.poll() is None
-+        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++        and NOT_IMPLEMENTED_call() is None
      ):
          pass
      # no newline before or after
@@ -349,7 +347,7 @@ instruction()#comment with bad spacing
      while True:
          if False:
              continue
-@@ -141,24 +111,18 @@
+@@ -141,24 +111,19 @@
          # and round and round we go
  
      # let's return
@@ -374,13 +372,14 @@ instruction()#comment with bad spacing
      def _init_host(self, parsed) -> None:
 -        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
 +        if (
-+            NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right  # type: ignore
++            parsed.hostname
++            is None  # type: ignore
 +            or not NOT_IMPLEMENTED_call()
 +        ):
              pass
  
  
-@@ -167,7 +131,7 @@
+@@ -167,7 +132,7 @@
  #######################
  
  
@@ -440,7 +439,7 @@ not_shareables = [
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 ]
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if "NOT_YET_IMPLEMENTED_STRING" in os.environ:
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:
     # for compiler in compilers.values():
@@ -474,12 +473,12 @@ def inline_comments_in_brackets_ruin_everything():
             parameters.children[-1],
         ]  # type: ignore
     if (
-        NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        self._proc is not None
         # has the child process finished?
-        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        and self._returncode is None
         # the child process has finished, but the
         # transport hasn't been notified yet?
-        and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+        and NOT_IMPLEMENTED_call() is None
     ):
         pass
     # no newline before or after
@@ -516,7 +515,8 @@ CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: 
 class Test:
     def _init_host(self, parsed) -> None:
         if (
-            NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right  # type: ignore
+            parsed.hostname
+            is None  # type: ignore
             or not NOT_IMPLEMENTED_call()
         ):
             pass

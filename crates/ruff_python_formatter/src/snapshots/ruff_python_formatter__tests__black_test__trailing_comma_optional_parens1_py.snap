@@ -38,13 +38,14 @@ class A:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,34 +1,25 @@
+@@ -1,34 +1,32 @@
 -if e1234123412341234.winerror not in (
 -    _winapi.ERROR_SEM_TIMEOUT,
 -    _winapi.ERROR_PIPE_BUSY,
 -) or _check_timeout(t):
 +if (
-+    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    e1234123412341234.winerror
++    not in (_winapi.ERROR_SEM_TIMEOUT, _winapi.ERROR_PIPE_BUSY)
 +    or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +):
      pass
@@ -82,7 +83,13 @@ class A:
 -        ) < self.connection.mysql_version < (10, 5, 2):
 +        if (
 +            self.connection.mysql_is_mariadb
-+            and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++            and (
++                10,
++                4,
++                3,
++            )
++            < self.connection.mysql_version
++            < (10, 5, 2)
 +        ):
              pass
 ```
@@ -91,7 +98,8 @@ class A:
 
 ```py
 if (
-    NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    e1234123412341234.winerror
+    not in (_winapi.ERROR_SEM_TIMEOUT, _winapi.ERROR_PIPE_BUSY)
     or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ):
     pass
@@ -112,7 +120,13 @@ class A:
     def b(self):
         if (
             self.connection.mysql_is_mariadb
-            and NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+            and (
+                10,
+                4,
+                3,
+            )
+            < self.connection.mysql_version
+            < (10, 5, 2)
         ):
             pass
 ```

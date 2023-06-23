@@ -411,7 +411,7 @@ d={'a':1,
 -    because . the . handling . inside . generate_ignored_nodes()
 -    now . considers . multiple . fmt . directives . within . one . prefix
 +    this = NOT_IMPLEMENTED_call()
-+    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    and_ = indeed.it is not formatted
 +    NOT_IMPLEMENTED_call()
 +    now.considers.multiple.fmt.directives.within.one.prefix
      # fmt: on
@@ -663,7 +663,7 @@ def on_and_off_broken():
     # fmt: on
     # fmt: off
     this = NOT_IMPLEMENTED_call()
-    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    and_ = indeed.it is not formatted
     NOT_IMPLEMENTED_call()
     now.considers.multiple.fmt.directives.within.one.prefix
     # fmt: on

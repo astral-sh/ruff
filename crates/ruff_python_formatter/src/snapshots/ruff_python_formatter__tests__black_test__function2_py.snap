@@ -107,7 +107,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
  
 -if os.name == "posix":
 -    import termios
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++if os.name == "NOT_YET_IMPLEMENTED_STRING":
 +    NOT_YET_IMPLEMENTED_StmtImport
  
      def i_should_be_followed_by_only_one_newline():
@@ -124,7 +124,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -
 -        def i_should_be_followed_by_only_one_newline():
 -            pass
-+elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++elif os.name == "NOT_YET_IMPLEMENTED_STRING":
 +    NOT_YET_IMPLEMENTED_StmtTry
  
  elif False:
@@ -173,12 +173,12 @@ def h():
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+if os.name == "NOT_YET_IMPLEMENTED_STRING":
     NOT_YET_IMPLEMENTED_StmtImport
 
     def i_should_be_followed_by_only_one_newline():
         pass
-elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+elif os.name == "NOT_YET_IMPLEMENTED_STRING":
     NOT_YET_IMPLEMENTED_StmtTry
 
 elif False:
