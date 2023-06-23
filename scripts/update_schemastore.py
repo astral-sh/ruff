@@ -47,9 +47,16 @@ def update_schemastore(schemastore: Path) -> None:
         cwd=schemastore,
     )
 
-    # Update the schema and format appropriately
+    # Update the schema and format appropriately.
     schema = json.loads(root.joinpath("ruff.schema.json").read_text())
     schema["$id"] = "https://json.schemastore.org/ruff.json"
+
+    # Rewrite any `uint8` types to `uint`. `uint8` seems to be unsupported by
+    # SchemaStore.
+    for definition in schema['definitions']:
+        if schema['definitions'][definition].get("format") == "uint8":
+            schema['definitions'][definition]['format'] = 'uint'
+
     schemastore.joinpath(ruff_json).write_text(
         json.dumps(dict(sorted(schema.items())), indent=2, ensure_ascii=False),
     )
