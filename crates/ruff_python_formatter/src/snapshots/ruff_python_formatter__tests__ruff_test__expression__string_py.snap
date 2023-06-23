@@ -44,6 +44,18 @@ String \"
 '''Multiline
 String \'
 '''
+
+'''Multiline
+String ""
+'''
+
+'''Multiline
+String """
+'''
+
+'''Multiline
+String \"\"\"
+'''
 ```
 
 
@@ -83,12 +95,24 @@ if True:
     "This string will not include \
         backslashes or newline characters."
 
+"""Multiline
+String \"
+"""
+
+"""Multiline
+String \'
+"""
+
+"""Multiline
+String ""
+"""
+
 '''Multiline
-String "
+String """
 '''
 
 """Multiline
-String '
+String \"\"\"
 """
 ```
 

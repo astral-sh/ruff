@@ -351,19 +351,12 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
      pass
  
  
-@@ -88,25 +90,30 @@
- 
- 
- def that():
--    """ "hey yah" """
-+    ''' "hey yah" '''
- 
+@@ -93,20 +95,25 @@
  
  def and_that():
--    """
+     """
 -    "hey yah" """
-+    '''
-+  "hey yah" '''
++  "hey yah" """
  
  
  def and_this():
@@ -569,12 +562,12 @@ def this():
 
 
 def that():
-    ''' "hey yah" '''
+    """ "hey yah" """
 
 
 def and_that():
-    '''
-  "hey yah" '''
+    """
+  "hey yah" """
 
 
 def and_this():

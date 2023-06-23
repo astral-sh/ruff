@@ -58,16 +58,11 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         let raw_content_range = relative_raw_content_range + self.part_range.start();
 
         let raw_content = &string_content[relative_raw_content_range];
-        let (preferred_quote, contains_newlines) = preferred_quotes(raw_content);
-
-        let preferred_quotes = StringQuotes {
-            style: preferred_quote,
-            triple: quotes.triple,
-        };
+        let (preferred_quotes, contains_newlines) = preferred_quotes(raw_content, quotes);
 
         write!(f, [prefix, preferred_quotes])?;
 
-        let normalized = normalize_quotes(raw_content, preferred_quote);
+        let normalized = normalize_quotes(raw_content, preferred_quotes);
 
         match normalized {
             Cow::Borrowed(_) => {
@@ -150,40 +145,93 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
     }
 }
 
-/// Detects the preferred quotes for `input`. The preferred quote style is the one that
-/// requires less escape sequences.
-fn preferred_quotes(input: &str) -> (QuoteStyle, ContainsNewlines) {
-    let mut single_quotes = 0u32;
-    let mut double_quotes = 0u32;
+/// Detects the preferred quotes for `input`.
+/// * single quoted strings: The preferred quote style is the one that requires less escape sequences.
+/// * triple quoted strings: Use double quotes except the string contains a sequence of `"""`.
+fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, ContainsNewlines) {
     let mut contains_newlines = ContainsNewlines::No;
 
-    for c in input.chars() {
-        match c {
-            '\'' => {
-                single_quotes += 1;
-            }
+    let preferred_style = if quotes.triple {
+        let mut use_single_quotes = false;
+        let mut chars = input.chars().peekable();
 
-            '"' => {
-                double_quotes += 1;
-            }
+        while let Some(c) = chars.next() {
+            match c {
+                '\n' | '\r' => contains_newlines = ContainsNewlines::Yes,
+                '\\' => {
+                    if matches!(chars.peek(), Some('"' | '\\')) {
+                        chars.next();
+                    }
+                }
+                '"' => {
+                    match chars.peek().copied() {
+                        Some('"') => {
+                            // `""`
+                            chars.next();
 
-            '\n' | '\r' => {
-                contains_newlines = ContainsNewlines::Yes;
+                            if chars.peek().copied() == Some('"') {
+                                // `"""`
+                                chars.next();
+                                use_single_quotes = true;
+                            }
+                        }
+                        Some(_) => {
+                            // Single quote, this is ok
+                        }
+                        None => {
+                            // Trailing quote at the end of the comment
+                            use_single_quotes = true;
+                        }
+                    }
+                }
+                _ => continue,
             }
-
-            _ => continue,
         }
-    }
 
-    let quote_style = if double_quotes > single_quotes {
-        QuoteStyle::Single
+        if use_single_quotes {
+            QuoteStyle::Single
+        } else {
+            QuoteStyle::Double
+        }
     } else {
-        QuoteStyle::Double
+        let mut single_quotes = 0u32;
+        let mut double_quotes = 0u32;
+
+        for c in input.chars() {
+            match c {
+                '\'' => {
+                    single_quotes += 1;
+                }
+
+                '"' => {
+                    double_quotes += 1;
+                }
+
+                '\n' | '\r' => {
+                    contains_newlines = ContainsNewlines::Yes;
+                }
+
+                _ => continue,
+            }
+        }
+
+        if double_quotes > single_quotes {
+            QuoteStyle::Single
+        } else {
+            QuoteStyle::Double
+        }
     };
 
-    (quote_style, contains_newlines)
+    (
+        StringQuotes {
+            triple: quotes.triple,
+            style: preferred_style,
+        },
+        contains_newlines,
+    )
 }
 
+#[derive(Copy, Clone, Debug)]
 struct StringQuotes {
     triple: bool,
     style: QuoteStyle,
@@ -201,7 +249,7 @@ impl StringQuotes {
         Some(Self { triple, style })
     }
 
-    const fn text_len(&self) -> TextSize {
+    const fn text_len(self) -> TextSize {
         if self.triple {
             TextSize::new(3)
         } else {
@@ -225,41 +273,46 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 
 /// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
 /// with the provided `style`.
-fn normalize_quotes(input: &str, style: QuoteStyle) -> Cow<str> {
-    // The normalized string if `input` is not yet normalized.
-    // `output` must remain empty if `input` is already normalized.
-    let mut output = String::new();
-    // Tracks the last index of `input` that has been written to `output`.
-    // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
-    let mut last_index = 0;
-
-    let preferred_quote = style.as_char();
-    let opposite_quote = style.opposite().as_char();
-
-    let mut chars = input.char_indices();
-
-    while let Some((index, c)) = chars.next() {
-        if c == '\\' {
-            if let Some((_, next)) = chars.next() {
-                if next == opposite_quote {
-                    // Remove the escape by ending before the backslash and starting again with the quote
-                    output.push_str(&input[last_index..index]);
-                    last_index = index + '\\'.len_utf8();
-                }
-            }
-        } else if c == preferred_quote {
-            // Escape the quote
-            output.push_str(&input[last_index..index]);
-            output.push('\\');
-            output.push(c);
-            last_index = index + preferred_quote.len_utf8();
-        }
-    }
-
-    if last_index == 0 {
+fn normalize_quotes(input: &str, quotes: StringQuotes) -> Cow<str> {
+    if quotes.triple {
         Cow::Borrowed(input)
     } else {
-        output.push_str(&input[last_index..]);
-        Cow::Owned(output)
+        // The normalized string if `input` is not yet normalized.
+        // `output` must remain empty if `input` is already normalized.
+        let mut output = String::new();
+        // Tracks the last index of `input` that has been written to `output`.
+        // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
+        let mut last_index = 0;
+
+        let style = quotes.style;
+        let preferred_quote = style.as_char();
+        let opposite_quote = style.opposite().as_char();
+
+        let mut chars = input.char_indices();
+
+        while let Some((index, c)) = chars.next() {
+            if c == '\\' {
+                if let Some((_, next)) = chars.next() {
+                    if next == opposite_quote {
+                        // Remove the escape by ending before the backslash and starting again with the quote
+                        output.push_str(&input[last_index..index]);
+                        last_index = index + '\\'.len_utf8();
+                    }
+                }
+            } else if c == preferred_quote {
+                // Escape the quote
+                output.push_str(&input[last_index..index]);
+                output.push('\\');
+                output.push(c);
+                last_index = index + preferred_quote.len_utf8();
+            }
+        }
+
+        if last_index == 0 {
+            Cow::Borrowed(input)
+        } else {
+            output.push_str(&input[last_index..]);
+            Cow::Owned(output)
+        }
     }
 }

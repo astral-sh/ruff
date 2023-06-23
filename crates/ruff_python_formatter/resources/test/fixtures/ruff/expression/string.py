@@ -38,3 +38,15 @@ String \"
 '''Multiline
 String \'
 '''
+
+'''Multiline
+String ""
+'''
+
+'''Multiline
+String """
+'''
+
+'''Multiline
+String \"\"\"
+'''
