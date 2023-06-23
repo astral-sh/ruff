@@ -163,40 +163,50 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
         return CommentPlacement::Default(comment);
     }
 
-    if let Some(AnyNodeRef::ExceptHandlerExceptHandler(except_handler)) = comment.preceding_node() {
-        // it now depends on the indentation level of the comment if it is a leading comment for e.g.
-        // the following `elif` or indeed a trailing comment of the previous body's last statement.
-        let comment_indentation =
-            whitespace::indentation_at_offset(locator, comment.slice().range().start())
-                .map(str::len)
-                .unwrap_or_default();
+    let Some(AnyNodeRef::ExceptHandlerExceptHandler(except_handler)) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
 
-        if let Some(except_indentation) =
-            whitespace::indentation(locator, except_handler).map(str::len)
+    // it now depends on the indentation level of the comment if it is a leading comment for e.g.
+    // the following `elif` or indeed a trailing comment of the previous body's last statement.
+    let comment_indentation =
+        whitespace::indentation_at_offset(locator, comment.slice().range().start())
+            .map(str::len)
+            .unwrap_or_default();
+
+    let Some(except_indentation) =
+            whitespace::indentation(locator, except_handler).map(str::len) else
         {
-            return if comment_indentation <= except_indentation {
-                // It has equal, or less indent than the `except` handler. It must be a comment
-                // of the following `finally` or `else` block
-                //
-                // ```python
-                // try:
-                //     pass
-                // except Exception:
-                //     print("noop")
-                // # leading
-                // finally:
-                //     pass
-                // ```
-                // Attach it to the `try` statement.
-                CommentPlacement::dangling(comment.enclosing_node(), comment)
-            } else {
-                // Delegate to `handle_trailing_body_comment`
-                CommentPlacement::Default(comment)
-            };
-        }
+            return CommentPlacement::Default(comment);
+        };
+
+    if comment_indentation > except_indentation {
+        // Delegate to `handle_trailing_body_comment`
+        return CommentPlacement::Default(comment);
     }
 
-    CommentPlacement::Default(comment)
+    // It has equal, or less indent than the `except` handler. It must be a comment of a subsequent
+    // except handler or of the following `finally` or `else` block
+    //
+    // ```python
+    // try:
+    //     pass
+    // except Exception:
+    //     print("noop")
+    // # leading
+    // finally:
+    //     pass
+    // ```
+
+    if let Some(following) = comment.following_node() {
+        if let AnyNodeRef::ExceptHandlerExceptHandler(_) = following {
+            // Attach it to the following except handler (which has a node) as leading
+
+            return CommentPlacement::leading(following, comment);
+        }
+    }
+    // No following except handler; attach it to the `try` statement.as dangling
+    CommentPlacement::dangling(comment.enclosing_node(), comment)
 }
 
 /// Handles own line comments between the last statement and the first statement of two bodies.
