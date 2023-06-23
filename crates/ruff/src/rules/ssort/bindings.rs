@@ -1,9 +1,15 @@
 use ruff_python_ast::prelude::*;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 
-pub(super) fn bindings(stmt: &Stmt) -> Vec<&str> {
+pub(super) fn stmt_bindings(stmt: &Stmt) -> Vec<&str> {
     let mut bindings = Bindings { bindings: vec![] };
     bindings.visit_stmt(stmt);
+    bindings.bindings
+}
+
+pub(super) fn expr_bindings(expr: &Expr) -> Vec<&str> {
+    let mut bindings = Bindings { bindings: vec![] };
+    bindings.visit_expr(expr);
     bindings.bindings
 }
 
@@ -170,7 +176,7 @@ mod tests {
                     q = r
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b"]);
     }
 
@@ -190,7 +196,7 @@ mod tests {
                     aa = ab
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(
             bindings,
             ["a", "g", "l", "t", "e", "j", "o", "r", "w", "y", "c"]
@@ -206,7 +212,7 @@ mod tests {
                     q = r
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b"]);
     }
 
@@ -226,7 +232,7 @@ mod tests {
                     aa = ab
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(
             bindings,
             ["a", "g", "l", "t", "e", "j", "o", "r", "w", "y", "c"]
@@ -242,7 +248,7 @@ mod tests {
                     g = h
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b"]);
     }
 
@@ -255,77 +261,77 @@ mod tests {
                     i = j
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "d", "g", "c"]);
     }
 
     #[test]
     fn return_() {
         let stmt = parse(r#"return a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn return_with_walrus() {
         let stmt = parse(r#"return (a := b)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn delete() {
         let stmt = parse(r#"del a, b.c, d[e:f:g]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn delete_with_walrus() {
         let stmt = parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "e", "g", "i", "k"]);
     }
 
     #[test]
     fn assign() {
         let stmt = parse(r#"a, b.c, [d, *e], *f = g"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "d", "e", "f"]);
     }
 
     #[test]
     fn assign_with_walrus() {
         let stmt = parse(r#"a, (b := c).d, [e, *f], *g = (h := i)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["h", "a", "b", "e", "f", "g"]);
     }
 
     #[test]
     fn aug_assign() {
         let stmt = parse(r#"a += b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn aug_assign_with_walrus() {
         let stmt = parse(r#"a += (b := c)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "b"]);
     }
 
     #[test]
     fn ann_assign() {
         let stmt = parse(r#"a: b = c"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn ann_assign_with_walrus() {
         let stmt = parse(r#"a: (b := c) = (d := e)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["d", "b", "a"]);
     }
 
@@ -339,7 +345,7 @@ mod tests {
                     e = f
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e"]);
     }
 
@@ -353,7 +359,7 @@ mod tests {
                     f = g
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "a", "d", "f"]);
     }
 
@@ -367,7 +373,7 @@ mod tests {
                     e = f
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e"]);
     }
 
@@ -381,7 +387,7 @@ mod tests {
                     f = g
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "a", "d", "f"]);
     }
 
@@ -395,7 +401,7 @@ mod tests {
                     d = e
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "d"]);
     }
 
@@ -409,7 +415,7 @@ mod tests {
                     e = f
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e"]);
     }
 
@@ -425,7 +431,7 @@ mod tests {
                     g = h
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "e", "g"]);
     }
 
@@ -441,7 +447,7 @@ mod tests {
                     i = j
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e", "g", "i"]);
     }
 
@@ -453,7 +459,7 @@ mod tests {
                     f = g
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "d", "e", "f"]);
     }
 
@@ -465,7 +471,7 @@ mod tests {
                     h = i
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "d", "f", "g", "h"]);
     }
 
@@ -477,7 +483,7 @@ mod tests {
                     f = g
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "d", "e", "f"]);
     }
 
@@ -489,21 +495,21 @@ mod tests {
                     h = i
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "d", "f", "g", "h"]);
     }
 
     #[test]
     fn raise() {
         let stmt = parse(r#"raise a from b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn raise_with_walrus() {
         let stmt = parse(r#"raise (a := b) from (c := d)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c"]);
     }
 
@@ -521,7 +527,7 @@ mod tests {
                     i = j
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "d", "e", "g", "i"]);
     }
 
@@ -539,7 +545,7 @@ mod tests {
                     j = k
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e", "f", "h", "j"]);
     }
 
@@ -557,7 +563,7 @@ mod tests {
                     i = j
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "d", "e", "g", "i"]);
     }
 
@@ -575,147 +581,147 @@ mod tests {
                     j = k
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e", "f", "h", "j"]);
     }
 
     #[test]
     fn assert() {
         let stmt = parse(r#"assert a, b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn assert_with_walrus() {
         let stmt = parse(r#"assert (a := b), (c := d)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c"]);
     }
 
     #[test]
     fn import() {
         let stmt = parse(r#"import a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn import_with_submodule() {
         let stmt = parse(r#"import a.b.c"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn import_with_alias() {
         let stmt = parse(r#"import a as b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b"]);
     }
 
     #[test]
     fn import_from() {
         let stmt = parse(r#"from a import b, c"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "c"]);
     }
 
     #[test]
     fn import_from_with_alias() {
         let stmt = parse(r#"from a import b as c, d as e"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["c", "e"]);
     }
 
     #[test]
     fn global() {
         let stmt = parse(r#"global a, b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "b"]);
     }
 
     #[test]
     fn nonlocal() {
         let stmt = parse(r#"nonlocal a, b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "b"]);
     }
 
     #[test]
     fn pass() {
         let stmt = parse(r#"pass"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn break_() {
         let stmt = parse(r#"break"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn continue_() {
         let stmt = parse(r#"continue"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn bool_op() {
         let stmt = parse(r#"a and b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn bool_op_with_walrus() {
         let stmt = parse(r#"(a := b) and (c := d)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c"]);
     }
 
     #[test]
     fn named_expr() {
         let stmt = parse(r#"(a := b)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn bin_op() {
         let stmt = parse(r#"a + b"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn bin_op_with_walrus() {
         let stmt = parse(r#"(a := b) + (c := d)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c"]);
     }
 
     #[test]
     fn unary_op() {
         let stmt = parse(r#"-a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn unary_op_with_walrus() {
         let stmt = parse(r#"-(a := b)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn lambda() {
         let stmt = parse(r#"lambda a = b, /, c = d, *e, f = g, **h: i"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
@@ -723,287 +729,287 @@ mod tests {
     fn lambda_with_walrus() {
         let stmt =
             parse(r#"lambda a = (b := c), /, d = (e := f), *g, h = (i := j), **k: (l := m)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "e", "i"]);
     }
 
     #[test]
     fn if_exp() {
         let stmt = parse(r#"a if b else c"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn if_exp_with_walrus() {
         let stmt = parse(r#"(a := b) if (c := d) else (e := f)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["c", "a", "e"]);
     }
 
     #[test]
     fn dict() {
         let stmt = parse(r#"{a: b, **c}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn dict_with_walrus() {
         let stmt = parse(r#"{(a := b): (c := d), **(e := f)}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e"]);
     }
 
     #[test]
     fn set() {
         let stmt = parse(r#"{a, *b}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn set_with_walrus() {
         let stmt = parse(r#"{(a := b), *(c := d)}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c"]);
     }
 
     #[test]
     fn list_comp() {
         let stmt = parse(r#"[a for b in c if d]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn list_comp_with_walrus() {
         let stmt = parse(r#"[(a := b) for c in (d := f) if (g := h)]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["d", "g", "a"]);
     }
 
     #[test]
     fn set_comp() {
         let stmt = parse(r#"{a for b in c if d}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn set_comp_with_walrus() {
         let stmt = parse(r#"{(a := b) for c in (d := f) if (g := h)}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["d", "g", "a"]);
     }
 
     #[test]
     fn dict_comp() {
         let stmt = parse(r#"{a: b for c in d if e}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn dict_comp_with_walrus() {
         let stmt = parse(r#"{(a := b): (c := d) for e in (f := g) if (h := i)}"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["f", "h", "a", "c"]);
     }
 
     #[test]
     fn generator_exp() {
         let stmt = parse(r#"(a for b in c if d)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn generator_exp_with_walrus() {
         let stmt = parse(r#"((a := b) for c in (d := f) if (g := h))"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["d", "g", "a"]);
     }
 
     #[test]
     fn await_() {
         let stmt = parse(r#"await a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn await_with_walrus() {
         let stmt = parse(r#"await (a := b)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn yield_() {
         let stmt = parse(r#"yield a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn yield_with_walrus() {
         let stmt = parse(r#"yield (a := b)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn yield_from() {
         let stmt = parse(r#"yield from a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn yield_from_with_walrus() {
         let stmt = parse(r#"yield from (a := b)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn compare() {
         let stmt = parse(r#"a < b < c"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn compare_with_walrus() {
         let stmt = parse(r#"(a := b) < (c := d) < (e := f)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e"]);
     }
 
     #[test]
     fn call() {
         let stmt = parse(r#"a(b, *c, d=e, **f)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn call_with_walrus() {
         let stmt = parse(r#"(a := b)((c := d), *(e := f), g=(h := i), **(j := k))"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e", "h", "j"]);
     }
 
     #[test]
     fn formatted_value() {
         let stmt = parse(r#"f"{a:b}""#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn formatted_value_with_walrus() {
         let stmt = parse(r#"f"{(a := b):{(c := d)}}""#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c"]);
     }
 
     #[test]
     fn joined_str() {
         let stmt = parse(r#"f"{a:b} {c:d}""#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn joined_str_with_walrus() {
         let stmt = parse(r#"f"{(a := b):{(c := d)}} {(e := f):{(g := h)}}""#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e", "g"]);
     }
 
     #[test]
     fn constant() {
         let stmt = parse(r#"1"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn attribute() {
         let stmt = parse(r#"a.b.c"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn attribute_with_walrus() {
         let stmt = parse(r#"(a := b).c.d"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn subscript() {
         let stmt = parse(r#"a[b:c:d]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn subscript_with_walrus() {
         let stmt = parse(r#"(a := b)[(c := d):(e := f):(g := h)]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e", "g"]);
     }
 
     #[test]
     fn starred() {
         let stmt = parse(r#"*a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn starred_with_walrus() {
         let stmt = parse(r#"*(a := b)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a"]);
     }
 
     #[test]
     fn name() {
         let stmt = parse(r#"a"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn list() {
         let stmt = parse(r#"[a, b, *c]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn list_with_walrus() {
         let stmt = parse(r#"[(a := b), (c := d), *(e := f)]"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e"]);
     }
 
     #[test]
     fn tuple() {
         let stmt = parse(r#"(a, b, *c)"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, [] as [&str; 0]);
     }
 
     #[test]
     fn tuple_with_walrus() {
         let stmt = parse(r#"((a := b), (c := d), *(e := f))"#);
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["a", "c", "e"]);
     }
 
@@ -1016,7 +1022,7 @@ mod tests {
                         d = e
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "d"]);
     }
 
@@ -1029,7 +1035,7 @@ mod tests {
                         d = e
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "d"]);
     }
 
@@ -1042,7 +1048,7 @@ mod tests {
                         g = h
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "c", "e", "g"]);
     }
 
@@ -1055,7 +1061,7 @@ mod tests {
                         h = i
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["c", "e", "f", "h"]);
     }
 
@@ -1068,7 +1074,7 @@ mod tests {
                         g=h
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["c", "e", "g"]);
     }
 
@@ -1081,7 +1087,7 @@ mod tests {
                         c = d
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "c"]);
     }
 
@@ -1094,7 +1100,7 @@ mod tests {
                         f = g
             "#,
         );
-        let bindings = bindings(&stmt);
+        let bindings = stmt_bindings(&stmt);
         assert_eq!(bindings, ["b", "c", "d", "f"]);
     }
 
