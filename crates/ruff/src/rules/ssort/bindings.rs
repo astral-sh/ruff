@@ -13,6 +13,18 @@ pub(super) fn expr_bindings(expr: &Expr) -> Vec<&str> {
     bindings.bindings
 }
 
+pub(super) fn arguments_bindings(arguments: &Arguments) -> Vec<&str> {
+    let mut bindings = Bindings::default();
+    bindings.visit_arguments(arguments);
+    bindings.bindings
+}
+
+pub(super) fn decorator_bindings(decorator: &Decorator) -> Vec<&str> {
+    let mut bindings = Bindings::default();
+    bindings.visit_decorator(decorator);
+    bindings.bindings
+}
+
 #[derive(Default)]
 struct Bindings<'a> {
     bindings: Vec<&'a str>,

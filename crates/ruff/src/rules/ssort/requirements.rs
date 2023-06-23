@@ -1,8 +1,11 @@
-use crate::rules::ssort::bindings::{expr_bindings, stmt_bindings};
+use crate::rules::ssort::bindings::{
+    arguments_bindings, decorator_bindings, expr_bindings, stmt_bindings,
+};
 use crate::rules::ssort::builtins::CLASS_BUILTINS;
 use ruff_python_ast::prelude::*;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 use std::collections::HashSet;
+use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) enum RequirementScope {
@@ -34,6 +37,7 @@ impl<'a> Visitor<'a> for Requirements<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(StmtFunctionDef {
+                name,
                 args,
                 body,
                 decorator_list,
@@ -41,6 +45,7 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 ..
             })
             | Stmt::AsyncFunctionDef(StmtAsyncFunctionDef {
+                name,
                 args,
                 body,
                 decorator_list,
@@ -57,10 +62,17 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                     self.visit_annotation(expr);
                 }
 
-                let mut scope = arguments_scope(args);
+                let mut scope = Scope::new();
+                scope.add_decorator_list(decorator_list);
+                scope.add_arguments(args);
+                if let Some(expr) = returns {
+                    scope.add_expr(expr)
+                }
+                scope.add_name(name);
+
                 let requirements = std::mem::take(&mut self.requirements);
                 for stmt in body {
-                    scope.extend(stmt_bindings(stmt));
+                    scope.add_stmt(stmt);
                     self.visit_stmt(stmt);
                 }
                 let requirements = std::mem::replace(&mut self.requirements, requirements);
@@ -99,7 +111,9 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                     self.visit_keyword(keyword);
                 }
 
-                let mut scope: HashSet<&str> = CLASS_BUILTINS.iter().copied().collect();
+                let mut scope = Scope::with_class_builtins();
+                scope.add_decorator_list(decorator_list);
+
                 for stmt in body {
                     let requirements = std::mem::take(&mut self.requirements);
                     self.visit_stmt(stmt);
@@ -109,7 +123,7 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                             self.requirements.push(requirement);
                         }
                     }
-                    scope.extend(stmt_bindings(stmt));
+                    scope.add_stmt(stmt);
                 }
             }
             Stmt::AugAssign(StmtAugAssign {
@@ -144,7 +158,9 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 self.visit_body(orelse);
                 let requirements = std::mem::replace(&mut self.requirements, requirements);
 
-                let scope = stmt_bindings(stmt);
+                let mut scope = Scope::new();
+                scope.add_stmt(stmt);
+
                 for requirement in requirements {
                     if !scope.contains(&requirement.name) {
                         self.requirements.push(requirement);
@@ -161,7 +177,9 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 self.visit_body(body);
                 let requirements = std::mem::replace(&mut self.requirements, requirements);
 
-                let scope = stmt_bindings(stmt);
+                let mut scope = Scope::new();
+                scope.add_stmt(stmt);
+
                 for requirement in requirements {
                     if !scope.contains(&requirement.name) {
                         self.requirements.push(requirement);
@@ -199,8 +217,9 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 self.visit_expr(body);
                 let requirements = std::mem::replace(&mut self.requirements, requirements);
 
-                let mut scope = arguments_scope(args);
-                scope.extend(expr_bindings(body));
+                let mut scope = Scope::new();
+                scope.add_arguments(args);
+
                 for mut requirement in requirements {
                     if !scope.contains(requirement.name) {
                         requirement.deferred = true;
@@ -216,7 +235,9 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 walk_expr(self, expr);
                 let requirements = std::mem::replace(&mut self.requirements, requirements);
 
-                let scope = comprehensions_scope(generators);
+                let mut scope = Scope::new();
+                scope.add_comprehensions(generators);
+
                 for requirement in requirements {
                     if !scope.contains(requirement.name) {
                         self.requirements.push(requirement);
@@ -237,22 +258,63 @@ impl<'a> Visitor<'a> for Requirements<'a> {
     }
 }
 
-fn arguments_scope(args: &Arguments) -> HashSet<&str> {
-    let mut scope = HashSet::new();
-    scope.extend(args.posonlyargs.iter().map(|arg| arg.def.arg.as_str()));
-    scope.extend(args.args.iter().map(|arg| arg.def.arg.as_str()));
-    scope.extend(args.vararg.iter().map(|arg| arg.arg.as_str()));
-    scope.extend(args.kwonlyargs.iter().map(|arg| arg.def.arg.as_str()));
-    scope.extend(args.kwarg.iter().map(|arg| arg.arg.as_str()));
-    scope
+#[derive(Default)]
+struct Scope<'a> {
+    scope: HashSet<&'a str>,
 }
 
-fn comprehensions_scope(comprehensions: &[Comprehension]) -> HashSet<&str> {
-    let mut scope = HashSet::new();
-    for comprehension in comprehensions {
-        scope.extend(expr_bindings(&comprehension.target));
+impl<'a> Scope<'a> {
+    fn new() -> Self {
+        Self::default()
     }
-    scope
+
+    fn with_class_builtins() -> Self {
+        Self {
+            scope: CLASS_BUILTINS.iter().copied().collect(),
+        }
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        self.scope.contains(name)
+    }
+
+    fn add_name(&mut self, name: &'a str) {
+        self.scope.insert(name);
+    }
+
+    fn add_stmt(&mut self, stmt: &'a Stmt) {
+        self.scope.extend(stmt_bindings(stmt));
+    }
+
+    fn add_expr(&mut self, expr: &'a Expr) {
+        self.scope.extend(expr_bindings(expr));
+    }
+
+    fn add_decorator_list<I: IntoIterator<Item = &'a Decorator>>(&mut self, decorator_list: I) {
+        for decorator in decorator_list {
+            self.scope.extend(decorator_bindings(decorator));
+        }
+    }
+
+    fn add_arguments(&mut self, arguments: &'a Arguments) {
+        self.scope.extend(arguments_bindings(arguments));
+        self.scope
+            .extend(arguments.posonlyargs.iter().map(|arg| arg.def.arg.as_str()));
+        self.scope
+            .extend(arguments.args.iter().map(|arg| arg.def.arg.as_str()));
+        self.scope
+            .extend(arguments.vararg.iter().map(|arg| arg.arg.as_str()));
+        self.scope
+            .extend(arguments.kwonlyargs.iter().map(|arg| arg.def.arg.as_str()));
+        self.scope
+            .extend(arguments.kwarg.iter().map(|arg| arg.arg.as_str()));
+    }
+
+    fn add_comprehensions<I: IntoIterator<Item = &'a Comprehension>>(&mut self, comprehensions: I) {
+        for comprehension in comprehensions {
+            self.scope.extend(expr_bindings(&comprehension.target));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -415,6 +477,80 @@ mod tests {
     }
 
     #[test]
+    fn function_def_with_bindings() {
+        let stmt = parse(
+            r#"
+                @(a := b)
+                def c(
+                    d: (e := f) = (g := h),
+                    /,
+                    i: (j := k) = (l := m),
+                    *n: (o := p),
+                    q: (r := s) = (t := u),
+                    **v: (w := x)
+                ) -> (y := z):
+                    _ = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "m",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "u",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "f",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "k",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "p",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "s",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "x",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "z",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn async_function_def() {
         let stmt = parse(
             r#"
@@ -559,6 +695,80 @@ mod tests {
                 Requirement {
                     name: "ab",
                     deferred: true,
+                    scope: RequirementScope::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn async_function_def_with_bindings() {
+        let stmt = parse(
+            r#"
+                @(a := b)
+                async def c(
+                    d: (e := f) = (g := h),
+                    /,
+                    i: (j := k) = (l := m),
+                    *n: (o := p),
+                    q: (r := s) = (t := u),
+                    **v: (w := x)
+                ) -> (y := z):
+                    _ = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
+            "#,
+        );
+        let requirements = stmt_requirements(&stmt);
+        assert_eq!(
+            requirements,
+            [
+                Requirement {
+                    name: "b",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "h",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "m",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "u",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "f",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "k",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "p",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "s",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "x",
+                    deferred: false,
+                    scope: RequirementScope::Local
+                },
+                Requirement {
+                    name: "z",
+                    deferred: false,
                     scope: RequirementScope::Local
                 },
             ]
