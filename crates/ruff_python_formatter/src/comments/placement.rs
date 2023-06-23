@@ -1050,19 +1050,19 @@ fn handle_dict_unpacking_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-// Own line comments coming after the node are always dangling comments
-// ```python
-// (
-//      a
-//      # trailing a comment
-//      . # dangling comment
-//      # or this
-//      b
-// )
-// ```
+/// Own line comments coming after the node are always dangling comments
+/// ```python
+/// (
+///      a
+///      # trailing a comment
+///      . # dangling comment
+///      # or this
+///      b
+/// )
+/// ```
 fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
+    _locator: &Locator,
 ) -> CommentPlacement<'a> {
     let Some(attribute) = comment.enclosing_node().expr_attribute() else {
         return CommentPlacement::Default(comment);
@@ -1073,14 +1073,13 @@ fn handle_attribute_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let between_value_and_attr = TextRange::new(attribute.value.end(), attribute.attr.start());
-
-    let dot = SimpleTokenizer::new(locator.contents(), between_value_and_attr)
-        .skip_trivia()
-        .next()
-        .expect("Expected the `.` character after the value");
-
-    if TextRange::new(dot.end(), attribute.attr.start()).contains(comment.slice().start()) {
+    if TextRange::new(attribute.value.end(), attribute.attr.start())
+        .contains(comment.slice().start())
+    {
+        // ```text
+        // value   .   attr
+        //      ^^^^^^^ the range of dangling comments
+        // ```
         if comment.line_position().is_end_of_line() {
             // Attach to node with b
             // ```python

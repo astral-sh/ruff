@@ -78,17 +78,17 @@ if (
     and self._returncode
     # the child process has finished, but the
     # transport hasn't been notified yet?
-    and NOT_IMPLEMENTED_call()
+    and self._proc.poll()
 ):
     pass
 
 if (
     self._proc
     and self._returncode
-    and NOT_IMPLEMENTED_call()
+    and self._proc.poll()
     and self._proc
     and self._returncode
-    and NOT_IMPLEMENTED_call()
+    and self._proc.poll()
 ):
     ...
 

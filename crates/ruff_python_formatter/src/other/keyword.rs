@@ -13,10 +13,11 @@ impl FormatNodeRule<Keyword> for FormatKeyword {
             arg,
             value,
         } = item;
-        if let Some(argument) = arg {
-            write!(f, [argument.format(), text("=")])?;
+        if let Some(arg) = arg {
+            write!(f, [arg.format(), text("="), value.format()])
+        } else {
+            // TODO(konstin): dangling comments after the stars?
+            write!(f, [text("**"), value.format()])
         }
-
-        value.format().fmt(f)
     }
 }

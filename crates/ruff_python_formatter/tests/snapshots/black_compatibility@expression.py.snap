@@ -337,7 +337,7 @@ last_call()
  ()
  (1,)
  (1, 2)
-@@ -68,60 +75,51 @@
+@@ -68,40 +75,37 @@
      2,
      3,
  ]
@@ -395,39 +395,19 @@ last_call()
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
  Python3 > Python2 > COBOL
  Life is Life
--call()
--call(arg)
--call(kwarg="hey")
--call(arg, kwarg="hey")
--call(arg, another, kwarg="hey", **kwargs)
--call(
--    this_is_a_very_long_variable_which_will_force_a_delimiter_split,
--    arg,
--    another,
--    kwarg="hey",
--    **kwargs,
--)  # note: no trailing comma pre-3.6
+ call()
+@@ -116,8 +120,8 @@
+     kwarg="hey",
+     **kwargs,
+ )  # note: no trailing comma pre-3.6
 -call(*gidgets[:2])
 -call(a, *gidgets[:2])
--call(**self.screen_kwargs)
--call(b, **self.screen_kwargs)
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # note: no trailing comma pre-3.6
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++call(*NOT_YET_IMPLEMENTED_ExprStarred)
++call(a, *NOT_YET_IMPLEMENTED_ExprStarred)
+ call(**self.screen_kwargs)
+ call(b, **self.screen_kwargs)
  lukasz.langa.pl
--call.me(maybe)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- (1).real
- (1.0).real
- ....__class__
-@@ -130,34 +128,28 @@
+@@ -130,34 +134,28 @@
  tuple[str, ...]
  tuple[str, int, float, dict[str, int]]
  tuple[
@@ -475,7 +455,7 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -171,25 +163,32 @@
+@@ -171,20 +169,27 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
@@ -511,34 +491,19 @@ last_call()
  {
      "id": "1",
      "type": "type",
--    "started_at": now(),
--    "ended_at": now() + timedelta(days=10),
-+    "started_at": NOT_IMPLEMENTED_call(),
-+    "ended_at": NOT_IMPLEMENTED_call() + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-     "priority": 1,
-     "import_session_id": 1,
-     **kwargs,
-@@ -198,35 +197,21 @@
- b = (1,)
+@@ -199,32 +204,22 @@
  c = 1
  d = (1,) + a + (2,)
--e = (1,).count(1)
+ e = (1,).count(1)
 -f = 1, *range(10)
 -g = 1, *"ten"
--what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
--    vars_to_remove
-+e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +f = 1, *NOT_YET_IMPLEMENTED_ExprStarred
 +g = 1, *NOT_YET_IMPLEMENTED_ExprStarred
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
-+    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
+     vars_to_remove
  )
--what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
--    vars_to_remove
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
-+    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+ what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
+     vars_to_remove
  )
 -result = (
 -    session.query(models.Customer.id)
@@ -558,16 +523,18 @@ last_call()
 -    )
 -    .all()
 -)
--Ø = set()
--authors.łukasz.say_thanks()
-+result = NOT_IMPLEMENTED_call()
-+result = NOT_IMPLEMENTED_call()
-+Ø = NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
++result = session.query(models.Customer.id).filter(
++    models.Customer.account_id == account_id, models.Customer.email == email_address
++).order_by(models.Customer.id.asc()).all()
++result = session.query(models.Customer.id).filter(
++    models.Customer.account_id == account_id, models.Customer.email == email_address
++).order_by(
++    models.Customer.id.asc(),
++).all()
+ Ø = set()
+ authors.łukasz.say_thanks()
  mapping = {
-     A: 0.25 * (10.0 / 12),
-     B: 0.1 * (10.0 / 12),
-@@ -236,31 +221,29 @@
+@@ -236,29 +231,27 @@
  
  
  def gen():
@@ -582,8 +549,7 @@ last_call()
  
  
  async def f():
--    await some.complicated[0].call(with_args=(True or (1 is not 1)))
-+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+     await some.complicated[0].call(with_args=(True or (1 is not 1)))
  
  
 -print(*[] or [1])
@@ -594,9 +560,9 @@ last_call()
 -    force=False
 -), "Short message"
 -assert parens is TooMany
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++print(*NOT_YET_IMPLEMENTED_ExprStarred)
++print(**NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
++print(*NOT_YET_IMPLEMENTED_ExprStarred)
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
@@ -607,34 +573,9 @@ last_call()
 -for z in (i for i in (1, 2, 3)):
 +for z in (i for i in []):
      ...
--for i in call():
-+for i in NOT_IMPLEMENTED_call():
+ for i in call():
      ...
- for j in 1 + (2 + 3):
-     ...
-@@ -272,7 +255,7 @@
-     addr_proto,
-     addr_canonname,
-     addr_sockaddr,
--) in socket.getaddrinfo("google.com", "http"):
-+) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
-     pass
- a = (
-     aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
-@@ -291,9 +274,9 @@
-     is not qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
- )
- if (
--    threading.current_thread() != threading.main_thread()
--    and threading.current_thread() != threading.main_thread()
--    or signal.getsignal(signal.SIGINT) != signal.default_int_handler
-+    NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
-+    and NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
-+    or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) != signal.default_int_handler
- ):
-     return True
- if (
-@@ -327,13 +310,18 @@
+@@ -327,13 +320,18 @@
  ):
      return True
  if (
@@ -656,7 +597,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -341,7 +329,8 @@
+@@ -341,7 +339,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -666,13 +607,6 @@ last_call()
      ^ aaaaaaaaaaaaaaaa.i
      << aaaaaaaaaaaaaaaa.k
      >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
-@@ -366,5 +355,5 @@
-     ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-     ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
- )
--last_call()
-+NOT_IMPLEMENTED_call()
- # standalone comment at ENDMARKER
 ```
 
 ## Ruff Output
@@ -788,18 +722,24 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 Python3 > Python2 > COBOL
 Life is Life
-NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # note: no trailing comma pre-3.6
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+call()
+call(arg)
+call(kwarg="hey")
+call(arg, kwarg="hey")
+call(arg, another, kwarg="hey", **kwargs)
+call(
+    this_is_a_very_long_variable_which_will_force_a_delimiter_split,
+    arg,
+    another,
+    kwarg="hey",
+    **kwargs,
+)  # note: no trailing comma pre-3.6
+call(*NOT_YET_IMPLEMENTED_ExprStarred)
+call(a, *NOT_YET_IMPLEMENTED_ExprStarred)
+call(**self.screen_kwargs)
+call(b, **self.screen_kwargs)
 lukasz.langa.pl
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+call.me(maybe)
 (1).real
 (1.0).real
 ....__class__
@@ -867,8 +807,8 @@ SomeName
 {
     "id": "1",
     "type": "type",
-    "started_at": NOT_IMPLEMENTED_call(),
-    "ended_at": NOT_IMPLEMENTED_call() + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    "started_at": now(),
+    "ended_at": now() + timedelta(days=10),
     "priority": 1,
     "import_session_id": 1,
     **kwargs,
@@ -877,21 +817,25 @@ a = (1,)
 b = (1,)
 c = 1
 d = (1,) + a + (2,)
-e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+e = (1,).count(1)
 f = 1, *NOT_YET_IMPLEMENTED_ExprStarred
 g = 1, *NOT_YET_IMPLEMENTED_ExprStarred
-what_is_up_with_those_new_coord_names = (
-    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
-    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
+    vars_to_remove
 )
-what_is_up_with_those_new_coord_names = (
-    (coord_names | NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
-    - NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
+    vars_to_remove
 )
-result = NOT_IMPLEMENTED_call()
-result = NOT_IMPLEMENTED_call()
-Ø = NOT_IMPLEMENTED_call()
-NOT_IMPLEMENTED_call()
+result = session.query(models.Customer.id).filter(
+    models.Customer.account_id == account_id, models.Customer.email == email_address
+).order_by(models.Customer.id.asc()).all()
+result = session.query(models.Customer.id).filter(
+    models.Customer.account_id == account_id, models.Customer.email == email_address
+).order_by(
+    models.Customer.id.asc(),
+).all()
+Ø = set()
+authors.łukasz.say_thanks()
 mapping = {
     A: 0.25 * (10.0 / 12),
     B: 0.1 * (10.0 / 12),
@@ -908,12 +852,12 @@ def gen():
 
 
 async def f():
-    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    await some.complicated[0].call(with_args=(True or (1 is not 1)))
 
 
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+print(*NOT_YET_IMPLEMENTED_ExprStarred)
+print(**NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
+print(*NOT_YET_IMPLEMENTED_ExprStarred)
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
@@ -923,7 +867,7 @@ for y in ():
     ...
 for z in (i for i in []):
     ...
-for i in NOT_IMPLEMENTED_call():
+for i in call():
     ...
 for j in 1 + (2 + 3):
     ...
@@ -935,7 +879,7 @@ for (
     addr_proto,
     addr_canonname,
     addr_sockaddr,
-) in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+) in socket.getaddrinfo("google.com", "http"):
     pass
 a = (
     aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp
@@ -954,9 +898,9 @@ a = (
     is not qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
 )
 if (
-    NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
-    and NOT_IMPLEMENTED_call() != NOT_IMPLEMENTED_call()
-    or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) != signal.default_int_handler
+    threading.current_thread() != threading.main_thread()
+    and threading.current_thread() != threading.main_thread()
+    or signal.getsignal(signal.SIGINT) != signal.default_int_handler
 ):
     return True
 if (
@@ -1035,7 +979,7 @@ bbbb >> bbbb * bbbb
     ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 )
-NOT_IMPLEMENTED_call()
+last_call()
 # standalone comment at ENDMARKER
 ```
 
