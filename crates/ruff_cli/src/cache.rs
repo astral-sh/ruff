@@ -140,7 +140,7 @@ impl Cache {
         let now = self.last_seen_cache;
         self.package.files.retain(|_, file| {
             // SAFETY: this will be truncated to the year ~2554.
-            (now - *file.last_seen.get_mut()) >= MAX_LAST_SEEN.as_millis() as u64
+            (now - *file.last_seen.get_mut()) <= MAX_LAST_SEEN.as_millis() as u64
         });
 
         // Apply any changes made and keep track of when we last saw files.
@@ -330,12 +330,15 @@ mod test {
     use std::env::temp_dir;
     use std::fs;
     use std::io::{self, Write};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::AtomicU64;
+    use std::time::SystemTime;
 
     use ruff::settings::{flags, AllSettings};
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_python_ast::imports::ImportMap;
 
-    use crate::cache::{self, Cache};
+    use crate::cache::{self, Cache, FileCache};
     use crate::diagnostics::{lint_path, Diagnostics};
 
     #[test]
@@ -523,5 +526,55 @@ mod test {
             got_diagnostics.source_kind.clear();
             assert!(expected_diagnostics == got_diagnostics);
         }
+    }
+
+    #[test]
+    fn remove_old_files() {
+        let mut cache_dir = temp_dir();
+        cache_dir.push("ruff_tests/cache_remove_old_files");
+        let _ = fs::remove_dir_all(&cache_dir);
+        cache::init(&cache_dir).unwrap();
+
+        let settings = AllSettings::default();
+        let package_root =
+            fs::canonicalize("resources/test/fixtures/cache_remove_old_files").unwrap();
+        let mut cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+
+        // Add a file to the cache that hasn't been linted or seen since the
+        // '70s!
+        cache.package.files.insert(
+            PathBuf::from("old.py"),
+            FileCache {
+                last_modified: SystemTime::UNIX_EPOCH,
+                last_seen: AtomicU64::new(123),
+                imports: ImportMap::new(),
+                messages: Vec::new(),
+                source: String::new(),
+            },
+        );
+
+        // Now actually lint a file.
+        let path = package_root.join("source.py");
+        lint_path(
+            &path,
+            Some(&package_root),
+            &settings,
+            Some(&cache),
+            flags::Noqa::Enabled,
+            flags::FixMode::Generate,
+        )
+        .unwrap();
+
+        // Storing the cache should remove the old (`old.py`) file.
+        cache.store().unwrap();
+        // So we when we open the cache again it shouldn't contain `old.py`.
+        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+
+        assert_eq!(cache.package.files.len(), 1, "didn't remove the old file");
+        assert!(
+            !cache.package.files.contains_key(&path),
+            "removed the wrong file"
+        );
     }
 }
