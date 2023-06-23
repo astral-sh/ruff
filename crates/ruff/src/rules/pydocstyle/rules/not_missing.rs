@@ -123,12 +123,12 @@ impl Violation for UndocumentedPublicModule {
 /// ```python
 /// class Player:
 ///     """A player in the game.
-///     
+///
 ///     Attributes:
 ///         name: The name of the player.
 ///         points: The number of points the player has.
 ///     """
-///     
+///
 ///     def __init__(self, name: str, points: int = 0) -> None:
 ///         self.name: str = name
 ///         self.points: int = points
@@ -203,7 +203,7 @@ impl Violation for UndocumentedPublicClass {
 /// class Cat(Animal):
 ///     def greet(self, happy: bool = True):
 ///         """Print a greeting from the cat.
-///         
+///
 ///         Args:
 ///             happy: Whether the cat is happy, is True by default.
 ///
