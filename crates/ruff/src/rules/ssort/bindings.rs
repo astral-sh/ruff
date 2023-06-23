@@ -1071,12 +1071,12 @@ mod tests {
         let stmt = parse(
             r#"
                 match a:
-                    case b(c, d=e, f=_):
-                        g=h
+                    case b(c, d=e, f=_) as g if h:
+                        i=j
             "#,
         );
         let bindings = stmt_bindings(&stmt);
-        assert_eq!(bindings, ["c", "e", "g"]);
+        assert_eq!(bindings, ["c", "e", "g", "i"]);
     }
 
     #[test]
@@ -1084,12 +1084,12 @@ mod tests {
         let stmt = parse(
             r#"
                 match a:
-                    case [*_] as b:
-                        c = d
+                    case [*_] as b if c:
+                        d = e
             "#,
         );
         let bindings = stmt_bindings(&stmt);
-        assert_eq!(bindings, ["b", "c"]);
+        assert_eq!(bindings, ["b", "d"]);
     }
 
     #[test]
