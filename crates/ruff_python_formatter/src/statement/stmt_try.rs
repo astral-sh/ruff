@@ -1,11 +1,13 @@
 use crate::comments;
 use crate::comments::leading_alternate_branch_comments;
+use crate::comments::SourceComment;
 use crate::prelude::*;
 use crate::statement::FormatRefWithRule;
+use crate::statement::Stmt;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::{ExceptHandler, Ranged, StmtTry};
+use rustpython_parser::ast::{ExceptHandler, Ranged, StmtTry, Suite};
 
 #[derive(Default)]
 pub struct FormatStmtTry;
@@ -60,7 +62,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             ]
         )?;
 
-        let mut last_node = body.last();
+        let mut previous_node = body.last();
 
         let mut first_handler = true;
 
@@ -79,44 +81,20 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             write!(
                 f,
                 [
-                    leading_alternate_branch_comments(handler_comments, last_node),
+                    leading_alternate_branch_comments(handler_comments, previous_node),
                     &handler.format()
                 ]
             )?;
-            last_node = match handler {
+            previous_node = match handler {
                 ExceptHandler::ExceptHandler(handler) => handler.body.last(),
             };
         }
 
-        if let [.., last] = &orelse[..] {
-            let orelse_comments_start =
-                dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
-            let (orelse_comments, rest) = dangling_comments.split_at(orelse_comments_start);
-            dangling_comments = rest;
-            write!(
-                f,
-                [
-                    leading_alternate_branch_comments(orelse_comments, last_node),
-                    text("else:"),
-                    block_indent(&orelse.format())
-                ]
-            )?;
-            last_node = orelse.last();
-        }
-        if let [.., last] = &finalbody[..] {
-            let finally_comments_start =
-                dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
-            let (finally_comments, rest) = dangling_comments.split_at(finally_comments_start);
-            dangling_comments = rest;
-            write!(
-                f,
-                [
-                    leading_alternate_branch_comments(finally_comments, last_node),
-                    text("finally:"),
-                    block_indent(&finalbody.format())
-                ]
-            )?;
-        }
+        (previous_node, dangling_comments) =
+            format_case("else", orelse, previous_node, dangling_comments, f)?;
+
+        format_case("finally", finalbody, previous_node, dangling_comments, f)?;
+
         write!(f, [comments::dangling_comments(dangling_comments)])
     }
 
@@ -124,4 +102,30 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         // dangling comments are formatted as part of fmt_fields
         Ok(())
     }
+}
+
+fn format_case<'a>(
+    name: &'static str,
+    body: &Suite,
+    previous_node: Option<&Stmt>,
+    dangling_comments: &'a [SourceComment],
+    f: &mut PyFormatter,
+) -> FormatResult<(Option<&'a Stmt>, &'a [SourceComment])> {
+    Ok(if let Some(last) = body.last() {
+        let case_comments_start =
+            dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
+        let (case_comments, rest) = dangling_comments.split_at(case_comments_start);
+        write!(
+            f,
+            [leading_alternate_branch_comments(
+                case_comments,
+                previous_node
+            )]
+        )?;
+
+        write!(f, [text(name), text(":"), block_indent(&body.format())])?;
+        (None, rest)
+    } else {
+        (None, dangling_comments)
+    })
 }
