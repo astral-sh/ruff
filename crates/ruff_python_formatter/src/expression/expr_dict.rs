@@ -1,12 +1,10 @@
+use crate::builders::use_magic_trailing_comma;
 use crate::comments::{dangling_node_comments, leading_comments, Comments};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::trivia::Token;
-use crate::trivia::{first_non_trivia_token, TokenKind};
-use crate::USE_MAGIC_TRAILING_COMMA;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::format_args;
 use ruff_formatter::{write, Buffer, FormatResult};
@@ -69,14 +67,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             }
             [.., last] => last,
         };
-        let magic_trailing_comma = USE_MAGIC_TRAILING_COMMA
-            && matches!(
-                first_non_trivia_token(last.range().end(), f.context().contents()),
-                Some(Token {
-                    kind: TokenKind::Comma,
-                    ..
-                })
-            );
+        let magic_trailing_comma = use_magic_trailing_comma(f, last.range());
 
         debug_assert_eq!(keys.len(), values.len());
 

@@ -1,8 +1,9 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::{lines_after, skip_trailing_trivia};
+use crate::trivia::{first_non_trivia_token, lines_after, skip_trailing_trivia, Token, TokenKind};
+use crate::USE_MAGIC_TRAILING_COMMA;
 use ruff_formatter::write;
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 
 /// Provides Python specific extensions to [`Formatter`].
@@ -143,6 +144,17 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
         self.result
     }
+}
+
+pub(crate) fn use_magic_trailing_comma(f: &mut PyFormatter, range: TextRange) -> bool {
+    USE_MAGIC_TRAILING_COMMA
+        && matches!(
+            first_non_trivia_token(range.end(), f.context().contents()),
+            Some(Token {
+                kind: TokenKind::Comma,
+                ..
+            })
+        )
 }
 
 #[cfg(test)]

@@ -1,8 +1,8 @@
+use crate::builders::use_magic_trailing_comma;
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::trivia::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
-use crate::USE_MAGIC_TRAILING_COMMA;
+use crate::trivia::{SimpleTokenizer, TokenKind};
 use ruff_formatter::{format_args, write};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Keyword, Ranged, StmtClassDef};
@@ -115,22 +115,13 @@ impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
 
         if_group_breaks(&text(",")).fmt(f)?;
 
-        if USE_MAGIC_TRAILING_COMMA {
-            let last_end = keywords
-                .last()
-                .map(Keyword::end)
-                .or_else(|| bases.last().map(Expr::end))
-                .unwrap();
-
-            if matches!(
-                first_non_trivia_token(last_end, f.context().contents()),
-                Some(Token {
-                    kind: TokenKind::Comma,
-                    ..
-                })
-            ) {
-                hard_line_break().fmt(f)?;
-            }
+        let last = keywords
+            .last()
+            .map(Keyword::range)
+            .or_else(|| bases.last().map(Expr::range))
+            .unwrap();
+        if use_magic_trailing_comma(f, last) {
+            hard_line_break().fmt(f)?;
         }
 
         Ok(())
