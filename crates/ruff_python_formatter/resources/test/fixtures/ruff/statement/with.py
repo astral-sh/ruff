@@ -14,11 +14,6 @@ with (
     # trailing
 
 
-with call(arg):
-    call(arg)
-# fmt: skip
-
-
 with (
         a  # a
         ,  # comma

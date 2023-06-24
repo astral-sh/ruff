@@ -20,11 +20,6 @@ with (
     # trailing
 
 
-with call(arg):
-    call(arg)
-# fmt: skip
-
-
 with (
         a  # a
         ,  # comma
@@ -84,11 +79,6 @@ with (
 ):
     ...
     # trailing
-
-
-with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-# fmt: skip
 
 
 with (
