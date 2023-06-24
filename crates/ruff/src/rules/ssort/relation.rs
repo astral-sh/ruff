@@ -1346,6 +1346,28 @@ mod tests {
     }
 
     #[test]
+    fn ann_assign_references_bindings() {
+        let stmt = parse(r#"a: (b := c) + b = (d := e) + d"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["d", "b", "a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn for_() {
         let stmt = parse(
             r#"
@@ -1414,6 +1436,28 @@ mod tests {
     }
 
     #[test]
+    fn for_references_bindings() {
+        let stmt = parse(
+            r#"
+                for a in (b := c):
+                    d = a, b
+                else:
+                    e = a, b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "a", "d", "e"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "c",
+                is_deferred: false,
+                context: RequirementContext::Local
+            }]
+        );
+    }
+
+    #[test]
     fn async_for_() {
         let stmt = parse(
             r#"
@@ -1478,6 +1522,28 @@ mod tests {
                     context: RequirementContext::Local
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn async_for_references_bindings() {
+        let stmt = parse(
+            r#"
+                async for a in (b := c):
+                    d = a, b
+                else:
+                    e = a, b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "a", "d", "e"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "c",
+                is_deferred: false,
+                context: RequirementContext::Local
+            }]
         );
     }
 
