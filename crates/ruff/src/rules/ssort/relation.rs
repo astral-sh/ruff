@@ -32,7 +32,7 @@ pub(super) enum RequirementContext {
 #[derive(Default)]
 struct RelationVisitor<'a> {
     relation: Relation<'a>,
-    is_store_requirement: bool,
+    is_expr_context_inverted: bool,
     is_deferred: bool,
 }
 
@@ -148,11 +148,13 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
             Stmt::AugAssign(StmtAugAssign {
                 target, op, value, ..
             }) => {
+                let is_expr_context_inverted =
+                    std::mem::replace(&mut self.is_expr_context_inverted, true);
+                self.visit_expr(target);
+                self.is_expr_context_inverted = is_expr_context_inverted;
                 self.visit_expr(value);
                 self.visit_operator(op);
-                let is_store_requirement = std::mem::replace(&mut self.is_store_requirement, true);
                 self.visit_expr(target);
-                self.is_store_requirement = is_store_requirement;
             }
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
@@ -285,16 +287,16 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 }
             }
             Expr::Name(ExprName { id, ctx, .. }) => {
-                if (self.is_store_requirement || ctx != &ExprContext::Store)
-                    && !self.relation.bindings.contains(id.as_str())
-                {
+                let store = (ctx == &ExprContext::Store) != self.is_expr_context_inverted;
+
+                if !store && !self.relation.bindings.contains(id.as_str()) {
                     self.relation.requirements.insert(Requirement {
                         name: id,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::Local,
                     });
                 }
-                if ctx == &ExprContext::Store {
+                if store {
                     self.relation.bindings.insert(id);
                 }
             }
@@ -1095,6 +1097,49 @@ mod tests {
     }
 
     #[test]
+    fn delete_reference_bindings() {
+        let stmt =
+            parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)], b, e, g, i, k"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "e", "g", "i", "k"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "j",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "l",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn assign() {
         let stmt = parse(r#"a = b, c.d, [e, *f], *g = h"#);
         let relation = stmt_relation(&stmt);
@@ -1142,6 +1187,33 @@ mod tests {
     }
 
     #[test]
+    fn assign_reference_bindings() {
+        let stmt = parse(
+            r#"a = b, (c := d).e, [f, *g], *h = a.a = b.a = c.a = f.a = g.a = h.a = (i := j), i"#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(
+            Vec::from_iter(relation.bindings),
+            ["i", "a", "b", "c", "f", "g", "h"]
+        );
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "j",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn aug_assign() {
         let stmt = parse(r#"a += b"#);
         let relation = stmt_relation(&stmt);
@@ -1150,12 +1222,12 @@ mod tests {
             Vec::from_iter(relation.requirements),
             [
                 Requirement {
-                    name: "b",
+                    name: "a",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
                 Requirement {
-                    name: "a",
+                    name: "b",
                     is_deferred: false,
                     context: RequirementContext::Local
                 }
@@ -1172,12 +1244,56 @@ mod tests {
             Vec::from_iter(relation.requirements),
             [
                 Requirement {
-                    name: "c",
+                    name: "a",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
                 Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn aug_assign_references_bindings() {
+        let stmt = parse(r#"a += (b := c) + a + b"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
                     name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn aug_assign_bindings_target() {
+        let stmt = parse(r#"a += (a := b)"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
                     is_deferred: false,
                     context: RequirementContext::Local
                 }
