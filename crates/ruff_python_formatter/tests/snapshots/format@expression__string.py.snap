@@ -18,7 +18,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
 
 # Prefer double quotes for string with equal amount of single and double quotes
 '" \' " " \'\''
-"' \" '' \" \" '"
+"' \" '' \" \""
 
 "\\' \"\""
 '\\\' ""'
@@ -54,11 +54,29 @@ String """
 '''
 
 '''Multiline
+String "'''
+
+"""Multiline
+String '''
+"""
+
+"""Multiline
+String '"""
+
+'''Multiline
 String \"\"\"
 '''
 ```
 
-## Output
+## Outputs
+### Output 1
+```
+indent-style            = Spaces, size: 4
+line-width              = 88
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
 ```py
 "' test"
 '" test'
@@ -74,7 +92,7 @@ String \"\"\"
 
 # Prefer double quotes for string with equal amount of single and double quotes
 "\" ' \" \" ''"
-"' \" '' \" \" '"
+"' \" '' \" \""
 
 '\\\' ""'
 '\\\' ""'
@@ -109,9 +127,93 @@ String ""
 String """
 '''
 
+'''Multiline
+String "'''
+
+"""Multiline
+String '''
+"""
+
+"""Multiline
+String '"""
+
 """Multiline
 String \"\"\"
 """
+```
+
+
+### Output 2
+```
+indent-style            = Spaces, size: 4
+line-width              = 88
+quote-style             = Single
+magic-trailing-comma    = Respect
+```
+
+```py
+"' test"
+'" test'
+
+'" test'
+"' test"
+
+# Prefer single quotes for string with more double quotes
+'\' " " \'\' " " \''
+
+# Prefer double quotes for string with more single quotes
+'\' " " \'\' " " \''
+
+# Prefer double quotes for string with equal amount of single and double quotes
+'" \' " " \'\''
+'\' " \'\' " "'
+
+'\\\' ""'
+'\\\' ""'
+
+
+'Test'
+'Test'
+
+r'Test'
+R'Test'
+
+'This string will not include \
+backslashes or newline characters.'
+
+if True:
+    'This string will not include \
+        backslashes or newline characters.'
+
+'''Multiline
+String \"
+'''
+
+'''Multiline
+String \'
+'''
+
+'''Multiline
+String ""
+'''
+
+'''Multiline
+String """
+'''
+
+'''Multiline
+String "'''
+
+"""Multiline
+String '''
+"""
+
+"""Multiline
+String '"""
+
+'''Multiline
+String \"\"\"
+'''
 ```
 
 

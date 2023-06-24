@@ -109,7 +109,7 @@ impl QuoteStyle {
     }
 
     #[must_use]
-    pub const fn opposite(self) -> QuoteStyle {
+    pub const fn invert(self) -> QuoteStyle {
         match self {
             QuoteStyle::Single => QuoteStyle::Double,
             QuoteStyle::Double => QuoteStyle::Single,

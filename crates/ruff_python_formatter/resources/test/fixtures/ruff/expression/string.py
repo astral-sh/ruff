@@ -12,7 +12,7 @@
 
 # Prefer double quotes for string with equal amount of single and double quotes
 '" \' " " \'\''
-"' \" '' \" \" '"
+"' \" '' \" \""
 
 "\\' \"\""
 '\\\' ""'
@@ -46,6 +46,16 @@ String ""
 '''Multiline
 String """
 '''
+
+'''Multiline
+String "'''
+
+"""Multiline
+String '''
+"""
+
+"""Multiline
+String '"""
 
 '''Multiline
 String \"\"\"
