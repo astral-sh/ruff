@@ -1,3 +1,3 @@
 mod builtins;
-mod relations;
+mod relation;
 pub(crate) mod rules;
