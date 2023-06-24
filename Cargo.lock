@@ -1843,6 +1843,7 @@ dependencies = [
  "globset",
  "ignore",
  "imperative",
+ "indexmap 2.0.0",
  "insta",
  "is-macro",
  "itertools",

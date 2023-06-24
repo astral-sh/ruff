@@ -1,12 +1,12 @@
 use crate::rules::ssort::builtins::CLASS_BUILTINS;
+use indexmap::IndexSet;
 use ruff_python_ast::prelude::*;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use std::collections::HashSet;
 
 pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
     let mut requirements = AstVisitor::default();
     requirements.visit_stmt(stmt);
-    requirements.requirements
+    Vec::from_iter(requirements.requirements)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -25,8 +25,8 @@ pub(super) enum RequirementContext {
 
 #[derive(Default)]
 struct AstVisitor<'a> {
-    requirements: Vec<Requirement<'a>>,
-    bindings: HashSet<&'a str>,
+    requirements: IndexSet<Requirement<'a>>,
+    bindings: IndexSet<&'a str>,
     is_store_requirement: bool,
     is_deferred: bool,
 }
@@ -76,24 +76,23 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                 let bindings = std::mem::replace(&mut self.bindings, bindings);
                 self.is_deferred = is_deferred;
 
-                println!("REQUIREMENTS: {:?}", requirements);
-                println!("self.bindings = {:?}", self.bindings);
-                println!("bindings = {:?}", bindings);
                 for mut requirement in requirements {
                     match requirement.context {
-                        RequirementContext::Global => self.requirements.push(requirement),
+                        RequirementContext::Global => {
+                            self.requirements.insert(requirement);
+                        }
                         RequirementContext::NonLocal => {
                             requirement.context = RequirementContext::Local;
-                            self.requirements.push(requirement);
+                            self.requirements.insert(requirement);
                         }
                         RequirementContext::Local => {
                             if !self.bindings.contains(requirement.name)
                                 && !bindings.contains(requirement.name)
                             {
-                                self.requirements.push(requirement);
+                                self.requirements.insert(requirement);
                             }
                         }
-                    }
+                    };
                 }
             }
             Stmt::ClassDef(StmtClassDef {
@@ -118,7 +117,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
 
                 self.bindings.insert(name);
 
-                let mut cumulative_bindings = HashSet::new();
+                let mut cumulative_bindings = IndexSet::new();
 
                 for stmt in body {
                     let requirements = std::mem::take(&mut self.requirements);
@@ -134,7 +133,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                             || (!self.bindings.contains(requirement.name)
                                 && !cumulative_bindings.contains(requirement.name))
                         {
-                            self.requirements.push(requirement);
+                            self.requirements.insert(requirement);
                         }
                     }
                     cumulative_bindings.extend(bindings);
@@ -151,7 +150,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
             }
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
-                    self.requirements.push(Requirement {
+                    self.requirements.insert(Requirement {
                         name,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::Global,
@@ -161,7 +160,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
             }
             Stmt::Nonlocal(StmtNonlocal { names, .. }) => {
                 for name in names {
-                    self.requirements.push(Requirement {
+                    self.requirements.insert(Requirement {
                         name,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::NonLocal,
@@ -192,19 +191,21 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
 
                 for mut requirement in requirements {
                     match requirement.context {
-                        RequirementContext::Global => self.requirements.push(requirement),
+                        RequirementContext::Global => {
+                            self.requirements.insert(requirement);
+                        }
                         RequirementContext::NonLocal => {
                             requirement.context = RequirementContext::Local;
-                            self.requirements.push(requirement);
+                            self.requirements.insert(requirement);
                         }
                         RequirementContext::Local => {
                             if !self.bindings.contains(requirement.name)
                                 && !bindings.contains(requirement.name)
                             {
-                                self.requirements.push(requirement);
+                                self.requirements.insert(requirement);
                             }
                         }
-                    }
+                    };
                 }
             }
             Expr::ListComp(ExprListComp {
@@ -217,7 +218,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                 elt, generators, ..
             }) => {
                 let requirements = std::mem::take(&mut self.requirements);
-                let mut bindings = HashSet::new();
+                let mut bindings = IndexSet::new();
 
                 for comprehension in generators {
                     self.visit_expr(&comprehension.iter);
@@ -239,7 +240,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                     if !self.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
                     {
-                        self.requirements.push(requirement);
+                        self.requirements.insert(requirement);
                     }
                 }
             }
@@ -250,7 +251,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                 ..
             }) => {
                 let requirements = std::mem::take(&mut self.requirements);
-                let mut bindings = HashSet::new();
+                let mut bindings = IndexSet::new();
 
                 for comprehension in generators {
                     self.visit_expr(&comprehension.iter);
@@ -273,13 +274,13 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                     if !self.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
                     {
-                        self.requirements.push(requirement);
+                        self.requirements.insert(requirement);
                     }
                 }
             }
             Expr::Name(ExprName { id, ctx, .. }) => {
                 if self.is_store_requirement || ctx != &ExprContext::Store {
-                    self.requirements.push(Requirement {
+                    self.requirements.insert(Requirement {
                         name: id,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::Local,
@@ -353,7 +354,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
     }
 }
 
-fn add_arguments_to_bindings<'a>(bindings: &mut HashSet<&'a str>, arguments: &'a Arguments) {
+fn add_arguments_to_bindings<'a>(bindings: &mut IndexSet<&'a str>, arguments: &'a Arguments) {
     bindings.extend(arguments.posonlyargs.iter().map(|arg| arg.def.arg.as_str()));
     bindings.extend(arguments.args.iter().map(|arg| arg.def.arg.as_str()));
     bindings.extend(arguments.vararg.iter().map(|arg| arg.arg.as_str()));
