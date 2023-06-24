@@ -543,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    fn function_def_with_bindings() {
+    fn function_def_reference_bindings() {
         let stmt = parse(
             r#"
                 @(a := b)
@@ -777,7 +777,7 @@ mod tests {
     }
 
     #[test]
-    fn async_function_def_with_bindings() {
+    fn async_function_def_reference_bindings() {
         let stmt = parse(
             r#"
                 @(a := b)
@@ -931,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn class_def_with_bindings() {
+    fn class_def_reference_bindings() {
         let stmt = parse(
             r#"
                 @(a := b)
