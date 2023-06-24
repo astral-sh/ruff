@@ -73,9 +73,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 add_arguments_to_bindings(&mut self.relation.bindings, args);
 
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                self.visit_body(body);
 
                 let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
                 let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
@@ -155,6 +153,42 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 self.visit_expr(value);
                 self.visit_operator(op);
                 self.visit_expr(target);
+            }
+            Stmt::If(StmtIf {
+                test, body, orelse, ..
+            }) => {
+                self.visit_expr(test);
+
+                let requirements = std::mem::take(&mut self.relation.requirements);
+                let bindings = std::mem::take(&mut self.relation.bindings);
+
+                self.visit_body(body);
+
+                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
+                let body_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+
+                for requirement in requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.relation.requirements.insert(requirement);
+                    }
+                }
+
+                let requirements = std::mem::take(&mut self.relation.requirements);
+                let bindings = std::mem::take(&mut self.relation.bindings);
+
+                self.visit_body(orelse);
+
+                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
+                let orelse_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+
+                for requirement in requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.relation.requirements.insert(requirement);
+                    }
+                }
+
+                self.relation.bindings.extend(body_bindings);
+                self.relation.bindings.extend(orelse_bindings);
             }
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
@@ -1753,6 +1787,58 @@ mod tests {
                 },
                 Requirement {
                     name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn if_references_bindings_in_conditional() {
+        let stmt = parse(
+            r#"
+                if a:
+                    b = a
+                    c = a
+                    d = a
+                elif b:
+                    e = c
+                else:
+                    f = d
+                    g = e
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(
+            Vec::from_iter(relation.bindings),
+            ["b", "c", "d", "e", "f", "g"]
+        );
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
