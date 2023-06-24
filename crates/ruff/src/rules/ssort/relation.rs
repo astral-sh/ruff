@@ -190,6 +190,88 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 self.relation.bindings.extend(body_bindings);
                 self.relation.bindings.extend(orelse_bindings);
             }
+            Stmt::Try(StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            })
+            | Stmt::TryStar(StmtTryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                self.visit_body(body);
+
+                let mut except_handler_bindings = vec![];
+                for except_handler in handlers {
+                    match except_handler {
+                        ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler {
+                            type_,
+                            name,
+                            body,
+                            ..
+                        }) => {
+                            if let Some(expr) = type_ {
+                                self.visit_expr(expr);
+                            }
+
+                            let requirements = std::mem::take(&mut self.relation.requirements);
+                            let bindings = std::mem::take(&mut self.relation.bindings);
+
+                            self.visit_body(body);
+
+                            let requirements =
+                                std::mem::replace(&mut self.relation.requirements, requirements);
+                            let mut bindings =
+                                std::mem::replace(&mut self.relation.bindings, bindings);
+
+                            if let Some(name) = name {
+                                for requirement in requirements {
+                                    if requirement.name != name.as_str()
+                                        && !self.relation.bindings.contains(requirement.name)
+                                    {
+                                        self.relation.requirements.insert(requirement);
+                                    }
+                                }
+                                bindings.remove(name.as_str());
+                            } else {
+                                for requirement in requirements {
+                                    if !self.relation.bindings.contains(requirement.name) {
+                                        self.relation.requirements.insert(requirement);
+                                    }
+                                }
+                            }
+
+                            except_handler_bindings.push(bindings);
+                        }
+                    }
+                }
+
+                let requirements = std::mem::take(&mut self.relation.requirements);
+                let bindings = std::mem::take(&mut self.relation.bindings);
+
+                self.visit_body(orelse);
+
+                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
+                let orelse_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+
+                for requirement in requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.relation.requirements.insert(requirement);
+                    }
+                }
+
+                for bindings in except_handler_bindings {
+                    self.relation.bindings.extend(bindings);
+                }
+                self.relation.bindings.extend(orelse_bindings);
+
+                self.visit_body(finalbody);
+            }
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
                     self.relation.requirements.insert(Requirement {
@@ -335,22 +417,6 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 }
             }
             expr => walk_expr(self, expr),
-        };
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
-        match except_handler {
-            ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler {
-                type_, name, body, ..
-            }) => {
-                if let Some(expr) = type_ {
-                    self.visit_expr(expr);
-                }
-                if let Some(name) = name {
-                    self.relation.bindings.insert(name);
-                }
-                self.visit_body(body);
-            }
         };
     }
 
@@ -2121,7 +2187,7 @@ mod tests {
             "#,
         );
         let relation = stmt_relation(&stmt);
-        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "e", "g", "i"]);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "e", "g", "i"]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
@@ -2169,10 +2235,7 @@ mod tests {
             "#,
         );
         let relation = stmt_relation(&stmt);
-        assert_eq!(
-            Vec::from_iter(relation.bindings),
-            ["a", "c", "e", "f", "h", "j"]
-        );
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "f", "h", "j"]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
@@ -2214,15 +2277,51 @@ mod tests {
                 except (c := d)[a][c] as e:
                     f = a, c, e
                 else:
-                    g = a, c, e
+                    g = a, c
                 finally:
-                    h = a, c, e
+                    h = a, c
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "f", "g", "h"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_references_bindings_in_conditional() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                    c = d
+                    e = f
+                except g as h:
+                    i = a
+                    j = h
+                else:
+                    k = c, i, h
+                finally:
+                    l = e, h, j, k
             "#,
         );
         let relation = stmt_relation(&stmt);
         assert_eq!(
             Vec::from_iter(relation.bindings),
-            ["a", "c", "e", "f", "g", "h"]
+            ["a", "c", "e", "i", "j", "k", "l"]
         );
         assert_eq!(
             Vec::from_iter(relation.requirements),
@@ -2234,6 +2333,26 @@ mod tests {
                 },
                 Requirement {
                     name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "i",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
@@ -2256,7 +2375,7 @@ mod tests {
             "#,
         );
         let relation = stmt_relation(&stmt);
-        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "e", "g", "i"]);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "e", "g", "i"]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
@@ -2304,10 +2423,7 @@ mod tests {
             "#,
         );
         let relation = stmt_relation(&stmt);
-        assert_eq!(
-            Vec::from_iter(relation.bindings),
-            ["a", "c", "e", "f", "h", "j"]
-        );
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "f", "h", "j"]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
@@ -2349,15 +2465,51 @@ mod tests {
                 except* (c := d)[a][c] as e:
                     f = a, c, e
                 else:
-                    g = a, c, e
+                    g = a, c
                 finally:
-                    h = a, c, e
+                    h = a, c
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "f", "g", "h"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_references_bindings_in_conditional() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                    c = d
+                    e = f
+                except* g as h:
+                    i = a
+                    j = h
+                else:
+                    k = c, i, h
+                finally:
+                    l = e, h, j, k
             "#,
         );
         let relation = stmt_relation(&stmt);
         assert_eq!(
             Vec::from_iter(relation.bindings),
-            ["a", "c", "e", "f", "g", "h"]
+            ["a", "c", "e", "i", "j", "k", "l"]
         );
         assert_eq!(
             Vec::from_iter(relation.requirements),
@@ -2369,6 +2521,26 @@ mod tests {
                 },
                 Requirement {
                     name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "i",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
