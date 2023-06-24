@@ -377,12 +377,14 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
             | Expr::GeneratorExp(ExprGeneratorExp {
                 elt, generators, ..
             }) => {
+                for comprehension in generators {
+                    self.visit_expr(&comprehension.iter);
+                }
+
                 let requirements = std::mem::take(&mut self.relation.requirements);
                 let mut bindings = IndexSet::new();
 
                 for comprehension in generators {
-                    self.visit_expr(&comprehension.iter);
-
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
                     self.visit_expr(&comprehension.target);
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
@@ -410,12 +412,14 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 generators,
                 ..
             }) => {
+                for comprehension in generators {
+                    self.visit_expr(&comprehension.iter);
+                }
+
                 let requirements = std::mem::take(&mut self.relation.requirements);
                 let mut bindings = IndexSet::new();
 
                 for comprehension in generators {
-                    self.visit_expr(&comprehension.iter);
-
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
                     self.visit_expr(&comprehension.target);
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
@@ -3545,6 +3549,21 @@ mod tests {
     }
 
     #[test]
+    fn list_comp_shadows_iter() {
+        let stmt = parse(r#"[a for a in a if a]"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "a",
+                is_deferred: false,
+                context: RequirementContext::Local
+            },]
+        );
+    }
+
+    #[test]
     fn set_comp() {
         let stmt = parse(r#"{a for b in c if d}"#);
         let relation = stmt_relation(&stmt);
@@ -3622,6 +3641,21 @@ mod tests {
                     context: RequirementContext::Local
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn set_comp_shadows_iter() {
+        let stmt = parse(r#"{a for a in a if a}"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "a",
+                is_deferred: false,
+                context: RequirementContext::Local
+            },]
         );
     }
 
@@ -3729,6 +3763,21 @@ mod tests {
     }
 
     #[test]
+    fn dict_comp_shadows_iter() {
+        let stmt = parse(r#"{a: a for a in a if a}"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "a",
+                is_deferred: false,
+                context: RequirementContext::Local
+            },]
+        );
+    }
+
+    #[test]
     fn generator_exp() {
         let stmt = parse(r#"(a for b in c if d)"#);
         let relation = stmt_relation(&stmt);
@@ -3806,6 +3855,21 @@ mod tests {
                     context: RequirementContext::Local
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn generator_exp_shadows_iter() {
+        let stmt = parse(r#"(a for a in a if a)"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "a",
+                is_deferred: false,
+                context: RequirementContext::Local
+            },]
         );
     }
 
