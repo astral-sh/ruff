@@ -285,7 +285,9 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 }
             }
             Expr::Name(ExprName { id, ctx, .. }) => {
-                if self.is_store_requirement || ctx != &ExprContext::Store {
+                if (self.is_store_requirement || ctx != &ExprContext::Store)
+                    && !self.relation.bindings.contains(id.as_str())
+                {
                     self.relation.requirements.insert(Requirement {
                         name: id,
                         is_deferred: self.is_deferred,
@@ -981,6 +983,21 @@ mod tests {
     #[test]
     fn return_with_walrus() {
         let stmt = parse(r#"return (a := b)"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "b",
+                is_deferred: false,
+                context: RequirementContext::Local
+            }]
+        );
+    }
+
+    #[test]
+    fn return_reference_bindings() {
+        let stmt = parse(r#"return (a := b), a"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
         assert_eq!(
