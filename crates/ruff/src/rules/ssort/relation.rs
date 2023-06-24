@@ -691,13 +691,13 @@ mod tests {
             r#"
                 @(a := b)
                 def c(
-                    d: (e := f) = (g := h),
+                    d: (e := f)[b][e][g][l][t] = (g := h)[b][g],
                     /,
-                    i: (j := k) = (l := m),
-                    *n: (o := p),
-                    q: (r := s) = (t := u),
-                    **v: (w := x)
-                ) -> (y := z):
+                    i: (j := k)[b][e][g][j][l][t] = (l := m)[b][g][l],
+                    *n: (o := p)[b][e][g][j][l][o][t],
+                    q: (r := s)[b][e][g][j][l][o][r][t] = (t := u)[b][g][l][t],
+                    **v: (w := x)[b][e][g][j][l][o][r][t][w]
+                ) -> (y := z)[b][e][g][j][l][o][r][t][w][y]:
                     aa = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
             "#,
         );
@@ -925,13 +925,13 @@ mod tests {
             r#"
                 @(a := b)
                 async def c(
-                    d: (e := f) = (g := h),
+                    d: (e := f)[b][e][g][l][t] = (g := h)[b][g],
                     /,
-                    i: (j := k) = (l := m),
-                    *n: (o := p),
-                    q: (r := s) = (t := u),
-                    **v: (w := x)
-                ) -> (y := z):
+                    i: (j := k)[b][e][g][j][l][t] = (l := m)[b][g][l],
+                    *n: (o := p)[b][e][g][j][l][o][t],
+                    q: (r := s)[b][e][g][j][l][o][r][t] = (t := u)[b][g][l][t],
+                    **v: (w := x)[b][e][g][j][l][o][r][t][w]
+                ) -> (y := z)[b][e][g][j][l][o][r][t][w][y]:
                     aa = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
             "#,
         );
