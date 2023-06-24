@@ -1,22 +1,54 @@
+use crate::builders::PyFormatterExtensions;
 use crate::comments::{dangling_node_comments, Comments};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::trivia::Token;
-use crate::trivia::{first_non_trivia_token, TokenKind};
-use crate::{AsFormat, FormatNodeRule, FormattedIterExt, PyFormatter, USE_MAGIC_TRAILING_COMMA};
+use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::{
-    block_indent, group, if_group_breaks, soft_block_indent, soft_line_break_or_space, text,
-};
-use ruff_formatter::{format_args, write, Buffer, Format, FormatResult};
+use ruff_formatter::prelude::{block_indent, group, if_group_breaks, soft_block_indent, text};
+use ruff_formatter::{format_args, write, Buffer, Format, FormatResult, FormatRuleWithOptions};
 use ruff_python_ast::prelude::{Expr, Ranged};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprTuple;
 
+#[derive(Eq, PartialEq, Debug, Default)]
+pub enum TupleParentheses {
+    /// Effectively `None` in `Option<Parentheses>`
+    #[default]
+    Default,
+    /// Effectively `Some(Parentheses)` in `Option<Parentheses>`
+    Expr(Parentheses),
+    /// Handle the special case where we remove parentheses even if they were initially present
+    ///
+    /// Normally, black keeps parentheses, but in the case of loops it formats
+    /// ```python
+    /// for (a, b) in x:
+    ///     pass
+    /// ```
+    /// to
+    /// ```python
+    /// for a, b in x:
+    ///     pass
+    /// ```
+    /// Black still does use parentheses in this position if the group breaks or magic trailing
+    /// comma is used.
+    StripInsideForLoop,
+}
+
 #[derive(Default)]
-pub struct FormatExprTuple;
+pub struct FormatExprTuple {
+    parentheses: TupleParentheses,
+}
+
+impl FormatRuleWithOptions<ExprTuple, PyFormatContext<'_>> for FormatExprTuple {
+    type Options = TupleParentheses;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.parentheses = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
@@ -27,9 +59,9 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         } = item;
 
         // Handle the edge cases of an empty tuple and a tuple with one element
-        let last = match &elts[..] {
+        match elts.as_slice() {
             [] => {
-                return write!(
+                write!(
                     f,
                     [
                         // An empty tuple always needs parentheses, but does not have a comma
@@ -37,10 +69,10 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         block_indent(&dangling_node_comments(item)),
                         &text(")"),
                     ]
-                );
+                )
             }
             [single] => {
-                return write!(
+                write!(
                     f,
                     [group(&format_args![
                         // A single element tuple always needs parentheses and a trailing comma
@@ -48,57 +80,38 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         soft_block_indent(&format_args![single.format(), &text(",")]),
                         &text(")"),
                     ])]
-                );
+                )
             }
-            [.., last] => last,
-        };
-
-        let magic_trailing_comma = USE_MAGIC_TRAILING_COMMA
-            && matches!(
-                first_non_trivia_token(last.range().end(), f.context().contents()),
-                Some(Token {
-                    kind: TokenKind::Comma,
-                    ..
-                })
-            );
-
-        if magic_trailing_comma {
-            // A magic trailing comma forces us to print in expanded mode since we have more than
-            // one element
-            write!(
-                f,
-                [
-                    // An expanded group always needs parentheses
-                    &text("("),
-                    block_indent(&ExprSequence::new(elts)),
-                    &text(")"),
-                ]
-            )?;
-        } else if is_parenthesized(*range, elts, f) {
-            // If the tuple has parentheses, keep them. Note that unlike other expr parentheses,
-            // those are actually part of the range
-            write!(
-                f,
-                [group(&format_args![
-                    // If there were previously parentheses, keep them
-                    &text("("),
-                    soft_block_indent(&ExprSequence::new(elts)),
-                    &text(")"),
-                ])]
-            )?;
-        } else {
-            write!(
-                f,
-                [group(&format_args![
-                    // If there were previously no parentheses, add them only if the group breaks
-                    if_group_breaks(&text("(")),
-                    soft_block_indent(&ExprSequence::new(elts)),
-                    if_group_breaks(&text(")")),
-                ])]
-            )?;
+            // If the tuple has parentheses, we generally want to keep them. The exception are for
+            // loops, see `TupleParentheses::StripInsideForLoop` doc comment.
+            //
+            // Unlike other expression parentheses, tuple parentheses are part of the range of the
+            // tuple itself.
+            elts if is_parenthesized(*range, elts, f)
+                && self.parentheses != TupleParentheses::StripInsideForLoop =>
+            {
+                write!(
+                    f,
+                    [group(&format_args![
+                        // If there were previously parentheses, keep them
+                        &text("("),
+                        soft_block_indent(&ExprSequence::new(elts)),
+                        &text(")"),
+                    ])]
+                )
+            }
+            elts => {
+                write!(
+                    f,
+                    [group(&format_args![
+                        // If there were previously no parentheses, add them only if the group breaks
+                        if_group_breaks(&text("(")),
+                        soft_block_indent(&ExprSequence::new(elts)),
+                        if_group_breaks(&text(")")),
+                    ])]
+                )
+            }
         }
-
-        Ok(())
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprTuple, _f: &mut PyFormatter) -> FormatResult<()> {
@@ -120,11 +133,7 @@ impl<'a> ExprSequence<'a> {
 
 impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        f.join_with(&format_args!(text(","), soft_line_break_or_space()))
-            .entries(self.elts.iter().formatted())
-            .finish()?;
-        // Black style has a trailing comma on the last entry of an expanded group
-        write!(f, [if_group_breaks(&text(","))])
+        f.join_comma_separated().nodes(self.elts.iter()).finish()
     }
 }
 

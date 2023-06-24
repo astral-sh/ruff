@@ -23,8 +23,14 @@ pub(super) fn default_expression_needs_parentheses(
         "Should only be called for expressions"
     );
 
+    #[allow(clippy::if_same_then_else)]
+    if parenthesize.is_always() {
+        Parentheses::Always
+    } else if parenthesize.is_never() {
+        Parentheses::Never
+    }
     // `Optional` or `Preserve` and expression has parentheses in source code.
-    if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, source) {
+    else if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, source) {
         Parentheses::Always
     }
     // `Optional` or `IfBreaks`: Add parentheses if the expression doesn't fit on a line but enforce
@@ -42,7 +48,7 @@ pub(super) fn default_expression_needs_parentheses(
 }
 
 /// Configures if the expression should be parenthesized.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum Parenthesize {
     /// Parenthesize the expression if it has parenthesis in the source.
     #[default]
@@ -53,14 +59,28 @@ pub enum Parenthesize {
 
     /// Parenthesizes the expression only if it doesn't fit on a line.
     IfBreaks,
+
+    /// Always adds parentheses
+    Always,
+
+    /// Never adds parentheses. Parentheses are handled by the caller.
+    Never,
 }
 
 impl Parenthesize {
-    const fn is_if_breaks(self) -> bool {
+    pub(crate) const fn is_always(self) -> bool {
+        matches!(self, Parenthesize::Always)
+    }
+
+    pub(crate) const fn is_never(self) -> bool {
+        matches!(self, Parenthesize::Never)
+    }
+
+    pub(crate) const fn is_if_breaks(self) -> bool {
         matches!(self, Parenthesize::IfBreaks)
     }
 
-    const fn is_preserve(self) -> bool {
+    pub(crate) const fn is_preserve(self) -> bool {
         matches!(self, Parenthesize::Preserve)
     }
 }
@@ -70,7 +90,8 @@ impl Parenthesize {
 /// whether there are parentheses in the source code or not.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Parentheses {
-    /// Always create parentheses
+    /// Always set parentheses regardless if the expression breaks or if they were
+    /// present in the source.
     Always,
 
     /// Only add parentheses when necessary because the expression breaks over multiple lines.

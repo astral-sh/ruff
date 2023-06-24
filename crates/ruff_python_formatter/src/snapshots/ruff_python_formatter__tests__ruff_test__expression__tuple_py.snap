@@ -77,98 +77,88 @@ a4 = ((1, 2), 3)
 
 # Wrapping parentheses checks
 b1 = (
-    ("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING"),
-    (
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-    ),
-    ("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING"),
-    ("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING"),
+    ("Michael", "Ende"),
+    ("Der", "satanarchäolügenialkohöllische", "Wunschpunsch"),
+    ("Beelzebub", "Irrwitzer"),
+    ("Tyrannja", "Vamperl"),
 )
 b2 = (
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
+    "akjdshflkjahdslkfjlasfdahjlfds",
+    "ljklsadhflakfdajflahfdlajfhafldkjalfj",
+    "ljklsadhflakfdajflahfdlajfhafldkjalf2",
 )
 b3 = (
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
+    "The",
+    "Night",
+    "of",
+    "Wishes:",
+    "Or",
+    "the",
+    "Satanarchaeolidealcohellish",
+    "Notion",
+    "Potion",
 )
 
 # Nested wrapping parentheses check
 c1 = (
-    ("NOT_YET_IMPLEMENTED_STRING"),
+    ("cicero"),
     (
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
+        "Qui",
+        "autem,",
+        "si",
+        "maxime",
+        "hoc",
+        "placeat,",
+        "moderatius",
+        "tamen",
+        "id",
+        "uolunt",
+        "fieri,",
+        "difficilem",
+        "quandam",
+        "temperantiam",
+        "postulant",
+        "in",
+        "eo,",
+        "quod",
+        "semel",
+        "admissum",
+        "coerceri",
+        "reprimique",
+        "non",
+        "potest,",
+        "ut",
+        "propemodum",
+        "iustioribus",
+        "utamur",
+        "illis,",
+        "qui",
+        "omnino",
+        "auocent",
+        "a",
+        "philosophia,",
+        "quam",
+        "his,",
+        "qui",
+        "rebus",
+        "infinitis",
+        "modum",
+        "constituant",
+        "in",
+        "reque",
+        "eo",
+        "meliore,",
+        "quo",
+        "maior",
+        "sit,",
+        "mediocritatem",
+        "desiderent.",
     ),
-    (
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-        "NOT_YET_IMPLEMENTED_STRING",
-    ),
+    ("de", "finibus", "bonorum", "et", "malorum"),
 )
 
 # Deeply nested parentheses
-d1 = ((("NOT_YET_IMPLEMENTED_STRING",),),)
+d1 = ((("3D",),),)
 d2 = (
     (
         (
@@ -197,7 +187,7 @@ d2 = (
                                                                                                     (
                                                                                                         (
                                                                                                             (
-                                                                                                                "NOT_YET_IMPLEMENTED_STRING",
+                                                                                                                "¯\_(ツ)_/¯",
                                                                                                             ),
                                                                                                         ),
                                                                                                     ),
@@ -234,7 +224,10 @@ e2 = (
     2,
 )
 e3 = (1,)
-e4 = ("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING")
+e4 = (
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+    "incididunt",
+)
 
 # Empty tuples and comments
 f1 = (
@@ -260,8 +253,14 @@ g2 = (
 
 # Ensure the correct number of parentheses
 h1 = (1, 2)
-h2 = (1, "NOT_YET_IMPLEMENTED_STRING")
-h3 = 1, "NOT_YET_IMPLEMENTED_STRING"
+h2 = (
+    1,
+    "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq",
+)
+h3 = (
+    1,
+    "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq",
+)
 ```
 
 

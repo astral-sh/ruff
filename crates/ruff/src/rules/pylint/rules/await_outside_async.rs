@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of `await` outside of `async` functions.
+/// Checks for uses of `await` outside of `async` functions.
 ///
 /// ## Why is this bad?
 /// Using `await` outside of an `async` function is a syntax error.

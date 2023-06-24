@@ -733,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.272"
+version = "0.0.275"
 dependencies = [
  "anyhow",
  "clap",
@@ -1793,7 +1793,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.272"
+version = "0.0.275"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1889,7 +1889,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.272"
+version = "0.0.275"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1908,6 +1908,7 @@ dependencies = [
  "glob",
  "ignore",
  "itertools",
+ "itoa",
  "log",
  "mimalloc",
  "notify",
@@ -1942,17 +1943,20 @@ dependencies = [
  "clap",
  "itertools",
  "libcst",
+ "log",
  "once_cell",
  "pretty_assertions",
  "regex",
  "ruff",
  "ruff_cli",
  "ruff_diagnostics",
+ "ruff_python_formatter",
  "ruff_textwrap",
  "rustpython-format",
  "rustpython-parser",
  "schemars",
  "serde_json",
+ "similar",
  "strum",
  "strum_macros",
 ]
@@ -2030,6 +2034,7 @@ name = "ruff_python_formatter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.3.1",
  "clap",
  "countme",
  "insta",
@@ -2067,10 +2072,6 @@ dependencies = [
 [[package]]
 name = "ruff_python_stdlib"
 version = "0.0.0"
-dependencies = [
- "once_cell",
- "rustc-hash",
-]
 
 [[package]]
 name = "ruff_python_whitespace"
@@ -2101,7 +2102,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=0dc8fdf52d146698c5bcf0b842fddc9e398ad8db#0dc8fdf52d146698c5bcf0b842fddc9e398ad8db"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "schemars",
  "serde",
@@ -2179,7 +2180,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=0dc8fdf52d146698c5bcf0b842fddc9e398ad8db#0dc8fdf52d146698c5bcf0b842fddc9e398ad8db"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -2190,7 +2191,7 @@ dependencies = [
 [[package]]
 name = "rustpython-format"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=0dc8fdf52d146698c5bcf0b842fddc9e398ad8db#0dc8fdf52d146698c5bcf0b842fddc9e398ad8db"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "bitflags 2.3.1",
  "itertools",
@@ -2202,7 +2203,7 @@ dependencies = [
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=0dc8fdf52d146698c5bcf0b842fddc9e398ad8db#0dc8fdf52d146698c5bcf0b842fddc9e398ad8db"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "hexf-parse",
  "is-macro",
@@ -2214,7 +2215,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=0dc8fdf52d146698c5bcf0b842fddc9e398ad8db#0dc8fdf52d146698c5bcf0b842fddc9e398ad8db"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "anyhow",
  "is-macro",
@@ -2237,9 +2238,10 @@ dependencies = [
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=0dc8fdf52d146698c5bcf0b842fddc9e398ad8db#0dc8fdf52d146698c5bcf0b842fddc9e398ad8db"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=8078663b6c914c1cb86993e427764f7c422fc12c#8078663b6c914c1cb86993e427764f7c422fc12c"
 dependencies = [
  "is-macro",
+ "memchr",
  "ruff_text_size",
 ]
 
@@ -2364,7 +2366,6 @@ version = "1.0.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "057d394a50403bcac12672b2b18fb387ab6d289d957dab67dd201875391e52f1"
 dependencies = [
- "indexmap",
  "itoa",
  "ryu",
  "serde",

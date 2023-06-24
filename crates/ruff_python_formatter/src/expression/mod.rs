@@ -1,5 +1,6 @@
 use crate::comments::Comments;
 use crate::context::NodeLevel;
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, Parentheses, Parenthesize};
 use crate::prelude::*;
 use ruff_formatter::{
@@ -7,6 +8,7 @@ use ruff_formatter::{
 };
 use rustpython_parser::ast::Expr;
 
+mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
@@ -35,6 +37,7 @@ pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
 pub(crate) mod parentheses;
+mod string;
 
 #[derive(Default)]
 pub struct FormatExpr {
@@ -59,7 +62,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         );
 
         let format_expr = format_with(|f| match item {
-            Expr::BoolOp(expr) => expr.format().fmt(f),
+            Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::NamedExpr(expr) => expr.format().fmt(f),
             Expr::BinOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::UnaryOp(expr) => expr.format().fmt(f),
@@ -74,7 +77,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Await(expr) => expr.format().fmt(f),
             Expr::Yield(expr) => expr.format().fmt(f),
             Expr::YieldFrom(expr) => expr.format().fmt(f),
-            Expr::Compare(expr) => expr.format().fmt(f),
+            Expr::Compare(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::JoinedStr(expr) => expr.format().fmt(f),
@@ -84,7 +87,10 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Starred(expr) => expr.format().fmt(f),
             Expr::Name(expr) => expr.format().fmt(f),
             Expr::List(expr) => expr.format().fmt(f),
-            Expr::Tuple(expr) => expr.format().fmt(f),
+            Expr::Tuple(expr) => expr
+                .format()
+                .with_options(TupleParentheses::Expr(parentheses))
+                .fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
         });
 

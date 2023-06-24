@@ -217,7 +217,7 @@ impl Renamer {
     /// Rename a [`Binding`] reference.
     fn rename_binding(binding: &Binding, name: &str, target: &str) -> Option<Edit> {
         match &binding.kind {
-            BindingKind::Importation(_) | BindingKind::FromImportation(_) => {
+            BindingKind::Import(_) | BindingKind::FromImport(_) => {
                 if binding.is_alias() {
                     // Ex) Rename `import pandas as alias` to `import pandas as pd`.
                     Some(Edit::range_replacement(target.to_string(), binding.range))
@@ -229,7 +229,7 @@ impl Renamer {
                     ))
                 }
             }
-            BindingKind::SubmoduleImportation(import) => {
+            BindingKind::SubmoduleImport(import) => {
                 // Ex) Rename `import pandas.core` to `import pandas as pd`.
                 let module_name = import.qualified_name.split('.').next().unwrap();
                 Some(Edit::range_replacement(
@@ -238,7 +238,7 @@ impl Renamer {
                 ))
             }
             // Avoid renaming builtins and other "special" bindings.
-            BindingKind::FutureImportation | BindingKind::Builtin | BindingKind::Export(_) => None,
+            BindingKind::FutureImport | BindingKind::Builtin | BindingKind::Export(_) => None,
             // By default, replace the binding's name with the target name.
             BindingKind::Annotation
             | BindingKind::Argument
@@ -251,7 +251,7 @@ impl Renamer {
             | BindingKind::ClassDefinition
             | BindingKind::FunctionDefinition
             | BindingKind::Deletion
-            | BindingKind::UnboundException => {
+            | BindingKind::UnboundException(_) => {
                 Some(Edit::range_replacement(target.to_string(), binding.range))
             }
         }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Excepthandler, Ranged, Stmt};
+use rustpython_parser::ast::{ExceptHandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -72,7 +72,7 @@ where
 }
 
 /// TRY301
-pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[Excepthandler]) {
+pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[ExceptHandler]) {
     if handlers.is_empty() {
         return;
     }

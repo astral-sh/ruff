@@ -191,8 +191,7 @@ pub(crate) fn invalid_string_characters(locator: &Locator, range: TextRange) -> 
         let location = range.start() + TextSize::try_from(column).unwrap();
         let range = TextRange::at(location, c.text_len());
 
-        #[allow(deprecated)]
-        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::unspecified(
+        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::automatic(
             Edit::range_replacement(replacement.to_string(), range),
         )));
     }

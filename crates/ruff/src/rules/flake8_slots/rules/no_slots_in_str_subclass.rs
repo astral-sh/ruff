@@ -59,10 +59,9 @@ pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class
             })
     }) {
         if !has_slots(&class.body) {
-            checker.diagnostics.push(Diagnostic::new(
-                NoSlotsInStrSubclass,
-                stmt.identifier(checker.locator),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(NoSlotsInStrSubclass, stmt.identifier()));
         }
     }
 }

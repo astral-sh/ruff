@@ -13,8 +13,8 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::is_typing_extension;
 
 use crate::binding::{
-    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImportation,
-    Importation, SubmoduleImportation,
+    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
+    SubmoduleImport,
 };
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
@@ -40,7 +40,6 @@ pub struct SemanticModel<'a> {
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
-    pub dead_scopes: Vec<ScopeId>,
 
     /// Stack of all definitions created in any scope, at any point in execution.
     pub definitions: Definitions<'a>,
@@ -130,7 +129,6 @@ impl<'a> SemanticModel<'a> {
             exprs: Vec::default(),
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
-            dead_scopes: Vec::default(),
             definitions: Definitions::for_module(module),
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
@@ -329,14 +327,56 @@ impl<'a> SemanticModel<'a> {
                     // ```
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException => {
+                    //
+                    // Similarly, given:
+                    //
+                    // ```python
+                    // try:
+                    //     pass
+                    // except ValueError as x:
+                    //     pass
+                    //
+                    // print(x)
+                    //
+                    // The `x` in `print(x)` should be treated as unresolved.
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
                         return ResolvedRead::UnboundLocal(binding_id)
                     }
 
-                    // Otherwise, treat it as resolved.
-                    _ => {
+                    // If we hit an unbound exception that shadowed a bound name, resole to the
+                    // bound name. For example, given:
+                    //
+                    // ```python
+                    // x = 1
+                    //
+                    // try:
+                    //     pass
+                    // except ValueError as x:
+                    //     pass
+                    //
+                    // print(x)
+                    // ```
+                    //
+                    // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
+                    BindingKind::UnboundException(Some(binding_id)) => {
+                        // Mark the binding as used.
+                        let context = self.execution_context();
+                        let reference_id = self.references.push(self.scope_id, range, context);
+                        self.bindings[binding_id].references.push(reference_id);
+
+                        // Mark any submodule aliases as used.
+                        if let Some(binding_id) =
+                            self.resolve_submodule(symbol, scope_id, binding_id)
+                        {
+                            let reference_id = self.references.push(self.scope_id, range, context);
+                            self.bindings[binding_id].references.push(reference_id);
+                        }
+
                         return ResolvedRead::Resolved(binding_id);
                     }
+
+                    // Otherwise, treat it as resolved.
+                    _ => return ResolvedRead::Resolved(binding_id),
                 }
             }
 
@@ -370,6 +410,50 @@ impl<'a> SemanticModel<'a> {
         } else {
             ResolvedRead::NotFound
         }
+    }
+
+    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_read`], but
+    /// doesn't add any read references to the resolved symbol.
+    pub fn lookup(&mut self, symbol: &str) -> Option<BindingId> {
+        if self.in_forward_reference() {
+            if let Some(binding_id) = self.scopes.global().get(symbol) {
+                if !self.bindings[binding_id].is_unbound() {
+                    return Some(binding_id);
+                }
+            }
+        }
+
+        let mut seen_function = false;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+            if scope.kind.is_class() {
+                if seen_function && matches!(symbol, "__class__") {
+                    return None;
+                }
+                if index > 0 {
+                    continue;
+                }
+            }
+
+            if let Some(binding_id) = scope.get(symbol) {
+                match self.bindings[binding_id].kind {
+                    BindingKind::Annotation => continue,
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                    BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
+                    _ => return Some(binding_id),
+                }
+            }
+
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return None;
+                }
+            }
+
+            seen_function |= scope.kind.is_any_function();
+        }
+
+        None
     }
 
     /// Given a `BindingId`, return the `BindingId` of the submodule import that it aliases.
@@ -419,7 +503,7 @@ impl<'a> SemanticModel<'a> {
         let head = call_path.first()?;
         let binding = self.find_binding(head)?;
         match &binding.kind {
-            BindingKind::Importation(Importation {
+            BindingKind::Import(Import {
                 qualified_name: name,
             }) => {
                 if name.starts_with('.') {
@@ -436,7 +520,7 @@ impl<'a> SemanticModel<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation {
+            BindingKind::SubmoduleImport(SubmoduleImport {
                 qualified_name: name,
             }) => {
                 let name = name.split('.').next().unwrap_or(name);
@@ -444,7 +528,7 @@ impl<'a> SemanticModel<'a> {
                 source_path.extend(call_path.into_iter().skip(1));
                 Some(source_path)
             }
-            BindingKind::FromImportation(FromImportation {
+            BindingKind::FromImport(FromImport {
                 qualified_name: name,
             }) => {
                 if name.starts_with('.') {
@@ -495,7 +579,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { qualified_name }) => {
+                    BindingKind::Import(Import { qualified_name }) => {
                         if qualified_name == &module {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
@@ -516,7 +600,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { qualified_name }) => {
+                    BindingKind::FromImport(FromImport { qualified_name }) => {
                         if let Some((target_module, target_member)) = qualified_name.split_once('.')
                         {
                             if target_module == module && target_member == member {
@@ -539,7 +623,7 @@ impl<'a> SemanticModel<'a> {
                     }
                     // Ex) Given `module="os"` and `object="name"`:
                     // `import os.path ` -> `os.name`
-                    BindingKind::SubmoduleImportation(SubmoduleImportation { .. }) => {
+                    BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
                         if name == module {
                             if let Some(source) = binding.source {
                                 // Verify that `os` isn't bound in an inner scope.
@@ -596,7 +680,6 @@ impl<'a> SemanticModel<'a> {
 
     /// Pop the current [`Scope`] off the stack.
     pub fn pop_scope(&mut self) {
-        self.dead_scopes.push(self.scope_id);
         self.scope_id = self.scopes[self.scope_id]
             .parent
             .expect("Attempted to pop without scope");

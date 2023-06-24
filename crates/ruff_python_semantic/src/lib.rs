@@ -7,6 +7,7 @@ mod model;
 mod node;
 mod reference;
 mod scope;
+mod star_import;
 
 pub use binding::*;
 pub use context::*;
@@ -16,3 +17,4 @@ pub use model::*;
 pub use node::*;
 pub use reference::*;
 pub use scope::*;
+pub use star_import::*;

@@ -17,82 +17,83 @@ pub trait AstNode: Ranged {
 
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNode {
-    ModModule(ModModule<TextRange>),
-    ModInteractive(ModInteractive<TextRange>),
-    ModExpression(ModExpression<TextRange>),
-    ModFunctionType(ModFunctionType<TextRange>),
-    StmtFunctionDef(StmtFunctionDef<TextRange>),
-    StmtAsyncFunctionDef(StmtAsyncFunctionDef<TextRange>),
-    StmtClassDef(StmtClassDef<TextRange>),
-    StmtReturn(StmtReturn<TextRange>),
-    StmtDelete(StmtDelete<TextRange>),
-    StmtAssign(StmtAssign<TextRange>),
-    StmtAugAssign(StmtAugAssign<TextRange>),
-    StmtAnnAssign(StmtAnnAssign<TextRange>),
-    StmtFor(StmtFor<TextRange>),
-    StmtAsyncFor(StmtAsyncFor<TextRange>),
-    StmtWhile(StmtWhile<TextRange>),
-    StmtIf(StmtIf<TextRange>),
-    StmtWith(StmtWith<TextRange>),
-    StmtAsyncWith(StmtAsyncWith<TextRange>),
-    StmtMatch(StmtMatch<TextRange>),
-    StmtRaise(StmtRaise<TextRange>),
-    StmtTry(StmtTry<TextRange>),
-    StmtTryStar(StmtTryStar<TextRange>),
-    StmtAssert(StmtAssert<TextRange>),
-    StmtImport(StmtImport<TextRange>),
-    StmtImportFrom(StmtImportFrom<TextRange>),
-    StmtGlobal(StmtGlobal<TextRange>),
-    StmtNonlocal(StmtNonlocal<TextRange>),
-    StmtExpr(StmtExpr<TextRange>),
-    StmtPass(StmtPass<TextRange>),
-    StmtBreak(StmtBreak<TextRange>),
-    StmtContinue(StmtContinue<TextRange>),
-    ExprBoolOp(ExprBoolOp<TextRange>),
-    ExprNamedExpr(ExprNamedExpr<TextRange>),
-    ExprBinOp(ExprBinOp<TextRange>),
-    ExprUnaryOp(ExprUnaryOp<TextRange>),
-    ExprLambda(ExprLambda<TextRange>),
-    ExprIfExp(ExprIfExp<TextRange>),
-    ExprDict(ExprDict<TextRange>),
-    ExprSet(ExprSet<TextRange>),
-    ExprListComp(ExprListComp<TextRange>),
-    ExprSetComp(ExprSetComp<TextRange>),
-    ExprDictComp(ExprDictComp<TextRange>),
-    ExprGeneratorExp(ExprGeneratorExp<TextRange>),
-    ExprAwait(ExprAwait<TextRange>),
-    ExprYield(ExprYield<TextRange>),
-    ExprYieldFrom(ExprYieldFrom<TextRange>),
-    ExprCompare(ExprCompare<TextRange>),
-    ExprCall(ExprCall<TextRange>),
-    ExprFormattedValue(ExprFormattedValue<TextRange>),
-    ExprJoinedStr(ExprJoinedStr<TextRange>),
-    ExprConstant(ExprConstant<TextRange>),
-    ExprAttribute(ExprAttribute<TextRange>),
-    ExprSubscript(ExprSubscript<TextRange>),
-    ExprStarred(ExprStarred<TextRange>),
-    ExprName(ExprName<TextRange>),
-    ExprList(ExprList<TextRange>),
-    ExprTuple(ExprTuple<TextRange>),
-    ExprSlice(ExprSlice<TextRange>),
-    ExcepthandlerExceptHandler(ExcepthandlerExceptHandler<TextRange>),
-    PatternMatchValue(PatternMatchValue<TextRange>),
-    PatternMatchSingleton(PatternMatchSingleton<TextRange>),
-    PatternMatchSequence(PatternMatchSequence<TextRange>),
-    PatternMatchMapping(PatternMatchMapping<TextRange>),
-    PatternMatchClass(PatternMatchClass<TextRange>),
-    PatternMatchStar(PatternMatchStar<TextRange>),
-    PatternMatchAs(PatternMatchAs<TextRange>),
-    PatternMatchOr(PatternMatchOr<TextRange>),
-    TypeIgnoreTypeIgnore(TypeIgnoreTypeIgnore<TextRange>),
-    Comprehension(Comprehension<TextRange>),
-    Arguments(Arguments<TextRange>),
-    Arg(Arg<TextRange>),
-    Keyword(Keyword<TextRange>),
-    Alias(Alias<TextRange>),
-    Withitem(Withitem<TextRange>),
-    MatchCase(MatchCase<TextRange>),
-    Decorator(Decorator<TextRange>),
+    ModModule(ModModule),
+    ModInteractive(ModInteractive),
+    ModExpression(ModExpression),
+    ModFunctionType(ModFunctionType),
+    StmtFunctionDef(StmtFunctionDef),
+    StmtAsyncFunctionDef(StmtAsyncFunctionDef),
+    StmtClassDef(StmtClassDef),
+    StmtReturn(StmtReturn),
+    StmtDelete(StmtDelete),
+    StmtAssign(StmtAssign),
+    StmtAugAssign(StmtAugAssign),
+    StmtAnnAssign(StmtAnnAssign),
+    StmtFor(StmtFor),
+    StmtAsyncFor(StmtAsyncFor),
+    StmtWhile(StmtWhile),
+    StmtIf(StmtIf),
+    StmtWith(StmtWith),
+    StmtAsyncWith(StmtAsyncWith),
+    StmtMatch(StmtMatch),
+    StmtRaise(StmtRaise),
+    StmtTry(StmtTry),
+    StmtTryStar(StmtTryStar),
+    StmtAssert(StmtAssert),
+    StmtImport(StmtImport),
+    StmtImportFrom(StmtImportFrom),
+    StmtGlobal(StmtGlobal),
+    StmtNonlocal(StmtNonlocal),
+    StmtExpr(StmtExpr),
+    StmtPass(StmtPass),
+    StmtBreak(StmtBreak),
+    StmtContinue(StmtContinue),
+    ExprBoolOp(ExprBoolOp),
+    ExprNamedExpr(ExprNamedExpr),
+    ExprBinOp(ExprBinOp),
+    ExprUnaryOp(ExprUnaryOp),
+    ExprLambda(ExprLambda),
+    ExprIfExp(ExprIfExp),
+    ExprDict(ExprDict),
+    ExprSet(ExprSet),
+    ExprListComp(ExprListComp),
+    ExprSetComp(ExprSetComp),
+    ExprDictComp(ExprDictComp),
+    ExprGeneratorExp(ExprGeneratorExp),
+    ExprAwait(ExprAwait),
+    ExprYield(ExprYield),
+    ExprYieldFrom(ExprYieldFrom),
+    ExprCompare(ExprCompare),
+    ExprCall(ExprCall),
+    ExprFormattedValue(ExprFormattedValue),
+    ExprJoinedStr(ExprJoinedStr),
+    ExprConstant(ExprConstant),
+    ExprAttribute(ExprAttribute),
+    ExprSubscript(ExprSubscript),
+    ExprStarred(ExprStarred),
+    ExprName(ExprName),
+    ExprList(ExprList),
+    ExprTuple(ExprTuple),
+    ExprSlice(ExprSlice),
+    ExceptHandlerExceptHandler(ExceptHandlerExceptHandler),
+    PatternMatchValue(PatternMatchValue),
+    PatternMatchSingleton(PatternMatchSingleton),
+    PatternMatchSequence(PatternMatchSequence),
+    PatternMatchMapping(PatternMatchMapping),
+    PatternMatchClass(PatternMatchClass),
+    PatternMatchStar(PatternMatchStar),
+    PatternMatchAs(PatternMatchAs),
+    PatternMatchOr(PatternMatchOr),
+    TypeIgnoreTypeIgnore(TypeIgnoreTypeIgnore),
+    Comprehension(Comprehension),
+    Arguments(Arguments),
+    Arg(Arg),
+    ArgWithDefault(ArgWithDefault),
+    Keyword(Keyword),
+    Alias(Alias),
+    WithItem(WithItem),
+    MatchCase(MatchCase),
+    Decorator(Decorator),
 }
 
 impl AnyNode {
@@ -157,7 +158,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -170,9 +171,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -239,7 +241,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -252,9 +254,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -321,7 +324,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -334,9 +337,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -411,22 +415,23 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
     }
 
-    pub fn except_handler(self) -> Option<Excepthandler> {
+    pub fn except_handler(self) -> Option<ExceptHandler> {
         match self {
-            AnyNode::ExcepthandlerExceptHandler(node) => Some(Excepthandler::ExceptHandler(node)),
+            AnyNode::ExceptHandlerExceptHandler(node) => Some(ExceptHandler::ExceptHandler(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModInteractive(_)
@@ -498,9 +503,10 @@ impl AnyNode {
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -576,13 +582,14 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
+            | AnyNode::ArgWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
-            | AnyNode::Withitem(_)
+            | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_) => None,
         }
@@ -672,7 +679,7 @@ impl AnyNode {
             Self::ExprList(node) => AnyNodeRef::ExprList(node),
             Self::ExprTuple(node) => AnyNodeRef::ExprTuple(node),
             Self::ExprSlice(node) => AnyNodeRef::ExprSlice(node),
-            Self::ExcepthandlerExceptHandler(node) => AnyNodeRef::ExcepthandlerExceptHandler(node),
+            Self::ExceptHandlerExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
             Self::PatternMatchValue(node) => AnyNodeRef::PatternMatchValue(node),
             Self::PatternMatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
             Self::PatternMatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
@@ -685,9 +692,10 @@ impl AnyNode {
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
             Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Arg(node) => AnyNodeRef::Arg(node),
+            Self::ArgWithDefault(node) => AnyNodeRef::ArgWithDefault(node),
             Self::Keyword(node) => AnyNodeRef::Keyword(node),
             Self::Alias(node) => AnyNodeRef::Alias(node),
-            Self::Withitem(node) => AnyNodeRef::Withitem(node),
+            Self::WithItem(node) => AnyNodeRef::WithItem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
             Self::Decorator(node) => AnyNodeRef::Decorator(node),
         }
@@ -699,7 +707,7 @@ impl AnyNode {
     }
 }
 
-impl AstNode for ModModule<TextRange> {
+impl AstNode for ModModule {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -727,7 +735,7 @@ impl AstNode for ModModule<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ModInteractive<TextRange> {
+impl AstNode for ModInteractive {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -755,7 +763,7 @@ impl AstNode for ModInteractive<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ModExpression<TextRange> {
+impl AstNode for ModExpression {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -783,7 +791,7 @@ impl AstNode for ModExpression<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ModFunctionType<TextRange> {
+impl AstNode for ModFunctionType {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -811,7 +819,7 @@ impl AstNode for ModFunctionType<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtFunctionDef<TextRange> {
+impl AstNode for StmtFunctionDef {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -839,7 +847,7 @@ impl AstNode for StmtFunctionDef<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtAsyncFunctionDef<TextRange> {
+impl AstNode for StmtAsyncFunctionDef {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -867,7 +875,7 @@ impl AstNode for StmtAsyncFunctionDef<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtClassDef<TextRange> {
+impl AstNode for StmtClassDef {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -895,7 +903,7 @@ impl AstNode for StmtClassDef<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtReturn<TextRange> {
+impl AstNode for StmtReturn {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -923,7 +931,7 @@ impl AstNode for StmtReturn<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtDelete<TextRange> {
+impl AstNode for StmtDelete {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -951,7 +959,7 @@ impl AstNode for StmtDelete<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtAssign<TextRange> {
+impl AstNode for StmtAssign {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -979,7 +987,7 @@ impl AstNode for StmtAssign<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtAugAssign<TextRange> {
+impl AstNode for StmtAugAssign {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1007,7 +1015,7 @@ impl AstNode for StmtAugAssign<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtAnnAssign<TextRange> {
+impl AstNode for StmtAnnAssign {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1035,7 +1043,7 @@ impl AstNode for StmtAnnAssign<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtFor<TextRange> {
+impl AstNode for StmtFor {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1063,7 +1071,7 @@ impl AstNode for StmtFor<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtAsyncFor<TextRange> {
+impl AstNode for StmtAsyncFor {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1091,7 +1099,7 @@ impl AstNode for StmtAsyncFor<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtWhile<TextRange> {
+impl AstNode for StmtWhile {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1119,7 +1127,7 @@ impl AstNode for StmtWhile<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtIf<TextRange> {
+impl AstNode for StmtIf {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1147,7 +1155,7 @@ impl AstNode for StmtIf<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtWith<TextRange> {
+impl AstNode for StmtWith {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1175,7 +1183,7 @@ impl AstNode for StmtWith<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtAsyncWith<TextRange> {
+impl AstNode for StmtAsyncWith {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1203,7 +1211,7 @@ impl AstNode for StmtAsyncWith<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtMatch<TextRange> {
+impl AstNode for StmtMatch {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1231,7 +1239,7 @@ impl AstNode for StmtMatch<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtRaise<TextRange> {
+impl AstNode for StmtRaise {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1259,7 +1267,7 @@ impl AstNode for StmtRaise<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtTry<TextRange> {
+impl AstNode for StmtTry {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1287,7 +1295,7 @@ impl AstNode for StmtTry<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtTryStar<TextRange> {
+impl AstNode for StmtTryStar {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1315,7 +1323,7 @@ impl AstNode for StmtTryStar<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtAssert<TextRange> {
+impl AstNode for StmtAssert {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1343,7 +1351,7 @@ impl AstNode for StmtAssert<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtImport<TextRange> {
+impl AstNode for StmtImport {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1371,7 +1379,7 @@ impl AstNode for StmtImport<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtImportFrom<TextRange> {
+impl AstNode for StmtImportFrom {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1399,7 +1407,7 @@ impl AstNode for StmtImportFrom<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtGlobal<TextRange> {
+impl AstNode for StmtGlobal {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1427,7 +1435,7 @@ impl AstNode for StmtGlobal<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtNonlocal<TextRange> {
+impl AstNode for StmtNonlocal {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1455,7 +1463,7 @@ impl AstNode for StmtNonlocal<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtExpr<TextRange> {
+impl AstNode for StmtExpr {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1483,7 +1491,7 @@ impl AstNode for StmtExpr<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtPass<TextRange> {
+impl AstNode for StmtPass {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1511,7 +1519,7 @@ impl AstNode for StmtPass<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtBreak<TextRange> {
+impl AstNode for StmtBreak {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1539,7 +1547,7 @@ impl AstNode for StmtBreak<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for StmtContinue<TextRange> {
+impl AstNode for StmtContinue {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1567,7 +1575,7 @@ impl AstNode for StmtContinue<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprBoolOp<TextRange> {
+impl AstNode for ExprBoolOp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1595,7 +1603,7 @@ impl AstNode for ExprBoolOp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprNamedExpr<TextRange> {
+impl AstNode for ExprNamedExpr {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1623,7 +1631,7 @@ impl AstNode for ExprNamedExpr<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprBinOp<TextRange> {
+impl AstNode for ExprBinOp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1651,7 +1659,7 @@ impl AstNode for ExprBinOp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprUnaryOp<TextRange> {
+impl AstNode for ExprUnaryOp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1679,7 +1687,7 @@ impl AstNode for ExprUnaryOp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprLambda<TextRange> {
+impl AstNode for ExprLambda {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1707,7 +1715,7 @@ impl AstNode for ExprLambda<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprIfExp<TextRange> {
+impl AstNode for ExprIfExp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1735,7 +1743,7 @@ impl AstNode for ExprIfExp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprDict<TextRange> {
+impl AstNode for ExprDict {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1763,7 +1771,7 @@ impl AstNode for ExprDict<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprSet<TextRange> {
+impl AstNode for ExprSet {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1791,7 +1799,7 @@ impl AstNode for ExprSet<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprListComp<TextRange> {
+impl AstNode for ExprListComp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1819,7 +1827,7 @@ impl AstNode for ExprListComp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprSetComp<TextRange> {
+impl AstNode for ExprSetComp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1847,7 +1855,7 @@ impl AstNode for ExprSetComp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprDictComp<TextRange> {
+impl AstNode for ExprDictComp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1875,7 +1883,7 @@ impl AstNode for ExprDictComp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprGeneratorExp<TextRange> {
+impl AstNode for ExprGeneratorExp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1903,7 +1911,7 @@ impl AstNode for ExprGeneratorExp<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprAwait<TextRange> {
+impl AstNode for ExprAwait {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1931,7 +1939,7 @@ impl AstNode for ExprAwait<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprYield<TextRange> {
+impl AstNode for ExprYield {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1959,7 +1967,7 @@ impl AstNode for ExprYield<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprYieldFrom<TextRange> {
+impl AstNode for ExprYieldFrom {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1987,7 +1995,7 @@ impl AstNode for ExprYieldFrom<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprCompare<TextRange> {
+impl AstNode for ExprCompare {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2015,7 +2023,7 @@ impl AstNode for ExprCompare<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprCall<TextRange> {
+impl AstNode for ExprCall {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2043,7 +2051,7 @@ impl AstNode for ExprCall<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprFormattedValue<TextRange> {
+impl AstNode for ExprFormattedValue {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2071,7 +2079,7 @@ impl AstNode for ExprFormattedValue<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprJoinedStr<TextRange> {
+impl AstNode for ExprJoinedStr {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2099,7 +2107,7 @@ impl AstNode for ExprJoinedStr<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprConstant<TextRange> {
+impl AstNode for ExprConstant {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2127,7 +2135,7 @@ impl AstNode for ExprConstant<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprAttribute<TextRange> {
+impl AstNode for ExprAttribute {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2155,7 +2163,7 @@ impl AstNode for ExprAttribute<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprSubscript<TextRange> {
+impl AstNode for ExprSubscript {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2183,7 +2191,7 @@ impl AstNode for ExprSubscript<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprStarred<TextRange> {
+impl AstNode for ExprStarred {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2211,7 +2219,7 @@ impl AstNode for ExprStarred<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprName<TextRange> {
+impl AstNode for ExprName {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2239,7 +2247,7 @@ impl AstNode for ExprName<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprList<TextRange> {
+impl AstNode for ExprList {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2267,7 +2275,7 @@ impl AstNode for ExprList<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprTuple<TextRange> {
+impl AstNode for ExprTuple {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2295,7 +2303,7 @@ impl AstNode for ExprTuple<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExprSlice<TextRange> {
+impl AstNode for ExprSlice {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2323,12 +2331,12 @@ impl AstNode for ExprSlice<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for ExcepthandlerExceptHandler<TextRange> {
+impl AstNode for ExceptHandlerExceptHandler {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExcepthandlerExceptHandler(node) = kind {
+        if let AnyNode::ExceptHandlerExceptHandler(node) = kind {
             Some(node)
         } else {
             None
@@ -2336,7 +2344,7 @@ impl AstNode for ExcepthandlerExceptHandler<TextRange> {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExcepthandlerExceptHandler(node) = kind {
+        if let AnyNodeRef::ExceptHandlerExceptHandler(node) = kind {
             Some(node)
         } else {
             None
@@ -2351,7 +2359,7 @@ impl AstNode for ExcepthandlerExceptHandler<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchValue<TextRange> {
+impl AstNode for PatternMatchValue {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2379,7 +2387,7 @@ impl AstNode for PatternMatchValue<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchSingleton<TextRange> {
+impl AstNode for PatternMatchSingleton {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2407,7 +2415,7 @@ impl AstNode for PatternMatchSingleton<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchSequence<TextRange> {
+impl AstNode for PatternMatchSequence {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2435,7 +2443,7 @@ impl AstNode for PatternMatchSequence<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchMapping<TextRange> {
+impl AstNode for PatternMatchMapping {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2463,7 +2471,7 @@ impl AstNode for PatternMatchMapping<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchClass<TextRange> {
+impl AstNode for PatternMatchClass {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2491,7 +2499,7 @@ impl AstNode for PatternMatchClass<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchStar<TextRange> {
+impl AstNode for PatternMatchStar {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2519,7 +2527,7 @@ impl AstNode for PatternMatchStar<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchAs<TextRange> {
+impl AstNode for PatternMatchAs {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2547,7 +2555,7 @@ impl AstNode for PatternMatchAs<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for PatternMatchOr<TextRange> {
+impl AstNode for PatternMatchOr {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2575,7 +2583,7 @@ impl AstNode for PatternMatchOr<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for TypeIgnoreTypeIgnore<TextRange> {
+impl AstNode for TypeIgnoreTypeIgnore {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2604,7 +2612,7 @@ impl AstNode for TypeIgnoreTypeIgnore<TextRange> {
     }
 }
 
-impl AstNode for Comprehension<TextRange> {
+impl AstNode for Comprehension {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2632,7 +2640,7 @@ impl AstNode for Comprehension<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for Arguments<TextRange> {
+impl AstNode for Arguments {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2660,7 +2668,7 @@ impl AstNode for Arguments<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for Arg<TextRange> {
+impl AstNode for Arg {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2688,7 +2696,35 @@ impl AstNode for Arg<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for Keyword<TextRange> {
+impl AstNode for ArgWithDefault {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ArgWithDefault(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ArgWithDefault(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+impl AstNode for Keyword {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2716,7 +2752,7 @@ impl AstNode for Keyword<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for Alias<TextRange> {
+impl AstNode for Alias {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2744,12 +2780,12 @@ impl AstNode for Alias<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for Withitem<TextRange> {
+impl AstNode for WithItem {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::Withitem(node) = kind {
+        if let AnyNode::WithItem(node) = kind {
             Some(node)
         } else {
             None
@@ -2757,7 +2793,7 @@ impl AstNode for Withitem<TextRange> {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Withitem(node) = kind {
+        if let AnyNodeRef::WithItem(node) = kind {
             Some(node)
         } else {
             None
@@ -2772,7 +2808,7 @@ impl AstNode for Withitem<TextRange> {
         AnyNode::from(self)
     }
 }
-impl AstNode for MatchCase<TextRange> {
+impl AstNode for MatchCase {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2801,7 +2837,7 @@ impl AstNode for MatchCase<TextRange> {
     }
 }
 
-impl AstNode for Decorator<TextRange> {
+impl AstNode for Decorator {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2924,10 +2960,10 @@ impl From<Pattern> for AnyNode {
     }
 }
 
-impl From<Excepthandler> for AnyNode {
-    fn from(handler: Excepthandler) -> Self {
+impl From<ExceptHandler> for AnyNode {
+    fn from(handler: ExceptHandler) -> Self {
         match handler {
-            Excepthandler::ExceptHandler(handler) => AnyNode::ExcepthandlerExceptHandler(handler),
+            ExceptHandler::ExceptHandler(handler) => AnyNode::ExceptHandlerExceptHandler(handler),
         }
     }
 }
@@ -3288,9 +3324,9 @@ impl From<ExprSlice> for AnyNode {
     }
 }
 
-impl From<ExcepthandlerExceptHandler> for AnyNode {
-    fn from(node: ExcepthandlerExceptHandler) -> Self {
-        AnyNode::ExcepthandlerExceptHandler(node)
+impl From<ExceptHandlerExceptHandler> for AnyNode {
+    fn from(node: ExceptHandlerExceptHandler) -> Self {
+        AnyNode::ExceptHandlerExceptHandler(node)
     }
 }
 
@@ -3363,6 +3399,11 @@ impl From<Arg> for AnyNode {
         AnyNode::Arg(node)
     }
 }
+impl From<ArgWithDefault> for AnyNode {
+    fn from(node: ArgWithDefault) -> Self {
+        AnyNode::ArgWithDefault(node)
+    }
+}
 impl From<Keyword> for AnyNode {
     fn from(node: Keyword) -> Self {
         AnyNode::Keyword(node)
@@ -3373,9 +3414,9 @@ impl From<Alias> for AnyNode {
         AnyNode::Alias(node)
     }
 }
-impl From<Withitem> for AnyNode {
-    fn from(node: Withitem) -> Self {
-        AnyNode::Withitem(node)
+impl From<WithItem> for AnyNode {
+    fn from(node: WithItem) -> Self {
+        AnyNode::WithItem(node)
     }
 }
 impl From<MatchCase> for AnyNode {
@@ -3450,7 +3491,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprList(node) => node.range(),
             AnyNode::ExprTuple(node) => node.range(),
             AnyNode::ExprSlice(node) => node.range(),
-            AnyNode::ExcepthandlerExceptHandler(node) => node.range(),
+            AnyNode::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNode::PatternMatchValue(node) => node.range(),
             AnyNode::PatternMatchSingleton(node) => node.range(),
             AnyNode::PatternMatchSequence(node) => node.range(),
@@ -3463,9 +3504,10 @@ impl Ranged for AnyNode {
             AnyNode::Comprehension(node) => node.range(),
             AnyNode::Arguments(node) => node.range(),
             AnyNode::Arg(node) => node.range(),
+            AnyNode::ArgWithDefault(node) => node.range(),
             AnyNode::Keyword(node) => node.range(),
             AnyNode::Alias(node) => node.range(),
-            AnyNode::Withitem(node) => node.range(),
+            AnyNode::WithItem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
             AnyNode::Decorator(node) => node.range(),
         }
@@ -3474,82 +3516,83 @@ impl Ranged for AnyNode {
 
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNodeRef<'a> {
-    ModModule(&'a ModModule<TextRange>),
-    ModInteractive(&'a ModInteractive<TextRange>),
-    ModExpression(&'a ModExpression<TextRange>),
-    ModFunctionType(&'a ModFunctionType<TextRange>),
-    StmtFunctionDef(&'a StmtFunctionDef<TextRange>),
-    StmtAsyncFunctionDef(&'a StmtAsyncFunctionDef<TextRange>),
-    StmtClassDef(&'a StmtClassDef<TextRange>),
-    StmtReturn(&'a StmtReturn<TextRange>),
-    StmtDelete(&'a StmtDelete<TextRange>),
-    StmtAssign(&'a StmtAssign<TextRange>),
-    StmtAugAssign(&'a StmtAugAssign<TextRange>),
-    StmtAnnAssign(&'a StmtAnnAssign<TextRange>),
-    StmtFor(&'a StmtFor<TextRange>),
-    StmtAsyncFor(&'a StmtAsyncFor<TextRange>),
-    StmtWhile(&'a StmtWhile<TextRange>),
-    StmtIf(&'a StmtIf<TextRange>),
-    StmtWith(&'a StmtWith<TextRange>),
-    StmtAsyncWith(&'a StmtAsyncWith<TextRange>),
-    StmtMatch(&'a StmtMatch<TextRange>),
-    StmtRaise(&'a StmtRaise<TextRange>),
-    StmtTry(&'a StmtTry<TextRange>),
-    StmtTryStar(&'a StmtTryStar<TextRange>),
-    StmtAssert(&'a StmtAssert<TextRange>),
-    StmtImport(&'a StmtImport<TextRange>),
-    StmtImportFrom(&'a StmtImportFrom<TextRange>),
-    StmtGlobal(&'a StmtGlobal<TextRange>),
-    StmtNonlocal(&'a StmtNonlocal<TextRange>),
-    StmtExpr(&'a StmtExpr<TextRange>),
-    StmtPass(&'a StmtPass<TextRange>),
-    StmtBreak(&'a StmtBreak<TextRange>),
-    StmtContinue(&'a StmtContinue<TextRange>),
-    ExprBoolOp(&'a ExprBoolOp<TextRange>),
-    ExprNamedExpr(&'a ExprNamedExpr<TextRange>),
-    ExprBinOp(&'a ExprBinOp<TextRange>),
-    ExprUnaryOp(&'a ExprUnaryOp<TextRange>),
-    ExprLambda(&'a ExprLambda<TextRange>),
-    ExprIfExp(&'a ExprIfExp<TextRange>),
-    ExprDict(&'a ExprDict<TextRange>),
-    ExprSet(&'a ExprSet<TextRange>),
-    ExprListComp(&'a ExprListComp<TextRange>),
-    ExprSetComp(&'a ExprSetComp<TextRange>),
-    ExprDictComp(&'a ExprDictComp<TextRange>),
-    ExprGeneratorExp(&'a ExprGeneratorExp<TextRange>),
-    ExprAwait(&'a ExprAwait<TextRange>),
-    ExprYield(&'a ExprYield<TextRange>),
-    ExprYieldFrom(&'a ExprYieldFrom<TextRange>),
-    ExprCompare(&'a ExprCompare<TextRange>),
-    ExprCall(&'a ExprCall<TextRange>),
-    ExprFormattedValue(&'a ExprFormattedValue<TextRange>),
-    ExprJoinedStr(&'a ExprJoinedStr<TextRange>),
-    ExprConstant(&'a ExprConstant<TextRange>),
-    ExprAttribute(&'a ExprAttribute<TextRange>),
-    ExprSubscript(&'a ExprSubscript<TextRange>),
-    ExprStarred(&'a ExprStarred<TextRange>),
-    ExprName(&'a ExprName<TextRange>),
-    ExprList(&'a ExprList<TextRange>),
-    ExprTuple(&'a ExprTuple<TextRange>),
-    ExprSlice(&'a ExprSlice<TextRange>),
-    ExcepthandlerExceptHandler(&'a ExcepthandlerExceptHandler<TextRange>),
-    PatternMatchValue(&'a PatternMatchValue<TextRange>),
-    PatternMatchSingleton(&'a PatternMatchSingleton<TextRange>),
-    PatternMatchSequence(&'a PatternMatchSequence<TextRange>),
-    PatternMatchMapping(&'a PatternMatchMapping<TextRange>),
-    PatternMatchClass(&'a PatternMatchClass<TextRange>),
-    PatternMatchStar(&'a PatternMatchStar<TextRange>),
-    PatternMatchAs(&'a PatternMatchAs<TextRange>),
-    PatternMatchOr(&'a PatternMatchOr<TextRange>),
-    TypeIgnoreTypeIgnore(&'a TypeIgnoreTypeIgnore<TextRange>),
-    Comprehension(&'a Comprehension<TextRange>),
-    Arguments(&'a Arguments<TextRange>),
-    Arg(&'a Arg<TextRange>),
-    Keyword(&'a Keyword<TextRange>),
-    Alias(&'a Alias<TextRange>),
-    Withitem(&'a Withitem<TextRange>),
-    MatchCase(&'a MatchCase<TextRange>),
-    Decorator(&'a Decorator<TextRange>),
+    ModModule(&'a ModModule),
+    ModInteractive(&'a ModInteractive),
+    ModExpression(&'a ModExpression),
+    ModFunctionType(&'a ModFunctionType),
+    StmtFunctionDef(&'a StmtFunctionDef),
+    StmtAsyncFunctionDef(&'a StmtAsyncFunctionDef),
+    StmtClassDef(&'a StmtClassDef),
+    StmtReturn(&'a StmtReturn),
+    StmtDelete(&'a StmtDelete),
+    StmtAssign(&'a StmtAssign),
+    StmtAugAssign(&'a StmtAugAssign),
+    StmtAnnAssign(&'a StmtAnnAssign),
+    StmtFor(&'a StmtFor),
+    StmtAsyncFor(&'a StmtAsyncFor),
+    StmtWhile(&'a StmtWhile),
+    StmtIf(&'a StmtIf),
+    StmtWith(&'a StmtWith),
+    StmtAsyncWith(&'a StmtAsyncWith),
+    StmtMatch(&'a StmtMatch),
+    StmtRaise(&'a StmtRaise),
+    StmtTry(&'a StmtTry),
+    StmtTryStar(&'a StmtTryStar),
+    StmtAssert(&'a StmtAssert),
+    StmtImport(&'a StmtImport),
+    StmtImportFrom(&'a StmtImportFrom),
+    StmtGlobal(&'a StmtGlobal),
+    StmtNonlocal(&'a StmtNonlocal),
+    StmtExpr(&'a StmtExpr),
+    StmtPass(&'a StmtPass),
+    StmtBreak(&'a StmtBreak),
+    StmtContinue(&'a StmtContinue),
+    ExprBoolOp(&'a ExprBoolOp),
+    ExprNamedExpr(&'a ExprNamedExpr),
+    ExprBinOp(&'a ExprBinOp),
+    ExprUnaryOp(&'a ExprUnaryOp),
+    ExprLambda(&'a ExprLambda),
+    ExprIfExp(&'a ExprIfExp),
+    ExprDict(&'a ExprDict),
+    ExprSet(&'a ExprSet),
+    ExprListComp(&'a ExprListComp),
+    ExprSetComp(&'a ExprSetComp),
+    ExprDictComp(&'a ExprDictComp),
+    ExprGeneratorExp(&'a ExprGeneratorExp),
+    ExprAwait(&'a ExprAwait),
+    ExprYield(&'a ExprYield),
+    ExprYieldFrom(&'a ExprYieldFrom),
+    ExprCompare(&'a ExprCompare),
+    ExprCall(&'a ExprCall),
+    ExprFormattedValue(&'a ExprFormattedValue),
+    ExprJoinedStr(&'a ExprJoinedStr),
+    ExprConstant(&'a ExprConstant),
+    ExprAttribute(&'a ExprAttribute),
+    ExprSubscript(&'a ExprSubscript),
+    ExprStarred(&'a ExprStarred),
+    ExprName(&'a ExprName),
+    ExprList(&'a ExprList),
+    ExprTuple(&'a ExprTuple),
+    ExprSlice(&'a ExprSlice),
+    ExceptHandlerExceptHandler(&'a ExceptHandlerExceptHandler),
+    PatternMatchValue(&'a PatternMatchValue),
+    PatternMatchSingleton(&'a PatternMatchSingleton),
+    PatternMatchSequence(&'a PatternMatchSequence),
+    PatternMatchMapping(&'a PatternMatchMapping),
+    PatternMatchClass(&'a PatternMatchClass),
+    PatternMatchStar(&'a PatternMatchStar),
+    PatternMatchAs(&'a PatternMatchAs),
+    PatternMatchOr(&'a PatternMatchOr),
+    TypeIgnoreTypeIgnore(&'a TypeIgnoreTypeIgnore),
+    Comprehension(&'a Comprehension),
+    Arguments(&'a Arguments),
+    Arg(&'a Arg),
+    ArgWithDefault(&'a ArgWithDefault),
+    Keyword(&'a Keyword),
+    Alias(&'a Alias),
+    WithItem(&'a WithItem),
+    MatchCase(&'a MatchCase),
+    Decorator(&'a Decorator),
 }
 
 impl AnyNodeRef<'_> {
@@ -3613,7 +3656,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExcepthandlerExceptHandler(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExceptHandlerExceptHandler(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchValue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSingleton(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSequence(node) => NonNull::from(*node).cast(),
@@ -3626,9 +3669,10 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arg(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ArgWithDefault(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Keyword(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Alias(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::Withitem(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
         }
@@ -3636,7 +3680,7 @@ impl AnyNodeRef<'_> {
 
     /// Compares two any node refs by their pointers (referential equality).
     pub fn ptr_eq(self, other: AnyNodeRef) -> bool {
-        self.as_ptr().eq(&other.as_ptr())
+        self.as_ptr().eq(&other.as_ptr()) && self.kind() == other.kind()
     }
 
     /// Returns the node's [`kind`](NodeKind) that has no data associated and is [`Copy`].
@@ -3700,7 +3744,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(_) => NodeKind::ExprList,
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
-            AnyNodeRef::ExcepthandlerExceptHandler(_) => NodeKind::ExcepthandlerExceptHandler,
+            AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
             AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
             AnyNodeRef::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
@@ -3713,9 +3757,10 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
             AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Arg(_) => NodeKind::Arg,
+            AnyNodeRef::ArgWithDefault(_) => NodeKind::ArgWithDefault,
             AnyNodeRef::Keyword(_) => NodeKind::Keyword,
             AnyNodeRef::Alias(_) => NodeKind::Alias,
-            AnyNodeRef::Withitem(_) => NodeKind::Withitem,
+            AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
             AnyNodeRef::Decorator(_) => NodeKind::Decorator,
         }
@@ -3782,7 +3827,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -3795,9 +3840,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -3864,7 +3910,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -3877,9 +3923,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -3946,7 +3993,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -3959,9 +4006,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -4036,14 +4084,15 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -4051,7 +4100,7 @@ impl AnyNodeRef<'_> {
 
     pub const fn is_except_handler(self) -> bool {
         match self {
-            AnyNodeRef::ExcepthandlerExceptHandler(_) => true,
+            AnyNodeRef::ExceptHandlerExceptHandler(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModInteractive(_)
@@ -4123,9 +4172,10 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -4201,13 +4251,14 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
+            | AnyNodeRef::ArgWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
-            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_) => false,
         }
@@ -4578,9 +4629,9 @@ impl<'a> From<&'a ExprSlice> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ExcepthandlerExceptHandler> for AnyNodeRef<'a> {
-    fn from(node: &'a ExcepthandlerExceptHandler) -> Self {
-        AnyNodeRef::ExcepthandlerExceptHandler(node)
+impl<'a> From<&'a ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
+    fn from(node: &'a ExceptHandlerExceptHandler) -> Self {
+        AnyNodeRef::ExceptHandlerExceptHandler(node)
     }
 }
 
@@ -4738,11 +4789,11 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a Excepthandler> for AnyNodeRef<'a> {
-    fn from(handler: &'a Excepthandler) -> Self {
+impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
+    fn from(handler: &'a ExceptHandler) -> Self {
         match handler {
-            Excepthandler::ExceptHandler(handler) => {
-                AnyNodeRef::ExcepthandlerExceptHandler(handler)
+            ExceptHandler::ExceptHandler(handler) => {
+                AnyNodeRef::ExceptHandlerExceptHandler(handler)
             }
         }
     }
@@ -4771,6 +4822,11 @@ impl<'a> From<&'a Arg> for AnyNodeRef<'a> {
         AnyNodeRef::Arg(node)
     }
 }
+impl<'a> From<&'a ArgWithDefault> for AnyNodeRef<'a> {
+    fn from(node: &'a ArgWithDefault) -> Self {
+        AnyNodeRef::ArgWithDefault(node)
+    }
+}
 impl<'a> From<&'a Keyword> for AnyNodeRef<'a> {
     fn from(node: &'a Keyword) -> Self {
         AnyNodeRef::Keyword(node)
@@ -4781,9 +4837,9 @@ impl<'a> From<&'a Alias> for AnyNodeRef<'a> {
         AnyNodeRef::Alias(node)
     }
 }
-impl<'a> From<&'a Withitem> for AnyNodeRef<'a> {
-    fn from(node: &'a Withitem) -> Self {
-        AnyNodeRef::Withitem(node)
+impl<'a> From<&'a WithItem> for AnyNodeRef<'a> {
+    fn from(node: &'a WithItem) -> Self {
+        AnyNodeRef::WithItem(node)
     }
 }
 impl<'a> From<&'a MatchCase> for AnyNodeRef<'a> {
@@ -4853,7 +4909,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => node.range(),
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
-            AnyNodeRef::ExcepthandlerExceptHandler(node) => node.range(),
+            AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::PatternMatchValue(node) => node.range(),
             AnyNodeRef::PatternMatchSingleton(node) => node.range(),
             AnyNodeRef::PatternMatchSequence(node) => node.range(),
@@ -4866,9 +4922,10 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::Comprehension(node) => node.range(),
             AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Arg(node) => node.range(),
+            AnyNodeRef::ArgWithDefault(node) => node.range(),
             AnyNodeRef::Keyword(node) => node.range(),
             AnyNodeRef::Alias(node) => node.range(),
-            AnyNodeRef::Withitem(node) => node.range(),
+            AnyNodeRef::WithItem(node) => node.range(),
             AnyNodeRef::MatchCase(node) => node.range(),
             AnyNodeRef::Decorator(node) => node.range(),
         }
@@ -4935,7 +4992,7 @@ pub enum NodeKind {
     ExprList,
     ExprTuple,
     ExprSlice,
-    ExcepthandlerExceptHandler,
+    ExceptHandlerExceptHandler,
     PatternMatchValue,
     PatternMatchSingleton,
     PatternMatchSequence,
@@ -4948,9 +5005,10 @@ pub enum NodeKind {
     Comprehension,
     Arguments,
     Arg,
+    ArgWithDefault,
     Keyword,
     Alias,
-    Withitem,
+    WithItem,
     MatchCase,
     Decorator,
 }

@@ -1,4 +1,6 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, Stmt, Unaryop};
+use rustpython_parser::ast::{
+    self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
+};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -156,7 +158,7 @@ fn is_valid_default_value_with_annotation(
                 });
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::USub,
+            op: UnaryOp::USub,
             operand,
             range: _,
         }) => {
@@ -199,7 +201,7 @@ fn is_valid_default_value_with_annotation(
                 {
                     return locator.slice(left.range()).len() <= 10;
                 } else if let Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: Unaryop::USub,
+                    op: UnaryOp::USub,
                     operand,
                     range: _,
                 }) = left.as_ref()
@@ -312,130 +314,74 @@ fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
 }
 
 /// PYI011
-pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
-    if !args.defaults.is_empty() {
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.defaults.get(i))
-            {
-                if arg.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        if def.annotation.is_some() {
+            if !is_valid_default_value_with_annotation(
+                default,
+                true,
+                checker.locator,
+                checker.semantic(),
+            ) {
+                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                        "...".to_string(),
+                        default.range(),
+                    )));
                 }
-            }
-        }
-    }
 
-    if !args.kw_defaults.is_empty() {
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                if kwarg.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
-
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
 }
 
 /// PYI014
-pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
-    if !args.defaults.is_empty() {
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.defaults.get(i))
-            {
-                if arg.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, default.range());
+pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        if def.annotation.is_none() {
+            if !is_valid_default_value_with_annotation(
+                default,
+                true,
+                checker.locator,
+                checker.semantic(),
+            ) {
+                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
 
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                        "...".to_string(),
+                        default.range(),
+                    )));
                 }
-            }
-        }
-    }
 
-    if !args.kw_defaults.is_empty() {
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                if kwarg.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, default.range());
-
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

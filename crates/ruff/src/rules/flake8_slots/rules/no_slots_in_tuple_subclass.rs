@@ -63,10 +63,9 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, cla
             })
     }) {
         if !has_slots(&class.body) {
-            checker.diagnostics.push(Diagnostic::new(
-                NoSlotsInTupleSubclass,
-                stmt.identifier(checker.locator),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(NoSlotsInTupleSubclass, stmt.identifier()));
         }
     }
 }

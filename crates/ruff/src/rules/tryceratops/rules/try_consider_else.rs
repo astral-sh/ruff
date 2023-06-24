@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -60,7 +60,7 @@ pub(crate) fn try_consider_else(
     checker: &mut Checker,
     body: &[Stmt],
     orelse: &[Stmt],
-    handler: &[Excepthandler],
+    handler: &[ExceptHandler],
 ) {
     if body.len() > 1 && orelse.is_empty() && !handler.is_empty() {
         if let Some(stmt) = body.last() {

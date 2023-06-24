@@ -52,3 +52,143 @@ if (
     ccccccccccc
 ):
     pass
+
+
+# Left only breaks
+if [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+] & aaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+if [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+] & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+# Right only can break
+if aaaaaaaaaaaaaaaaaaaaaaaaaa & [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+]:
+    ...
+
+if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+]:
+    ...
+
+
+# Left or right can break
+if [2222, 333] & [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+]:
+    ...
+
+if [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+] & [2222, 333]:
+    ...
+
+if [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+] & [fffffffffffffffff, gggggggggggggggggggg, hhhhhhhhhhhhhhhhhhhhh, iiiiiiiiiiiiiiii, jjjjjjjjjjjjj]:
+    ...
+
+if (
+    # comment
+    [
+        aaaaaaaaaaaaa,
+        bbbbbbbbbbbbbbbbbbbb,
+        cccccccccccccccccccc,
+        dddddddddddddddddddd,
+        eeeeeeeeee,
+    ]
+) & [
+    fffffffffffffffff,
+    gggggggggggggggggggg,
+    hhhhhhhhhhhhhhhhhhhhh,
+    iiiiiiiiiiiiiiii,
+    jjjjjjjjjjjjj,
+]:
+    pass
+
+    ...
+
+# Nesting
+if (aaaa + b) & [
+    fffffffffffffffff,
+    gggggggggggggggggggg,
+    hhhhhhhhhhhhhhhhhhhhh,
+    iiiiiiiiiiiiiiii,
+    jjjjjjjjjjjjj,
+]:
+    ...
+
+if [
+    fffffffffffffffff,
+    gggggggggggggggggggg,
+    hhhhhhhhhhhhhhhhhhhhh,
+    iiiiiiiiiiiiiiii,
+    jjjjjjjjjjjjj,
+] & (a + b):
+    ...
+
+
+if [
+    fffffffffffffffff,
+    gggggggggggggggggggg,
+    hhhhhhhhhhhhhhhhhhhhh,
+    iiiiiiiiiiiiiiii,
+    jjjjjjjjjjjjj,
+] & (
+    # comment
+    a
+    + b
+):
+    ...
+
+if (
+    [
+        fffffffffffffffff,
+        gggggggggggggggggggg,
+        hhhhhhhhhhhhhhhhhhhhh,
+        iiiiiiiiiiiiiiii,
+        jjjjjjjjjjjjj,
+    ]
+    &
+    # comment
+    a + b
+):
+    ...
+
+
+# Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
+for user_id in set(target_user_ids) - {u.user_id for u in updates}:
+    updates.append(UserPresenceState.default(user_id))

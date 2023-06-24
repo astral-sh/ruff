@@ -18,19 +18,19 @@ def f(arg: object = None):
     pass
 
 
-def f(arg: int = None):  # RUF011
+def f(arg: int = None):  # RUF013
     pass
 
 
-def f(arg: str = None):  # RUF011
+def f(arg: str = None):  # RUF013
     pass
 
 
-def f(arg: typing.List[str] = None):  # RUF011
+def f(arg: typing.List[str] = None):  # RUF013
     pass
 
 
-def f(arg: Tuple[str] = None):  # RUF011
+def f(arg: Tuple[str] = None):  # RUF013
     pass
 
 
@@ -64,15 +64,15 @@ def f(arg: Union[int, str, Any] = None):
     pass
 
 
-def f(arg: Union = None):  # RUF011
+def f(arg: Union = None):  # RUF013
     pass
 
 
-def f(arg: Union[int, str] = None):  # RUF011
+def f(arg: Union[int, str] = None):  # RUF013
     pass
 
 
-def f(arg: typing.Union[int, str] = None):  # RUF011
+def f(arg: typing.Union[int, str] = None):  # RUF013
     pass
 
 
@@ -91,11 +91,11 @@ def f(arg: int | float | str | None = None):
     pass
 
 
-def f(arg: int | float = None):  # RUF011
+def f(arg: int | float = None):  # RUF013
     pass
 
 
-def f(arg: int | float | str | bytes = None):  # RUF011
+def f(arg: int | float | str | bytes = None):  # RUF013
     pass
 
 
@@ -110,11 +110,11 @@ def f(arg: Literal[1, 2, None, 3] = None):
     pass
 
 
-def f(arg: Literal[1, "foo"] = None):  # RUF011
+def f(arg: Literal[1, "foo"] = None):  # RUF013
     pass
 
 
-def f(arg: typing.Literal[1, "foo", True] = None):  # RUF011
+def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
     pass
 
 
@@ -133,11 +133,11 @@ def f(arg: Annotated[Any, ...] = None):
     pass
 
 
-def f(arg: Annotated[int, ...] = None):  # RUF011
+def f(arg: Annotated[int, ...] = None):  # RUF013
     pass
 
 
-def f(arg: Annotated[Annotated[int | str, ...], ...] = None):  # RUF011
+def f(arg: Annotated[Annotated[int | str, ...], ...] = None):  # RUF013
     pass
 
 
@@ -153,9 +153,9 @@ def f(
 
 
 def f(
-    arg1: int = None,  # RUF011
-    arg2: Union[int, float] = None,  # RUF011
-    arg3: Literal[1, 2, 3] = None,  # RUF011
+    arg1: int = None,  # RUF013
+    arg2: Union[int, float] = None,  # RUF013
+    arg3: Literal[1, 2, 3] = None,  # RUF013
 ):
     pass
 
@@ -183,5 +183,61 @@ def f(arg: Union[Annotated[int, ...], Annotated[Optional[float], ...]] = None):
     pass
 
 
-def f(arg: Union[Annotated[int, ...], Union[str, bytes]] = None):  # RUF011
+def f(arg: Union[Annotated[int, ...], Union[str, bytes]] = None):  # RUF013
+    pass
+
+
+# Quoted
+
+
+def f(arg: "int" = None):  # RUF013
+    pass
+
+
+def f(arg: "str" = None):  # RUF013
+    pass
+
+
+def f(arg: "st" "r" = None):  # RUF013
+    pass
+
+
+def f(arg: "Optional[int]" = None):
+    pass
+
+
+def f(arg: Union["int", "str"] = None):  # RUF013
+    pass
+
+
+def f(arg: Union["int", "None"] = None):
+    pass
+
+
+def f(arg: Union["No" "ne", "int"] = None):
+    pass
+
+
+# Avoid flagging when there's a parse error in the forward reference
+def f(arg: Union["<>", "int"] = None):
+    pass
+
+
+# Type aliases
+
+Text = str | bytes
+
+
+def f(arg: Text = None):
+    pass
+
+
+def f(arg: "Text" = None):
+    pass
+
+
+from custom_typing import MaybeInt
+
+
+def f(arg: MaybeInt = None):
     pass

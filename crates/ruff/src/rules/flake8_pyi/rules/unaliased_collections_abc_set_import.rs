@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{BindingKind, FromImportation, Scope};
+use ruff_python_semantic::{BindingKind, FromImport, Scope};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -53,7 +53,7 @@ pub(crate) fn unaliased_collections_abc_set_import(
 ) {
     for (name, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
-        let BindingKind::FromImportation(FromImportation { qualified_name }) = &binding.kind else {
+        let BindingKind::FromImport(FromImport { qualified_name }) = &binding.kind else {
             continue;
         };
         if qualified_name.as_str() != "collections.abc.Set" {

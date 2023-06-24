@@ -17,6 +17,7 @@ ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
+bitflags = { workspace = true }
 clap = { workspace = true }
 countme = "3.0.1"
 is-macro = { workspace = true }

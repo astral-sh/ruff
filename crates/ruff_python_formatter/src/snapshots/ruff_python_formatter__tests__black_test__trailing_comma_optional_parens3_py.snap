@@ -30,10 +30,10 @@ if True:
 -                + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
 -                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
 -            ) % {"reported_username": reported_username, "report_reason": report_reason}
-+            return (
-+                NOT_IMPLEMENTED_call()
-+                % {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+            )
++            return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
++                "reported_username": reported_username,
++                "report_reason": report_reason,
++            }
 ```
 
 ## Ruff Output
@@ -42,10 +42,10 @@ if True:
 if True:
     if True:
         if True:
-            return (
-                NOT_IMPLEMENTED_call()
-                % {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-            )
+            return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
+                "reported_username": reported_username,
+                "report_reason": report_reason,
+            }
 ```
 
 ## Black Output

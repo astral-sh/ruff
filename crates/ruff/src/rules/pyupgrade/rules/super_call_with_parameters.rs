@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arg, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Arg, ArgWithDefault, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -104,8 +104,9 @@ pub(crate) fn super_call_with_parameters(
     };
 
     // Extract the name of the first argument to the enclosing function.
-    let Some(Arg {
-        arg: parent_arg, ..
+    let Some(ArgWithDefault {
+        def: Arg { arg: parent_arg, .. },
+        ..
     }) = parent_args.args.first() else {
         return;
     };
@@ -128,7 +129,7 @@ pub(crate) fn super_call_with_parameters(
         return;
     };
 
-    if !(first_arg_id == parent_name && second_arg_id == parent_arg) {
+    if !(first_arg_id == parent_name.as_str() && second_arg_id == parent_arg.as_str()) {
         return;
     }
 

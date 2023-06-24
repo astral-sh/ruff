@@ -24,9 +24,9 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: ExprConstant,
-        range: 17..19,
-        source: `10`,
+        kind: ArgWithDefault,
+        range: 15..19,
+        source: `a=10`,
     }: {
         "leading": [],
         "dangling": [],
@@ -39,9 +39,9 @@ expression: comments.debug(test_case.source_code)
         ],
     },
     Node {
-        kind: Arg,
-        range: 173..174,
-        source: `b`,
+        kind: ArgWithDefault,
+        range: 173..177,
+        source: `b=20`,
     }: {
         "leading": [
             SourceComment {

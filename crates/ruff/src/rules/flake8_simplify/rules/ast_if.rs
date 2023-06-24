@@ -1,7 +1,7 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -385,8 +385,7 @@ pub(crate) fn nested_if_statements(
                                 <= checker.settings.line_length
                         })
                     {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(edit));
+                        diagnostic.set_fix(Fix::suggested(edit));
                     }
                 }
                 Err(err) => error!("Failed to fix nested if: {err}"),
@@ -457,8 +456,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(test.clone()),
                     range: TextRange::default(),
                 };
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node.into()),
                     stmt.range(),
                 )));
@@ -480,8 +478,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(Box::new(node1.into())),
                     range: TextRange::default(),
                 };
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node2.into()),
                     stmt.range(),
                 )));
@@ -621,8 +618,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !has_comments(stmt, checker.locator) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));
@@ -734,7 +730,7 @@ pub(crate) fn manual_dict_lookup(
     if orelse.len() != 1 {
         return;
     }
-    if !(ops.len() == 1 && ops[0] == Cmpop::Eq) {
+    if !(ops.len() == 1 && ops[0] == CmpOp::Eq) {
         return;
     }
     if comparators.len() != 1 {
@@ -807,7 +803,7 @@ pub(crate) fn manual_dict_lookup(
         let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
             return;
         };
-        if !(id == target && ops.len() == 1 && ops[0] == Cmpop::Eq) {
+        if !(id == target && ops.len() == 1 && ops[0] == CmpOp::Eq) {
             return;
         }
         if comparators.len() != 1 {
@@ -882,8 +878,8 @@ pub(crate) fn use_dict_get_with_default(
         return;
     }
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [Cmpop::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
-        [Cmpop::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
+        [CmpOp::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
+        [CmpOp::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
         _ => {
             return;
         }
@@ -941,7 +937,7 @@ pub(crate) fn use_dict_get_with_default(
     let node1 = *test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
-        attr: "get".into(),
+        attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };
@@ -978,8 +974,7 @@ pub(crate) fn use_dict_get_with_default(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !has_comments(stmt, checker.locator) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));

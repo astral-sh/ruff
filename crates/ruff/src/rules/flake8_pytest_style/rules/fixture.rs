@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -379,7 +379,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestIncorrectFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            stmt.identifier(checker.locator),
+            stmt.identifier(),
         ));
     } else if checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
         && !visitor.has_return_with_value
@@ -390,7 +390,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
             PytestMissingFixtureNameUnderscore {
                 function: name.to_string(),
             },
-            stmt.identifier(checker.locator),
+            stmt.identifier(),
         ));
     }
 
@@ -421,18 +421,29 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
 }
 
 /// PT019
-fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
-    args.args.iter().chain(&args.kwonlyargs).for_each(|arg| {
-        let name = &arg.arg;
-        if name.starts_with('_') {
-            checker.diagnostics.push(Diagnostic::new(
-                PytestFixtureParamWithoutValue {
-                    name: name.to_string(),
-                },
-                arg.range(),
-            ));
-        }
-    });
+fn check_test_function_args(checker: &mut Checker, arguments: &Arguments) {
+    arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+        .for_each(
+            |ArgWithDefault {
+                 def,
+                 default: _,
+                 range: _,
+             }| {
+                let name = &def.arg;
+                if name.starts_with('_') {
+                    checker.diagnostics.push(Diagnostic::new(
+                        PytestFixtureParamWithoutValue {
+                            name: name.to_string(),
+                        },
+                        def.range(),
+                    ));
+                }
+            },
+        );
 }
 
 /// PT020

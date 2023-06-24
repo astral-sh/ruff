@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,6 +9,28 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of `setattr` that take a constant attribute value as an
+/// argument (e.g., `setattr(obj, "foo", 42)`).
+///
+/// ## Why is this bad?
+/// `setattr` is used to set attributes dynamically. If the attribute is
+/// defined as a constant, it is no safer than a typical property access. When
+/// possible, prefer property access over `setattr` calls, as the former is
+/// more concise and idiomatic.
+///
+/// ## Example
+/// ```python
+/// setattr(obj, "foo", 42)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// obj.foo = 42
+/// ```
+///
+/// ## References
+/// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[violation]
 pub struct SetAttrWithConstant;
 
@@ -30,7 +52,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
     let stmt = Stmt::Assign(ast::StmtAssign {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
             value: Box::new(obj.clone()),
-            attr: name.into(),
+            attr: Identifier::new(name.to_string(), TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
         })],

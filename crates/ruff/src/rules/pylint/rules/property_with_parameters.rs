@@ -59,18 +59,17 @@ pub(crate) fn property_with_parameters(
     {
         return;
     }
-    if checker.semantic().is_builtin("property")
-        && args
-            .args
-            .iter()
-            .chain(args.posonlyargs.iter())
-            .chain(args.kwonlyargs.iter())
-            .count()
-            > 1
+    if args
+        .posonlyargs
+        .iter()
+        .chain(&args.args)
+        .chain(&args.kwonlyargs)
+        .count()
+        > 1
+        && checker.semantic().is_builtin("property")
     {
-        checker.diagnostics.push(Diagnostic::new(
-            PropertyWithParameters,
-            stmt.identifier(checker.locator),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));
     }
 }

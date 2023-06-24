@@ -44,11 +44,11 @@ class Repository(NamedTuple):
     async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
         """Shallow clone this repository to a temporary directory."""
         if checkout_dir.exists():
-            logger.debug(f"Reusing {self.org}/{self.repo}")
+            logger.debug(f"Reusing {self.org}:{self.repo}")
             yield Path(checkout_dir)
             return
 
-        logger.debug(f"Cloning {self.org}/{self.repo}")
+        logger.debug(f"Cloning {self.org}:{self.repo}")
         git_command = [
             "git",
             "clone",
@@ -85,6 +85,8 @@ REPOSITORIES: list[Repository] = [
     Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
+    Repository("pypa", "setuptools", "main"),
+    Repository("python", "mypy", "master"),
     Repository("DisnakeDev", "disnake", "master"),
     Repository("scikit-build", "scikit-build", "main"),
     Repository("scikit-build", "scikit-build-core", "main"),
@@ -175,18 +177,17 @@ async def compare(
     """Check a specific repository against two versions of ruff."""
     removed, added = set(), set()
 
-    # Allows to keep the checkouts locations
+    # By the default, the git clone are transient, but if the user provides a
+    # directory for permanent storage we keep it there
     if checkouts:
-        checkout_parent = checkouts.joinpath(repo.org)
-        # Don't create the repodir itself, we need that for checking for existing
-        # clones
-        checkout_parent.mkdir(exist_ok=True, parents=True)
-        location_context = nullcontext(checkout_parent)
+        location_context = nullcontext(checkouts)
     else:
         location_context = tempfile.TemporaryDirectory()
 
     with location_context as checkout_parent:
-        checkout_dir = Path(checkout_parent).joinpath(repo.repo)
+        assert ":" not in repo.org
+        assert ":" not in repo.repo
+        checkout_dir = Path(checkout_parent).joinpath(f"{repo.org}:{repo.repo}")
         async with repo.clone(checkout_dir) as path:
             try:
                 async with asyncio.TaskGroup() as tg:
@@ -282,8 +283,19 @@ async def main(
 
     logger.debug(f"Checking {len(repositories)} projects")
 
+    # https://stackoverflow.com/a/61478547/3549270
+    # Otherwise doing 3k repositories can take >8GB RAM
+    semaphore = asyncio.Semaphore(50)
+
+    async def limited_parallelism(coroutine):  # noqa: ANN
+        async with semaphore:
+            return await coroutine
+
     results = await asyncio.gather(
-        *[compare(ruff1, ruff2, repo, checkouts) for repo in repositories.values()],
+        *[
+            limited_parallelism(compare(ruff1, ruff2, repo, checkouts))
+            for repo in repositories.values()
+        ],
         return_exceptions=True,
     )
 
@@ -431,6 +443,8 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.INFO)
 
     loop = asyncio.get_event_loop()
+    if args.checkouts:
+        args.checkouts.mkdir(exist_ok=True, parents=True)
     main_task = asyncio.ensure_future(
         main(
             ruff1=args.ruff1,

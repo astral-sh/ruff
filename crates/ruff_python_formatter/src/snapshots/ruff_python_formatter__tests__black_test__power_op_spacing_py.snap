@@ -76,80 +76,65 @@ return np.divide(
 ```diff
 --- Black
 +++ Ruff
-@@ -8,56 +8,49 @@
+@@ -12,52 +12,45 @@
  
  
- def function_dont_replace_spaces():
--    {**a, **b, **c}
-+    {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
- 
- 
--a = 5**~4
+ a = 5**~4
 -b = 5 ** f()
--c = -(5**2)
--d = 5 ** f["hi"]
++b = 5 ** NOT_IMPLEMENTED_call()
+ c = -(5**2)
+ d = 5 ** f["hi"]
 -e = lazy(lambda **kwargs: 5)
 -f = f() ** 5
--g = a.b**c.d
++e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++f = NOT_IMPLEMENTED_call() ** 5
+ g = a.b**c.d
 -h = 5 ** funcs.f()
 -i = funcs.f() ** 5
 -j = super().name ** 5
 -k = [(2**idx, value) for idx, value in pairs]
 -l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
-+a = 5**NOT_YET_IMPLEMENTED_ExprUnaryOp
-+b = 5 ** NOT_IMPLEMENTED_call()
-+c = NOT_YET_IMPLEMENTED_ExprUnaryOp
-+d = 5 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+e = NOT_IMPLEMENTED_call()
-+f = NOT_IMPLEMENTED_call() ** 5
-+g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
 +h = 5 ** NOT_IMPLEMENTED_call()
 +i = NOT_IMPLEMENTED_call() ** 5
-+j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 5
++j = NOT_IMPLEMENTED_call().name ** 5
 +k = [i for i in []]
-+l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  m = [([2**63], [1, 2**63])]
--n = count <= 10**5
+ n = count <= 10**5
 -o = settings(max_examples=10**6)
 -p = {(k, k**2): v**2 for k, v in pairs}
 -q = [10**i for i in range(6)]
-+n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+o = NOT_IMPLEMENTED_call()
++o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +q = [i for i in []]
  r = x**y
  
--a = 5.0**~4.0
+ a = 5.0**~4.0
 -b = 5.0 ** f()
--c = -(5.0**2.0)
--d = 5.0 ** f["hi"]
++b = 5.0 ** NOT_IMPLEMENTED_call()
+ c = -(5.0**2.0)
+ d = 5.0 ** f["hi"]
 -e = lazy(lambda **kwargs: 5)
 -f = f() ** 5.0
--g = a.b**c.d
++e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++f = NOT_IMPLEMENTED_call() ** 5.0
+ g = a.b**c.d
 -h = 5.0 ** funcs.f()
 -i = funcs.f() ** 5.0
 -j = super().name ** 5.0
 -k = [(2.0**idx, value) for idx, value in pairs]
 -l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
-+a = 5.0**NOT_YET_IMPLEMENTED_ExprUnaryOp
-+b = 5.0 ** NOT_IMPLEMENTED_call()
-+c = NOT_YET_IMPLEMENTED_ExprUnaryOp
-+d = 5.0 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+e = NOT_IMPLEMENTED_call()
-+f = NOT_IMPLEMENTED_call() ** 5.0
-+g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
 +h = 5.0 ** NOT_IMPLEMENTED_call()
 +i = NOT_IMPLEMENTED_call() ** 5.0
-+j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 5.0
++j = NOT_IMPLEMENTED_call().name ** 5.0
 +k = [i for i in []]
-+l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  m = [([2.0**63.0], [1.0, 2**63.0])]
--n = count <= 10**5.0
+ n = count <= 10**5.0
 -o = settings(max_examples=10**6.0)
 -p = {(k, k**2): v**2.0 for k, v in pairs}
 -q = [10.5**i for i in range(6)]
-+n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+o = NOT_IMPLEMENTED_call()
++o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +q = [i for i in []]
  
@@ -162,13 +147,13 @@ return np.divide(
 -        out=np.full(view.sum_of_weights.shape, np.nan),  # type: ignore[union-attr]
 -        where=view.sum_of_weights**2 > view.sum_of_weights_squared,  # type: ignore[union-attr]
 -    )
-+if NOT_IMPLEMENTED_call():
-+    return NOT_IMPLEMENTED_call()
++if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
 -return np.divide(
 -    where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
 -)
-+return NOT_IMPLEMENTED_call()
++return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -184,52 +169,52 @@ def function_replace_spaces(**kwargs):
 
 
 def function_dont_replace_spaces():
-    {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    {**a, **b, **c}
 
 
-a = 5**NOT_YET_IMPLEMENTED_ExprUnaryOp
+a = 5**~4
 b = 5 ** NOT_IMPLEMENTED_call()
-c = NOT_YET_IMPLEMENTED_ExprUnaryOp
-d = 5 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-e = NOT_IMPLEMENTED_call()
+c = -(5**2)
+d = 5 ** f["hi"]
+e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 f = NOT_IMPLEMENTED_call() ** 5
-g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
+g = a.b**c.d
 h = 5 ** NOT_IMPLEMENTED_call()
 i = NOT_IMPLEMENTED_call() ** 5
-j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 5
+j = NOT_IMPLEMENTED_call().name ** 5
 k = [i for i in []]
-l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 m = [([2**63], [1, 2**63])]
-n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-o = NOT_IMPLEMENTED_call()
+n = count <= 10**5
+o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 q = [i for i in []]
 r = x**y
 
-a = 5.0**NOT_YET_IMPLEMENTED_ExprUnaryOp
+a = 5.0**~4.0
 b = 5.0 ** NOT_IMPLEMENTED_call()
-c = NOT_YET_IMPLEMENTED_ExprUnaryOp
-d = 5.0 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-e = NOT_IMPLEMENTED_call()
+c = -(5.0**2.0)
+d = 5.0 ** f["hi"]
+e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 f = NOT_IMPLEMENTED_call() ** 5.0
-g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
+g = a.b**c.d
 h = 5.0 ** NOT_IMPLEMENTED_call()
 i = NOT_IMPLEMENTED_call() ** 5.0
-j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 5.0
+j = NOT_IMPLEMENTED_call().name ** 5.0
 k = [i for i in []]
-l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+l = mod.weights_[0] == NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 m = [([2.0**63.0], [1.0, 2**63.0])]
-n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-o = NOT_IMPLEMENTED_call()
+n = count <= 10**5.0
+o = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 q = [i for i in []]
 
 
 # WE SHOULD DEFINITELY NOT EAT THESE COMMENTS (https://github.com/psf/black/issues/2873)
-if NOT_IMPLEMENTED_call():
-    return NOT_IMPLEMENTED_call()
+if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
-return NOT_IMPLEMENTED_call()
+return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

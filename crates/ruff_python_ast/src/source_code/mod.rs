@@ -202,7 +202,7 @@ impl SourceFile {
             .get_or_init(|| LineIndex::from_source_text(self.source_text()))
     }
 
-    /// Returns `Some` with the source text if set, or `None`.
+    /// Returns the source code.
     #[inline]
     pub fn source_text(&self) -> &str {
         &self.inner.code

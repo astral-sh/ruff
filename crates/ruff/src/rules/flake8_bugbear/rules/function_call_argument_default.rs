@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arguments, Expr, Ranged};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -114,12 +114,19 @@ pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &
         .collect();
     let diagnostics = {
         let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), extend_immutable_calls);
-        for expr in arguments
-            .defaults
+        for ArgWithDefault {
+            default,
+            def: _,
+            range: _,
+        } in arguments
+            .posonlyargs
             .iter()
-            .chain(arguments.kw_defaults.iter())
+            .chain(&arguments.args)
+            .chain(&arguments.kwonlyargs)
         {
-            visitor.visit_expr(expr);
+            if let Some(expr) = &default {
+                visitor.visit_expr(expr);
+            }
         }
         visitor.diagnostics
     };

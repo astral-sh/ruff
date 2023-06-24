@@ -136,7 +136,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
         {
             let slice = trailing.slice();
 
-            has_trailing_own_line_comment |= trailing.position().is_own_line();
+            has_trailing_own_line_comment |= trailing.line_position().is_own_line();
 
             if has_trailing_own_line_comment {
                 let lines_before_comment = lines_before(slice.start(), f.context().contents());
@@ -208,7 +208,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
             .iter()
             .filter(|comment| comment.is_unformatted())
         {
-            if first && comment.position().is_end_of_line() {
+            if first && comment.line_position().is_end_of_line() {
                 write!(f, [space(), space()])?;
             }
 

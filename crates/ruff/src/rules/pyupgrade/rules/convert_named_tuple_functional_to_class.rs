@@ -1,7 +1,9 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -185,7 +187,7 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
     ast::StmtClassDef {
-        name: typename.into(),
+        name: Identifier::new(typename.to_string(), TextRange::default()),
         bases: vec![base_class.clone()],
         keywords: vec![],
         body,

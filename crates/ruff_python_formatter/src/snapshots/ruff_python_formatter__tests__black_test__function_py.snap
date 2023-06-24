@@ -112,21 +112,21 @@ def __await__(): return (yield)
  #!/usr/bin/env python3
 -import asyncio
 -import sys
--
--from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImport
 +NOT_YET_IMPLEMENTED_StmtImport
  
--from library import some_connection, some_decorator
+-from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
+-from library import some_connection, some_decorator
+-
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
  
  
  def func_no_args():
-@@ -14,135 +13,87 @@
+@@ -14,25 +13,24 @@
      b
      c
      if True:
@@ -136,38 +136,35 @@ def __await__(): return (yield)
          ...
 -    for i in range(10):
 -        print(i)
--        continue
++    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+         continue
 -    exec("new-style exec", {}, {})
-+    NOT_YET_IMPLEMENTED_StmtFor
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      return None
  
  
  async def coroutine(arg, exec=False):
--    "Single-line docstring. Multiline is harder to reformat."
+     "Single-line docstring. Multiline is harder to reformat."
 -    async with some_connection() as conn:
 -        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
 -    await asyncio.sleep(1)
-+    "NOT_YET_IMPLEMENTED_STRING"
 +    NOT_YET_IMPLEMENTED_StmtAsyncWith
-+    await NOT_IMPLEMENTED_call()
++    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
--@asyncio.coroutine
+ @asyncio.coroutine
 -@some_decorator(with_args=True, many_args=[1, 2, 3])
-+@asyncio.NOT_IMPLEMENTED_attr
-+@NOT_IMPLEMENTED_call()
++@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  def function_signature_stress_test(
      number: int,
      no_annotation=None,
--    text: str = "default",
-+    text: str = "NOT_YET_IMPLEMENTED_STRING",
-     *,
+@@ -41,12 +39,22 @@
      debug: bool = False,
      **kwargs,
  ) -> str:
 -    return text[number:-1]
-+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++    return text[number : -1]
  
  
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
@@ -177,39 +174,33 @@ def __await__(): return (yield)
 +    a=1,
 +    b=(),
 +    c=[],
-+    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
++    d={},
 +    e=True,
-+    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
++    f=-1,
 +    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h="NOT_YET_IMPLEMENTED_STRING",
-+    i="NOT_YET_IMPLEMENTED_STRING",
++    h="",
++    i=r"",
 +):
-+    offset = NOT_IMPLEMENTED_call()
++    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-     a: int = 1,
-     b: tuple = (),
-     c: list = [],
--    d: dict = {},
-+    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+@@ -56,70 +64,26 @@
+     d: dict = {},
      e: bool = True,
--    f: int = -1,
+     f: int = -1,
 -    g: int = 1 if False else 2,
--    h: str = "",
--    i: str = r"",
-+    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
 +    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h: str = "NOT_YET_IMPLEMENTED_STRING",
-+    i: str = "NOT_YET_IMPLEMENTED_STRING",
+     h: str = "",
+     i: str = r"",
  ):
      ...
  
  
 -def spaces2(result=_core.Value(None)):
 -    assert fut is self._read_fut, (fut, self._read_fut)
-+def spaces2(result=NOT_IMPLEMENTED_call()):
++def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
@@ -267,22 +258,13 @@ def __await__(): return (yield)
 -        """,
 -        re.MULTILINE | re.VERBOSE,
 -    )
-+        NOT_IMPLEMENTED_call()
-+        NOT_IMPLEMENTED_call()
-+    _type_comment_re = NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def trailing_comma():
--    mapping = {
--        A: 0.25 * (10.0 / 12),
--        B: 0.1 * (10.0 / 12),
--        C: 0.1 * (10.0 / 12),
--        D: 0.1 * (10.0 / 12),
--    }
-+    mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
- 
- 
- def f(
+@@ -135,14 +99,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -322,42 +304,44 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    NOT_YET_IMPLEMENTED_StmtFor
-    NOT_IMPLEMENTED_call()
+    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        continue
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     return None
 
 
 async def coroutine(arg, exec=False):
-    "NOT_YET_IMPLEMENTED_STRING"
+    "Single-line docstring. Multiline is harder to reformat."
     NOT_YET_IMPLEMENTED_StmtAsyncWith
-    await NOT_IMPLEMENTED_call()
+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-@asyncio.NOT_IMPLEMENTED_attr
-@NOT_IMPLEMENTED_call()
+@asyncio.coroutine
+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
-    text: str = "NOT_YET_IMPLEMENTED_STRING",
+    text: str = "default",
     *,
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    return text[number : -1]
 
 
 def spaces(
     a=1,
     b=(),
     c=[],
-    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    d={},
     e=True,
-    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    f=-1,
     g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h="NOT_YET_IMPLEMENTED_STRING",
-    i="NOT_YET_IMPLEMENTED_STRING",
+    h="",
+    i=r"",
 ):
-    offset = NOT_IMPLEMENTED_call()
+    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -365,17 +349,17 @@ def spaces_types(
     a: int = 1,
     b: tuple = (),
     c: list = [],
-    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    d: dict = {},
     e: bool = True,
-    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    f: int = -1,
     g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h: str = "NOT_YET_IMPLEMENTED_STRING",
-    i: str = "NOT_YET_IMPLEMENTED_STRING",
+    h: str = "",
+    i: str = r"",
 ):
     ...
 
 
-def spaces2(result=NOT_IMPLEMENTED_call()):
+def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -385,13 +369,18 @@ def example(session):
 
 def long_lines():
     if True:
-        NOT_IMPLEMENTED_call()
-        NOT_IMPLEMENTED_call()
-    _type_comment_re = NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 def trailing_comma():
-    mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    mapping = {
+        A: 0.25 * (10.0 / 12),
+        B: 0.1 * (10.0 / 12),
+        C: 0.1 * (10.0 / 12),
+        D: 0.1 * (10.0 / 12),
+    }
 
 
 def f(

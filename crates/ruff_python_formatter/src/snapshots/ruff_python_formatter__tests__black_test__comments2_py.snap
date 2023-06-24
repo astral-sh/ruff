@@ -178,7 +178,7 @@ instruction()#comment with bad spacing
 ```diff
 --- Black
 +++ Ruff
-@@ -1,31 +1,27 @@
+@@ -1,9 +1,5 @@
 -from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
 -    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 -)
@@ -190,44 +190,7 @@ instruction()#comment with bad spacing
  
  # Please keep __all__ alphabetized within each category.
  
- __all__ = [
-     # Super-special typing primitives.
--    "Any",
--    "Callable",
--    "ClassVar",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-     # ABCs (from collections.abc).
--    "AbstractSet",  # collections.abc.Set.
--    "ByteString",
--    "Container",
-+    "NOT_YET_IMPLEMENTED_STRING",  # collections.abc.Set.
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-     # Concrete collection types.
--    "Counter",
--    "Deque",
--    "Dict",
--    "DefaultDict",
--    "List",
--    "Set",
--    "FrozenSet",
--    "NamedTuple",  # Not really a type.
--    "Generator",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",  # Not really a type.
-+    "NOT_YET_IMPLEMENTED_STRING",
- ]
- 
- not_shareables = [
-@@ -37,50 +33,51 @@
+@@ -37,31 +33,35 @@
      # builtin types and objects
      type,
      object,
@@ -237,25 +200,23 @@ instruction()#comment with bad spacing
 +    NOT_IMPLEMENTED_call(),
      42,
      100.0,
--    "spam",
-+    "NOT_YET_IMPLEMENTED_STRING",
+     "spam",
      # user-defined types and objects
      Cheese,
 -    Cheese("Wensleydale"),
 -    SubBytes(b"spam"),
-+    NOT_IMPLEMENTED_call(),
-+    NOT_IMPLEMENTED_call(),
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
  ]
  
--if "PYTHON" in os.environ:
+ if "PYTHON" in os.environ:
 -    add_compiler(compiler_from_env())
-+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  else:
      # for compiler in compilers.values():
      # add_compiler(compiler)
 -    add_compiler(compilers[(7.0, 32)])
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
      # add_compiler(compilers[(7.1, 64)])
  
  
@@ -263,47 +224,37 @@ instruction()#comment with bad spacing
  def inline_comments_in_brackets_ruin_everything():
      if typedargslist:
 -        parameters.children = [children[0], body, children[-1]]  # (1  # )1
--        parameters.children = [
--            children[0],
-+        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (1
+         parameters.children = [
++            children[0],  # (1
 +            body,
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )1
++            children[-1],  # )1
 +        ]
-+        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
++        parameters.children = [
+             children[0],
              body,
--            children[-1],  # type: ignore
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: ignore
-         ]
-     else:
--        parameters.children = [
--            parameters.children[0],  # (2 what if this was actually long
-+        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (2 what if this was actually long
+             children[-1],  # type: ignore
+@@ -72,14 +72,18 @@
              body,
--            parameters.children[-1],  # )2
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )2
+             parameters.children[-1],  # )2
          ]
 -        parameters.children = [parameters.what_if_this_was_actually_long.children[0], body, parameters.children[-1]]  # type: ignore
--    if (
--        self._proc is not None
--        # has the child process finished?
--        and self._returncode is None
--        # the child process has finished, but the
--        # transport hasn't been notified yet?
--        and self._proc.poll() is None
--    ):
-+        parameters.NOT_IMPLEMENTED_attr = [
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
++        parameters.children = [
++            parameters.what_if_this_was_actually_long.children[0],
 +            body,
-+            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
++            parameters.children[-1],
 +        ]  # type: ignore
-+    if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+     if (
+         self._proc is not None
+         # has the child process finished?
+         and self._returncode is None
+         # the child process has finished, but the
+         # transport hasn't been notified yet?
+-        and self._proc.poll() is None
++        and NOT_IMPLEMENTED_call() is None
+     ):
          pass
      # no newline before or after
-     short = [
-@@ -91,75 +88,29 @@
+@@ -91,48 +95,14 @@
      ]
  
      # no newline after
@@ -315,7 +266,7 @@ instruction()#comment with bad spacing
 -""",
 -        arg3=True,
 -    )
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
      ############################################################################
  
@@ -350,16 +301,14 @@ instruction()#comment with bad spacing
 -        # right
 -        if element is not None
 -    ]
-+    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    lcomp = [i for i in []]
 +    lcomp2 = [i for i in []]
 +    lcomp3 = [i for i in []]
      while True:
          if False:
--            continue
-+            NOT_YET_IMPLEMENTED_StmtContinue
- 
-             # and round and round we go
+             continue
+@@ -141,24 +111,19 @@
          # and round and round we go
  
      # let's return
@@ -367,7 +316,7 @@ instruction()#comment with bad spacing
 -        syms.simple_stmt,
 -        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
 -    )
-+    return NOT_IMPLEMENTED_call()
++    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -CONFIG_FILES = (
@@ -380,15 +329,18 @@ instruction()#comment with bad spacing
 +CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
  
  
--class Test:
--    def _init_host(self, parsed) -> None:
+ class Test:
+     def _init_host(self, parsed) -> None:
 -        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
--            pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
++        if (
++            parsed.hostname
++            is None  # type: ignore
++            or not NOT_IMPLEMENTED_call()
++        ):
+             pass
  
  
- #######################
-@@ -167,7 +118,7 @@
+@@ -167,7 +132,7 @@
  #######################
  
  
@@ -409,23 +361,23 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 
 __all__ = [
     # Super-special typing primitives.
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
+    "Any",
+    "Callable",
+    "ClassVar",
     # ABCs (from collections.abc).
-    "NOT_YET_IMPLEMENTED_STRING",  # collections.abc.Set.
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
+    "AbstractSet",  # collections.abc.Set.
+    "ByteString",
+    "Container",
     # Concrete collection types.
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",
-    "NOT_YET_IMPLEMENTED_STRING",  # Not really a type.
-    "NOT_YET_IMPLEMENTED_STRING",
+    "Counter",
+    "Deque",
+    "Dict",
+    "DefaultDict",
+    "List",
+    "Set",
+    "FrozenSet",
+    "NamedTuple",  # Not really a type.
+    "Generator",
 ]
 
 not_shareables = [
@@ -441,47 +393,54 @@ not_shareables = [
     NOT_IMPLEMENTED_call(),
     42,
     100.0,
-    "NOT_YET_IMPLEMENTED_STRING",
+    "spam",
     # user-defined types and objects
     Cheese,
-    NOT_IMPLEMENTED_call(),
-    NOT_IMPLEMENTED_call(),
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
 ]
 
-if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
-    NOT_IMPLEMENTED_call()
+if "PYTHON" in os.environ:
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 else:
     # for compiler in compilers.values():
     # add_compiler(compiler)
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     # add_compiler(compilers[(7.1, 64)])
 
 
 # Comment before function.
 def inline_comments_in_brackets_ruin_everything():
     if typedargslist:
-        parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (1
+        parameters.children = [
+            children[0],  # (1
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )1
+            children[-1],  # )1
         ]
-        parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+        parameters.children = [
+            children[0],
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # type: ignore
+            children[-1],  # type: ignore
         ]
     else:
-        parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # (2 what if this was actually long
+        parameters.children = [
+            parameters.children[0],  # (2 what if this was actually long
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],  # )2
+            parameters.children[-1],  # )2
         ]
-        parameters.NOT_IMPLEMENTED_attr = [
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+        parameters.children = [
+            parameters.what_if_this_was_actually_long.children[0],
             body,
-            NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key],
+            parameters.children[-1],
         ]  # type: ignore
-    if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    if (
+        self._proc is not None
+        # has the child process finished?
+        and self._returncode is None
+        # the child process has finished, but the
+        # transport hasn't been notified yet?
+        and NOT_IMPLEMENTED_call() is None
+    ):
         pass
     # no newline before or after
     short = [
@@ -492,29 +451,36 @@ def inline_comments_in_brackets_ruin_everything():
     ]
 
     # no newline after
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
     ############################################################################
 
-    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     lcomp = [i for i in []]
     lcomp2 = [i for i in []]
     lcomp3 = [i for i in []]
     while True:
         if False:
-            NOT_YET_IMPLEMENTED_StmtContinue
+            continue
 
             # and round and round we go
         # and round and round we go
 
     # let's return
-    return NOT_IMPLEMENTED_call()
+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
 CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Test:
+    def _init_host(self, parsed) -> None:
+        if (
+            parsed.hostname
+            is None  # type: ignore
+            or not NOT_IMPLEMENTED_call()
+        ):
+            pass
 
 
 #######################

@@ -20,7 +20,7 @@ f = ["This is a very long line that should be formatted into a clearer line ", "
 ```diff
 --- Black
 +++ Ruff
-@@ -1,10 +1,7 @@
+@@ -1,7 +1,7 @@
  a = 3
  # fmt: off
 -b,    c = 1, 2
@@ -29,11 +29,7 @@ f = ["This is a very long line that should be formatted into a clearer line ", "
 +d = 6  # fmt: skip
  e = 5
  # fmt: on
--f = [
--    "This is a very long line that should be formatted into a clearer line ",
--    "by rearranging.",
--]
-+f = ["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING"]
+ f = [
 ```
 
 ## Ruff Output
@@ -45,7 +41,10 @@ b, c = 1, 2
 d = 6  # fmt: skip
 e = 5
 # fmt: on
-f = ["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING"]
+f = [
+    "This is a very long line that should be formatted into a clearer line ",
+    "by rearranging.",
+]
 ```
 
 ## Black Output

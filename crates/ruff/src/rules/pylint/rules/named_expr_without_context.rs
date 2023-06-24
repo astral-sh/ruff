@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of named expressions (e.g., `a := 42`) that can be
+/// Checks for uses of named expressions (e.g., `a := 42`) that can be
 /// replaced by regular assignment statements (e.g., `a = 42`).
 ///
 /// ## Why is this bad?

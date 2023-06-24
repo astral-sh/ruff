@@ -1,14 +1,14 @@
 //! Lint rules based on checking physical lines.
+use std::path::Path;
 
 use ruff_text_size::TextSize;
-use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_whitespace::UniversalNewlines;
 
 use crate::registry::Rule;
-use crate::rules::copyright::rules::missing_copyright_notice;
+use crate::rules::flake8_copyright::rules::missing_copyright_notice;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
@@ -146,7 +146,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, settings) {
+            if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -185,9 +185,10 @@ pub(crate) fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
-    use std::path::Path;
 
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 

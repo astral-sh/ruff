@@ -52,14 +52,17 @@ b = 20
 
 
 # Adds two lines after `b`
-NOT_YET_IMPLEMENTED_StmtClassDef
+class Test:
+    def a(self):
+        pass
+        # trailing comment
 
 
 # two lines before, one line after
 
 c = 30
 
-while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+while a == 10:
     ...
 
     # trailing comment with one line before
@@ -68,7 +71,7 @@ while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
 
 d = 40
 
-while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+while b == 20:
     ...
     # no empty line before
 

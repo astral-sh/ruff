@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -162,8 +162,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test, Expr::Compare(_)) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 checker.generator().expr(&test.clone()),
                 expr.range(),
             )));
@@ -179,8 +178,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
                 keywords: vec![],
                 range: TextRange::default(),
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 checker.generator().expr(&node1.into()),
                 expr.range(),
             )));
@@ -219,12 +217,11 @@ pub(crate) fn explicit_false_true_in_ifexpr(
     if checker.patch(diagnostic.kind.rule()) {
         let node = test.clone();
         let node1 = ast::ExprUnaryOp {
-            op: Unaryop::Not,
+            op: UnaryOp::Not,
             operand: Box::new(node),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&node1.into()),
             expr.range(),
         )));
@@ -275,8 +272,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
             orelse: Box::new(node),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&node3.into()),
             expr.range(),
         )));

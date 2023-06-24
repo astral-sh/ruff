@@ -112,9 +112,8 @@ impl Token {
         self.range.start()
     }
 
-    #[allow(unused)]
     pub(crate) const fn end(&self) -> TextSize {
-        self.range.start()
+        self.range.end()
     }
 }
 
@@ -162,6 +161,12 @@ pub(crate) enum TokenKind {
     /// '/'
     Slash,
 
+    /// '*'
+    Star,
+
+    /// `.`.
+    Dot,
+
     /// Any other non trivia token. Always has a length of 1
     Other,
 
@@ -181,6 +186,8 @@ impl TokenKind {
             ',' => TokenKind::Comma,
             ':' => TokenKind::Colon,
             '/' => TokenKind::Slash,
+            '*' => TokenKind::Star,
+            '.' => TokenKind::Dot,
             _ => TokenKind::Other,
         }
     }

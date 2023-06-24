@@ -1,5 +1,7 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -78,8 +80,8 @@ pub(crate) fn lambda_assignment(
             // See https://github.com/astral-sh/ruff/issues/3046
             if checker.patch(diagnostic.kind.rule())
                 && !checker.semantic().scope().kind.is_class()
-                && !has_leading_content(stmt, checker.locator)
-                && !has_trailing_content(stmt, checker.locator)
+                && !has_leading_content(stmt.start(), checker.locator)
+                && !has_trailing_content(stmt.end(), checker.locator)
             {
                 let first_line = checker.locator.line(stmt.start());
                 let indentation = leading_indentation(first_line);
@@ -176,26 +178,32 @@ fn function(
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| Arg {
-                    annotation: arg_types
-                        .get(idx)
-                        .map(|arg_type| Box::new(arg_type.clone())),
-                    ..arg.clone()
+                .map(|(idx, arg_with_default)| ArgWithDefault {
+                    def: Arg {
+                        annotation: arg_types
+                            .get(idx)
+                            .map(|arg_type| Box::new(arg_type.clone())),
+                        ..arg_with_default.def.clone()
+                    },
+                    ..arg_with_default.clone()
                 })
                 .collect::<Vec<_>>();
             let new_args = args
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| Arg {
-                    annotation: arg_types
-                        .get(idx + new_posonlyargs.len())
-                        .map(|arg_type| Box::new(arg_type.clone())),
-                    ..arg.clone()
+                .map(|(idx, arg_with_default)| ArgWithDefault {
+                    def: Arg {
+                        annotation: arg_types
+                            .get(idx + new_posonlyargs.len())
+                            .map(|arg_type| Box::new(arg_type.clone())),
+                        ..arg_with_default.def.clone()
+                    },
+                    ..arg_with_default.clone()
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-                name: name.into(),
+                name: Identifier::new(name.to_string(), TextRange::default()),
                 args: Box::new(Arguments {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
@@ -211,7 +219,7 @@ fn function(
         }
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-        name: name.into(),
+        name: Identifier::new(name.to_string(), TextRange::default()),
         args: Box::new(args.clone()),
         body: vec![body],
         decorator_list: vec![],

@@ -9,6 +9,7 @@ Example usage:
         --code 807 \
         --linter flake8-pie
 """
+from __future__ import annotations
 
 import argparse
 import subprocess

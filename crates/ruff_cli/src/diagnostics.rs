@@ -25,7 +25,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_python_stdlib::path::is_project_toml;
 
-use crate::cache;
+use crate::cache::Cache;
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -100,7 +100,7 @@ pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
-    cache: flags::Cache,
+    cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
@@ -110,15 +110,19 @@ pub(crate) fn lint_path(
     // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
-    let metadata = if cache.into() && noqa.into() && autofix.is_generate() {
-        let metadata = path.metadata()?;
-        if let Some((messages, imports)) = cache::get(path, package, &metadata, settings) {
-            debug!("Cache hit for: {}", path.display());
-            return Ok(Diagnostics::new(messages, imports));
+    let caching = match cache {
+        Some(cache) if noqa.into() && autofix.is_generate() => {
+            let relative_path = cache
+                .relative_path(path)
+                .expect("wrong package cache for file");
+            let last_modified = path.metadata()?.modified()?;
+            if let Some(cache) = cache.get(relative_path, last_modified) {
+                return Ok(cache.as_diagnostics(path));
+            }
+
+            Some((cache, relative_path, last_modified))
         }
-        Some(metadata)
-    } else {
-        None
+        _ => None,
     };
 
     debug!("Checking: {}", path.display());
@@ -203,6 +207,18 @@ pub(crate) fn lint_path(
 
     let imports = imports.unwrap_or_default();
 
+    if let Some((cache, relative_path, file_last_modified)) = caching {
+        // We don't cache parsing errors.
+        if parse_error.is_none() {
+            cache.update(
+                relative_path.to_owned(),
+                file_last_modified,
+                &messages,
+                &imports,
+            );
+        }
+    }
+
     if let Some(err) = parse_error {
         error!(
             "{}",
@@ -212,16 +228,6 @@ pub(crate) fn lint_path(
                 Some(&source_kind),
             )
         );
-
-        // Purge the cache.
-        if let Some(metadata) = metadata {
-            cache::del(path, package, &metadata, settings);
-        }
-    } else {
-        // Re-populate the cache.
-        if let Some(metadata) = metadata {
-            cache::set(path, package, &metadata, settings, &messages, &imports);
-        }
     }
 
     Ok(Diagnostics {
@@ -344,7 +350,7 @@ pub(crate) fn lint_stdin(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::path::Path;
 
     use crate::diagnostics::{load_jupyter_notebook, Diagnostics};

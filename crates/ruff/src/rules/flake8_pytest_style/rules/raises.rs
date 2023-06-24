@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Identifier, Keyword, Ranged, Stmt, Withitem};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -74,9 +74,12 @@ pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], key
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            let match_keyword = keywords
-                .iter()
-                .find(|kw| kw.arg == Some(Identifier::new("match")));
+            let match_keyword = keywords.iter().find(|keyword| {
+                keyword
+                    .arg
+                    .as_ref()
+                    .map_or(false, |arg| arg.as_str() == "match")
+            });
 
             if let Some(exception) = args.first() {
                 if let Some(match_keyword) = match_keyword {
@@ -94,7 +97,7 @@ pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], key
 pub(crate) fn complex_raises(
     checker: &mut Checker,
     stmt: &Stmt,
-    items: &[Withitem],
+    items: &[WithItem],
     body: &[Stmt],
 ) {
     let mut is_too_complex = false;

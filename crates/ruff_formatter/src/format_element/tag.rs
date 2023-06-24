@@ -1,8 +1,5 @@
 use crate::format_element::PrintMode;
 use crate::{GroupId, TextSize};
-#[cfg(debug_assertions)]
-use std::any::type_name;
-use std::any::TypeId;
 use std::cell::Cell;
 use std::num::NonZeroU8;
 
@@ -203,8 +200,8 @@ pub enum DedentMode {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Condition {
-    /// - Flat -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
-    /// - Multiline -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
+    /// - `Flat` -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
+    /// - `Expanded` -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
     pub(crate) mode: PrintMode,
 
     /// The id of the group for which it should check if it breaks or not. The group must appear in the document
@@ -213,7 +210,7 @@ pub struct Condition {
 }
 
 impl Condition {
-    pub fn new(mode: PrintMode) -> Self {
+    pub(crate) fn new(mode: PrintMode) -> Self {
         Self {
             mode,
             group_id: None,
@@ -223,10 +220,6 @@ impl Condition {
     pub fn with_group_id(mut self, id: Option<GroupId>) -> Self {
         self.group_id = id;
         self
-    }
-
-    pub fn mode(&self) -> PrintMode {
-        self.mode
     }
 }
 
@@ -239,35 +232,46 @@ impl Align {
     }
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, Copy, Clone)]
 pub struct LabelId {
-    id: TypeId,
+    value: u64,
     #[cfg(debug_assertions)]
-    label: &'static str,
+    name: &'static str,
 }
 
-#[cfg(debug_assertions)]
-impl std::fmt::Debug for LabelId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.label)
-    }
-}
+impl PartialEq for LabelId {
+    fn eq(&self, other: &Self) -> bool {
+        let is_equal = self.value == other.value;
 
-#[cfg(not(debug_assertions))]
-impl std::fmt::Debug for LabelId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "#{:?}", self.id)
+        #[cfg(debug_assertions)]
+        {
+            if is_equal {
+                assert_eq!(self.name, other.name, "Two `LabelId`s with different names have the same `value`. Are you mixing labels of two different `LabelDefinition` or are the values returned by the `LabelDefinition` not unique?");
+            }
+        }
+
+        is_equal
     }
 }
 
 impl LabelId {
-    pub fn of<T: ?Sized + 'static>() -> Self {
+    pub fn of<T: LabelDefinition>(label: T) -> Self {
         Self {
-            id: TypeId::of::<T>(),
+            value: label.value(),
             #[cfg(debug_assertions)]
-            label: type_name::<T>(),
+            name: label.name(),
         }
     }
+}
+
+/// Defines the valid labels of a language. You want to have at most one implementation per formatter
+/// project.
+pub trait LabelDefinition {
+    /// Returns the `u64` uniquely identifying this specific label.
+    fn value(&self) -> u64;
+
+    /// Returns the name of the label that is shown in debug builds.
+    fn name(&self) -> &'static str;
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]

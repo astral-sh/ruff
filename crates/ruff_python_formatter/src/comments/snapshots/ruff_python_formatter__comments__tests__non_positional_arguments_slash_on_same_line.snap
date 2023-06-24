@@ -19,9 +19,9 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: Arg,
-        range: 90..91,
-        source: `b`,
+        kind: ArgWithDefault,
+        range: 90..94,
+        source: `b=20`,
     }: {
         "leading": [
             SourceComment {

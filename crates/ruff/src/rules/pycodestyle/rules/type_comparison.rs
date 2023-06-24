@@ -1,5 +1,5 @@
 use itertools::izip;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -41,11 +41,11 @@ impl Violation for TypeComparison {
 pub(crate) fn type_comparison(
     checker: &mut Checker,
     expr: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     for (op, right) in izip!(ops, comparators) {
-        if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
+        if !matches!(op, CmpOp::Is | CmpOp::IsNot | CmpOp::Eq | CmpOp::NotEq) {
             continue;
         }
         match right {

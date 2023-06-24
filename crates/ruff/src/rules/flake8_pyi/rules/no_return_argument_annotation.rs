@@ -1,6 +1,5 @@
 use std::fmt;
 
-use itertools::chain;
 use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -49,12 +48,12 @@ impl Violation for NoReturnArgumentAnnotationInStub {
 
 /// PYI050
 pub(crate) fn no_return_argument_annotation(checker: &mut Checker, args: &Arguments) {
-    for annotation in chain!(
-        args.args.iter(),
-        args.posonlyargs.iter(),
-        args.kwonlyargs.iter()
-    )
-    .filter_map(|arg| arg.annotation.as_ref())
+    for annotation in args
+        .posonlyargs
+        .iter()
+        .chain(&args.args)
+        .chain(&args.kwonlyargs)
+        .filter_map(|arg| arg.def.annotation.as_ref())
     {
         if checker.semantic().match_typing_expr(annotation, "NoReturn") {
             checker.diagnostics.push(Diagnostic::new(

@@ -93,7 +93,6 @@ pub(crate) fn duplicate_class_field_definition<'a, 'b>(
                     Some(parent),
                     checker.locator,
                     checker.indexer,
-                    checker.stylist,
                 );
                 diagnostic.set_fix(Fix::suggested(edit).isolate(checker.isolation(Some(parent))));
             }

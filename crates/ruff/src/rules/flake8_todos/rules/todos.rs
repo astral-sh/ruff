@@ -67,7 +67,7 @@ pub struct MissingTodoAuthor;
 impl Violation for MissingTodoAuthor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author in TODO; try: `# TODO(<author_name>): ...`")
+        format!("Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`")
     }
 }
 
@@ -229,15 +229,15 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r#"^#\s*(http|https)://.*"#, // issue link
         r#"^#\s*\d+$"#,              // issue code - like "003"
-        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003" or "TD-003"
+        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003"
     ])
     .unwrap()
 });
 
 pub(crate) fn todos(
     todo_comments: &[TodoComment],
-    indexer: &Indexer,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -339,8 +339,7 @@ fn directive_errors(
     }
 }
 
-/// Checks for "static" errors in the comment: missing colon, missing author, etc. This function
-/// modifies `diagnostics` in-place.
+/// Checks for "static" errors in the comment: missing colon, missing author, etc.
 fn static_errors(
     diagnostics: &mut Vec<Diagnostic>,
     comment: &str,
@@ -357,6 +356,15 @@ fn static_errors(
                 TextSize::try_from(end_index + 1).unwrap()
             } else {
                 trimmed.text_len()
+            }
+        } else if trimmed.starts_with('@') {
+            if let Some(end_index) = trimmed.find(|c: char| c.is_whitespace() || c == ':') {
+                TextSize::try_from(end_index).unwrap()
+            } else {
+                // TD002
+                diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+
+                TextSize::new(0)
             }
         } else {
             // TD002

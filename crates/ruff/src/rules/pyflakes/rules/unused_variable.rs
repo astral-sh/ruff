@@ -210,13 +210,7 @@ fn remove_unused_variable(
                     Some(Fix::suggested(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let edit = delete_stmt(
-                        stmt,
-                        parent,
-                        checker.locator,
-                        checker.indexer,
-                        checker.stylist,
-                    );
+                    let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
                     Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
                 };
             }
@@ -241,22 +235,16 @@ fn remove_unused_variable(
                 Some(Fix::suggested(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                let edit = delete_stmt(
-                    stmt,
-                    parent,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                );
+                let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
                 Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
             };
         }
     }
 
-    // Third case: withitem (`with foo() as x:`)
+    // Third case: with_item (`with foo() as x:`)
     if let Stmt::With(ast::StmtWith { items, .. }) = stmt {
         // Find the binding that matches the given `Range`.
-        // TODO(charlie): Store the `Withitem` in the `Binding`.
+        // TODO(charlie): Store the `WithItem` in the `Binding`.
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == range {

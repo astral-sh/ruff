@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{self, Excepthandler, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for functions or methods with too many branches.
@@ -147,8 +146,8 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                             .iter()
                             .map(|handler| {
                                 1 + {
-                                    let Excepthandler::ExceptHandler(
-                                        ast::ExcepthandlerExceptHandler { body, .. },
+                                    let ExceptHandler::ExceptHandler(
+                                        ast::ExceptHandlerExceptHandler { body, .. },
                                     ) = handler;
                                     num_branches(body)
                                 }
@@ -166,7 +165,6 @@ pub(crate) fn too_many_branches(
     stmt: &Stmt,
     body: &[Stmt],
     max_branches: usize,
-    locator: &Locator,
 ) -> Option<Diagnostic> {
     let branches = num_branches(body);
     if branches > max_branches {
@@ -175,7 +173,7 @@ pub(crate) fn too_many_branches(
                 branches,
                 max_branches,
             },
-            stmt.identifier(locator),
+            stmt.identifier(),
         ))
     } else {
         None
