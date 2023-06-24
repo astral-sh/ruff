@@ -1,6 +1,12 @@
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
-b, c, d = (2, 3, 4)
+a, b, c, d = (1, 2, 3, 4)
+
+del a, b, c, d
+del a, b, c, d  # Trailing
+
+del a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a
+del a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a  # Trailing
 
 del (
     # Dangling comment
@@ -15,7 +21,7 @@ del (
     # Deleting something
     x  # Deleted something
     # Finishing deletes
-) # Completed
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -23,7 +29,7 @@ del (
     # Deleting something
     x  # Deleted something
     # Finishing deletes
-) # Completed
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -31,7 +37,7 @@ del (
     # Deleting something
     x,  # Deleted something
     # Finishing deletes
-) # Completed
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -39,9 +45,8 @@ del (
     # Deleting something
     x  # Deleted something
     # Finishing deletes
-
     # Dangling comment
-) # Completed
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -55,7 +60,7 @@ del (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     b,
     c,
-    d
+    d,
     # Deleted
-) # Completed
+)  # Completed
 # Done
