@@ -352,7 +352,7 @@ d={'a':1,
      # fmt: off
 -    a , b = *hello
 -    'unformatted'
-+    a, b = NOT_YET_IMPLEMENTED_ExprStarred
++    a, b = *NOT_YET_IMPLEMENTED_ExprStarred
 +    "unformatted"
      # fmt: on
  
@@ -607,7 +607,7 @@ def import_as_names():
 
 def testlist_star_expr():
     # fmt: off
-    a, b = NOT_YET_IMPLEMENTED_ExprStarred
+    a, b = *NOT_YET_IMPLEMENTED_ExprStarred
     "unformatted"
     # fmt: on
 

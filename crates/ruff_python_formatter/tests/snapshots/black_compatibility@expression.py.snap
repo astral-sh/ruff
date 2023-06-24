@@ -353,10 +353,10 @@ last_call()
 -    5,
 -]
 +[1, 2, 3]
-+[NOT_YET_IMPLEMENTED_ExprStarred]
-+[NOT_YET_IMPLEMENTED_ExprStarred]
-+[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
-+[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
++[*NOT_YET_IMPLEMENTED_ExprStarred]
++[*NOT_YET_IMPLEMENTED_ExprStarred]
++[*NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
++[4, *NOT_YET_IMPLEMENTED_ExprStarred, 5]
  [
 -    4,
 -    *a,
@@ -367,7 +367,7 @@ last_call()
      element,
      another,
 -    *more,
-+    NOT_YET_IMPLEMENTED_ExprStarred,
++    *NOT_YET_IMPLEMENTED_ExprStarred,
  ]
 -{i for i in (1, 2, 3)}
 -{(i**2) for i in (1, 2, 3)}
@@ -512,7 +512,7 @@ last_call()
 +(i for i in [])
 +(i for i in [])
 +(i for i in [])
-+(NOT_YET_IMPLEMENTED_ExprStarred,)
++(*NOT_YET_IMPLEMENTED_ExprStarred,)
  {
      "id": "1",
      "type": "type",
@@ -544,8 +544,8 @@ last_call()
 -    .order_by(models.Customer.id.asc())
 -    .all()
 +e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+f = 1, NOT_YET_IMPLEMENTED_ExprStarred
-+g = 1, NOT_YET_IMPLEMENTED_ExprStarred
++f = 1, *NOT_YET_IMPLEMENTED_ExprStarred
++g = 1, *NOT_YET_IMPLEMENTED_ExprStarred
 +what_is_up_with_those_new_coord_names = (
 +    (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
 +    + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
@@ -756,15 +756,15 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 []
 [1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
 [1, 2, 3]
-[NOT_YET_IMPLEMENTED_ExprStarred]
-[NOT_YET_IMPLEMENTED_ExprStarred]
-[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
-[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
+[*NOT_YET_IMPLEMENTED_ExprStarred]
+[*NOT_YET_IMPLEMENTED_ExprStarred]
+[*NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
+[4, *NOT_YET_IMPLEMENTED_ExprStarred, 5]
 [
     this_is_a_very_long_variable_which_will_force_a_delimiter_split,
     element,
     another,
-    NOT_YET_IMPLEMENTED_ExprStarred,
+    *NOT_YET_IMPLEMENTED_ExprStarred,
 ]
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
@@ -856,7 +856,7 @@ SomeName
 (i for i in [])
 (i for i in [])
 (i for i in [])
-(NOT_YET_IMPLEMENTED_ExprStarred,)
+(*NOT_YET_IMPLEMENTED_ExprStarred,)
 {
     "id": "1",
     "type": "type",
@@ -871,8 +871,8 @@ b = (1,)
 c = 1
 d = (1,) + a + (2,)
 e = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-f = 1, NOT_YET_IMPLEMENTED_ExprStarred
-g = 1, NOT_YET_IMPLEMENTED_ExprStarred
+f = 1, *NOT_YET_IMPLEMENTED_ExprStarred
+g = 1, *NOT_YET_IMPLEMENTED_ExprStarred
 what_is_up_with_those_new_coord_names = (
     (coord_names + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
     + NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)

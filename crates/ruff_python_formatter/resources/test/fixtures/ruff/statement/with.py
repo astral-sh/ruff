@@ -50,3 +50,10 @@ with (a):  # should remove brackets
 # WithItem allow the `aa + bb` content expression to be wrapped
 with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c:
     ...
+
+
+# currently unparsable by black: https://github.com/psf/black/issues/3678
+with (name_2 for name_0 in name_4):
+    pass
+with (a, *b):
+    pass
