@@ -332,6 +332,42 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     };
                 }
             }
+            Expr::IfExp(ExprIfExp {
+                test, body, orelse, ..
+            }) => {
+                self.visit_expr(test);
+
+                let requirements = std::mem::take(&mut self.relation.requirements);
+                let bindings = std::mem::take(&mut self.relation.bindings);
+
+                self.visit_expr(body);
+
+                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
+                let body_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+
+                for requirement in requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.relation.requirements.insert(requirement);
+                    }
+                }
+
+                let requirements = std::mem::take(&mut self.relation.requirements);
+                let bindings = std::mem::take(&mut self.relation.bindings);
+
+                self.visit_expr(orelse);
+
+                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
+                let orelse_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+
+                for requirement in requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.relation.requirements.insert(requirement);
+                    }
+                }
+
+                self.relation.bindings.extend(body_bindings);
+                self.relation.bindings.extend(orelse_bindings);
+            }
             Expr::ListComp(ExprListComp {
                 elt, generators, ..
             })
@@ -482,12 +518,15 @@ mod tests {
 
     fn parse(source: &str) -> Stmt {
         let source = unindent(source);
+        println!("-----BEGIN SOURCE-----\n{}\n-----END SOURCE-----", source);
         let tokens = lex(&source, Mode::Module);
         let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
-        match parsed {
+        let ast = match parsed {
             Mod::Module(ModModule { body, .. }) => body.into_iter().next().unwrap(),
             _ => panic!("Unsupported module type"),
-        }
+        };
+        println!("-----BEGIN AST-----\n{:?}\n-----END AST-----", ast);
+        ast
     }
 
     #[test]
@@ -2696,6 +2735,28 @@ mod tests {
     }
 
     #[test]
+    fn assert_references_bindings() {
+        let stmt = parse(r#"assert (a := b)[a], (c := d)[a][c]"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn import() {
         let stmt = parse(r#"import a"#);
         let relation = stmt_relation(&stmt);
@@ -2707,7 +2768,7 @@ mod tests {
     }
 
     #[test]
-    fn import_with_submodule() {
+    fn import_submodule() {
         let stmt = parse(r#"import a.b.c"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
@@ -2872,8 +2933,45 @@ mod tests {
     }
 
     #[test]
+    fn bool_op_references_bindings() {
+        let stmt = parse(r#"(a := b)[a] and (c := d)[a][c]"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn named_expr() {
         let stmt = parse(r#"(a := b)"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "b",
+                is_deferred: false,
+                context: RequirementContext::Local
+            },]
+        );
+    }
+
+    #[test]
+    fn named_expr_references_bindings() {
+        let stmt = parse(r#"(a := b)[a]"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
         assert_eq!(
@@ -2931,6 +3029,28 @@ mod tests {
     }
 
     #[test]
+    fn bin_op_references_bindings() {
+        let stmt = parse(r#"(a := b)[a] + (c := d)[a][c]"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn unary_op() {
         let stmt = parse(r#"-a"#);
         let relation = stmt_relation(&stmt);
@@ -2948,6 +3068,21 @@ mod tests {
     #[test]
     fn unary_op_with_walrus() {
         let stmt = parse(r#"-(a := b)"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [Requirement {
+                name: "b",
+                is_deferred: false,
+                context: RequirementContext::Local
+            },]
+        );
+    }
+
+    #[test]
+    fn unary_op_references_bindings() {
+        let stmt = parse(r#"-(a := b)[a]"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
         assert_eq!(
@@ -3026,6 +3161,44 @@ mod tests {
     }
 
     #[test]
+    fn lambda_references_bindings() {
+        let stmt = parse(
+            r#"
+                lambda \
+                    a = (b := c)[b], \
+                    /, \
+                    d = (e := f)[b][e], \
+                    *g, \
+                    h = (i := j)[b][e][i], \
+                    **k \
+                : \
+                    (a, b, d, e, g, h, i, k)"#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "e", "i"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "j",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn if_exp() {
         let stmt = parse(r#"a if b else c"#);
         let relation = stmt_relation(&stmt);
@@ -3072,6 +3245,70 @@ mod tests {
                 },
                 Requirement {
                     name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn if_exp_references_bindings() {
+        let stmt = parse(r#"(a := b)[a][c] if (c := d)[c] else (e := f)[c][e]"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["c", "a", "e"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn if_exp_references_bindings_in_conditional() {
+        let stmt = parse(r#"(a := b)[a][c][e] if (c := d)[c] else (e := f)[a][c][e]"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["c", "a", "e"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "a",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
