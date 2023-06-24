@@ -1,6 +1,7 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::{lines_after, skip_trailing_trivia};
+use crate::trivia::{first_non_trivia_token, lines_after, skip_trailing_trivia, Token, TokenKind};
+use crate::USE_MAGIC_TRAILING_COMMA;
 use ruff_formatter::write;
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::Ranged;
@@ -15,11 +16,20 @@ pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
     /// * [`NodeLevel::CompoundStatement`]: Up to one empty line
     /// * [`NodeLevel::Expression`]: No empty lines
     fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf>;
+
+    /// A builder that separates each element by a `,` and a [`soft_line_break_or_space`].
+    /// It emits a trailing `,` that is only shown if the enclosing group expands. It forces the enclosing
+    /// group to expand if the last item has a trailing `comma` and the magical comma option is enabled.
+    fn join_comma_separated<'fmt>(&'fmt mut self) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf>;
 }
 
 impl<'buf, 'ast> PyFormatterExtensions<'ast, 'buf> for PyFormatter<'ast, 'buf> {
     fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf> {
         JoinNodesBuilder::new(self, level)
+    }
+
+    fn join_comma_separated<'fmt>(&'fmt mut self) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+        JoinCommaSeparatedBuilder::new(self)
     }
 }
 
@@ -142,6 +152,89 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
     /// Finishes the joiner and gets the format result.
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
         self.result
+    }
+}
+
+pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+    result: FormatResult<()>,
+    fmt: &'fmt mut PyFormatter<'ast, 'buf>,
+    last_end: Option<TextSize>,
+}
+
+impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+    fn new(f: &'fmt mut PyFormatter<'ast, 'buf>) -> Self {
+        Self {
+            fmt: f,
+            result: Ok(()),
+            last_end: None,
+        }
+    }
+
+    pub(crate) fn entry<T>(
+        &mut self,
+        node: &T,
+        content: &dyn Format<PyFormatContext<'ast>>,
+    ) -> &mut Self
+    where
+        T: Ranged,
+    {
+        self.result = self.result.and_then(|_| {
+            if self.last_end.is_some() {
+                write!(self.fmt, [text(","), soft_line_break_or_space()])?;
+            }
+
+            self.last_end = Some(node.end());
+
+            content.fmt(self.fmt)
+        });
+
+        self
+    }
+
+    #[allow(unused)]
+    pub(crate) fn entries<T, I, F>(&mut self, entries: I) -> &mut Self
+    where
+        T: Ranged,
+        F: Format<PyFormatContext<'ast>>,
+        I: Iterator<Item = (T, F)>,
+    {
+        for (node, content) in entries {
+            self.entry(&node, &content);
+        }
+
+        self
+    }
+
+    pub(crate) fn nodes<'a, T, I>(&mut self, entries: I) -> &mut Self
+    where
+        T: Ranged + AsFormat<PyFormatContext<'ast>> + 'a,
+        I: Iterator<Item = &'a T>,
+    {
+        for node in entries {
+            self.entry(node, &node.format());
+        }
+
+        self
+    }
+
+    pub(crate) fn finish(&mut self) -> FormatResult<()> {
+        if let Some(last_end) = self.last_end.take() {
+            if_group_breaks(&text(",")).fmt(self.fmt)?;
+
+            if USE_MAGIC_TRAILING_COMMA
+                && matches!(
+                    first_non_trivia_token(last_end, self.fmt.context().contents()),
+                    Some(Token {
+                        kind: TokenKind::Comma,
+                        ..
+                    })
+                )
+            {
+                expand_parent().fmt(self.fmt)?;
+            }
+        }
+
+        Ok(())
     }
 }
 

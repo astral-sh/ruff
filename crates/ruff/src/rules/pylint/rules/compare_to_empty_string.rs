@@ -68,7 +68,7 @@ pub(crate) fn compare_to_empty_string(
     let mut first = true;
     for ((lhs, rhs), op) in std::iter::once(left)
         .chain(comparators.iter())
-        .tuple_windows::<(&Expr<_>, &Expr<_>)>()
+        .tuple_windows::<(&Expr, &Expr)>()
         .zip(ops)
     {
         if let Ok(op) = EmptyStringCmpOp::try_from(op) {

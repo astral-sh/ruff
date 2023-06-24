@@ -167,9 +167,9 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             value,
             range: _range,
         }) => {
-            visitor.visit_expr(target);
-            visitor.visit_operator(op);
             visitor.visit_expr(value);
+            visitor.visit_operator(op);
+            visitor.visit_expr(target);
         }
         Stmt::AnnAssign(ast::StmtAnnAssign {
             target,
