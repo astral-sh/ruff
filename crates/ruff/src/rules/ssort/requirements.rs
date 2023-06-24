@@ -1,39 +1,37 @@
-use crate::rules::ssort::bindings::{
-    arguments_bindings, decorator_bindings, expr_bindings, keyword_bindings, stmt_bindings,
-};
 use crate::rules::ssort::builtins::CLASS_BUILTINS;
 use ruff_python_ast::prelude::*;
-use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use std::collections::HashSet;
-use std::ops::Deref;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(super) enum RequirementScope {
-    Local,
-    NonLocal,
-    Global,
+pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
+    let mut requirements = AstVisitor::default();
+    requirements.visit_stmt(stmt);
+    requirements.requirements
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) struct Requirement<'a> {
     name: &'a str,
-    deferred: bool,
-    scope: RequirementScope,
+    is_deferred: bool,
+    context: RequirementContext,
 }
 
-pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
-    let mut requirements = Requirements::default();
-    requirements.visit_stmt(stmt);
-    requirements.requirements
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(super) enum RequirementContext {
+    Local,
+    NonLocal,
+    Global,
 }
 
 #[derive(Default)]
-struct Requirements<'a> {
+struct AstVisitor<'a> {
     requirements: Vec<Requirement<'a>>,
+    bindings: HashSet<&'a str>,
     is_store_requirement: bool,
+    is_deferred: bool,
 }
 
-impl<'a> Visitor<'a> for Requirements<'a> {
+impl<'a> Visitor<'a> for AstVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(StmtFunctionDef {
@@ -62,34 +60,40 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                     self.visit_annotation(expr);
                 }
 
-                let mut scope = Scope::new();
-                scope.add_decorator_list(decorator_list);
-                scope.add_arguments(args);
-                if let Some(expr) = returns {
-                    scope.add_expr(expr)
-                }
-                scope.add_name(name);
+                self.bindings.insert(name);
 
                 let requirements = std::mem::take(&mut self.requirements);
+                let bindings = std::mem::take(&mut self.bindings);
+                let is_deferred = std::mem::replace(&mut self.is_deferred, true);
+
+                add_arguments_to_bindings(&mut self.bindings, args);
+
                 for stmt in body {
-                    scope.add_stmt(stmt);
                     self.visit_stmt(stmt);
                 }
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
 
+                let requirements = std::mem::replace(&mut self.requirements, requirements);
+                let bindings = std::mem::replace(&mut self.bindings, bindings);
+                self.is_deferred = is_deferred;
+
+                println!("REQUIREMENTS: {:?}", requirements);
+                println!("self.bindings = {:?}", self.bindings);
+                println!("bindings = {:?}", bindings);
                 for mut requirement in requirements {
-                    match requirement.scope {
-                        RequirementScope::Global => {}
-                        RequirementScope::NonLocal => requirement.scope = RequirementScope::Local,
-                        RequirementScope::Local => {
-                            if scope.contains(requirement.name) {
-                                continue;
+                    match requirement.context {
+                        RequirementContext::Global => self.requirements.push(requirement),
+                        RequirementContext::NonLocal => {
+                            requirement.context = RequirementContext::Local;
+                            self.requirements.push(requirement);
+                        }
+                        RequirementContext::Local => {
+                            if !self.bindings.contains(requirement.name)
+                                && !bindings.contains(requirement.name)
+                            {
+                                self.requirements.push(requirement);
                             }
                         }
                     }
-
-                    requirement.deferred = true;
-                    self.requirements.push(requirement);
                 }
             }
             Stmt::ClassDef(StmtClassDef {
@@ -112,22 +116,28 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                     self.visit_keyword(keyword);
                 }
 
-                let mut scope = Scope::with_class_builtins();
-                scope.add_decorator_list(decorator_list);
-                scope.add_exprs(bases);
-                scope.add_keywords(keywords);
-                scope.add_name(name);
+                self.bindings.insert(name);
+
+                let mut cumulative_bindings = HashSet::new();
 
                 for stmt in body {
                     let requirements = std::mem::take(&mut self.requirements);
+                    let bindings = std::mem::take(&mut self.bindings);
+
                     self.visit_stmt(stmt);
+
                     let requirements = std::mem::replace(&mut self.requirements, requirements);
+                    let bindings = std::mem::replace(&mut self.bindings, bindings);
+
                     for requirement in requirements {
-                        if requirement.deferred || !scope.contains(requirement.name) {
+                        if requirement.is_deferred
+                            || (!self.bindings.contains(requirement.name)
+                                && !cumulative_bindings.contains(requirement.name))
+                        {
                             self.requirements.push(requirement);
                         }
                     }
-                    scope.add_stmt(stmt);
+                    cumulative_bindings.extend(bindings);
                 }
             }
             Stmt::AugAssign(StmtAugAssign {
@@ -135,81 +145,32 @@ impl<'a> Visitor<'a> for Requirements<'a> {
             }) => {
                 self.visit_expr(value);
                 self.visit_operator(op);
-                let is_store_requirement = self.is_store_requirement;
-                self.is_store_requirement = true;
+                let is_store_requirement = std::mem::replace(&mut self.is_store_requirement, true);
                 self.visit_expr(target);
                 self.is_store_requirement = is_store_requirement;
-            }
-            Stmt::For(StmtFor {
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            })
-            | Stmt::AsyncFor(StmtAsyncFor {
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            }) => {
-                self.visit_expr(iter);
-                self.visit_expr(target);
-
-                let requirements = std::mem::take(&mut self.requirements);
-                self.visit_body(body);
-                self.visit_body(orelse);
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
-
-                let mut scope = Scope::new();
-                scope.add_stmt(stmt);
-
-                for requirement in requirements {
-                    if !scope.contains(&requirement.name) {
-                        self.requirements.push(requirement);
-                    }
-                }
-            }
-            Stmt::With(StmtWith { items, body, .. })
-            | Stmt::AsyncWith(StmtAsyncWith { items, body, .. }) => {
-                for with_item in items {
-                    self.visit_with_item(with_item);
-                }
-
-                let requirements = std::mem::take(&mut self.requirements);
-                self.visit_body(body);
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
-
-                let mut scope = Scope::new();
-                scope.add_stmt(stmt);
-
-                for requirement in requirements {
-                    if !scope.contains(&requirement.name) {
-                        self.requirements.push(requirement);
-                    }
-                }
             }
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
                     self.requirements.push(Requirement {
                         name,
-                        deferred: false,
-                        scope: RequirementScope::Global,
+                        is_deferred: self.is_deferred,
+                        context: RequirementContext::Global,
                     });
+                    self.bindings.insert(name);
                 }
             }
             Stmt::Nonlocal(StmtNonlocal { names, .. }) => {
                 for name in names {
                     self.requirements.push(Requirement {
                         name,
-                        deferred: false,
-                        scope: RequirementScope::NonLocal,
+                        is_deferred: self.is_deferred,
+                        context: RequirementContext::NonLocal,
                     });
+                    self.bindings.insert(name);
                 }
             }
             stmt => walk_stmt(self, stmt),
-        }
+        };
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
@@ -218,32 +179,100 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 self.visit_arguments(args);
 
                 let requirements = std::mem::take(&mut self.requirements);
-                self.visit_expr(body);
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
+                let bindings = std::mem::take(&mut self.bindings);
+                let is_deferred = std::mem::replace(&mut self.is_deferred, true);
 
-                let mut scope = Scope::new();
-                scope.add_arguments(args);
+                add_arguments_to_bindings(&mut self.bindings, args);
+
+                self.visit_expr(body);
+
+                let requirements = std::mem::replace(&mut self.requirements, requirements);
+                let bindings = std::mem::replace(&mut self.bindings, bindings);
+                self.is_deferred = is_deferred;
 
                 for mut requirement in requirements {
-                    if !scope.contains(requirement.name) {
-                        requirement.deferred = true;
+                    match requirement.context {
+                        RequirementContext::Global => self.requirements.push(requirement),
+                        RequirementContext::NonLocal => {
+                            requirement.context = RequirementContext::Local;
+                            self.requirements.push(requirement);
+                        }
+                        RequirementContext::Local => {
+                            if !self.bindings.contains(requirement.name)
+                                && !bindings.contains(requirement.name)
+                            {
+                                self.requirements.push(requirement);
+                            }
+                        }
+                    }
+                }
+            }
+            Expr::ListComp(ExprListComp {
+                elt, generators, ..
+            })
+            | Expr::SetComp(ExprSetComp {
+                elt, generators, ..
+            })
+            | Expr::GeneratorExp(ExprGeneratorExp {
+                elt, generators, ..
+            }) => {
+                let requirements = std::mem::take(&mut self.requirements);
+                let mut bindings = HashSet::new();
+
+                for comprehension in generators {
+                    self.visit_expr(&comprehension.iter);
+
+                    bindings = std::mem::replace(&mut self.bindings, bindings);
+                    self.visit_expr(&comprehension.target);
+                    bindings = std::mem::replace(&mut self.bindings, bindings);
+
+                    for expr in &comprehension.ifs {
+                        self.visit_expr(expr);
+                    }
+                }
+
+                self.visit_expr(elt);
+
+                let requirements = std::mem::replace(&mut self.requirements, requirements);
+
+                for requirement in requirements {
+                    if !self.bindings.contains(requirement.name)
+                        && !bindings.contains(requirement.name)
+                    {
                         self.requirements.push(requirement);
                     }
                 }
             }
-            Expr::ListComp(ExprListComp { generators, .. })
-            | Expr::SetComp(ExprSetComp { generators, .. })
-            | Expr::DictComp(ExprDictComp { generators, .. })
-            | Expr::GeneratorExp(ExprGeneratorExp { generators, .. }) => {
+            Expr::DictComp(ExprDictComp {
+                key,
+                value,
+                generators,
+                ..
+            }) => {
                 let requirements = std::mem::take(&mut self.requirements);
-                walk_expr(self, expr);
+                let mut bindings = HashSet::new();
+
+                for comprehension in generators {
+                    self.visit_expr(&comprehension.iter);
+
+                    bindings = std::mem::replace(&mut self.bindings, bindings);
+                    self.visit_expr(&comprehension.target);
+                    bindings = std::mem::replace(&mut self.bindings, bindings);
+
+                    for expr in &comprehension.ifs {
+                        self.visit_expr(expr);
+                    }
+                }
+
+                self.visit_expr(key);
+                self.visit_expr(value);
+
                 let requirements = std::mem::replace(&mut self.requirements, requirements);
 
-                let mut scope = Scope::new();
-                scope.add_comprehensions(generators);
-
                 for requirement in requirements {
-                    if !scope.contains(requirement.name) {
+                    if !self.bindings.contains(requirement.name)
+                        && !bindings.contains(requirement.name)
+                    {
                         self.requirements.push(requirement);
                     }
                 }
@@ -252,97 +281,84 @@ impl<'a> Visitor<'a> for Requirements<'a> {
                 if self.is_store_requirement || ctx != &ExprContext::Store {
                     self.requirements.push(Requirement {
                         name: id,
-                        deferred: false,
-                        scope: RequirementScope::Local,
+                        is_deferred: self.is_deferred,
+                        context: RequirementContext::Local,
                     });
+                }
+                if ctx == &ExprContext::Store {
+                    self.bindings.insert(id);
                 }
             }
             expr => walk_expr(self, expr),
-        }
+        };
+    }
+
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+        match except_handler {
+            ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler {
+                type_, name, body, ..
+            }) => {
+                if let Some(expr) = type_ {
+                    self.visit_expr(expr);
+                }
+                if let Some(name) = name {
+                    self.bindings.insert(name);
+                }
+                self.visit_body(body);
+            }
+        };
+    }
+
+    fn visit_alias(&mut self, alias: &'a Alias) {
+        match &alias.asname {
+            Some(asname) => self.bindings.insert(asname),
+            None => match alias.name.split_once('.') {
+                Some((prefix, _)) => self.bindings.insert(prefix),
+                _ => self.bindings.insert(&alias.name),
+            },
+        };
+    }
+
+    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+        match pattern {
+            Pattern::MatchStar(PatternMatchStar { name, .. }) => {
+                if let Some(name) = name {
+                    self.bindings.insert(name);
+                }
+            }
+            Pattern::MatchMapping(PatternMatchMapping {
+                keys,
+                patterns,
+                rest,
+                ..
+            }) => {
+                for (key, pattern) in keys.iter().zip(patterns) {
+                    self.visit_expr(key);
+                    self.visit_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.bindings.insert(rest);
+                }
+            }
+            Pattern::MatchAs(PatternMatchAs { pattern, name, .. }) => {
+                if let Some(pattern) = pattern {
+                    self.visit_pattern(pattern);
+                }
+                if let Some(name) = name {
+                    self.bindings.insert(name);
+                }
+            }
+            pattern => walk_pattern(self, pattern),
+        };
     }
 }
 
-#[derive(Default)]
-struct Scope<'a> {
-    scope: HashSet<&'a str>,
-}
-
-impl<'a> Scope<'a> {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn with_class_builtins() -> Self {
-        Self {
-            scope: CLASS_BUILTINS.iter().copied().collect(),
-        }
-    }
-
-    fn contains(&self, name: &str) -> bool {
-        self.scope.contains(name)
-    }
-
-    fn add_name(&mut self, name: &'a str) {
-        self.scope.insert(name);
-    }
-
-    fn add_stmt(&mut self, stmt: &'a Stmt) {
-        self.scope.extend(stmt_bindings(stmt));
-    }
-
-    fn add_expr(&mut self, expr: &'a Expr) {
-        self.scope.extend(expr_bindings(expr));
-    }
-
-    fn add_exprs<I: IntoIterator<Item = &'a Expr>>(&mut self, exprs: I) {
-        for expr in exprs {
-            self.add_expr(expr);
-        }
-    }
-
-    fn add_decorator(&mut self, decorator: &'a Decorator) {
-        self.scope.extend(decorator_bindings(decorator));
-    }
-
-    fn add_decorator_list<I: IntoIterator<Item = &'a Decorator>>(&mut self, decorator_list: I) {
-        for decorator in decorator_list {
-            self.add_decorator(decorator);
-        }
-    }
-
-    fn add_arguments(&mut self, arguments: &'a Arguments) {
-        self.scope.extend(arguments_bindings(arguments));
-        self.scope
-            .extend(arguments.posonlyargs.iter().map(|arg| arg.def.arg.as_str()));
-        self.scope
-            .extend(arguments.args.iter().map(|arg| arg.def.arg.as_str()));
-        self.scope
-            .extend(arguments.vararg.iter().map(|arg| arg.arg.as_str()));
-        self.scope
-            .extend(arguments.kwonlyargs.iter().map(|arg| arg.def.arg.as_str()));
-        self.scope
-            .extend(arguments.kwarg.iter().map(|arg| arg.arg.as_str()));
-    }
-
-    fn add_keyword(&mut self, keyword: &'a Keyword) {
-        self.scope.extend(keyword_bindings(keyword))
-    }
-
-    fn add_keywords<I: IntoIterator<Item = &'a Keyword>>(&mut self, keywords: I) {
-        for keyword in keywords {
-            self.add_keyword(keyword);
-        }
-    }
-
-    fn add_comprehension(&mut self, comprehension: &'a Comprehension) {
-        self.scope.extend(expr_bindings(&comprehension.target));
-    }
-
-    fn add_comprehensions<I: IntoIterator<Item = &'a Comprehension>>(&mut self, comprehensions: I) {
-        for comprehension in comprehensions {
-            self.add_comprehension(comprehension);
-        }
-    }
+fn add_arguments_to_bindings<'a>(bindings: &mut HashSet<&'a str>, arguments: &'a Arguments) {
+    bindings.extend(arguments.posonlyargs.iter().map(|arg| arg.def.arg.as_str()));
+    bindings.extend(arguments.args.iter().map(|arg| arg.def.arg.as_str()));
+    bindings.extend(arguments.vararg.iter().map(|arg| arg.arg.as_str()));
+    bindings.extend(arguments.kwonlyargs.iter().map(|arg| arg.def.arg.as_str()));
+    bindings.extend(arguments.kwarg.iter().map(|arg| arg.arg.as_str()));
 }
 
 #[cfg(test)]
@@ -368,58 +384,58 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "m",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "l",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "o",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "p",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "r",
-                    deferred: true,
-                    scope: RequirementScope::Local
+                    is_deferred: true,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -447,58 +463,58 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "m",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "u",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "k",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "p",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "s",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "x",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "z",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "ab",
-                    deferred: true,
-                    scope: RequirementScope::Local
+                    is_deferred: true,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -526,53 +542,53 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "m",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "u",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "k",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "p",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "s",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "x",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "z",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -593,58 +609,58 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "m",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "l",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "o",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "p",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "r",
-                    deferred: true,
-                    scope: RequirementScope::Local
+                    is_deferred: true,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -672,58 +688,58 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "m",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "u",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "k",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "p",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "s",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "x",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "z",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "ab",
-                    deferred: true,
-                    scope: RequirementScope::Local
+                    is_deferred: true,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -751,53 +767,53 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "m",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "u",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "k",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "p",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "s",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "x",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "z",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -818,23 +834,23 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -855,23 +871,23 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -892,18 +908,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -917,8 +933,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             }]
         );
     }
@@ -931,8 +947,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             }]
         );
     }
@@ -946,33 +962,33 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -987,33 +1003,33 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "l",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -1028,13 +1044,13 @@ mod tests {
             [
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -1049,13 +1065,13 @@ mod tests {
             [
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -1070,13 +1086,13 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -1091,13 +1107,13 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 }
             ]
         );
@@ -1112,13 +1128,13 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1133,13 +1149,13 @@ mod tests {
             [
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1161,18 +1177,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1194,18 +1210,18 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1227,18 +1243,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1260,18 +1276,18 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1293,18 +1309,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1326,18 +1342,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1361,28 +1377,28 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1406,28 +1422,28 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1447,18 +1463,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1478,18 +1494,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1509,18 +1525,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1540,18 +1556,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1566,13 +1582,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1587,13 +1603,13 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1619,28 +1635,28 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1666,28 +1682,28 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "k",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1713,28 +1729,28 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1760,28 +1776,28 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "k",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1796,13 +1812,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1817,13 +1833,13 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1873,13 +1889,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Global
+                    is_deferred: false,
+                    context: RequirementContext::Global
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Global
+                    is_deferred: false,
+                    context: RequirementContext::Global
                 },
             ]
         );
@@ -1894,13 +1910,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::NonLocal
+                    is_deferred: false,
+                    context: RequirementContext::NonLocal
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::NonLocal
+                    is_deferred: false,
+                    context: RequirementContext::NonLocal
                 },
             ]
         );
@@ -1936,13 +1952,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1957,13 +1973,13 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -1977,8 +1993,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -1992,13 +2008,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2013,13 +2029,13 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2033,8 +2049,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2047,8 +2063,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2062,23 +2078,23 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: true,
-                    scope: RequirementScope::Local
+                    is_deferred: true,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2094,23 +2110,23 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "m",
-                    deferred: true,
-                    scope: RequirementScope::Local
+                    is_deferred: true,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2125,18 +2141,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2151,18 +2167,18 @@ mod tests {
             [
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2177,18 +2193,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2203,18 +2219,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2229,13 +2245,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2250,13 +2266,13 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2271,18 +2287,18 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2297,18 +2313,18 @@ mod tests {
             [
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2323,18 +2339,18 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2349,18 +2365,18 @@ mod tests {
             [
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2375,23 +2391,23 @@ mod tests {
             [
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2406,23 +2422,23 @@ mod tests {
             [
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2437,18 +2453,18 @@ mod tests {
             [
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2463,18 +2479,18 @@ mod tests {
             [
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2488,8 +2504,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2502,8 +2518,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2516,8 +2532,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2530,8 +2546,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2544,8 +2560,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2558,8 +2574,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2573,18 +2589,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2599,18 +2615,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2625,28 +2641,28 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2661,28 +2677,28 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "k",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2697,13 +2713,13 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2718,13 +2734,13 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2739,23 +2755,23 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2770,23 +2786,23 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2807,8 +2823,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2821,8 +2837,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2836,23 +2852,23 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2867,23 +2883,23 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2897,8 +2913,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2911,8 +2927,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "b",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2925,8 +2941,8 @@ mod tests {
             requirements,
             [Requirement {
                 name: "a",
-                deferred: false,
-                scope: RequirementScope::Local
+                is_deferred: false,
+                context: RequirementContext::Local
             },]
         );
     }
@@ -2940,18 +2956,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2966,18 +2982,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -2992,18 +3008,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3018,18 +3034,18 @@ mod tests {
             [
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "d",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3050,18 +3066,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3082,18 +3098,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3114,18 +3130,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "f",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3146,18 +3162,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "i",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3178,23 +3194,23 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "b",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "h",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "j",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3215,18 +3231,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "c",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
@@ -3247,18 +3263,18 @@ mod tests {
             [
                 Requirement {
                     name: "a",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "e",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
                 Requirement {
                     name: "g",
-                    deferred: false,
-                    scope: RequirementScope::Local
+                    is_deferred: false,
+                    context: RequirementContext::Local
                 },
             ]
         );
