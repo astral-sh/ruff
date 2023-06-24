@@ -80,4 +80,24 @@ W605_0.py:18:6: W605 [*] Invalid escape sequence: `\_`
 17 17 | literal
 18 18 | with \_ somewhere
 
+W605_0.py:23:39: W605 [*] Invalid escape sequence: `\_`
+   |
+22 | #: W605:1:38
+23 | value = 'new line\nand invalid escape \_ here'
+   |                                       ^^ W605
+24 | 
+25 | #: Okay
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Fix
+20 20 | """
+21 21 | 
+22 22 | #: W605:1:38
+23    |-value = 'new line\nand invalid escape \_ here'
+   23 |+value = 'new line\nand invalid escape \\_ here'
+24 24 | 
+25 25 | #: Okay
+26 26 | regex = r'\.png$'
+
 
