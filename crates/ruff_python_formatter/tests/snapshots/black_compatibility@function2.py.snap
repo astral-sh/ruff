@@ -65,12 +65,13 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -2,17 +2,9 @@
+@@ -2,17 +2,11 @@
      a,
      **kwargs,
  ) -> A:
 -    with cache_dir():
--        if something:
++    with NOT_IMPLEMENTED_call():
+         if something:
 -            result = CliRunner().invoke(
 -                black.main, [str(src1), str(src2), "--diff", "--check"]
 -            )
@@ -80,13 +81,13 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -        very_long_argument_name2=-very.long.value.for_the_argument,
 -        **kwargs,
 -    )
-+    NOT_YET_IMPLEMENTED_StmtWith
++            result = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # negate top
 +    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
  def g():
-@@ -21,45 +13,30 @@
+@@ -21,45 +15,31 @@
      def inner():
          pass
  
@@ -136,8 +137,8 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -
  
 -with hmm_but_this_should_get_two_preceding_newlines():
--    pass
-+NOT_YET_IMPLEMENTED_StmtWith
++with NOT_IMPLEMENTED_call():
+     pass
 ```
 
 ## Ruff Output
@@ -147,7 +148,9 @@ def f(
     a,
     **kwargs,
 ) -> A:
-    NOT_YET_IMPLEMENTED_StmtWith
+    with NOT_IMPLEMENTED_call():
+        if something:
+            result = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # negate top
     return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
@@ -184,7 +187,8 @@ else:
     def foo():
         pass
 
-NOT_YET_IMPLEMENTED_StmtWith
+with NOT_IMPLEMENTED_call():
+    pass
 ```
 
 ## Black Output
