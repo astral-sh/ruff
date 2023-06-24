@@ -1558,6 +1558,35 @@ mod tests {
     }
 
     #[test]
+    fn for_references_bindings_in_conditional() {
+        let stmt = parse(
+            r#"
+                for a in (b := c)[b]:
+                    d = a, b, e
+                else:
+                    e = a, b, d
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "a", "d", "e"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn async_for_() {
         let stmt = parse(
             r#"
@@ -1648,6 +1677,35 @@ mod tests {
     }
 
     #[test]
+    fn async_for_references_bindings_in_conditional() {
+        let stmt = parse(
+            r#"
+                async for a in (b := c)[b]:
+                    d = a, b, e
+                else:
+                    e = a, b, d
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "a", "d", "e"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn while_() {
         let stmt = parse(
             r#"
@@ -1734,6 +1792,35 @@ mod tests {
                 is_deferred: false,
                 context: RequirementContext::Local
             },]
+        );
+    }
+
+    #[test]
+    fn while_references_bindings_in_conditional() {
+        let stmt = parse(
+            r#"
+                while (a := b)[a]:
+                    c = a, d
+                else:
+                    d = a, c
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "d"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
         );
     }
 
@@ -1866,25 +1953,36 @@ mod tests {
             r#"
                 if a:
                     b = a
-                    c = a
-                    d = a
+                    c = e
+                    d = g
                 elif b:
                     e = c
+                    f = h
                 else:
-                    f = d
-                    g = e
+                    g = d
+                    h = f
             "#,
         );
         let relation = stmt_relation(&stmt);
         assert_eq!(
             Vec::from_iter(relation.bindings),
-            ["b", "c", "d", "e", "f", "g"]
+            ["b", "c", "d", "e", "f", "g", "h"]
         );
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
                 Requirement {
                     name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
@@ -1899,12 +1997,17 @@ mod tests {
                     context: RequirementContext::Local
                 },
                 Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
                     name: "d",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
                 Requirement {
-                    name: "e",
+                    name: "f",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
