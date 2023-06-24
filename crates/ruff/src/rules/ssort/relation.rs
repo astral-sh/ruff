@@ -3371,6 +3371,33 @@ mod tests {
     }
 
     #[test]
+    fn dict_references_bindings() {
+        let stmt = parse(r#"{(a := b)[a]: (c := d)[a][c], **(e := f)[a][c][e]}"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "e"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn set() {
         let stmt = parse(r#"{a, *b}"#);
         let relation = stmt_relation(&stmt);
@@ -3395,6 +3422,28 @@ mod tests {
     #[test]
     fn set_with_walrus() {
         let stmt = parse(r#"{(a := b), *(c := d)}"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn set_references_bindings() {
+        let stmt = parse(r#"{(a := b)[a], *(c := d)[a][c]}"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
         assert_eq!(
@@ -3469,6 +3518,33 @@ mod tests {
     }
 
     #[test]
+    fn list_comp_references_bindings() {
+        let stmt = parse(r#"[(a := b)[a][c][d][g] for c in (d := f)[d] if (g := h)[c][d][g]]"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["d", "g", "a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn set_comp() {
         let stmt = parse(r#"{a for b in c if d}"#);
         let relation = stmt_relation(&stmt);
@@ -3498,6 +3574,33 @@ mod tests {
     #[test]
     fn set_comp_with_walrus() {
         let stmt = parse(r#"{(a := b) for c in (d := f) if (g := h)}"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["d", "g", "a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn set_comp_references_bindings() {
+        let stmt = parse(r#"{(a := b)[a][c][d][g] for c in (d := f)[d] if (g := h)[c][d][g]}"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["d", "g", "a"]);
         assert_eq!(
@@ -3587,6 +3690,45 @@ mod tests {
     }
 
     #[test]
+    fn dict_comp_references_bindings() {
+        let stmt = parse(
+            r#"
+                {
+                    (a := b)[a][e][f][h]: (c := d)[a][c][e][f][h]
+                    for e in (f := g)[f] if (h := i)[e][f][h]
+                }
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["f", "h", "a", "c"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "i",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn generator_exp() {
         let stmt = parse(r#"(a for b in c if d)"#);
         let relation = stmt_relation(&stmt);
@@ -3616,6 +3758,33 @@ mod tests {
     #[test]
     fn generator_exp_with_walrus() {
         let stmt = parse(r#"((a := b) for c in (d := f) if (g := h))"#);
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["d", "g", "a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn generator_exp_references_bindings() {
+        let stmt = parse(r#"((a := b)[a][c][d][g] for c in (d := f)[d] if (g := h)[c][d][g])"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["d", "g", "a"]);
         assert_eq!(
