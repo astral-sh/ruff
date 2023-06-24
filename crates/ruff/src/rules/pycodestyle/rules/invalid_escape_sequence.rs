@@ -79,6 +79,8 @@ pub(crate) fn invalid_escape_sequence(
 
         let mut chars_iter = body.char_indices().peekable();
 
+        let mut contains_valid_escape_sequence = false;
+
         while let Some((i, c)) = chars_iter.next() {
             if c != '\\' {
                 continue;
@@ -101,19 +103,34 @@ pub(crate) fn invalid_escape_sequence(
 
             // If the next character is a valid escape sequence, skip.
             if VALID_ESCAPE_SEQUENCES.contains(next_char) {
+                contains_valid_escape_sequence = true;
                 continue;
             }
 
             let location = start_offset + TextSize::try_from(i).unwrap();
             let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
-            let mut diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
-            if autofix {
-                diagnostic.set_fix(Fix::automatic(Edit::insertion(
-                    r"\".to_string(),
-                    range.start() + TextSize::from(1),
-                )));
-            }
+            let diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
             diagnostics.push(diagnostic);
+        }
+
+        if autofix {
+            if contains_valid_escape_sequence {
+                // Escape with backslash
+                for diagnostic in diagnostics.iter_mut() {
+                    diagnostic.set_fix(Fix::automatic(Edit::insertion(
+                        r"\".to_string(),
+                        diagnostic.range().start() + TextSize::from(1),
+                    )));
+                }
+            } else {
+                // Turn into raw string
+                for diagnostic in diagnostics.iter_mut() {
+                    diagnostic.set_fix(Fix::automatic(Edit::insertion(
+                        "r".to_string(),
+                        range.start() + TextSize::try_from(quote_pos).unwrap(),
+                    )));
+                }
+            }
         }
     }
 
