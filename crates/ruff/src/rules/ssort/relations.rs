@@ -3,10 +3,16 @@ use indexmap::IndexSet;
 use ruff_python_ast::prelude::*;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 
-pub(super) fn stmt_requirements(stmt: &Stmt) -> Vec<Requirement> {
-    let mut requirements = AstVisitor::default();
-    requirements.visit_stmt(stmt);
-    Vec::from_iter(requirements.requirements)
+pub(super) fn stmt_relations(stmt: &Stmt) -> Relations {
+    let mut visitor = RelationsVisitor::default();
+    visitor.visit_stmt(stmt);
+    visitor.relations
+}
+
+#[derive(Default)]
+pub(super) struct Relations<'a> {
+    pub requirements: IndexSet<Requirement<'a>>,
+    pub bindings: IndexSet<&'a str>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -24,14 +30,13 @@ pub(super) enum RequirementContext {
 }
 
 #[derive(Default)]
-struct AstVisitor<'a> {
-    requirements: IndexSet<Requirement<'a>>,
-    bindings: IndexSet<&'a str>,
+struct RelationsVisitor<'a> {
+    relations: Relations<'a>,
     is_store_requirement: bool,
     is_deferred: bool,
 }
 
-impl<'a> Visitor<'a> for AstVisitor<'a> {
+impl<'a> Visitor<'a> for RelationsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(StmtFunctionDef {
@@ -60,36 +65,37 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                     self.visit_annotation(expr);
                 }
 
-                self.bindings.insert(name);
+                self.relations.bindings.insert(name);
 
-                let requirements = std::mem::take(&mut self.requirements);
-                let bindings = std::mem::take(&mut self.bindings);
+                let requirements = std::mem::take(&mut self.relations.requirements);
+                let bindings = std::mem::take(&mut self.relations.bindings);
                 let is_deferred = std::mem::replace(&mut self.is_deferred, true);
 
-                add_arguments_to_bindings(&mut self.bindings, args);
+                add_arguments_to_bindings(&mut self.relations.bindings, args);
 
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
 
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
-                let bindings = std::mem::replace(&mut self.bindings, bindings);
+                let requirements =
+                    std::mem::replace(&mut self.relations.requirements, requirements);
+                let bindings = std::mem::replace(&mut self.relations.bindings, bindings);
                 self.is_deferred = is_deferred;
 
                 for mut requirement in requirements {
                     match requirement.context {
                         RequirementContext::Global => {
-                            self.requirements.insert(requirement);
+                            self.relations.requirements.insert(requirement);
                         }
                         RequirementContext::NonLocal => {
                             requirement.context = RequirementContext::Local;
-                            self.requirements.insert(requirement);
+                            self.relations.requirements.insert(requirement);
                         }
                         RequirementContext::Local => {
-                            if !self.bindings.contains(requirement.name)
+                            if !self.relations.bindings.contains(requirement.name)
                                 && !bindings.contains(requirement.name)
                             {
-                                self.requirements.insert(requirement);
+                                self.relations.requirements.insert(requirement);
                             }
                         }
                     };
@@ -115,25 +121,26 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                     self.visit_keyword(keyword);
                 }
 
-                self.bindings.insert(name);
+                self.relations.bindings.insert(name);
 
                 let mut cumulative_bindings = IndexSet::new();
 
                 for stmt in body {
-                    let requirements = std::mem::take(&mut self.requirements);
-                    let bindings = std::mem::take(&mut self.bindings);
+                    let requirements = std::mem::take(&mut self.relations.requirements);
+                    let bindings = std::mem::take(&mut self.relations.bindings);
 
                     self.visit_stmt(stmt);
 
-                    let requirements = std::mem::replace(&mut self.requirements, requirements);
-                    let bindings = std::mem::replace(&mut self.bindings, bindings);
+                    let requirements =
+                        std::mem::replace(&mut self.relations.requirements, requirements);
+                    let bindings = std::mem::replace(&mut self.relations.bindings, bindings);
 
                     for requirement in requirements {
                         if requirement.is_deferred
-                            || (!self.bindings.contains(requirement.name)
+                            || (!self.relations.bindings.contains(requirement.name)
                                 && !cumulative_bindings.contains(requirement.name))
                         {
-                            self.requirements.insert(requirement);
+                            self.relations.requirements.insert(requirement);
                         }
                     }
                     cumulative_bindings.extend(bindings);
@@ -150,22 +157,22 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
             }
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
-                    self.requirements.insert(Requirement {
+                    self.relations.requirements.insert(Requirement {
                         name,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::Global,
                     });
-                    self.bindings.insert(name);
+                    self.relations.bindings.insert(name);
                 }
             }
             Stmt::Nonlocal(StmtNonlocal { names, .. }) => {
                 for name in names {
-                    self.requirements.insert(Requirement {
+                    self.relations.requirements.insert(Requirement {
                         name,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::NonLocal,
                     });
-                    self.bindings.insert(name);
+                    self.relations.bindings.insert(name);
                 }
             }
             stmt => walk_stmt(self, stmt),
@@ -177,32 +184,33 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
             Expr::Lambda(ExprLambda { args, body, .. }) => {
                 self.visit_arguments(args);
 
-                let requirements = std::mem::take(&mut self.requirements);
-                let bindings = std::mem::take(&mut self.bindings);
+                let requirements = std::mem::take(&mut self.relations.requirements);
+                let bindings = std::mem::take(&mut self.relations.bindings);
                 let is_deferred = std::mem::replace(&mut self.is_deferred, true);
 
-                add_arguments_to_bindings(&mut self.bindings, args);
+                add_arguments_to_bindings(&mut self.relations.bindings, args);
 
                 self.visit_expr(body);
 
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
-                let bindings = std::mem::replace(&mut self.bindings, bindings);
+                let requirements =
+                    std::mem::replace(&mut self.relations.requirements, requirements);
+                let bindings = std::mem::replace(&mut self.relations.bindings, bindings);
                 self.is_deferred = is_deferred;
 
                 for mut requirement in requirements {
                     match requirement.context {
                         RequirementContext::Global => {
-                            self.requirements.insert(requirement);
+                            self.relations.requirements.insert(requirement);
                         }
                         RequirementContext::NonLocal => {
                             requirement.context = RequirementContext::Local;
-                            self.requirements.insert(requirement);
+                            self.relations.requirements.insert(requirement);
                         }
                         RequirementContext::Local => {
-                            if !self.bindings.contains(requirement.name)
+                            if !self.relations.bindings.contains(requirement.name)
                                 && !bindings.contains(requirement.name)
                             {
-                                self.requirements.insert(requirement);
+                                self.relations.requirements.insert(requirement);
                             }
                         }
                     };
@@ -217,15 +225,15 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
             | Expr::GeneratorExp(ExprGeneratorExp {
                 elt, generators, ..
             }) => {
-                let requirements = std::mem::take(&mut self.requirements);
+                let requirements = std::mem::take(&mut self.relations.requirements);
                 let mut bindings = IndexSet::new();
 
                 for comprehension in generators {
                     self.visit_expr(&comprehension.iter);
 
-                    bindings = std::mem::replace(&mut self.bindings, bindings);
+                    bindings = std::mem::replace(&mut self.relations.bindings, bindings);
                     self.visit_expr(&comprehension.target);
-                    bindings = std::mem::replace(&mut self.bindings, bindings);
+                    bindings = std::mem::replace(&mut self.relations.bindings, bindings);
 
                     for expr in &comprehension.ifs {
                         self.visit_expr(expr);
@@ -234,13 +242,14 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
 
                 self.visit_expr(elt);
 
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
+                let requirements =
+                    std::mem::replace(&mut self.relations.requirements, requirements);
 
                 for requirement in requirements {
-                    if !self.bindings.contains(requirement.name)
+                    if !self.relations.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
                     {
-                        self.requirements.insert(requirement);
+                        self.relations.requirements.insert(requirement);
                     }
                 }
             }
@@ -250,15 +259,15 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                 generators,
                 ..
             }) => {
-                let requirements = std::mem::take(&mut self.requirements);
+                let requirements = std::mem::take(&mut self.relations.requirements);
                 let mut bindings = IndexSet::new();
 
                 for comprehension in generators {
                     self.visit_expr(&comprehension.iter);
 
-                    bindings = std::mem::replace(&mut self.bindings, bindings);
+                    bindings = std::mem::replace(&mut self.relations.bindings, bindings);
                     self.visit_expr(&comprehension.target);
-                    bindings = std::mem::replace(&mut self.bindings, bindings);
+                    bindings = std::mem::replace(&mut self.relations.bindings, bindings);
 
                     for expr in &comprehension.ifs {
                         self.visit_expr(expr);
@@ -268,26 +277,27 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                 self.visit_expr(key);
                 self.visit_expr(value);
 
-                let requirements = std::mem::replace(&mut self.requirements, requirements);
+                let requirements =
+                    std::mem::replace(&mut self.relations.requirements, requirements);
 
                 for requirement in requirements {
-                    if !self.bindings.contains(requirement.name)
+                    if !self.relations.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
                     {
-                        self.requirements.insert(requirement);
+                        self.relations.requirements.insert(requirement);
                     }
                 }
             }
             Expr::Name(ExprName { id, ctx, .. }) => {
                 if self.is_store_requirement || ctx != &ExprContext::Store {
-                    self.requirements.insert(Requirement {
+                    self.relations.requirements.insert(Requirement {
                         name: id,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::Local,
                     });
                 }
                 if ctx == &ExprContext::Store {
-                    self.bindings.insert(id);
+                    self.relations.bindings.insert(id);
                 }
             }
             expr => walk_expr(self, expr),
@@ -303,7 +313,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                     self.visit_expr(expr);
                 }
                 if let Some(name) = name {
-                    self.bindings.insert(name);
+                    self.relations.bindings.insert(name);
                 }
                 self.visit_body(body);
             }
@@ -312,10 +322,10 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
 
     fn visit_alias(&mut self, alias: &'a Alias) {
         match &alias.asname {
-            Some(asname) => self.bindings.insert(asname),
+            Some(asname) => self.relations.bindings.insert(asname),
             None => match alias.name.split_once('.') {
-                Some((prefix, _)) => self.bindings.insert(prefix),
-                _ => self.bindings.insert(&alias.name),
+                Some((prefix, _)) => self.relations.bindings.insert(prefix),
+                _ => self.relations.bindings.insert(&alias.name),
             },
         };
     }
@@ -324,7 +334,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
         match pattern {
             Pattern::MatchStar(PatternMatchStar { name, .. }) => {
                 if let Some(name) = name {
-                    self.bindings.insert(name);
+                    self.relations.bindings.insert(name);
                 }
             }
             Pattern::MatchMapping(PatternMatchMapping {
@@ -338,7 +348,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.bindings.insert(rest);
+                    self.relations.bindings.insert(rest);
                 }
             }
             Pattern::MatchAs(PatternMatchAs { pattern, name, .. }) => {
@@ -346,7 +356,7 @@ impl<'a> Visitor<'a> for AstVisitor<'a> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(name) = name {
-                    self.bindings.insert(name);
+                    self.relations.bindings.insert(name);
                 }
             }
             pattern => walk_pattern(self, pattern),
@@ -379,12 +389,6 @@ mod tests {
         }
     }
 
-    pub(super) fn stmt_bindings(stmt: &Stmt) -> Vec<&str> {
-        let mut requirements = AstVisitor::default();
-        requirements.visit_stmt(stmt);
-        Vec::from_iter(requirements.bindings)
-    }
-
     mod bindings {
         use super::*;
         use pretty_assertions::assert_eq;
@@ -398,8 +402,8 @@ mod tests {
                     q = r
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b"]);
         }
 
         #[test]
@@ -418,9 +422,9 @@ mod tests {
                     aa = ab
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                bindings,
+                Vec::from_iter(relations.bindings),
                 ["a", "g", "l", "t", "e", "j", "o", "r", "w", "y", "c"]
             );
         }
@@ -434,8 +438,8 @@ mod tests {
                     q = r
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b"]);
         }
 
         #[test]
@@ -454,9 +458,9 @@ mod tests {
                     aa = ab
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                bindings,
+                Vec::from_iter(relations.bindings),
                 ["a", "g", "l", "t", "e", "j", "o", "r", "w", "y", "c"]
             );
         }
@@ -470,8 +474,8 @@ mod tests {
                     g = h
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b"]);
         }
 
         #[test]
@@ -483,78 +487,87 @@ mod tests {
                     i = j
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "d", "g", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "d", "g", "c"]);
         }
 
         #[test]
         fn return_() {
             let stmt = parse(r#"return a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn return_with_walrus() {
             let stmt = parse(r#"return (a := b)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn delete() {
             let stmt = parse(r#"del a, b.c, d[e:f:g]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn delete_with_walrus() {
             let stmt = parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "e", "g", "i", "k"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["b", "e", "g", "i", "k"]
+            );
         }
 
         #[test]
         fn assign() {
             let stmt = parse(r#"a = b, c.d, [e, *f], *g = h"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "b", "e", "f", "g"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "b", "e", "f", "g"]
+            );
         }
 
         #[test]
         fn assign_with_walrus() {
             let stmt = parse(r#"a = b, (c := d).e, [f, *g], *h = (i := j)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["i", "a", "b", "c", "f", "g", "h"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["i", "a", "b", "c", "f", "g", "h"]
+            );
         }
 
         #[test]
         fn aug_assign() {
             let stmt = parse(r#"a += b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn aug_assign_with_walrus() {
             let stmt = parse(r#"a += (b := c)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "a"]);
         }
 
         #[test]
         fn ann_assign() {
             let stmt = parse(r#"a: b = c"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn ann_assign_with_walrus() {
             let stmt = parse(r#"a: (b := c) = (d := e)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["d", "b", "a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["d", "b", "a"]);
         }
 
         #[test]
@@ -567,8 +580,8 @@ mod tests {
                     e = f
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e"]);
         }
 
         #[test]
@@ -581,8 +594,8 @@ mod tests {
                     f = g
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "a", "d", "f"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "a", "d", "f"]);
         }
 
         #[test]
@@ -595,8 +608,8 @@ mod tests {
                     e = f
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e"]);
         }
 
         #[test]
@@ -609,8 +622,8 @@ mod tests {
                     f = g
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "a", "d", "f"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "a", "d", "f"]);
         }
 
         #[test]
@@ -623,8 +636,8 @@ mod tests {
                     d = e
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "d"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "d"]);
         }
 
         #[test]
@@ -637,8 +650,8 @@ mod tests {
                     e = f
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e"]);
         }
 
         #[test]
@@ -653,8 +666,8 @@ mod tests {
                     g = h
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "e", "g"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "e", "g"]);
         }
 
         #[test]
@@ -669,8 +682,11 @@ mod tests {
                     i = j
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e", "g", "i"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "c", "e", "g", "i"]
+            );
         }
 
         #[test]
@@ -681,8 +697,8 @@ mod tests {
                     f = g
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "d", "e", "f"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "d", "e", "f"]);
         }
 
         #[test]
@@ -693,8 +709,11 @@ mod tests {
                     h = i
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "d", "f", "g", "h"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "c", "d", "f", "g", "h"]
+            );
         }
 
         #[test]
@@ -705,8 +724,8 @@ mod tests {
                     f = g
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "d", "e", "f"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "d", "e", "f"]);
         }
 
         #[test]
@@ -717,22 +736,25 @@ mod tests {
                     h = i
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "d", "f", "g", "h"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "c", "d", "f", "g", "h"]
+            );
         }
 
         #[test]
         fn raise() {
             let stmt = parse(r#"raise a from b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn raise_with_walrus() {
             let stmt = parse(r#"raise (a := b) from (c := d)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c"]);
         }
 
         #[test]
@@ -749,8 +771,11 @@ mod tests {
                     i = j
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "d", "e", "g", "i"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "d", "e", "g", "i"]
+            );
         }
 
         #[test]
@@ -767,8 +792,11 @@ mod tests {
                     j = k
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e", "f", "h", "j"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "c", "e", "f", "h", "j"]
+            );
         }
 
         #[test]
@@ -785,8 +813,11 @@ mod tests {
                     i = j
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "d", "e", "g", "i"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "d", "e", "g", "i"]
+            );
         }
 
         #[test]
@@ -803,436 +834,442 @@ mod tests {
                     j = k
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e", "f", "h", "j"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "c", "e", "f", "h", "j"]
+            );
         }
 
         #[test]
         fn assert() {
             let stmt = parse(r#"assert a, b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn assert_with_walrus() {
             let stmt = parse(r#"assert (a := b), (c := d)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c"]);
         }
 
         #[test]
         fn import() {
             let stmt = parse(r#"import a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn import_with_submodule() {
             let stmt = parse(r#"import a.b.c"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn import_with_alias() {
             let stmt = parse(r#"import a as b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b"]);
         }
 
         #[test]
         fn import_from() {
             let stmt = parse(r#"from a import b, c"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "c"]);
         }
 
         #[test]
         fn import_from_with_alias() {
             let stmt = parse(r#"from a import b as c, d as e"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["c", "e"]);
         }
 
         #[test]
         fn global() {
             let stmt = parse(r#"global a, b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "b"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "b"]);
         }
 
         #[test]
         fn nonlocal() {
             let stmt = parse(r#"nonlocal a, b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "b"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "b"]);
         }
 
         #[test]
         fn pass() {
             let stmt = parse(r#"pass"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn break_() {
             let stmt = parse(r#"break"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn continue_() {
             let stmt = parse(r#"continue"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn bool_op() {
             let stmt = parse(r#"a and b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn bool_op_with_walrus() {
             let stmt = parse(r#"(a := b) and (c := d)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c"]);
         }
 
         #[test]
         fn named_expr() {
             let stmt = parse(r#"(a := b)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn bin_op() {
             let stmt = parse(r#"a + b"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn bin_op_with_walrus() {
             let stmt = parse(r#"(a := b) + (c := d)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c"]);
         }
 
         #[test]
         fn unary_op() {
             let stmt = parse(r#"-a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn unary_op_with_walrus() {
             let stmt = parse(r#"-(a := b)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn lambda() {
             let stmt = parse(r#"lambda a = b, /, c = d, *e, f = g, **h: i"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn lambda_with_walrus() {
             let stmt =
                 parse(r#"lambda a = (b := c), /, d = (e := f), *g, h = (i := j), **k: (l := m)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "e", "i"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "e", "i"]);
         }
 
         #[test]
         fn if_exp() {
             let stmt = parse(r#"a if b else c"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn if_exp_with_walrus() {
             let stmt = parse(r#"(a := b) if (c := d) else (e := f)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["c", "a", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["c", "a", "e"]);
         }
 
         #[test]
         fn dict() {
             let stmt = parse(r#"{a: b, **c}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn dict_with_walrus() {
             let stmt = parse(r#"{(a := b): (c := d), **(e := f)}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e"]);
         }
 
         #[test]
         fn set() {
             let stmt = parse(r#"{a, *b}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn set_with_walrus() {
             let stmt = parse(r#"{(a := b), *(c := d)}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c"]);
         }
 
         #[test]
         fn list_comp() {
             let stmt = parse(r#"[a for b in c if d]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn list_comp_with_walrus() {
             let stmt = parse(r#"[(a := b) for c in (d := f) if (g := h)]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["d", "g", "a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["d", "g", "a"]);
         }
 
         #[test]
         fn set_comp() {
             let stmt = parse(r#"{a for b in c if d}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn set_comp_with_walrus() {
             let stmt = parse(r#"{(a := b) for c in (d := f) if (g := h)}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["d", "g", "a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["d", "g", "a"]);
         }
 
         #[test]
         fn dict_comp() {
             let stmt = parse(r#"{a: b for c in d if e}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn dict_comp_with_walrus() {
             let stmt = parse(r#"{(a := b): (c := d) for e in (f := g) if (h := i)}"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["f", "h", "a", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["f", "h", "a", "c"]);
         }
 
         #[test]
         fn generator_exp() {
             let stmt = parse(r#"(a for b in c if d)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn generator_exp_with_walrus() {
             let stmt = parse(r#"((a := b) for c in (d := f) if (g := h))"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["d", "g", "a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["d", "g", "a"]);
         }
 
         #[test]
         fn await_() {
             let stmt = parse(r#"await a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn await_with_walrus() {
             let stmt = parse(r#"await (a := b)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn yield_() {
             let stmt = parse(r#"yield a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn yield_with_walrus() {
             let stmt = parse(r#"yield (a := b)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn yield_from() {
             let stmt = parse(r#"yield from a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn yield_from_with_walrus() {
             let stmt = parse(r#"yield from (a := b)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn compare() {
             let stmt = parse(r#"a < b < c"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn compare_with_walrus() {
             let stmt = parse(r#"(a := b) < (c := d) < (e := f)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e"]);
         }
 
         #[test]
         fn call() {
             let stmt = parse(r#"a(b, *c, d=e, **f)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn call_with_walrus() {
             let stmt = parse(r#"(a := b)((c := d), *(e := f), g=(h := i), **(j := k))"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e", "h", "j"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.bindings),
+                ["a", "c", "e", "h", "j"]
+            );
         }
 
         #[test]
         fn formatted_value() {
             let stmt = parse(r#"f"{a:{b}}""#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn formatted_value_with_walrus() {
             let stmt = parse(r#"f"{(a := b):{(c := d)}}""#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c"]);
         }
 
         #[test]
         fn joined_str() {
             let stmt = parse(r#"f"{a:{b}} {c:{d}}""#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn joined_str_with_walrus() {
             let stmt = parse(r#"f"{(a := b):{(c := d)}} {(e := f):{(g := h)}}""#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e", "g"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e", "g"]);
         }
 
         #[test]
         fn constant() {
             let stmt = parse(r#"1"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn attribute() {
             let stmt = parse(r#"a.b.c"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn attribute_with_walrus() {
             let stmt = parse(r#"(a := b).c.d"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn subscript() {
             let stmt = parse(r#"a[b:c:d]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn subscript_with_walrus() {
             let stmt = parse(r#"(a := b)[(c := d):(e := f):(g := h)]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e", "g"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e", "g"]);
         }
 
         #[test]
         fn starred() {
             let stmt = parse(r#"*a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn starred_with_walrus() {
             let stmt = parse(r#"*(a := b)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a"]);
         }
 
         #[test]
         fn name() {
             let stmt = parse(r#"a"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn list() {
             let stmt = parse(r#"[a, b, *c]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn list_with_walrus() {
             let stmt = parse(r#"[(a := b), (c := d), *(e := f)]"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e"]);
         }
 
         #[test]
         fn tuple() {
             let stmt = parse(r#"(a, b, *c)"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, [] as [&str; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), [] as [&str; 0]);
         }
 
         #[test]
         fn tuple_with_walrus() {
             let stmt = parse(r#"((a := b), (c := d), *(e := f))"#);
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["a", "c", "e"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["a", "c", "e"]);
         }
 
         #[test]
@@ -1244,8 +1281,8 @@ mod tests {
                         d = e
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "d"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "d"]);
         }
 
         #[test]
@@ -1257,8 +1294,8 @@ mod tests {
                         d = e
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "d"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "d"]);
         }
 
         #[test]
@@ -1270,8 +1307,8 @@ mod tests {
                         g = h
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "c", "e", "g"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "c", "e", "g"]);
         }
 
         #[test]
@@ -1283,8 +1320,8 @@ mod tests {
                         h = i
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["c", "e", "f", "h"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["c", "e", "f", "h"]);
         }
 
         #[test]
@@ -1296,8 +1333,8 @@ mod tests {
                         i=j
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["c", "e", "g", "i"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["c", "e", "g", "i"]);
         }
 
         #[test]
@@ -1309,8 +1346,8 @@ mod tests {
                         d = e
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "d"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "d"]);
         }
 
         #[test]
@@ -1322,8 +1359,8 @@ mod tests {
                         f = g
             "#,
             );
-            let bindings = stmt_bindings(&stmt);
-            assert_eq!(bindings, ["b", "c", "d", "f"]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(Vec::from_iter(relations.bindings), ["b", "c", "d", "f"]);
         }
     }
 
@@ -1340,9 +1377,9 @@ mod tests {
                     q = r
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -1419,9 +1456,9 @@ mod tests {
                     aa = ab
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -1498,9 +1535,9 @@ mod tests {
                     _ = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -1565,9 +1602,9 @@ mod tests {
                     q = r
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -1644,9 +1681,9 @@ mod tests {
                     aa = ab
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -1723,9 +1760,9 @@ mod tests {
                     _ = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -1790,9 +1827,9 @@ mod tests {
                     g = h
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -1827,9 +1864,9 @@ mod tests {
                     i = j
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -1864,9 +1901,9 @@ mod tests {
                     _ = a, c, d, g
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -1890,9 +1927,9 @@ mod tests {
         #[test]
         fn return_() {
             let stmt = parse(r#"return a"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -1904,9 +1941,9 @@ mod tests {
         #[test]
         fn return_with_walrus() {
             let stmt = parse(r#"return (a := b)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -1918,9 +1955,9 @@ mod tests {
         #[test]
         fn delete() {
             let stmt = parse(r#"del a, b.c, d[e:f:g]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -1959,9 +1996,9 @@ mod tests {
         #[test]
         fn delete_with_walrus() {
             let stmt = parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2000,9 +2037,9 @@ mod tests {
         #[test]
         fn assign() {
             let stmt = parse(r#"a = b, c.d, [e, *f], *g = h"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "h",
@@ -2021,9 +2058,9 @@ mod tests {
         #[test]
         fn assign_with_walrus() {
             let stmt = parse(r#"a = b, (c := d).e, [f, *g], *h = (i := j)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "j",
@@ -2042,9 +2079,9 @@ mod tests {
         #[test]
         fn aug_assign() {
             let stmt = parse(r#"a += b"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2063,9 +2100,9 @@ mod tests {
         #[test]
         fn aug_assign_with_walrus() {
             let stmt = parse(r#"a += (b := c)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -2084,9 +2121,9 @@ mod tests {
         #[test]
         fn ann_assign() {
             let stmt = parse(r#"a: b = c"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -2105,9 +2142,9 @@ mod tests {
         #[test]
         fn ann_assign_with_walrus() {
             let stmt = parse(r#"a: (b := c) = (d := e)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "e",
@@ -2133,9 +2170,9 @@ mod tests {
                     e = f
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2166,9 +2203,9 @@ mod tests {
                     f = g
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -2199,9 +2236,9 @@ mod tests {
                     e = f
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2232,9 +2269,9 @@ mod tests {
                     f = g
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -2265,9 +2302,9 @@ mod tests {
                     d = e
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2298,9 +2335,9 @@ mod tests {
                     e = f
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2333,9 +2370,9 @@ mod tests {
                     g = h
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2378,9 +2415,9 @@ mod tests {
                     i = j
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2419,9 +2456,9 @@ mod tests {
                     f = g
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2450,9 +2487,9 @@ mod tests {
                     h = i
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2481,9 +2518,9 @@ mod tests {
                     f = g
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2512,9 +2549,9 @@ mod tests {
                     h = i
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2538,9 +2575,9 @@ mod tests {
         #[test]
         fn raise() {
             let stmt = parse(r#"raise a from b"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2559,9 +2596,9 @@ mod tests {
         #[test]
         fn raise_with_walrus() {
             let stmt = parse(r#"raise (a := b) from (c := d)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2591,9 +2628,9 @@ mod tests {
                     i = j
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2638,9 +2675,9 @@ mod tests {
                     j = k
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2685,9 +2722,9 @@ mod tests {
                     i = j
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2732,9 +2769,9 @@ mod tests {
                     j = k
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2768,9 +2805,9 @@ mod tests {
         #[test]
         fn assert() {
             let stmt = parse(r#"assert a, b"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2789,9 +2826,9 @@ mod tests {
         #[test]
         fn assert_with_walrus() {
             let stmt = parse(r#"assert (a := b), (c := d)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2810,44 +2847,59 @@ mod tests {
         #[test]
         fn import() {
             let stmt = parse(r#"import a"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn import_with_submodule() {
             let stmt = parse(r#"import a.b.c"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn import_with_alias() {
             let stmt = parse(r#"import a as b"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn import_from() {
             let stmt = parse(r#"from a import b, c"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn import_from_with_alias() {
             let stmt = parse(r#"from a import b as c, d as e"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn global() {
             let stmt = parse(r#"global a, b"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2866,9 +2918,9 @@ mod tests {
         #[test]
         fn nonlocal() {
             let stmt = parse(r#"nonlocal a, b"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2887,30 +2939,39 @@ mod tests {
         #[test]
         fn pass() {
             let stmt = parse(r#"pass"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn break_() {
             let stmt = parse(r#"break"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn continue_() {
             let stmt = parse(r#"continue"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn bool_op() {
             let stmt = parse(r#"a and b"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2929,9 +2990,9 @@ mod tests {
         #[test]
         fn bool_op_with_walrus() {
             let stmt = parse(r#"(a := b) and (c := d)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -2950,9 +3011,9 @@ mod tests {
         #[test]
         fn named_expr() {
             let stmt = parse(r#"(a := b)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -2964,9 +3025,9 @@ mod tests {
         #[test]
         fn bin_op() {
             let stmt = parse(r#"a + b"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -2985,9 +3046,9 @@ mod tests {
         #[test]
         fn bin_op_with_walrus() {
             let stmt = parse(r#"(a := b) + (c := d)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3006,9 +3067,9 @@ mod tests {
         #[test]
         fn unary_op() {
             let stmt = parse(r#"-a"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -3020,9 +3081,9 @@ mod tests {
         #[test]
         fn unary_op_with_walrus() {
             let stmt = parse(r#"-(a := b)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -3034,9 +3095,9 @@ mod tests {
         #[test]
         fn lambda() {
             let stmt = parse(r#"lambda a = b, /, c = d, *e, f = g, **h: i"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3066,9 +3127,9 @@ mod tests {
         fn lambda_with_walrus() {
             let stmt =
                 parse(r#"lambda a = (b := c), /, d = (e := f), *g, h = (i := j), **k: (l := m)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -3097,9 +3158,9 @@ mod tests {
         #[test]
         fn if_exp() {
             let stmt = parse(r#"a if b else c"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3123,9 +3184,9 @@ mod tests {
         #[test]
         fn if_exp_with_walrus() {
             let stmt = parse(r#"(a := b) if (c := d) else (e := f)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "d",
@@ -3149,9 +3210,9 @@ mod tests {
         #[test]
         fn dict() {
             let stmt = parse(r#"{a: b, **c}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3175,9 +3236,9 @@ mod tests {
         #[test]
         fn dict_with_walrus() {
             let stmt = parse(r#"{(a := b): (c := d), **(e := f)}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3201,9 +3262,9 @@ mod tests {
         #[test]
         fn set() {
             let stmt = parse(r#"{a, *b}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3222,9 +3283,9 @@ mod tests {
         #[test]
         fn set_with_walrus() {
             let stmt = parse(r#"{(a := b), *(c := d)}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3243,9 +3304,9 @@ mod tests {
         #[test]
         fn list_comp() {
             let stmt = parse(r#"[a for b in c if d]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -3269,9 +3330,9 @@ mod tests {
         #[test]
         fn list_comp_with_walrus() {
             let stmt = parse(r#"[(a := b) for c in (d := f) if (g := h)]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "f",
@@ -3295,9 +3356,9 @@ mod tests {
         #[test]
         fn set_comp() {
             let stmt = parse(r#"{a for b in c if d}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -3321,9 +3382,9 @@ mod tests {
         #[test]
         fn set_comp_with_walrus() {
             let stmt = parse(r#"{(a := b) for c in (d := f) if (g := h)}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "f",
@@ -3347,9 +3408,9 @@ mod tests {
         #[test]
         fn dict_comp() {
             let stmt = parse(r#"{a: b for c in d if e}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "d",
@@ -3378,9 +3439,9 @@ mod tests {
         #[test]
         fn dict_comp_with_walrus() {
             let stmt = parse(r#"{(a := b): (c := d) for e in (f := g) if (h := i)}"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "g",
@@ -3409,9 +3470,9 @@ mod tests {
         #[test]
         fn generator_exp() {
             let stmt = parse(r#"(a for b in c if d)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "c",
@@ -3435,9 +3496,9 @@ mod tests {
         #[test]
         fn generator_exp_with_walrus() {
             let stmt = parse(r#"((a := b) for c in (d := f) if (g := h))"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "f",
@@ -3461,9 +3522,9 @@ mod tests {
         #[test]
         fn await_() {
             let stmt = parse(r#"await a"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -3475,9 +3536,9 @@ mod tests {
         #[test]
         fn await_with_walrus() {
             let stmt = parse(r#"await (a := b)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -3489,9 +3550,9 @@ mod tests {
         #[test]
         fn yield_() {
             let stmt = parse(r#"yield a"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -3503,9 +3564,9 @@ mod tests {
         #[test]
         fn yield_with_walrus() {
             let stmt = parse(r#"yield (a := b)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -3517,9 +3578,9 @@ mod tests {
         #[test]
         fn yield_from() {
             let stmt = parse(r#"yield from a"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -3531,9 +3592,9 @@ mod tests {
         #[test]
         fn yield_from_with_walrus() {
             let stmt = parse(r#"yield from (a := b)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -3545,9 +3606,9 @@ mod tests {
         #[test]
         fn compare() {
             let stmt = parse(r#"a < b < c"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3571,9 +3632,9 @@ mod tests {
         #[test]
         fn compare_with_walrus() {
             let stmt = parse(r#"(a := b) < (c := d) < (e := f)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3597,9 +3658,9 @@ mod tests {
         #[test]
         fn call() {
             let stmt = parse(r#"a(b, *c, d=e, **f)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3633,9 +3694,9 @@ mod tests {
         #[test]
         fn call_with_walrus() {
             let stmt = parse(r#"(a := b)((c := d), *(e := f), g=(h := i), **(j := k))"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3669,9 +3730,9 @@ mod tests {
         #[test]
         fn formatted_value() {
             let stmt = parse(r#"f"{a:{b}}""#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3690,9 +3751,9 @@ mod tests {
         #[test]
         fn formatted_value_with_walrus() {
             let stmt = parse(r#"f"{(a := b):{(c := d)}}""#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3711,9 +3772,9 @@ mod tests {
         #[test]
         fn joined_str() {
             let stmt = parse(r#"f"{a:{b}} {c:{d}}""#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3742,9 +3803,9 @@ mod tests {
         #[test]
         fn joined_str_with_walrus() {
             let stmt = parse(r#"f"{(a := b):{(c := d)}} {(e := f):{(g := h)}}""#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3773,16 +3834,19 @@ mod tests {
         #[test]
         fn constant() {
             let stmt = parse(r#"1"#);
-            let requirements = stmt_requirements(&stmt);
-            assert_eq!(requirements, [] as [Requirement; 0]);
+            let relations = stmt_relations(&stmt);
+            assert_eq!(
+                Vec::from_iter(relations.requirements),
+                [] as [Requirement; 0]
+            );
         }
 
         #[test]
         fn attribute() {
             let stmt = parse(r#"a.b.c"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -3794,9 +3858,9 @@ mod tests {
         #[test]
         fn attribute_with_walrus() {
             let stmt = parse(r#"(a := b).c.d"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -3808,9 +3872,9 @@ mod tests {
         #[test]
         fn subscript() {
             let stmt = parse(r#"a[b:c:d]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3839,9 +3903,9 @@ mod tests {
         #[test]
         fn subscript_with_walrus() {
             let stmt = parse(r#"(a := b)[(c := d):(e := f):(g := h)]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3870,9 +3934,9 @@ mod tests {
         #[test]
         fn starred() {
             let stmt = parse(r#"*a"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -3884,9 +3948,9 @@ mod tests {
         #[test]
         fn starred_with_walrus() {
             let stmt = parse(r#"*(a := b)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "b",
                     is_deferred: false,
@@ -3898,9 +3962,9 @@ mod tests {
         #[test]
         fn name() {
             let stmt = parse(r#"a"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [Requirement {
                     name: "a",
                     is_deferred: false,
@@ -3912,9 +3976,9 @@ mod tests {
         #[test]
         fn list() {
             let stmt = parse(r#"[a, b, *c]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3938,9 +4002,9 @@ mod tests {
         #[test]
         fn list_with_walrus() {
             let stmt = parse(r#"[(a := b), (c := d), *(e := f)]"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -3964,9 +4028,9 @@ mod tests {
         #[test]
         fn tuple() {
             let stmt = parse(r#"(a, b, *c)"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -3990,9 +4054,9 @@ mod tests {
         #[test]
         fn tuple_with_walrus() {
             let stmt = parse(r#"((a := b), (c := d), *(e := f))"#);
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "b",
@@ -4022,9 +4086,9 @@ mod tests {
                         d = e
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -4054,9 +4118,9 @@ mod tests {
                         d = e
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -4086,9 +4150,9 @@ mod tests {
                         g = h
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -4118,9 +4182,9 @@ mod tests {
                         h = i
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -4150,9 +4214,9 @@ mod tests {
                         i=j
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -4187,9 +4251,9 @@ mod tests {
                         d = e
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
@@ -4219,9 +4283,9 @@ mod tests {
                         f = g
             "#,
             );
-            let requirements = stmt_requirements(&stmt);
+            let relations = stmt_relations(&stmt);
             assert_eq!(
-                requirements,
+                Vec::from_iter(relations.requirements),
                 [
                     Requirement {
                         name: "a",
