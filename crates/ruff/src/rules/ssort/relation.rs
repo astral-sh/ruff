@@ -593,7 +593,7 @@ mod tests {
                     q: (r := s) = (t := u),
                     **v: (w := x)
                 ) -> (y := z):
-                    _ = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
+                    aa = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
             "#,
         );
         let relation = stmt_relation(&stmt);
@@ -827,7 +827,7 @@ mod tests {
                     q: (r := s) = (t := u),
                     **v: (w := x)
                 ) -> (y := z):
-                    _ = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
+                    aa = a, c, d, e, g, i, j, l, n, o, q, r, t, v, w, y
             "#,
         );
         let relation = stmt_relation(&stmt);
@@ -1314,7 +1314,7 @@ mod tests {
     }
 
     #[test]
-    fn aug_assign_bindings_target() {
+    fn aug_assign_binds_target() {
         let stmt = parse(r#"a += (a := b)"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
@@ -1914,6 +1914,36 @@ mod tests {
     }
 
     #[test]
+    fn with_references_bindings() {
+        let stmt = parse(
+            r#"
+                with (a := b) + a as c, (d := e) + a + c + d as (f, g):
+                    h = a, c, d, f, g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(
+            Vec::from_iter(relation.bindings),
+            ["a", "c", "d", "f", "g", "h"]
+        );
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn async_with() {
         let stmt = parse(
             r#"
@@ -1973,6 +2003,36 @@ mod tests {
                 },
                 Requirement {
                     name: "i",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn async_with_references_bindings() {
+        let stmt = parse(
+            r#"
+                async with (a := b) + a as c, (d := e) + a + c + d as (f, g):
+                    h = a, c, d, f, g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(
+            Vec::from_iter(relation.bindings),
+            ["a", "c", "d", "f", "g", "h"]
+        );
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
