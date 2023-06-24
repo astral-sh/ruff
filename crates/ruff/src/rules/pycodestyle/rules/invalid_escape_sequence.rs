@@ -116,7 +116,7 @@ pub(crate) fn invalid_escape_sequence(
         if autofix {
             if contains_valid_escape_sequence {
                 // Escape with backslash
-                for diagnostic in diagnostics.iter_mut() {
+                for diagnostic in &mut diagnostics {
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         r"\".to_string(),
                         diagnostic.range().start() + TextSize::from(1),
@@ -124,7 +124,7 @@ pub(crate) fn invalid_escape_sequence(
                 }
             } else {
                 // Turn into raw string
-                for diagnostic in diagnostics.iter_mut() {
+                for diagnostic in &mut diagnostics {
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         "r".to_string(),
                         range.start() + TextSize::try_from(quote_pos).unwrap(),
