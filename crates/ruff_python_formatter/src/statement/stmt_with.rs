@@ -19,14 +19,6 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
-        let trailing_items_comments = body.first().map(|body_start| {
-            let before_body = dangling_comments
-                .partition_point(|comment| comment.slice().end() < body_start.start());
-
-            let (trailing_items_comments, rest) = dangling_comments.split_at(before_body);
-            debug_assert!(rest.is_empty());
-            trailing_items_comments
-        });
 
         let joined_items = format_with(|f| f.join_comma_separated().nodes(items.iter()).finish());
 
@@ -41,7 +33,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                     if_group_breaks(&text(")")),
                 ]),
                 text(":"),
-                trailing_items_comments.map(trailing_comments),
+                trailing_comments(dangling_comments),
                 block_indent(&body.format())
             ]
         )
