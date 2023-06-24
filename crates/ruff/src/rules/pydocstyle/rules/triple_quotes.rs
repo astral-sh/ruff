@@ -4,6 +4,29 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
+/// ## What it does
+/// Checks for docstrings defined using single quotes instead of double quotes.
+///
+/// ## Why is this bad?
+/// Use double quotes when defining docstrings for consistency, as per
+/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring).
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     '''Foo docstring.'''
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     """Foo docstring."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct TripleSingleQuotes;
 

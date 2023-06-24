@@ -7,6 +7,36 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
+/// ## What it does
+/// Checks for docstrings that
+///
+/// ## Why is this bad?
+/// Backslashes are used to escape characters in strings, unless the string is
+/// defined as a raw string literal. Use the raw string literal prefix `r` when
+/// declaring docstrings with backslashes to avoid confusion and accidental
+/// escaping.
+///
+/// ## Example
+/// ```python
+/// def foobar():
+///     """Docstring for foo\bar."""
+///
+///
+/// foobar.__doc__  # "Docstring for foar."
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foobar():
+///     r"""Docstring for foo\bar."""
+///
+///
+/// foobar.__doc__  # "Docstring for foo\bar."
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[violation]
 pub struct EscapeSequenceInDocstring;
 
