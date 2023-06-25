@@ -19,6 +19,9 @@ with \_ somewhere
 in the middle
 """
 
+#: W605:1:38
+value = 'new line\nand invalid escape \_ here'
+
 #: Okay
 regex = r'\.png$'
 regex = '\\.png$'
