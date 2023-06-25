@@ -4,6 +4,31 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
+/// ## What it does
+/// Checks for docstrings that use `'''triple single quotes'''` instead of
+/// `"""triple double quotes"""`.
+///
+/// ## Why is this bad?
+/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
+/// the use of `"""triple double quotes"""` for docstrings, to ensure
+/// consistency.
+///
+/// ## Example
+/// ```python
+/// def kos_root():
+///     '''Return the pathname of the KOS root directory.'''
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def kos_root():
+///     """Return the pathname of the KOS root directory."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct TripleSingleQuotes;
 
