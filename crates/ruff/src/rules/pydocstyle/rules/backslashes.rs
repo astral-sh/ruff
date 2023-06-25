@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
 /// ## What it does
-/// Checks for docstrings that include escape sequences, but are not defined as
+/// Checks for docstrings that include backslashes, but are not defined as
 /// raw string literals.
 ///
 /// ## Why is this bad?
