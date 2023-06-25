@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+assertion_line: 143
+---
+F811_25.py:12:27: F811 Redefinition of unused `metadata` from line 10
+   |
+10 |         from importlib import metadata
+11 | else:
+12 |     from importlib import metadata
+   |                           ^^^^^^^^ F811
+13 | 
+14 | __all__ = ["metadata"]
+   |
+
+

@@ -1,0 +1,17 @@
+[package]
+name = "ruff-minimizer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+fs-err = "2.9.0"
+regex = { workspace = true }
+ruff_rustpython = { path = "../ruff_rustpython" }
+rustpython-ast = { workspace = true }
+shlex = "1.1.0"
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
