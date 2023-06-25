@@ -5,22 +5,24 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
 /// ## What it does
-/// Checks for docstrings defined using single quotes instead of double quotes.
+/// Checks for docstrings that use `'''triple single quotes'''` instead of
+/// `"""triple double quotes"""`.
 ///
 /// ## Why is this bad?
-/// Use double quotes when defining docstrings for consistency, as per
-/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring).
+/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
+/// the use of `"""triple double quotes"""` for docstrings, to ensure
+/// consistency.
 ///
 /// ## Example
 /// ```python
-/// def foo():
-///     '''Foo docstring.'''
+/// def kos_root():
+///     '''Return the pathname of the KOS root directory.'''
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo():
-///     """Foo docstring."""
+/// def kos_root():
+///     """Return the pathname of the KOS root directory."""
 /// ```
 ///
 /// ## References
