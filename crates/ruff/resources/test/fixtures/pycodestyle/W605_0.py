@@ -22,6 +22,11 @@ in the middle
 #: W605:1:38
 value = 'new line\nand invalid escape \_ here'
 
+
+def f():
+    #: W605:1:11
+    return'\.png$'
+
 #: Okay
 regex = r'\.png$'
 regex = '\\.png$'
