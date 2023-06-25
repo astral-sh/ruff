@@ -204,10 +204,7 @@ for user_id in set(target_user_ids) - {u.user_id for u in updates}:
 
 ## Output
 ```py
-(
-    aaaaaaaa
-    + b  # trailing operator comment  # trailing right comment
-)
+(aaaaaaaa + b)  # trailing operator comment  # trailing right comment
 
 
 (

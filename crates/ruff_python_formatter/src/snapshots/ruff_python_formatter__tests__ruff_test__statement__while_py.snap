@@ -65,11 +65,7 @@ while NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and anotherCondition or aThirdCo
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-while (
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # trailing some condition
-    and anotherCondition
-    or aThirdCondition  # trailing third condition
-):  # comment
+while NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and anotherCondition or aThirdCondition:  # trailing some condition  # trailing third condition  # comment
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 

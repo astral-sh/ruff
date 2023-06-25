@@ -367,9 +367,7 @@ def f(arg1=1, *, kwonlyarg1, kwonlyarg2=2):
 
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5176#issuecomment-1598171989
-def foo(
-    b=3 + 2,  # comment
-):
+def foo(b=3 + 2):  # comment
     ...
 
 

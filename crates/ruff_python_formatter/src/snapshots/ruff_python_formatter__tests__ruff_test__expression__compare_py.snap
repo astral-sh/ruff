@@ -88,10 +88,7 @@ a not in b
     == b
 )
 
-(
-    a  # comment
-    == b
-)
+(a == b)  # comment
 
 a < b > c == d
 

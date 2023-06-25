@@ -78,14 +78,9 @@ a = {
 
 {**d}
 
-{
-    **a,  #  leading
-    **b,  # middle  # trailing
-}
+{**a, **b}  #  leading  # middle  # trailing
 
-{
-    **b,  # middle with single item
-}
+{**b}  # middle with single item
 
 {
     # before

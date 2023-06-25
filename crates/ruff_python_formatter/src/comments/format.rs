@@ -163,10 +163,11 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
             } else {
                 write!(
                     f,
-                    [
-                        line_suffix(&format_args![space(), space(), format_comment(trailing)]),
-                        expand_parent()
-                    ]
+                    [line_suffix(&format_args![
+                        space(),
+                        space(),
+                        format_comment(trailing)
+                    ])]
                 )?;
             }
 

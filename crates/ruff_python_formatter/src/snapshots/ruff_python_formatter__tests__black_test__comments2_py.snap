@@ -190,7 +190,7 @@ instruction()#comment with bad spacing
  
  # Please keep __all__ alphabetized within each category.
  
-@@ -37,31 +33,35 @@
+@@ -37,23 +33,23 @@
      # builtin types and objects
      type,
      object,
@@ -220,20 +220,7 @@ instruction()#comment with bad spacing
      # add_compiler(compilers[(7.1, 64)])
  
  
- # Comment before function.
- def inline_comments_in_brackets_ruin_everything():
-     if typedargslist:
--        parameters.children = [children[0], body, children[-1]]  # (1  # )1
-         parameters.children = [
-+            children[0],  # (1
-+            body,
-+            children[-1],  # )1
-+        ]
-+        parameters.children = [
-             children[0],
-             body,
-             children[-1],  # type: ignore
-@@ -72,14 +72,18 @@
+@@ -72,14 +68,18 @@
              body,
              parameters.children[-1],  # )2
          ]
@@ -254,7 +241,7 @@ instruction()#comment with bad spacing
      ):
          pass
      # no newline before or after
-@@ -91,48 +95,14 @@
+@@ -91,48 +91,14 @@
      ]
  
      # no newline after
@@ -308,7 +295,7 @@ instruction()#comment with bad spacing
      while True:
          if False:
              continue
-@@ -141,10 +111,7 @@
+@@ -141,10 +107,7 @@
          # and round and round we go
  
      # let's return
@@ -320,20 +307,16 @@ instruction()#comment with bad spacing
  
  
  CONFIG_FILES = (
-@@ -158,7 +125,11 @@
+@@ -158,7 +121,7 @@
  
  class Test:
      def _init_host(self, parsed) -> None:
 -        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
-+        if (
-+            parsed.hostname
-+            is None  # type: ignore
-+            or not NOT_IMPLEMENTED_call()
-+        ):
++        if parsed.hostname is None or not NOT_IMPLEMENTED_call():  # type: ignore
              pass
  
  
-@@ -167,7 +138,7 @@
+@@ -167,7 +130,7 @@
  #######################
  
  
@@ -405,11 +388,7 @@ else:
 # Comment before function.
 def inline_comments_in_brackets_ruin_everything():
     if typedargslist:
-        parameters.children = [
-            children[0],  # (1
-            body,
-            children[-1],  # )1
-        ]
+        parameters.children = [children[0], body, children[-1]]  # (1  # )1
         parameters.children = [
             children[0],
             body,
@@ -474,11 +453,7 @@ CONFIG_FILES = (
 
 class Test:
     def _init_host(self, parsed) -> None:
-        if (
-            parsed.hostname
-            is None  # type: ignore
-            or not NOT_IMPLEMENTED_call()
-        ):
+        if parsed.hostname is None or not NOT_IMPLEMENTED_call():  # type: ignore
             pass
 
 

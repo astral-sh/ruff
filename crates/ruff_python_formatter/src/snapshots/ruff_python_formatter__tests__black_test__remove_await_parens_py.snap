@@ -94,7 +94,7 @@ async def main():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,66 +1,57 @@
+@@ -1,66 +1,53 @@
 -import asyncio
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -132,11 +132,7 @@ async def main():
  
  async def main():
 -    await asyncio.sleep(1)  # Hello
-+    (
-+        await (
-+            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # Hello
-+        )
-+    )
++    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))  # Hello
  
  
  async def main():
@@ -179,7 +175,7 @@ async def main():
  
  
  # Keep brackets around non power operations and nested awaits
-@@ -69,7 +60,7 @@
+@@ -69,7 +56,7 @@
  
  
  async def main():
@@ -188,7 +184,7 @@ async def main():
  
  
  # It's awaits all the way down...
-@@ -78,16 +69,16 @@
+@@ -78,16 +65,16 @@
  
  
  async def main():
@@ -244,11 +240,7 @@ async def main():
 
 
 async def main():
-    (
-        await (
-            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # Hello
-        )
-    )
+    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))  # Hello
 
 
 async def main():
