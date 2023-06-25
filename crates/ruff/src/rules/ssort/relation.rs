@@ -523,14 +523,12 @@ mod tests {
 
     fn parse(source: &str) -> Stmt {
         let source = unindent(source);
-        println!("-----BEGIN SOURCE-----\n{}\n-----END SOURCE-----", source);
         let tokens = lex(&source, Mode::Module);
         let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
         let ast = match parsed {
             Mod::Module(ModModule { body, .. }) => body.into_iter().next().unwrap(),
             _ => panic!("Unsupported module type"),
         };
-        println!("-----BEGIN AST-----\n{:?}\n-----END AST-----", ast);
         ast
     }
 
