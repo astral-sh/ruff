@@ -8,13 +8,19 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
 /// ## What it does
-/// Checks for docstrings that
+/// Checks for docstrings that include escape sequences, but are not defined as
+/// raw string literals.
 ///
 /// ## Why is this bad?
-/// Backslashes are used to escape characters in strings, unless the string is
-/// defined as a raw string literal. Use the raw string literal prefix `r` when
-/// declaring docstrings with backslashes to avoid confusion and accidental
-/// escaping.
+/// In Python, backslashes are typically used to escape characters in strings.
+/// In raw strings (those prefixed with an `r`), however, backslashes are
+/// treated as literal characters.
+///
+/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
+/// the use of raw strings (i.e., `r"""raw triple double quotes"""`) for
+/// docstrings that include backslashes. The use of a raw string ensures that
+/// any backslashes are treated as literal characters, and not as escape
+/// sequences, which avoids confusion.
 ///
 /// ## Example
 /// ```python
