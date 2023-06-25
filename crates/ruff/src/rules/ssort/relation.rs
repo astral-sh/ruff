@@ -135,7 +135,8 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     for requirement in requirements {
                         if requirement.is_deferred
                             || (!self.relation.bindings.contains(requirement.name)
-                                && !cumulative_bindings.contains(requirement.name))
+                                && !cumulative_bindings.contains(requirement.name)
+                                && !CLASS_BUILTINS.contains(&requirement.name))
                         {
                             self.relation.requirements.insert(requirement);
                         }
@@ -1107,6 +1108,23 @@ mod tests {
                     context: RequirementContext::Local
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn class_def_builtins() {
+        let stmt = parse(
+            r#"
+                class a:
+                    b = __module__
+                    c = __qualname__
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [] as [Requirement; 0]
         );
     }
 
