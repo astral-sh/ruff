@@ -1827,6 +1827,7 @@ dependencies = [
  "itertools",
  "libcst",
  "log",
+ "memchr",
  "natord",
  "nohash-hasher",
  "num-bigint",

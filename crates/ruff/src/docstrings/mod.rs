@@ -18,7 +18,6 @@ pub(crate) struct Docstring<'a> {
     pub(crate) expr: &'a Expr,
     /// The content of the docstring, including the leading and trailing quotes.
     pub(crate) contents: &'a str,
-
     /// The range of the docstring body (without the quotes). The range is relative to [`Self::contents`].
     pub(crate) body_range: TextRange,
     pub(crate) indentation: &'a str,
