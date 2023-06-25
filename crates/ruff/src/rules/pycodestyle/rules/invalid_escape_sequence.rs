@@ -70,10 +70,10 @@ pub(crate) fn invalid_escape_sequence(
         return diagnostics;
     };
     let quote_pos = text.find(quote).unwrap();
-    let prefix = text[..quote_pos].to_lowercase();
+    let prefix = &text[..quote_pos];
     let body = &text[quote_pos + quote.len()..text.len() - quote.len()];
 
-    if !prefix.contains('r') {
+    if !prefix.contains(['r', 'R']) {
         let start_offset =
             range.start() + TextSize::try_from(quote_pos).unwrap() + quote.text_len();
 
@@ -115,7 +115,7 @@ pub(crate) fn invalid_escape_sequence(
 
         if autofix {
             if contains_valid_escape_sequence {
-                // Escape with backslash
+                // Escape with backslash.
                 for diagnostic in &mut diagnostics {
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         r"\".to_string(),
@@ -123,10 +123,23 @@ pub(crate) fn invalid_escape_sequence(
                     )));
                 }
             } else {
-                // Turn into raw string
+                // Turn into raw string.
                 for diagnostic in &mut diagnostics {
+                    // If necessary, add a space between any leading keyword (`return`, `yield`,
+                    // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
+                    // `returnr"foo"` is not.
+                    let requires_space = locator
+                        .slice(TextRange::up_to(range.start()))
+                        .chars()
+                        .last()
+                        .map_or(false, |char| char.is_ascii_alphabetic());
+
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
-                        "r".to_string(),
+                        if requires_space {
+                            " r".to_string()
+                        } else {
+                            "r".to_string()
+                        },
                         range.start() + TextSize::try_from(quote_pos).unwrap(),
                     )));
                 }
