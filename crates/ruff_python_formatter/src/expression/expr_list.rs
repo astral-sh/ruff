@@ -52,23 +52,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             "A non-empty expression list has dangling comments"
         );
 
-        let items = format_with(|f| {
-            let mut iter = elts.iter();
-
-            if let Some(first) = iter.next() {
-                write!(f, [first.format()])?;
-            }
-
-            for item in iter {
-                write!(f, [text(","), soft_line_break_or_space(), item.format()])?;
-            }
-
-            if !elts.is_empty() {
-                write!(f, [if_group_breaks(&text(","))])?;
-            }
-
-            Ok(())
-        });
+        let items = format_with(|f| f.join_comma_separated().nodes(elts.iter()).finish());
 
         write!(
             f,

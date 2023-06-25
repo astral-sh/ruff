@@ -308,7 +308,7 @@ instruction()#comment with bad spacing
      while True:
          if False:
              continue
-@@ -141,24 +111,19 @@
+@@ -141,10 +111,7 @@
          # and round and round we go
  
      # let's return
@@ -319,15 +319,8 @@ instruction()#comment with bad spacing
 +    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
--CONFIG_FILES = (
--    [
--        CONFIG_FILE,
--    ]
--    + SHARED_CONFIG_FILES
--    + USER_CONFIG_FILES
--)  # type: Final
-+CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
- 
+ CONFIG_FILES = (
+@@ -158,7 +125,11 @@
  
  class Test:
      def _init_host(self, parsed) -> None:
@@ -340,7 +333,7 @@ instruction()#comment with bad spacing
              pass
  
  
-@@ -167,7 +132,7 @@
+@@ -167,7 +138,7 @@
  #######################
  
  
@@ -470,7 +463,13 @@ def inline_comments_in_brackets_ruin_everything():
     return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
+CONFIG_FILES = (
+    [
+        CONFIG_FILE,
+    ]
+    + SHARED_CONFIG_FILES
+    + USER_CONFIG_FILES
+)  # type: Final
 
 
 class Test:

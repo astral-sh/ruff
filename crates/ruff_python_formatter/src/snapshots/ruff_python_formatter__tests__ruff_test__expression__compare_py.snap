@@ -104,7 +104,10 @@ a < b > c == d
 
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    < [bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ff]
+    < [
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        ff,
+    ]
     < [ccccccccccccccccccccccccccccc, dddd]
     < ddddddddddddddddddddddddddddddddddddddddddd
 )

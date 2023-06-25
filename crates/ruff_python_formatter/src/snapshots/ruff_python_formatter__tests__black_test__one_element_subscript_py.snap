@@ -25,7 +25,7 @@ list_of_types = [tuple[int,],]
 ```diff
 --- Black
 +++ Ruff
-@@ -1,22 +1,17 @@
+@@ -1,16 +1,15 @@
  # We should not treat the trailing comma
  # in a single-element subscript.
 -a: tuple[int,]
@@ -49,14 +49,13 @@ list_of_types = [tuple[int,],]
  ]
  
  # Magic commas still work as expected for non-subscripts.
--small_list = [
--    1,
--]
--list_of_types = [
+@@ -18,5 +17,5 @@
+     1,
+ ]
+ list_of_types = [
 -    tuple[int,],
--]
-+small_list = [1]
-+list_of_types = [tuple[(int,)]]
++    tuple[(int,)],
+ ]
 ```
 
 ## Ruff Output
@@ -77,8 +76,12 @@ d = tuple[
 ]
 
 # Magic commas still work as expected for non-subscripts.
-small_list = [1]
-list_of_types = [tuple[(int,)]]
+small_list = [
+    1,
+]
+list_of_types = [
+    tuple[(int,)],
+]
 ```
 
 ## Black Output
