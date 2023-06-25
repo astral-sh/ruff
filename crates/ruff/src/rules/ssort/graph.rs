@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use petgraph::algo::{dijkstra, tarjan_scc};
-use petgraph::graph::{DefaultIx, EdgeReference, EdgesConnecting, NodeIndex};
-use petgraph::visit::{EdgeRef, NodeRef};
-use petgraph::{Directed, Graph};
+use petgraph::algo::tarjan_scc;
+use petgraph::graph::EdgeReference;
+use petgraph::visit::EdgeRef;
+use petgraph::Graph;
 use std::collections::HashSet;
 
 pub(super) fn break_cycles<'a, N, E: 'a, F, K>(graph: &'a mut Graph<N, E>, edge_cost: F)
@@ -19,11 +19,11 @@ where
 
             found_cycle = true;
 
-            let nodes: HashSet<_> = strongly_connected_component.iter().cloned().collect();
+            let nodes: HashSet<_> = strongly_connected_component.iter().copied().collect();
 
             let edges_to_remove = strongly_connected_component
                 .into_iter()
-                .map(|node| {
+                .flat_map(|node| {
                     graph
                         .edges(node)
                         .filter(|edge| nodes.contains(&edge.target()))
@@ -32,7 +32,6 @@ where
                         .map(|(_, edges)| edges.collect::<Vec<_>>())
                         .collect::<Vec<_>>()
                 })
-                .flatten()
                 .max_by_key(|edges| edges.iter().map(&edge_cost).min().unwrap())
                 .unwrap()
                 .into_iter()
@@ -48,10 +47,6 @@ where
             break;
         }
     }
-}
-
-struct MaxEdgeSearcher {
-    nodes: HashSet<NodeIndex>,
 }
 
 #[cfg(test)]
