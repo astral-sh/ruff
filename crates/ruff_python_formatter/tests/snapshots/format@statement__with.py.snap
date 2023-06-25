@@ -82,14 +82,18 @@ with (
 
 
 with (
-    a,  # a  # comma
+    (
+        a  # a  # comma
+    ),
     b,  # c
 ):  # colon
     ...
 
 
 with (
-    a as b,  # a  # as  # b  # comma
+    (
+        a  # a  # as
+    ) as b,  # b  # comma
     c,  # c
 ):  # colon
     ...  # body
@@ -109,8 +113,10 @@ with a:  # should remove brackets
 # if we do want to wrap, do we prefer to wrap the entire WithItem or to let the
 # WithItem allow the `aa + bb` content expression to be wrapped
 with (
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c,
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    ) as c,
 ):
     ...
 

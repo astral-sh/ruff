@@ -14,11 +14,17 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             context_expr,
             optional_vars,
         } = item;
-        // parentheses added by parent StmtWith
-        write!(f, [context_expr.format().with_options(Parenthesize::Never)])?;
-        if let Some(optional_vars) = optional_vars {
-            write!(f, [space(), text("as"), space(), optional_vars.format()])?;
-        }
-        Ok(())
+
+        let inner = format_with(|f| {
+            write!(
+                f,
+                [context_expr.format().with_options(Parenthesize::IfBreaks)]
+            )?;
+            if let Some(optional_vars) = optional_vars {
+                write!(f, [space(), text("as"), space(), optional_vars.format()])?;
+            }
+            Ok(())
+        });
+        write!(f, [group(&inner)])
     }
 }
