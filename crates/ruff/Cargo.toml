@@ -38,6 +38,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 ignore = { workspace = true }
 imperative = { version = "1.0.4" }
+indexmap = "2.0.0"
 is-macro = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
@@ -54,6 +55,7 @@ path-absolutize = { workspace = true, features = [
 ] }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
+petgraph = "0.6.3"
 phf = { version = "0.11", features = ["macros"] }
 pyproject-toml = { version = "0.6.0" }
 quick-junit = { version = "0.3.2" }
@@ -77,7 +79,6 @@ toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
-indexmap = "2.0.0"
 
 [dev-dependencies]
 insta = { workspace = true }
