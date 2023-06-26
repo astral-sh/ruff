@@ -1,5 +1,5 @@
 for i in range(10):
-    try: # PERF203
+    try:  # PERF203
         print(f"{i}")
     except:
         print("error")
@@ -11,7 +11,7 @@ except:
     print("error")
 
 i = 0
-while i < 10: # PERF203
+while i < 10:  # PERF203
     try:
         print(f"{i}")
     except:

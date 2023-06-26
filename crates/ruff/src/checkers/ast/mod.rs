@@ -1430,8 +1430,8 @@ where
                 if self.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
-                if self.enabled(Rule::LoopTryExceptUsage) {
-                    perflint::rules::loop_try_except_usage(self, body);
+                if self.enabled(Rule::TryExceptInLoop) {
+                    perflint::rules::try_except_in_loop(self, body);
                 }
             }
             Stmt::For(ast::StmtFor {
@@ -1480,8 +1480,8 @@ where
                     if self.enabled(Rule::InDictKeys) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
                     }
-                    if self.enabled(Rule::LoopTryExceptUsage) {
-                        perflint::rules::loop_try_except_usage(self, body);
+                    if self.enabled(Rule::TryExceptInLoop) {
+                        perflint::rules::try_except_in_loop(self, body);
                     }
                 }
                 if self.enabled(Rule::IncorrectDictIterator) {
