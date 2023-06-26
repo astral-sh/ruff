@@ -120,7 +120,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,78 +1,74 @@
+@@ -1,78 +1,78 @@
 -import random
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -214,18 +214,22 @@ with open("/path/to/file.txt", mode="r") as read_file:
  
 -with open("/path/to/file.txt", mode="w") as file:
 -    file.write("The new line above me is about to be removed!")
-+NOT_YET_IMPLEMENTED_StmtWith
++with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as file:
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -with open("/path/to/file.txt", mode="w") as file:
 -    file.write("The new lines above me is about to be removed!")
-+NOT_YET_IMPLEMENTED_StmtWith
++with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as file:
++    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
 -with open("/path/to/file.txt", mode="r") as read_file:
 -    with open("/path/to/output_file.txt", mode="w") as write_file:
 -        write_file.writelines(read_file.readlines())
-+NOT_YET_IMPLEMENTED_StmtWith
++with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as read_file:
++    with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as write_file:
++        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -298,13 +302,17 @@ while True:
         NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-NOT_YET_IMPLEMENTED_StmtWith
+with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as file:
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-NOT_YET_IMPLEMENTED_StmtWith
+with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as file:
+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 
-NOT_YET_IMPLEMENTED_StmtWith
+with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as read_file:
+    with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as write_file:
+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Black Output

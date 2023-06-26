@@ -193,7 +193,7 @@ class C:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,159 +1,42 @@
+@@ -1,23 +1,10 @@
  class C:
      def test(self) -> None:
 -        with patch("black.out", print):
@@ -214,18 +214,22 @@ class C:
 -                "2 files reformatted, 2 files left unchanged, 2 files failed to"
 -                " reformat.",
 -            )
--            for i in (a,):
--                if (
--                    # Rule 1
--                    i % 2 == 0
--                    # Rule 2
--                    and i % 3 == 0
--                ):
--                    while (
--                        # Just a comment
++        with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+             for i in (a,):
+                 if (
+                     # Rule 1
+@@ -27,133 +14,46 @@
+                 ):
+                     while (
+                         # Just a comment
 -                        call()
 -                        # Another
--                    ):
++                        NOT_IMPLEMENTED_call()
+                     ):
 -                        print(i)
 -        xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
 -            push_manager=context.request.resource_manager,
@@ -235,7 +239,8 @@ class C:
 -            # Only send the first n items.
 -            items=items[:num_items]
 -        )
-+        NOT_YET_IMPLEMENTED_StmtWith
++                        # Another
++                        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +        xxxxxxxxxxxxxxxx = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
          return (
              'Utterly failed doctest test for %s\n   File "%s", line %s, in %s\n\n%s'
@@ -371,7 +376,7 @@ class C:
          %3d           0 LOAD_FAST                1 (x)
                        2 LOAD_CONST               1 (1)
                        4 COMPARE_OP               2 (==)
-@@ -161,21 +44,8 @@
+@@ -161,21 +61,8 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
@@ -403,7 +408,24 @@ class C:
 ```py
 class C:
     def test(self) -> None:
-        NOT_YET_IMPLEMENTED_StmtWith
+        with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+            for i in (a,):
+                if (
+                    # Rule 1
+                    i % 2 == 0
+                    # Rule 2
+                    and i % 3 == 0
+                ):
+                    while (
+                        # Just a comment
+                        NOT_IMPLEMENTED_call()
+                    ):
+                        # Another
+                        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         xxxxxxxxxxxxxxxx = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
         return (
             'Utterly failed doctest test for %s\n   File "%s", line %s, in %s\n\n%s'
