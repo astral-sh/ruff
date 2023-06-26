@@ -3,7 +3,7 @@ use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(
-    any(feature = "serde", test),
+    feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
     serde(default)
 )]
@@ -14,6 +14,7 @@ pub struct PyFormatOptions {
     indent_style: IndentStyle,
 
     /// The preferred line width at which the formatter should wrap lines.
+    #[cfg_attr(feature = "serde", serde(default = "default_line_width"))]
     line_width: LineWidth,
 
     /// The preferred quote style to use (single vs double quotes).
@@ -21,6 +22,10 @@ pub struct PyFormatOptions {
 
     /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`
     magic_trailing_comma: MagicTrailingComma,
+}
+
+fn default_line_width() -> LineWidth {
+    LineWidth::try_from(88).unwrap()
 }
 
 impl PyFormatOptions {
@@ -85,8 +90,9 @@ impl Default for PyFormatOptions {
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[cfg_attr(
-    any(feature = "serde", test),
-    derive(serde::Serialize, serde::Deserialize)
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
 )]
 pub enum QuoteStyle {
     Single,
@@ -125,8 +131,9 @@ impl TryFrom<char> for QuoteStyle {
 
 #[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(
-    any(feature = "serde", test),
-    derive(serde::Serialize, serde::Deserialize)
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
 )]
 pub enum MagicTrailingComma {
     #[default]

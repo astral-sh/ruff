@@ -36,7 +36,7 @@ serde_json = { workspace = true }
 similar = { workspace = true }
 
 [[test]]
-name = "fixture"
+name = "ruff_python_formatter_fixtures"
 path = "tests/fixtures.rs"
 test = true
 required-features = [ "serde" ]

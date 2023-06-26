@@ -1,8 +1,8 @@
 [
   {
-    "magic_trailing_comma": "Respect"
+    "magic_trailing_comma": "respect"
   },
   {
-    "magic_trailing_comma": "Ignore"
+    "magic_trailing_comma": "ignore"
   }
 ]

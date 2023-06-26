@@ -1,5 +1,5 @@
-use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
-use ruff_python_formatter::{format_module, MagicTrailingComma, PyFormatOptions, QuoteStyle};
+use ruff_formatter::FormatOptions;
+use ruff_python_formatter::{format_module, PyFormatOptions};
 use similar::TextDiff;
 use std::fmt::{Formatter, Write};
 use std::io::BufReader;

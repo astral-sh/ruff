@@ -1,4 +1,4 @@
-g---
+---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/skip_magic_trailing_comma.py
 ---
