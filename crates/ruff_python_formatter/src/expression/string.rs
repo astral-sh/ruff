@@ -58,7 +58,8 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         let raw_content_range = relative_raw_content_range + self.part_range.start();
 
         let raw_content = &string_content[relative_raw_content_range];
-        let (preferred_quotes, contains_newlines) = preferred_quotes(raw_content, quotes);
+        let (preferred_quotes, contains_newlines) =
+            preferred_quotes(raw_content, quotes, f.options().quote_style());
 
         write!(f, [prefix, preferred_quotes])?;
 
@@ -148,14 +149,20 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 /// Detects the preferred quotes for `input`.
 /// * single quoted strings: The preferred quote style is the one that requires less escape sequences.
 /// * triple quoted strings: Use double quotes except the string contains a sequence of `"""`.
-fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, ContainsNewlines) {
+fn preferred_quotes(
+    input: &str,
+    quotes: StringQuotes,
+    configured_style: QuoteStyle,
+) -> (StringQuotes, ContainsNewlines) {
     let mut contains_newlines = ContainsNewlines::No;
 
     let preferred_style = if quotes.triple {
-        let mut use_single_quotes = false;
+        // True if the string contains a triple quote sequence of the configured quote style.
+        let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
 
         while let Some(c) = chars.next() {
+            let configured_quote_char = configured_style.as_char();
             match c {
                 '\n' | '\r' => contains_newlines = ContainsNewlines::Yes,
                 '\\' => {
@@ -163,24 +170,25 @@ fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, Contain
                         chars.next();
                     }
                 }
-                '"' => {
+                // `"` or `'`
+                c if c == configured_quote_char => {
                     match chars.peek().copied() {
-                        Some('"') => {
-                            // `""`
+                        Some(c) if c == configured_quote_char => {
+                            // `""` or `''`
                             chars.next();
 
-                            if chars.peek().copied() == Some('"') {
-                                // `"""`
+                            if chars.peek().copied() == Some(configured_quote_char) {
+                                // `"""` or `'''`
                                 chars.next();
-                                use_single_quotes = true;
+                                uses_triple_quotes = true;
                             }
                         }
                         Some(_) => {
-                            // Single quote, this is ok
+                            // A single quote char, this is ok
                         }
                         None => {
                             // Trailing quote at the end of the comment
-                            use_single_quotes = true;
+                            uses_triple_quotes = true;
                         }
                     }
                 }
@@ -188,10 +196,12 @@ fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, Contain
             }
         }
 
-        if use_single_quotes {
-            QuoteStyle::Single
+        if uses_triple_quotes {
+            // String contains a triple quote sequence of the configured quote style.
+            // Keep the existing quote style.
+            quotes.style
         } else {
-            QuoteStyle::Double
+            configured_style
         }
     } else {
         let mut single_quotes = 0u32;
@@ -215,10 +225,21 @@ fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, Contain
             }
         }
 
-        if double_quotes > single_quotes {
-            QuoteStyle::Single
-        } else {
-            QuoteStyle::Double
+        match configured_style {
+            QuoteStyle::Single => {
+                if single_quotes > double_quotes {
+                    QuoteStyle::Double
+                } else {
+                    QuoteStyle::Single
+                }
+            }
+            QuoteStyle::Double => {
+                if double_quotes > single_quotes {
+                    QuoteStyle::Single
+                } else {
+                    QuoteStyle::Double
+                }
+            }
         }
     };
 
@@ -286,7 +307,7 @@ fn normalize_quotes(input: &str, quotes: StringQuotes) -> Cow<str> {
 
         let style = quotes.style;
         let preferred_quote = style.as_char();
-        let opposite_quote = style.opposite().as_char();
+        let opposite_quote = style.invert().as_char();
 
         let mut chars = input.char_indices();
 
