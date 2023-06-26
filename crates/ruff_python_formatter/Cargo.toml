@@ -27,8 +27,6 @@ rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
 
 [dev-dependencies]
-ruff_testing_macros = { path = "../ruff_testing_macros" }
-
-insta = { workspace = true, features = [] }
+insta = { workspace = true, features = ["glob"] }
 test-case = { workspace = true }
 similar = { workspace = true }

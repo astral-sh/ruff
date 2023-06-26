@@ -988,9 +988,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28491f7753051e5704d4d0ae7860d45fae3238d7d235bc4289dcd45c48d3cec3"
 dependencies = [
  "console",
+ "globset",
  "lazy_static",
  "linked-hash-map",
  "similar",
+ "walkdir",
  "yaml-rust",
 ]
 
@@ -2060,7 +2062,6 @@ dependencies = [
  "ruff_formatter",
  "ruff_python_ast",
  "ruff_python_whitespace",
- "ruff_testing_macros",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-parser",
@@ -2103,16 +2104,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "rustpython-parser",
-]
-
-[[package]]
-name = "ruff_testing_macros"
-version = "0.0.0"
-dependencies = [
- "glob",
- "proc-macro2",
- "quote",
- "syn 2.0.22",
 ]
 
 [[package]]

@@ -6,7 +6,7 @@ exclude: |
     crates/ruff/src/rules/.*/snapshots/.*|
     crates/ruff_cli/resources/.*|
     crates/ruff_python_formatter/resources/.*|
-    crates/ruff_python_formatter/src/snapshots/.*
+    crates/ruff_python_formatter/tests/snapshots/.*
   )$
 
 repos:
