@@ -16,6 +16,8 @@ use std::borrow::Cow;
 pub enum StringLayout {
     Default(Option<Parentheses>),
 
+    /// Enforces that implicit continuation strings are printed on a single line even if they exceed
+    /// the configured line width.  
     Flat,
 }
 
