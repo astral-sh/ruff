@@ -52,6 +52,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "shebang-leading-whitespace",
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
+    "triple-single-quotes",
     "unexpected-indentation-comment",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",

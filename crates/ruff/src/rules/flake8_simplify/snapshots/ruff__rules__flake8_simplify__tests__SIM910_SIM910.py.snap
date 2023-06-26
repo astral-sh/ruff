@@ -11,7 +11,7 @@ SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
   |
   = help: Replace `{}.get(key, None)` with `{}.get(key)`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # SIM910
 2   |-{}.get(key, None)
   2 |+{}.get(key)
@@ -29,7 +29,7 @@ SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
   |
   = help: Replace `{}.get("key", None)` with `{}.get("key")`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | {}.get(key, None)
 3 3 | 
 4 4 | # SIM910
@@ -48,7 +48,7 @@ SIM910.py:20:9: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
    |
    = help: Replace `{}.get(key, None)` with `{}.get(key)`
 
-ℹ Suggested fix
+ℹ Fix
 17 17 | {}.get("key", False)
 18 18 | 
 19 19 | # SIM910
@@ -68,7 +68,7 @@ SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
    |
    = help: Replace `{}.get(key, None)` with `{}.get(key)`
 
-ℹ Suggested fix
+ℹ Fix
 21 21 |     pass
 22 22 | 
 23 23 | # SIM910
@@ -86,7 +86,7 @@ SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
    |
    = help: Replace `({}).get(key, None)` with `({}).get(key)`
 
-ℹ Suggested fix
+ℹ Fix
 24 24 | a = {}.get(key, None)
 25 25 | 
 26 26 | # SIM910

@@ -1,10 +1,9 @@
-use anyhow::{bail, Result};
-use log::error;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::str::{leading_quote, trailing_quote};
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -21,6 +20,9 @@ use ruff_python_ast::source_code::Locator;
 /// ```python
 /// regex = r"\.png$"
 /// ```
+///
+/// ## References
+/// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[violation]
 pub struct InvalidEscapeSequence(char);
 
@@ -36,24 +38,6 @@ impl AlwaysAutofixableViolation for InvalidEscapeSequence {
     }
 }
 
-// See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-const VALID_ESCAPE_SEQUENCES: &[char; 23] = &[
-    '\n', '\\', '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v', '0', '1', '2', '3', '4', '5', '6',
-    '7', 'x', // Escape sequences only recognized in string literals
-    'N', 'u', 'U',
-];
-
-/// Return the quotation markers used for a String token.
-fn extract_quote(text: &str) -> Result<&str> {
-    for quote in ["'''", "\"\"\"", "'", "\""] {
-        if text.ends_with(quote) {
-            return Ok(quote);
-        }
-    }
-
-    bail!("Unable to find quotation mark for String token")
-}
-
 /// W605
 pub(crate) fn invalid_escape_sequence(
     locator: &Locator,
@@ -65,55 +49,113 @@ pub(crate) fn invalid_escape_sequence(
     let text = locator.slice(range);
 
     // Determine whether the string is single- or triple-quoted.
-    let Ok(quote) = extract_quote(text) else {
-        error!("Unable to find quotation mark for string token");
+    let Some(leading_quote) = leading_quote(text) else {
         return diagnostics;
     };
-    let quote_pos = text.find(quote).unwrap();
-    let prefix = text[..quote_pos].to_lowercase();
-    let body = &text[quote_pos + quote.len()..text.len() - quote.len()];
+    let Some(trailing_quote) = trailing_quote(text) else {
+        return diagnostics;
+    };
+    let body = &text[leading_quote.len()..text.len() - trailing_quote.len()];
 
-    if !prefix.contains('r') {
-        let start_offset =
-            range.start() + TextSize::try_from(quote_pos).unwrap() + quote.text_len();
+    if leading_quote.contains(['r', 'R']) {
+        return diagnostics;
+    }
 
-        let mut chars_iter = body.char_indices().peekable();
+    let start_offset = range.start() + TextSize::try_from(leading_quote.len()).unwrap();
 
-        while let Some((i, c)) = chars_iter.next() {
-            if c != '\\' {
-                continue;
-            }
+    let mut chars_iter = body.char_indices().peekable();
 
-            // If the previous character was also a backslash, skip.
-            if i > 0 && body.as_bytes()[i - 1] == b'\\' {
-                continue;
-            }
+    let mut contains_valid_escape_sequence = false;
 
-            // If we're at the end of the file, skip.
-            let Some((_, next_char)) = chars_iter.peek() else {
-                continue;
-            };
+    while let Some((i, c)) = chars_iter.next() {
+        if c != '\\' {
+            continue;
+        }
 
-            // If we're at the end of the line, skip
-            if matches!(next_char, '\n' | '\r') {
-                continue;
-            }
+        // If the previous character was also a backslash, skip.
+        if i > 0 && body.as_bytes()[i - 1] == b'\\' {
+            continue;
+        }
 
-            // If the next character is a valid escape sequence, skip.
-            if VALID_ESCAPE_SEQUENCES.contains(next_char) {
-                continue;
-            }
+        // If we're at the end of the file, skip.
+        let Some((_, next_char)) = chars_iter.peek() else {
+            continue;
+        };
 
-            let location = start_offset + TextSize::try_from(i).unwrap();
-            let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
-            let mut diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
-            if autofix {
+        // If we're at the end of the line, skip
+        if matches!(next_char, '\n' | '\r') {
+            continue;
+        }
+
+        // If the next character is a valid escape sequence, skip.
+        // See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals.
+        if matches!(
+            next_char,
+            '\n'
+            | '\\'
+            | '\''
+            | '"'
+            | 'a'
+            | 'b'
+            | 'f'
+            | 'n'
+            | 'r'
+            | 't'
+            | 'v'
+            | '0'
+            | '1'
+            | '2'
+            | '3'
+            | '4'
+            | '5'
+            | '6'
+            | '7'
+            | 'x'
+            // Escape sequences only recognized in string literals
+            | 'N'
+            | 'u'
+            | 'U'
+        ) {
+            contains_valid_escape_sequence = true;
+            continue;
+        }
+
+        let location = start_offset + TextSize::try_from(i).unwrap();
+        let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
+        let diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
+        diagnostics.push(diagnostic);
+    }
+
+    if autofix {
+        if contains_valid_escape_sequence {
+            // Escape with backslash.
+            for diagnostic in &mut diagnostics {
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     r"\".to_string(),
-                    range.start() + TextSize::from(1),
+                    diagnostic.range().start() + TextSize::from(1),
                 )));
             }
-            diagnostics.push(diagnostic);
+        } else {
+            // Turn into raw string.
+            for diagnostic in &mut diagnostics {
+                // If necessary, add a space between any leading keyword (`return`, `yield`,
+                // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
+                // `returnr"foo"` is not.
+                let requires_space = locator
+                    .slice(TextRange::up_to(range.start()))
+                    .chars()
+                    .last()
+                    .map_or(false, |char| char.is_ascii_alphabetic());
+
+                diagnostic.set_fix(Fix::automatic(Edit::insertion(
+                    if requires_space {
+                        " r".to_string()
+                    } else {
+                        "r".to_string()
+                    },
+                    range.start(),
+                )));
+            }
         }
     }
 

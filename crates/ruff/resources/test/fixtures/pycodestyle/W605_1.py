@@ -19,6 +19,11 @@ with \_ somewhere
 in the middle
 """
 
+
+def f():
+    #: W605:1:11
+    return'\.png$'
+
 #: Okay
 regex = r'\.png$'
 regex = '\\.png$'

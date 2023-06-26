@@ -162,8 +162,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test, Expr::Compare(_)) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 checker.generator().expr(&test.clone()),
                 expr.range(),
             )));
@@ -179,8 +178,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
                 keywords: vec![],
                 range: TextRange::default(),
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 checker.generator().expr(&node1.into()),
                 expr.range(),
             )));
@@ -223,8 +221,7 @@ pub(crate) fn explicit_false_true_in_ifexpr(
             operand: Box::new(node),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&node1.into()),
             expr.range(),
         )));
@@ -275,8 +272,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
             orelse: Box::new(node),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&node3.into()),
             expr.range(),
         )));

@@ -1,0 +1,141 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/string_prefixes.py
+---
+## Input
+
+```py
+#!/usr/bin/env python3
+
+name = "Łukasz"
+(f"hello {name}", F"hello {name}")
+(b"", B"")
+(u"", U"")
+(r"", R"")
+
+(rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
+(rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
+
+
+def docstring_singleline():
+    R"""2020 was one hell of a year. The good news is that we were able to"""
+
+
+def docstring_multiline():
+    R"""
+    clear out all of the issues opened in that time :p
+    """
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,13 +1,31 @@
+ #!/usr/bin/env python3
+ 
+ name = "Łukasz"
+-(f"hello {name}", f"hello {name}")
+-(b"", b"")
++(NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
++(b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
+ ("", "")
+ (r"", R"")
+ 
+-(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
+-(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
++(
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++)
++(
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
++)
+ 
+ 
+ def docstring_singleline():
+```
+
+## Ruff Output
+
+```py
+#!/usr/bin/env python3
+
+name = "Łukasz"
+(NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
+(b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
+("", "")
+(r"", R"")
+
+(
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+)
+(
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
+)
+
+
+def docstring_singleline():
+    R"""2020 was one hell of a year. The good news is that we were able to"""
+
+
+def docstring_multiline():
+    R"""
+    clear out all of the issues opened in that time :p
+    """
+```
+
+## Black Output
+
+```py
+#!/usr/bin/env python3
+
+name = "Łukasz"
+(f"hello {name}", f"hello {name}")
+(b"", b"")
+("", "")
+(r"", R"")
+
+(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
+(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
+
+
+def docstring_singleline():
+    R"""2020 was one hell of a year. The good news is that we were able to"""
+
+
+def docstring_multiline():
+    R"""
+    clear out all of the issues opened in that time :p
+    """
+```
+
+

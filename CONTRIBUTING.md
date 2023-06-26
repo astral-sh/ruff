@@ -327,21 +327,17 @@ git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resour
 To benchmark the release build:
 
 ```shell
-cargo build --release && hyperfine --ignore-failure --warmup 10 \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache" \
-  "./target/release/ruff ./crates/ruff/resources/test/cpython/"
+cargo build --release && hyperfine --warmup 10 \
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache -e" \
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/ -e"
 
 Benchmark 1: ./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache
   Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
   Range (min … max):   289.9 ms … 301.6 ms    10 runs
 
-  Warning: Ignoring non-zero exit code.
-
 Benchmark 2: ./target/release/ruff ./crates/ruff/resources/test/cpython/
   Time (mean ± σ):      48.0 ms ±   3.1 ms    [User: 65.2 ms, System: 124.7 ms]
   Range (min … max):    45.0 ms …  66.7 ms    62 runs
-
-  Warning: Ignoring non-zero exit code.
 
 Summary
   './target/release/ruff ./crates/ruff/resources/test/cpython/' ran
@@ -503,7 +499,7 @@ examples.
 Install `perf` and build `ruff_benchmark` with the `release-debug` profile and then run it with perf
 
 ```shell
-cargo bench -p ruff_benchmark --no-run --profile=release-debug && perf record -g -F 9999 cargo bench -p ruff_benchmark --profile=release-debug -- --profile-time=1
+cargo bench -p ruff_benchmark --no-run --profile=release-debug && perf record --call-graph dwarf -F 9999 cargo bench -p ruff_benchmark --profile=release-debug -- --profile-time=1
 ```
 
 You can also use the `ruff_dev` launcher to run `ruff check` multiple times on a repository to

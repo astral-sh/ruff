@@ -37,7 +37,7 @@ use crate::registry::AsRule;
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
-/// - [Python docs: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
+/// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 #[violation]
 pub struct CollectionLiteralConcatenation {
     expr: String,
