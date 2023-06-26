@@ -1,4 +1,4 @@
-use ruff_python_formatter::format_module;
+use ruff_python_formatter::{format_module, PyFormatOptions};
 use similar::TextDiff;
 use std::fmt::{Formatter, Write};
 use std::fs;
@@ -9,7 +9,8 @@ fn black_compatibility() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let printed = format_module(&content).expect("Formatting to succeed");
+        let printed =
+            format_module(&content, PyFormatOptions::default()).expect("Formatting to succeed");
 
         let expected_path = input_path.with_extension("py.expect");
         let expected_output = fs::read_to_string(&expected_path)
@@ -88,7 +89,8 @@ fn format() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let printed = format_module(&content).expect("Formatting to succeed");
+        let printed =
+            format_module(&content, PyFormatOptions::default()).expect("Formatting to succeed");
         let formatted_code = printed.as_code();
 
         ensure_stability_when_formatting_twice(formatted_code);
@@ -117,7 +119,7 @@ fn format() {
 
 /// Format another time and make sure that there are no changes anymore
 fn ensure_stability_when_formatting_twice(formatted_code: &str) {
-    let reformatted = match format_module(formatted_code) {
+    let reformatted = match format_module(formatted_code, PyFormatOptions::default()) {
         Ok(reformatted) => reformatted,
         Err(err) => {
             panic!(

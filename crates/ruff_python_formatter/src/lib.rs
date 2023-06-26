@@ -2,10 +2,11 @@ use crate::comments::{
     dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
 };
 use crate::context::PyFormatContext;
+pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
 use anyhow::{anyhow, Context, Result};
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write};
-use ruff_formatter::{Formatted, IndentStyle, Printed, SimpleFormatOptions, SourceCode};
+use ruff_formatter::{Formatted, Printed, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
 use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 use ruff_text_size::{TextLen, TextRange};
@@ -21,6 +22,7 @@ pub(crate) mod context;
 pub(crate) mod expression;
 mod generated;
 pub(crate) mod module;
+mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
@@ -28,10 +30,6 @@ pub(crate) mod statement;
 mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
-
-/// TODO(konstin): hook this up to the settings by replacing `SimpleFormatOptions` with a python
-/// specific struct.
-pub(crate) const USE_MAGIC_TRAILING_COMMA: bool = true;
 
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
@@ -86,7 +84,7 @@ where
     }
 }
 
-pub fn format_module(contents: &str) -> Result<Printed> {
+pub fn format_module(contents: &str, options: PyFormatOptions) -> Result<Printed> {
     // Tokenize once
     let mut tokens = Vec::new();
     let mut comment_ranges = CommentRangesBuilder::default();
@@ -107,7 +105,7 @@ pub fn format_module(contents: &str) -> Result<Printed> {
     let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
         .with_context(|| "Syntax error in input")?;
 
-    let formatted = format_node(&python_ast, &comment_ranges, contents)?;
+    let formatted = format_node(&python_ast, &comment_ranges, contents, options)?;
 
     formatted
         .print()
@@ -118,20 +116,14 @@ pub fn format_node<'a>(
     root: &'a Mod,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
+    options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
 
     let locator = Locator::new(source);
 
     format!(
-        PyFormatContext::new(
-            SimpleFormatOptions {
-                indent_style: IndentStyle::Space(4),
-                line_width: 88.try_into().unwrap(),
-            },
-            locator.contents(),
-            comments,
-        ),
+        PyFormatContext::new(options, locator.contents(), comments),
         [root.format()]
     )
 }
@@ -226,44 +218,9 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum QuoteStyle {
-    Single,
-    Double,
-}
-
-impl QuoteStyle {
-    pub const fn as_char(self) -> char {
-        match self {
-            QuoteStyle::Single => '\'',
-            QuoteStyle::Double => '"',
-        }
-    }
-
-    #[must_use]
-    pub const fn opposite(self) -> QuoteStyle {
-        match self {
-            QuoteStyle::Single => QuoteStyle::Double,
-            QuoteStyle::Double => QuoteStyle::Single,
-        }
-    }
-}
-
-impl TryFrom<char> for QuoteStyle {
-    type Error = ();
-
-    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
-        match value {
-            '\'' => Ok(QuoteStyle::Single),
-            '"' => Ok(QuoteStyle::Double),
-            _ => Err(()),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{format_module, format_node};
+    use crate::{format_module, format_node, PyFormatOptions};
     use anyhow::Result;
     use insta::assert_snapshot;
     use ruff_python_ast::source_code::CommentRangesBuilder;
@@ -284,7 +241,9 @@ if True:
     pass
 # trailing
 "#;
-        let actual = format_module(input)?.as_code().to_string();
+        let actual = format_module(input, PyFormatOptions::default())?
+            .as_code()
+            .to_string();
         assert_eq!(expected, actual);
         Ok(())
     }
@@ -315,7 +274,13 @@ if [
         // Parse the AST.
         let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
 
-        let formatted = format_node(&python_ast, &comment_ranges, src).unwrap();
+        let formatted = format_node(
+            &python_ast,
+            &comment_ranges,
+            src,
+            PyFormatOptions::default(),
+        )
+        .unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

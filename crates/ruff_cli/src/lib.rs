@@ -13,7 +13,7 @@ use ruff::logging::{set_up_logging, LogLevel};
 use ruff::settings::types::SerializationFormat;
 use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
-use ruff_python_formatter::format_module;
+use ruff_python_formatter::{format_module, PyFormatOptions};
 
 use crate::args::{Args, CheckArgs, Command};
 use crate::commands::run_stdin::read_from_stdin;
@@ -137,7 +137,7 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
         // dummy, to check that the function was actually called
         let contents = code.replace("# DEL", "");
         // real formatting that is currently a passthrough
-        format_module(&contents)
+        format_module(&contents, PyFormatOptions::default())
     };
 
     match &files {

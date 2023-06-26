@@ -10,7 +10,7 @@ use rustpython_parser::{parse_tokens, Mode};
 use ruff_formatter::SourceCode;
 use ruff_python_ast::source_code::CommentRangesBuilder;
 
-use crate::format_node;
+use crate::{format_node, PyFormatOptions};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum Emit {
@@ -57,7 +57,12 @@ pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
     let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
         .with_context(|| "Syntax error in input")?;
 
-    let formatted = format_node(&python_ast, &comment_ranges, input)?;
+    let formatted = format_node(
+        &python_ast,
+        &comment_ranges,
+        input,
+        PyFormatOptions::default(),
+    )?;
     if cli.print_ir {
         println!("{}", formatted.document().display(SourceCode::new(input)));
     }
