@@ -1,3 +1,7 @@
+from argparse import Namespace
+
+a = Namespace()
+
 (
     a
     # comment
@@ -26,64 +30,74 @@
 )
 
 
-aaaaaaaaaaaaaaaaaaaaa.lllllllllllllllllllllllllllloooooooooong.chaaaaaaaaaaaaaaaaaaaaaaiiiiiiiiiiiiiiiiiiiiiiinnnnnnnn.ooooooooooooooooooooooooofffffffff.aaaaaaaaaattr
+a.aaaaaaaaaaaaaaaaaaaaa.lllllllllllllllllllllllllllloooooooooong.chaaaaaaaaaaaaaaaaaaaaaaiiiiiiiiiiiiiiiiiiiiiiinnnnnnnn.ooooooooooooooooooooooooofffffffff.aaaaaaaaaattr
 
 
 # Test that we add parentheses around the outermost attribute access in an attribute
 # chain if and only if we need them, that is if there are own line comments inside
 # the chain.
 x1 = (
-    a1
-    .a2
-    # a
-    .  # b
-    # c
-    a3
-    .a4
+    a
+    .b
+    # comment 1
+    .  # comment 2
+    # comment 3
+    c
+    .d
 )
+
 x20 = (
     a
     .b
 )
 x21 = (
-    a
-    # trailing name own line
+    # leading name own line
+    a  # trailing name end-of-line
     .b
 )
 x22 = (
-    ""
-    # leading
-    .b
-)
-x23 = (
-    # leading
     a
-    .b
+    # outermost leading own line
+    .b # outermost trailing end-of-line
 )
-x24 = (
-    a # trailing name end-of-line
-    .b
-)
+
 x31 = (
     a
-    .# a
+    # own line between nodes 1
+    .b
+)
+x321 = (
+    a
+    . # end-of-line dot comment
     b
 )
-x32 = (
+x322 = (
     a
-    .# a
+    . # end-of-line dot comment 2
     b
     .c
 )
-x4 = (
+x331 = (
     a.
-    # a
+    # own line between nodes 3
     b
 )
-x5 = (
+x332 = (
+    ""
+    # own line between nodes
+    .find
+)
+
+x8 = (
+    (a + a)
+    .b
+)
+
+x51 = (
     a.b.c
 )
-x61 = askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
-x62 = (
-    askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
+x52 = a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
+x53 = (
+    a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
 )
+
