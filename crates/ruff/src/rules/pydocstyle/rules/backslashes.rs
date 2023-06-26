@@ -54,14 +54,14 @@ impl Violation for EscapeSequenceInDocstring {
 
 /// D301
 pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
-    let body = docstring.body();
-
     // Docstring is already raw.
-    if body.starts_with('r') || body.starts_with("ur") {
+    let contents = docstring.contents;
+    if contents.starts_with('r') || contents.starts_with("ur") {
         return;
     }
 
     // Docstring contains at least one backslash.
+    let body = docstring.body();
     let bytes = body.as_bytes();
     if memchr_iter(b'\\', bytes).any(|position| {
         let escaped_char = bytes.get(position.saturating_add(1));
