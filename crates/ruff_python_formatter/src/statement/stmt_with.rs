@@ -1,7 +1,8 @@
+use crate::builders::optional_parentheses;
 use crate::comments::trailing_comments;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::prelude::*;
 use rustpython_parser::ast::StmtWith;
 
@@ -27,11 +28,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
             [
                 text("with"),
                 space(),
-                group(&format_args![
-                    if_group_breaks(&text("(")),
-                    soft_block_indent(&joined_items),
-                    if_group_breaks(&text(")")),
-                ]),
+                group(&optional_parentheses(&joined_items)),
                 text(":"),
                 trailing_comments(dangling_comments),
                 block_indent(&body.format())
