@@ -221,7 +221,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,30 +16,53 @@
+@@ -18,30 +16,54 @@
  
  # fmt: off
  def func_no_args():
@@ -253,7 +253,8 @@ d={'a':1,
 -     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
 - await asyncio.sleep(1)
 +    "Single-line docstring. Multiline is harder to reformat."
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    async with NOT_IMPLEMENTED_call() as conn:
++        await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +
 +
@@ -296,7 +297,7 @@ d={'a':1,
  
  
  def spaces_types(
-@@ -51,68 +72,66 @@
+@@ -51,68 +73,66 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -385,7 +386,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -133,10 +152,10 @@
+@@ -133,10 +153,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -400,7 +401,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,43 +164,11 @@
+@@ -145,43 +165,11 @@
  
  def long_lines():
      if True:
@@ -447,7 +448,7 @@ d={'a':1,
  
  
  def single_literal_yapf_disable():
-@@ -189,36 +176,9 @@
+@@ -189,36 +177,9 @@
      BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
  
  
@@ -527,7 +528,8 @@ def func_no_args():
 
 async def coroutine(arg, exec=False):
     "Single-line docstring. Multiline is harder to reformat."
-    NOT_YET_IMPLEMENTED_StmtAsyncWith
+    async with NOT_IMPLEMENTED_call() as conn:
+        await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 

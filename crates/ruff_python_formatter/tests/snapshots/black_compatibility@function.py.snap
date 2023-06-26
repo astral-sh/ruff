@@ -115,17 +115,17 @@ def __await__(): return (yield)
 +NOT_YET_IMPLEMENTED_StmtImport
  
 -from third_party import X, Y, Z
+-
+-from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
--from library import some_connection, some_decorator
--
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
  
  
  def func_no_args():
-@@ -14,25 +13,24 @@
+@@ -14,25 +13,25 @@
      b
      c
      if True:
@@ -148,7 +148,8 @@ def __await__(): return (yield)
 -    async with some_connection() as conn:
 -        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
 -    await asyncio.sleep(1)
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    async with NOT_IMPLEMENTED_call() as conn:
++        await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
  
  
@@ -158,7 +159,7 @@ def __await__(): return (yield)
  def function_signature_stress_test(
      number: int,
      no_annotation=None,
-@@ -41,12 +39,22 @@
+@@ -41,12 +40,22 @@
      debug: bool = False,
      **kwargs,
  ) -> str:
@@ -185,7 +186,7 @@ def __await__(): return (yield)
  
  
  def spaces_types(
-@@ -56,70 +64,26 @@
+@@ -56,70 +65,26 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -263,7 +264,7 @@ def __await__(): return (yield)
  
  
  def trailing_comma():
-@@ -135,14 +99,8 @@
+@@ -135,14 +100,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -312,7 +313,8 @@ def func_no_args():
 
 async def coroutine(arg, exec=False):
     "Single-line docstring. Multiline is harder to reformat."
-    NOT_YET_IMPLEMENTED_StmtAsyncWith
+    async with NOT_IMPLEMENTED_call() as conn:
+        await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
     await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 
 

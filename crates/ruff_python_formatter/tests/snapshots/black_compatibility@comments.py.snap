@@ -160,7 +160,7 @@ async def wat():
  
  
  # Another comment!
-@@ -78,19 +79,18 @@
+@@ -78,19 +79,19 @@
  #' <h1>This is pweave!</h1>
  
  
@@ -171,7 +171,8 @@ async def wat():
      # contains a trailing backslash.
 -    async with X.open_async() as x:  # Some more comments
 -        result = await x.method1()
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
++    async with NOT_IMPLEMENTED_call() as x:  # Some more comments
++        result = await NOT_IMPLEMENTED_call()
      # Comment after ending a block.
      if result:
 -        print("A OK", file=sys.stdout)
@@ -276,7 +277,8 @@ class Foo:
 async def wat():
     # This comment, for some reason \
     # contains a trailing backslash.
-    NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
+    async with NOT_IMPLEMENTED_call() as x:  # Some more comments
+        result = await NOT_IMPLEMENTED_call()
     # Comment after ending a block.
     if result:
         NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
