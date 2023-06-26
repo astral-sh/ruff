@@ -21,8 +21,6 @@ use ruff::settings::{defaults, flags, Settings};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceLocation, Stylist};
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
 export interface Diagnostic {
@@ -87,7 +85,7 @@ pub fn run() {
 #[wasm_bindgen]
 #[allow(non_snake_case)]
 pub fn currentVersion() -> JsValue {
-    JsValue::from(VERSION)
+    JsValue::from(ruff::VERSION)
 }
 
 #[wasm_bindgen]
