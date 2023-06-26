@@ -1077,7 +1077,19 @@ fn handle_attribute_comment<'a>(
         .expect("Expected the `.` character after the value");
 
     if TextRange::new(dot.end(), attribute.attr.start()).contains(comment.slice().start()) {
-        CommentPlacement::dangling(attribute.into(), comment)
+        if comment.line_position().is_end_of_line() {
+            // Attach to node with b
+            // ```python
+            // x322 = (
+            //     a
+            //     . # end-of-line dot comment 2
+            //     b
+            // )
+            // ```
+            CommentPlacement::trailing(comment.enclosing_node(), comment)
+        } else {
+            CommentPlacement::dangling(attribute.into(), comment)
+        }
     } else {
         CommentPlacement::Default(comment)
     }

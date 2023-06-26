@@ -1,0 +1,32 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assign.py
+---
+## Input
+```py
+# break left hand side
+a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = cakjdshflkjahdslkfjlasfdahjlfds = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = 3
+
+# join left hand side
+a2 = (
+    b2
+) = 2
+
+# Break the last element
+a = asdf = fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal = 1
+```
+
+## Output
+```py
+# break left hand side
+a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = cakjdshflkjahdslkfjlasfdahjlfds = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = 3
+
+# join left hand side
+a2 = (b2) = 2
+
+# Break the last element
+a = asdf = fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal = 1
+```
+
+
+

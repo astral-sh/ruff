@@ -1,10 +1,34 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, lines_after, skip_trailing_trivia, Token, TokenKind};
-use crate::USE_MAGIC_TRAILING_COMMA;
-use ruff_formatter::write;
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::Ranged;
+
+/// Adds parentheses and indents `content` if it doesn't fit on a line.
+pub(crate) fn optional_parentheses<'ast, T>(content: &T) -> OptionalParentheses<'_, 'ast>
+where
+    T: Format<PyFormatContext<'ast>>,
+{
+    OptionalParentheses {
+        inner: Argument::new(content),
+    }
+}
+
+pub(crate) struct OptionalParentheses<'a, 'ast> {
+    inner: Argument<'a, PyFormatContext<'ast>>,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        group(&format_args![
+            if_group_breaks(&text("(")),
+            soft_block_indent(&Arguments::from(&self.inner)),
+            if_group_breaks(&text(")"))
+        ])
+        .fmt(f)
+    }
+}
 
 /// Provides Python specific extensions to [`Formatter`].
 pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
@@ -221,7 +245,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         if let Some(last_end) = self.last_end.take() {
             if_group_breaks(&text(",")).fmt(self.fmt)?;
 
-            if USE_MAGIC_TRAILING_COMMA
+            if self.fmt.options().magic_trailing_comma().is_respect()
                 && matches!(
                     first_non_trivia_token(last_end, self.fmt.context().contents()),
                     Some(Token {
@@ -243,8 +267,8 @@ mod tests {
     use crate::comments::Comments;
     use crate::context::{NodeLevel, PyFormatContext};
     use crate::prelude::*;
+    use crate::PyFormatOptions;
     use ruff_formatter::format;
-    use ruff_formatter::SimpleFormatOptions;
     use rustpython_parser::ast::ModModule;
     use rustpython_parser::Parse;
 
@@ -265,8 +289,7 @@ no_leading_newline = 30
 
         let module = ModModule::parse(source, "test.py").unwrap();
 
-        let context =
-            PyFormatContext::new(SimpleFormatOptions::default(), source, Comments::default());
+        let context = PyFormatContext::new(PyFormatOptions::default(), source, Comments::default());
 
         let test_formatter =
             format_with(|f: &mut PyFormatter| f.join_nodes(level).nodes(&module.body).finish());
