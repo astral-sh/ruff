@@ -63,7 +63,7 @@ def main() -> None:
                 capture_output=True,
                 text=True,
             )
-        except CalledProcessError as e:  # noqa: PERF203
+        except CalledProcessError as e:
             tqdm.write(f"Ruff failed on {project_dir}: {e}")
             errors += 1
             continue
