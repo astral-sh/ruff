@@ -1,4 +1,4 @@
-use crate::comments::{trailing_comments, Comments};
+use crate::comments::{trailing_comments, trailing_node_comments, Comments};
 use crate::expression::binary_like::{BinaryLayout, FormatBinaryLike};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parenthesize,
@@ -10,6 +10,8 @@ use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWi
 use rustpython_parser::ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
 };
+use smallvec::SmallVec;
+use std::iter;
 
 #[derive(Default)]
 pub struct FormatExprBinOp {
@@ -40,41 +42,68 @@ impl<'ast> FormatBinaryLike<'ast> for ExprBinOp {
     type FormatOperator = FormatOwnedWithRule<Operator, FormatOperator, PyFormatContext<'ast>>;
 
     fn fmt_default(&self, f: &mut PyFormatter<'ast, '_>) -> FormatResult<()> {
-        let ExprBinOp {
-            range: _,
-            left,
-            op,
-            right,
-        } = self;
-
         let comments = f.context().comments().clone();
-        let operator_comments = comments.dangling_comments(self);
-        let needs_space = !is_simple_power_expression(self);
 
-        let before_operator_space = if needs_space {
-            soft_line_break_or_space()
-        } else {
-            soft_line_break()
-        };
+        let format_inner = format_with(|f| {
+            let binary_chain: SmallVec<[&ExprBinOp; 4]> =
+                iter::successors(Some(self), |parent| parent.left.as_bin_op_expr()).collect();
 
-        write!(
-            f,
-            [
-                left.format(),
-                before_operator_space,
-                op.format(),
-                trailing_comments(operator_comments),
-            ]
-        )?;
+            // SAFETY: `binary_chain` is guaranteed not to be empty because it always contains the current expression.
+            let left_most = binary_chain.last().unwrap();
 
-        // Format the operator on its own line if the right side has any leading comments.
-        if comments.has_leading_comments(right.as_ref()) {
-            write!(f, [hard_line_break()])?;
-        } else if needs_space {
-            write!(f, [space()])?;
-        }
+            // Format the left most expression
+            group(&left_most.left.format()).fmt(f)?;
 
-        write!(f, [group(&right.format())])
+            // Iterate upwards in the binary expression tree and, for each level, format the operator
+            // and the right expression.
+            for current in binary_chain.into_iter().rev() {
+                let ExprBinOp {
+                    range: _,
+                    left: _,
+                    op,
+                    right,
+                } = current;
+
+                let operator_comments = comments.dangling_comments(current);
+                let needs_space = !is_simple_power_expression(current);
+
+                let before_operator_space = if needs_space {
+                    soft_line_break_or_space()
+                } else {
+                    soft_line_break()
+                };
+
+                write!(
+                    f,
+                    [
+                        before_operator_space,
+                        op.format(),
+                        trailing_comments(operator_comments),
+                    ]
+                )?;
+
+                // Format the operator on its own line if the right side has any leading comments.
+                if comments.has_leading_comments(right.as_ref()) || !operator_comments.is_empty() {
+                    hard_line_break().fmt(f)?;
+                } else if needs_space {
+                    space().fmt(f)?;
+                }
+
+                group(&right.format()).fmt(f)?;
+
+                // It's necessary to format the trailing comments because the code bypasses
+                // `FormatNodeRule::fmt` for the nested binary expressions.
+                // Don't call the formatting function for the most outer binary expression because
+                // these comments have already been formatted.
+                if current != self {
+                    trailing_node_comments(current).fmt(f)?;
+                }
+            }
+
+            Ok(())
+        });
+
+        group(&format_inner).fmt(f)
     }
 
     fn left(&self) -> FormatResult<&Expr> {
@@ -162,7 +191,7 @@ impl NeedsParentheses for ExprBinOp {
     ) -> Parentheses {
         match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
             Parentheses::Optional => {
-                if self.binary_layout() == BinaryLayout::Default
+                if self.binary_layout(source) == BinaryLayout::Default
                     || comments.has_leading_comments(self.right.as_ref())
                     || comments.has_dangling_comments(self)
                 {

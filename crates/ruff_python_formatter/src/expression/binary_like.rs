@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Expr};
 
 use ruff_formatter::{format_args, write};
 
-use crate::expression::parentheses::Parentheses;
+use crate::expression::parentheses::{is_expression_parenthesized, Parentheses};
 use crate::prelude::*;
 
 /// Trait to implement a binary like syntax that has a left operand, an operator, and a right operand.
@@ -24,7 +24,7 @@ pub(super) trait FormatBinaryLike<'ast> {
         let right = self.right()?;
 
         let layout = if parentheses == Some(Parentheses::Custom) {
-            self.binary_layout()
+            self.binary_layout(f.context().contents())
         } else {
             BinaryLayout::Default
         };
@@ -113,9 +113,9 @@ pub(super) trait FormatBinaryLike<'ast> {
     }
 
     /// Determines which binary layout to use.
-    fn binary_layout(&self) -> BinaryLayout {
+    fn binary_layout(&self, source: &str) -> BinaryLayout {
         if let (Ok(left), Ok(right)) = (self.left(), self.right()) {
-            BinaryLayout::from_left_right(left, right)
+            BinaryLayout::from_left_right(left, right, source)
         } else {
             BinaryLayout::Default
         }
@@ -134,8 +134,8 @@ pub(super) trait FormatBinaryLike<'ast> {
     fn operator(&self) -> Self::FormatOperator;
 }
 
-fn can_break_expr(expr: &Expr) -> bool {
-    match expr {
+fn can_break_expr(expr: &Expr, source: &str) -> bool {
+    let can_break = match expr {
         Expr::Tuple(ast::ExprTuple {
             elts: expressions, ..
         })
@@ -153,12 +153,11 @@ fn can_break_expr(expr: &Expr) -> bool {
             !(args.is_empty() && keywords.is_empty())
         }
         Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::GeneratorExp(_) => true,
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => match operand.as_ref() {
-            Expr::BinOp(_) => true,
-            _ => can_break_expr(operand.as_ref()),
-        },
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => can_break_expr(operand.as_ref(), source),
         _ => false,
-    }
+    };
+
+    can_break || is_expression_parenthesized(expr.into(), source)
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -206,8 +205,8 @@ pub(super) enum BinaryLayout {
 }
 
 impl BinaryLayout {
-    pub(super) fn from_left_right(left: &Expr, right: &Expr) -> BinaryLayout {
-        match (can_break_expr(left), can_break_expr(right)) {
+    pub(super) fn from_left_right(left: &Expr, right: &Expr, source: &str) -> BinaryLayout {
+        match (can_break_expr(left, source), can_break_expr(right, source)) {
             (false, false) => BinaryLayout::Default,
             (true, false) => BinaryLayout::ExpandLeft,
             (false, true) => BinaryLayout::ExpandRight,

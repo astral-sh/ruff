@@ -10,6 +10,19 @@
     b
 )
 
+(
+    # leading left most comment
+    aaaaaaaa
+    +  # trailing operator comment
+    # leading b comment
+    b # trailing b comment
+    # trailing b ownline comment
+    +  # trailing second operator comment
+    # leading c comment
+    c # trailing c comment
+    # trailing own line comment
+ )
+
 
 # Black breaks the right side first for the following expressions:
 aaaaaaaaaaaaaa + caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaal(argument1, argument2, argument3)

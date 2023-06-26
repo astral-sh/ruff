@@ -147,7 +147,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
  
      tup = (
-@@ -100,19 +98,35 @@
+@@ -100,19 +98,32 @@
      )
  
      c = call(
@@ -169,10 +169,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  
 -AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA  # type: ignore
 +AAAAAAAAAAAAA = (
-+    [AAAAAAAAAAAAA]
-+    + SHARED_AAAAAAAAAAAAA
-+    + USER_AAAAAAAAAAAAA
-+    + AAAAAAAAAAAAA
++    [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA
 +)  # type: ignore
  
  call_to_some_function_asdf(
@@ -308,10 +305,7 @@ def func(
 result = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # aaa
 
 AAAAAAAAAAAAA = (
-    [AAAAAAAAAAAAA]
-    + SHARED_AAAAAAAAAAAAA
-    + USER_AAAAAAAAAAAAA
-    + AAAAAAAAAAAAA
+    [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA
 )  # type: ignore
 
 call_to_some_function_asdf(
