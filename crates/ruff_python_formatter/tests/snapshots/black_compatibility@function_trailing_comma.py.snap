@@ -97,7 +97,7 @@ some_module.some_function(
      if (
          a
          == {
-@@ -47,23 +43,17 @@
+@@ -47,22 +43,24 @@
              "f": 6,
              "g": 7,
              "h": 8,
@@ -112,23 +112,24 @@ some_module.some_function(
 -def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
 -    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
 -):
--    json = {
--        "k": {
--            "k2": {
--                "k3": [
--                    1,
--                ]
--            }
--        }
--    }
 +def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
 +    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 +]:
-+    json = {"k": {"k2": {"k3": [1]}}}
+     json = {
+         "k": {
+             "k2": {
+                 "k3": [
+                     1,
+-                ]
+-            }
+-        }
++                ],
++            },
++        },
+     }
  
  
- # The type annotation shouldn't get a trailing comma since that would change its type.
-@@ -80,35 +70,16 @@
+@@ -80,35 +78,16 @@
      pass
  
  
@@ -228,7 +229,15 @@ def f(
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ]:
-    json = {"k": {"k2": {"k3": [1]}}}
+    json = {
+        "k": {
+            "k2": {
+                "k3": [
+                    1,
+                ],
+            },
+        },
+    }
 
 
 # The type annotation shouldn't get a trailing comma since that would change its type.
