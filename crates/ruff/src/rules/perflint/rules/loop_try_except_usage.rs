@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::prelude::{Stmt, StmtTry};
+use ruff_python_ast::prelude::{Ranged, Stmt, StmtTry};
+use rustpython_parser::ast::{ExceptHandler, ExceptHandlerExceptHandler};
 
 use crate::checkers::ast::Checker;
 
@@ -44,7 +45,14 @@ impl Violation for LoopTryExceptUsage {
 pub(crate) fn loop_try_except_usage(checker: &mut Checker, body: &[Stmt]) {
     body.iter()
         .filter_map(|stmt| match stmt {
-            Stmt::Try(StmtTry { range, .. }) => Some(Diagnostic::new(LoopTryExceptUsage, *range)),
+            Stmt::Try(StmtTry { handlers, .. }) => {
+                if let Some(handler) = handlers.iter().next() {
+                    let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { .. }) = handler;
+                    Some(Diagnostic::new(LoopTryExceptUsage, handler.range()))
+                } else {
+                    None
+                }
+            }
             _ => None,
         })
         .for_each(|diagnostic| checker.diagnostics.push(diagnostic));

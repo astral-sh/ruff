@@ -1,27 +1,24 @@
 ---
 source: crates/ruff/src/rules/perflint/mod.rs
 ---
-PERF203.py:2:5: PERF203 Try..except blocks can have significant overhead. Avoid using them inside of a loop.
+PERF203.py:4:5: PERF203 Try..except blocks can have significant overhead. Avoid using them inside of a loop.
   |
-1 |   for i in range(10):
 2 |       try: # PERF203
+3 |           print(f"{i}")
+4 |       except:
   |  _____^
-3 | |         print(f"{i}")
-4 | |     except:
 5 | |         print("error")
   | |______________________^ PERF203
 6 |   
 7 |   try:
   |
 
-PERF203.py:15:5: PERF203 Try..except blocks can have significant overhead. Avoid using them inside of a loop.
+PERF203.py:17:5: PERF203 Try..except blocks can have significant overhead. Avoid using them inside of a loop.
    |
-13 |   i = 0
-14 |   while i < 10: # PERF203
 15 |       try:
+16 |           print(f"{i}")
+17 |       except:
    |  _____^
-16 | |         print(f"{i}")
-17 | |     except:
 18 | |         print("error")
    | |______________________^ PERF203
 19 |   
