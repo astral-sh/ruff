@@ -53,11 +53,11 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e
 # Please tag the RustPython version everytime you update its revision here.
 # Tagging the version ensures that older ruff versions continue to build from source even when we rebase our RustPython fork.
 # Current tag: v0.0.7
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "aeaa8caa6b9790dbbb54ba4e35d688a8b3badcc2" }
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "aeaa8caa6b9790dbbb54ba4e35d688a8b3badcc2" , default-features = false, features = ["num-bigint"]}
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "aeaa8caa6b9790dbbb54ba4e35d688a8b3badcc2", default-features = false, features = ["num-bigint"] }
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "aeaa8caa6b9790dbbb54ba4e35d688a8b3badcc2", default-features = false }
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "aeaa8caa6b9790dbbb54ba4e35d688a8b3badcc2" , default-features = false, features = ["full-lexer", "num-bigint"] }
+ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "c174bbf1f29527edd43d432326327f16f47ab9e0" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "c174bbf1f29527edd43d432326327f16f47ab9e0" , default-features = false, features = ["num-bigint"]}
+rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "c174bbf1f29527edd43d432326327f16f47ab9e0", default-features = false, features = ["num-bigint"] }
+rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "c174bbf1f29527edd43d432326327f16f47ab9e0", default-features = false }
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "c174bbf1f29527edd43d432326327f16f47ab9e0" , default-features = false, features = ["full-lexer", "num-bigint"] }
 
 [profile.release]
 lto = "fat"
