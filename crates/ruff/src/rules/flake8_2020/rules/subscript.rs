@@ -12,26 +12,27 @@ use crate::rules::flake8_2020::helpers::is_sys;
 /// Checks for uses of `sys.version[:3]`.
 ///
 /// ## Why is this bad?
-/// If the major or minor version number consists of two digits, this will
-/// truncate the version number (e.g., `"3.10"` becomes `"3.1"`). This is
-/// likely unintended, and will cause problems if the version string is used to
-/// check for a specific version.
+/// If the current major or minor version consists of multiple digits,
+/// `sys.version[:3]` will truncate the version number (e.g., `"3.10"` would
+/// become `"3.1"`). This is likely unintended, and can lead to subtle bugs if
+/// the version string is used to test against a specific Python version.
 ///
-/// Instead, use `sys.version_info` to get the version information as a tuple.
-/// This is more future-proof and less error-prone.
+/// Instead, use `sys.version_info` to access the current major and minor
+/// version numbers as a tuple, which can be compared to other tuples
+/// without issue.
 ///
 /// ## Example
 /// ```python
 /// import sys
 ///
-/// sys.version[:3]  # If using Python 3.10, this evaluates to "3.1".
+/// sys.version[:3]  # Evaluates to "3.1" on Python 3.10.
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import sys
 ///
-/// "{}.{}".format(*sys.version_info)  # If using Python 3.10, this evaluates to "3.10".
+/// sys.version_info[:2]  # Evaluates to (3, 10) on Python 3.10.
 /// ```
 ///
 /// ## References
@@ -51,26 +52,27 @@ impl Violation for SysVersionSlice3 {
 /// Checks for uses of `sys.version[2]`.
 ///
 /// ## Why is this bad?
-/// If the major or minor version number consists of two digits, this will
-/// select the first digit of the minor number only (e.g., `"3.10"` becomes
-/// `"1"`). This is likely unintended, and will cause problems if the version
-/// string is used to check for a minor version number.
+/// If the current major or minor version consists of multiple digits,
+/// `sys.version[2]` will select the first digit of the minor number only
+/// (e.g., `"3.10"` would evaluate to `"1"`). This is likely unintended, and
+/// can lead to subtle bugs if the version is used to test against a minor
+/// version number.
 ///
-/// Instead, use `sys.version_info.minor` to get the minor version number. This
-/// is more future-proof and less error-prone.
+/// Instead, use `sys.version_info.minor` to access the current minor version
+/// number.
 ///
 /// ## Example
 /// ```python
 /// import sys
 ///
-/// sys.version[2]  # If using Python 3.10, this evaluates to "1".
+/// sys.version[2]  # Evaluates to "1" on Python 3.10.
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import sys
 ///
-/// f"{sys.version_info.minor}"  # If using Python 3.10, this evaluates to "10".
+/// f"{sys.version_info.minor}"  # Evaluates to "10" on Python 3.10.
 /// ```
 ///
 /// ## References
@@ -90,14 +92,14 @@ impl Violation for SysVersion2 {
 /// Checks for uses of `sys.version[0]`.
 ///
 /// ## Why is this bad?
-/// If the major version number consists of more than one digit, this will
-/// select the first digit of the major version number only (e.g., `"10.0"`
-/// becomes `"1"`). This is likely unintended, and will cause problems in
-/// future versions of Python if the version string is used to check for a
+/// If the current major or minor version consists of multiple digits,
+/// `sys.version[0]` will select the first digit of the major version number
+/// only (e.g., `"3.10"` would evaluate to `"1"`). This is likely unintended,
+/// and can lead to subtle bugs if the version string is used to test against a
 /// major version number.
 ///
-/// Instead, use `sys.version_info.major` to get the major version number. This
-/// is more future-proof and less error-prone.
+/// Instead, use `sys.version_info.major` to access the current major version
+/// number.
 ///
 /// ## Example
 /// ```python
@@ -132,12 +134,12 @@ impl Violation for SysVersion0 {
 /// ## Why is this bad?
 /// If the major version number consists of more than one digit, this will
 /// select the first digit of the major version number only (e.g., `"10.0"`
-/// becomes `"1"`). This is likely unintended, and will cause problems in
-/// future versions of Python if the version string is used to check for a
-/// major version number.
+/// would evaluate to `"1"`). This is likely unintended, and can lead to subtle
+/// bugs in future versions of Python if the version string is used to test
+/// against a specific major version number.
 ///
-/// Instead, use `sys.version_info.major` to get the major version number. This
-/// is more future-proof and less error-prone.
+/// Instead, use `sys.version_info.major` to access the current major version
+/// number.
 ///
 /// ## Example
 /// ```python

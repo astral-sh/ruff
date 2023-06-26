@@ -10,30 +10,30 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// `six.PY3` will evaluate to `False` on Python 4 and greater. This is likely
-/// unintended, and may cause code intended to be run on Python 2 to be
-/// executed on Python 4.
+/// unintended, and may cause code intended to run on Python 2 to run on Python 4
+/// too.
 ///
-/// Instead, use `not six.PY2` to check if the Python version is not 2. This is
-/// more future-proof.
+/// Instead, use `not six.PY2` to validate that the current Python major version is
+/// _not_ equal to 2, to future-proof the code.
 ///
 /// ## Example
 /// ```python
 /// import six
 ///
-/// six.PY3  # If using Python 4, this evaluates to `False`.
+/// six.PY3  # `False` on Python 4.
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import six
 ///
-/// not six.PY2  # If using Python 4, this evaluates to `True`.
+/// not six.PY2  # `True` on Python 4.
 /// ```
 ///
 /// ## References
 /// - [PyPI: `six`](https://pypi.org/project/six/)
-/// - [Six documentation: `six.PY3`](https://six.readthedocs.io/#six.PY3)
 /// - [Six documentation: `six.PY2`](https://six.readthedocs.io/#six.PY2)
+/// - [Six documentation: `six.PY3`](https://six.readthedocs.io/#six.PY3)
 #[violation]
 pub struct SixPY3;
 
