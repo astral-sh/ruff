@@ -12,9 +12,8 @@ use crate::rules::flake8_2020::helpers::is_sys;
 /// Checks for uses of `sys.version[:3]`.
 ///
 /// ## Why is this bad?
-/// `sys.version[:3]` will select the first three characters of the version
-/// string. If the major or minor version number consists of two digits, this
-/// will truncate the version number (e.g., `"3.10"` becomes `"3.1"`). This is
+/// If the major or minor version number consists of two digits, this will
+/// truncate the version number (e.g., `"3.10"` becomes `"3.1"`). This is
 /// likely unintended, and will cause problems if the version string is used to
 /// check for a specific version.
 ///
@@ -52,7 +51,6 @@ impl Violation for SysVersionSlice3 {
 /// Checks for uses of `sys.version[2]`.
 ///
 /// ## Why is this bad?
-/// `sys.version[2]` will select the third character of the version string.
 /// If the major or minor version number consists of two digits, this will
 /// select the first digit of the minor number only (e.g., `"3.10"` becomes
 /// `"1"`). This is likely unintended, and will cause problems if the version
@@ -92,7 +90,6 @@ impl Violation for SysVersion2 {
 /// Checks for uses of `sys.version[0]`.
 ///
 /// ## Why is this bad?
-/// `sys.version[0]` will select the first character of the version string.
 /// If the major version number consists of more than one digit, this will
 /// select the first digit of the major version number only (e.g., `"10.0"`
 /// becomes `"1"`). This is likely unintended, and will cause problems in
@@ -133,7 +130,6 @@ impl Violation for SysVersion0 {
 /// Checks for uses of `sys.version[:1]`.
 ///
 /// ## Why is this bad?
-/// `sys.version[:1]` will select the first character of the version string.
 /// If the major version number consists of more than one digit, this will
 /// select the first digit of the major version number only (e.g., `"10.0"`
 /// becomes `"1"`). This is likely unintended, and will cause problems in

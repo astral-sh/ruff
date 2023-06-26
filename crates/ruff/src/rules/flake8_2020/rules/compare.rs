@@ -50,8 +50,7 @@ impl Violation for SysVersionCmpStr3 {
 /// Checks for uses of `sys.version_info[0] == 3`.
 ///
 /// ## Why is this bad?
-/// `sys.version_info[0] == 3` will check if the major version number is 3. In
-/// Python 4 and greater, this will evaluate to `False`. This is likely
+/// In Python 4 and greater, this will evaluate to `False`. This is likely
 /// unintended, and may cause code intended to be run on Python 2 to be
 /// executed on Python 4.
 ///
@@ -95,9 +94,9 @@ impl Violation for SysVersionInfo0Eq3 {
 /// Checks for comparisons of `sys.version_info[1]` to an integer.
 ///
 /// ## Why is this bad?
-/// Comparison of the minor version number of `sys.version_info` to an integer
-/// does not consider the major version number. This is likely unintended, and
-/// may cause bugs when run on Python 4 and greater.
+/// Comparison of the minor version number to an integer does not consider the
+/// major version number. This is likely unintended, and may cause bugs when
+/// run on Python 4 and greater.
 ///
 /// Instead, compare `sys.version_info` to a tuple, including the major and
 /// minor version numbers. This is more future-proof.
@@ -138,9 +137,9 @@ impl Violation for SysVersionInfo1CmpInt {
 /// Checks for comparisons of `sys.version_info.minor` to an integer.
 ///
 /// ## Why is this bad?
-/// Comparison of the minor version number of `sys.version_info` to an integer
-/// is independent of the major version number. This is likely unintended, and
-/// may cause bugs when run on Python 4 and greater.
+/// Comparison of the minor version number to an integer is independent of the
+/// major version number. This is likely unintended, and may cause bugs when
+/// run on Python 4 and greater.
 ///
 /// Instead, compare `sys.version_info` to a tuple, including the major and
 /// minor version numbers. This is more future-proof.
