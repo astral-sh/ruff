@@ -3,9 +3,18 @@ use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
 
 #[derive(Clone, Debug)]
 pub struct PyFormatOptions {
+    /// Specifies the indent style:
+    /// * Either a tab
+    /// * or a specific amount of spaces
     indent_style: IndentStyle,
+
+    /// The preferred line width at which the formatter should wrap lines.
     line_width: LineWidth,
+
+    /// The preferred quote style to use (single vs double quotes).
     quote_style: QuoteStyle,
+
+    /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`
     magic_trailing_comma: MagicTrailingComma,
 }
 
