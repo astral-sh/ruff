@@ -1,10 +1,12 @@
+use rustpython_parser::ast::StmtWith;
+
+use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AstNode;
+
 use crate::builders::optional_parentheses;
 use crate::comments::trailing_comments;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::prelude::*;
-use rustpython_parser::ast::StmtWith;
 
 #[derive(Default)]
 pub struct FormatStmtWith;

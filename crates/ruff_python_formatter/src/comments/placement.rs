@@ -1,16 +1,20 @@
+use std::cmp::Ordering;
+
+use ruff_text_size::TextRange;
+use rustpython_parser::ast;
+use rustpython_parser::ast::{Expr, ExprSlice, Ranged};
+
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::whitespace;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
+
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
 use crate::other::arguments::{
     assign_argument_separator_comment_placement, find_argument_separators,
 };
 use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::whitespace;
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, ExprSlice, Ranged};
-use std::cmp::Ordering;
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
@@ -574,8 +578,6 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    use ruff_python_ast::prelude::*;
-
     // Must be an end of line comment
     if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
@@ -587,23 +589,25 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     };
 
     let expression_before_colon = match comment.enclosing_node() {
-        AnyNodeRef::StmtIf(StmtIf { test: expr, .. })
-        | AnyNodeRef::StmtWhile(StmtWhile { test: expr, .. })
-        | AnyNodeRef::StmtFor(StmtFor { iter: expr, .. })
-        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { iter: expr, .. }) => {
+        AnyNodeRef::StmtIf(ast::StmtIf { test: expr, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { test: expr, .. })
+        | AnyNodeRef::StmtFor(ast::StmtFor { iter: expr, .. })
+        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { iter: expr, .. }) => {
             Some(AnyNodeRef::from(expr.as_ref()))
         }
 
-        AnyNodeRef::StmtWith(StmtWith { items, .. })
-        | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { items, .. }) => {
+        AnyNodeRef::StmtWith(ast::StmtWith { items, .. })
+        | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { items, .. }) => {
             items.last().map(AnyNodeRef::from)
         }
-        AnyNodeRef::StmtFunctionDef(StmtFunctionDef { returns, args, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(StmtAsyncFunctionDef { returns, args, .. }) => returns
-            .as_deref()
-            .map(AnyNodeRef::from)
-            .or_else(|| Some(AnyNodeRef::from(args.as_ref()))),
-        AnyNodeRef::StmtClassDef(StmtClassDef {
+        AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { returns, args, .. })
+        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { returns, args, .. }) => {
+            returns
+                .as_deref()
+                .map(AnyNodeRef::from)
+                .or_else(|| Some(AnyNodeRef::from(args.as_ref())))
+        }
+        AnyNodeRef::StmtClassDef(ast::StmtClassDef {
             bases, keywords, ..
         }) => keywords
             .last()
@@ -1104,21 +1108,21 @@ where
 }
 
 fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
-    use ruff_python_ast::prelude::*;
-
     let body = match node {
-        AnyNodeRef::StmtFunctionDef(StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(StmtAsyncFunctionDef { body, .. })
-        | AnyNodeRef::StmtClassDef(StmtClassDef { body, .. })
-        | AnyNodeRef::StmtWith(StmtWith { body, .. })
-        | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { body, .. })
-        | AnyNodeRef::MatchCase(MatchCase { body, .. })
-        | AnyNodeRef::ExceptHandlerExceptHandler(ExceptHandlerExceptHandler { body, .. }) => body,
+        AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
+        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
+        | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
+        | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
+        | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { body, .. })
+        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
+        | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+            body, ..
+        }) => body,
 
-        AnyNodeRef::StmtIf(StmtIf { body, orelse, .. })
-        | AnyNodeRef::StmtFor(StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { body, orelse, .. })
-        | AnyNodeRef::StmtWhile(StmtWhile { body, orelse, .. }) => {
+        AnyNodeRef::StmtIf(ast::StmtIf { body, orelse, .. })
+        | AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
             if orelse.is_empty() {
                 body
             } else {
@@ -1126,18 +1130,18 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
             }
         }
 
-        AnyNodeRef::StmtMatch(StmtMatch { cases, .. }) => {
+        AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
             return cases.last().map(AnyNodeRef::from)
         }
 
-        AnyNodeRef::StmtTry(StmtTry {
+        AnyNodeRef::StmtTry(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
             ..
         })
-        | AnyNodeRef::StmtTryStar(StmtTryStar {
+        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
@@ -1171,23 +1175,21 @@ fn is_first_statement_in_enclosing_alternate_body(
     following: AnyNodeRef,
     enclosing: AnyNodeRef,
 ) -> bool {
-    use ruff_python_ast::prelude::*;
-
     match enclosing {
-        AnyNodeRef::StmtIf(StmtIf { orelse, .. })
-        | AnyNodeRef::StmtFor(StmtFor { orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { orelse, .. })
-        | AnyNodeRef::StmtWhile(StmtWhile { orelse, .. }) => {
+        AnyNodeRef::StmtIf(ast::StmtIf { orelse, .. })
+        | AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
+        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { orelse, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
             are_same_optional(following, orelse.first())
         }
 
-        AnyNodeRef::StmtTry(StmtTry {
+        AnyNodeRef::StmtTry(ast::StmtTry {
             handlers,
             orelse,
             finalbody,
             ..
         })
-        | AnyNodeRef::StmtTryStar(StmtTryStar {
+        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
             handlers,
             orelse,
             finalbody,

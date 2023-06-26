@@ -8,9 +8,9 @@ use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
 use ruff_python_ast::node::AstNode;
-use ruff_python_ast::prelude::{Expr, Ranged};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprSlice;
+use rustpython_parser::ast::{Expr, Ranged};
 
 #[derive(Default)]
 pub struct FormatExprSlice;

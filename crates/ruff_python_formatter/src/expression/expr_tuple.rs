@@ -5,9 +5,9 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::prelude::{Expr, Ranged};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprTuple;
+use rustpython_parser::ast::{Expr, Ranged};
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
