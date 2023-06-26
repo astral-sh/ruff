@@ -1,16 +1,13 @@
-use crate::builders::PyFormatterExtensions;
+use crate::builders::optional_parentheses;
 use crate::comments::{dangling_node_comments, Comments};
-use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::{block_indent, group, if_group_breaks, soft_block_indent, text};
-use ruff_formatter::{format_args, write, Buffer, Format, FormatResult, FormatRuleWithOptions};
-use ruff_python_ast::prelude::{Expr, Ranged};
+use crate::prelude::*;
+use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprTuple;
+use rustpython_parser::ast::{Expr, Ranged};
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
@@ -100,17 +97,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                     ])]
                 )
             }
-            elts => {
-                write!(
-                    f,
-                    [group(&format_args![
-                        // If there were previously no parentheses, add them only if the group breaks
-                        if_group_breaks(&text("(")),
-                        soft_block_indent(&ExprSequence::new(elts)),
-                        if_group_breaks(&text(")")),
-                    ])]
-                )
-            }
+            elts => optional_parentheses(&ExprSequence::new(elts)).fmt(f),
         }
     }
 

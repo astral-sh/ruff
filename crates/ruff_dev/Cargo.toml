@@ -15,6 +15,7 @@ ruff = { path = "../ruff", features = ["schemars"] }
 ruff_cli = { path = "../ruff_cli" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_textwrap = { path = "../ruff_textwrap" }
 
 anyhow = { workspace = true }

@@ -8,7 +8,7 @@ use crate::FormatNodeRule;
 use ruff_formatter::{
     write, FormatError, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
 };
-use ruff_python_ast::prelude::Expr;
+use rustpython_parser::ast::Expr;
 use rustpython_parser::ast::{CmpOp, ExprCompare};
 
 #[derive(Default)]

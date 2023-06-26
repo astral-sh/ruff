@@ -1,35 +1,152 @@
+use crate::builders::optional_parentheses;
+use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::parentheses::Parentheses;
 use crate::prelude::*;
-use crate::{not_yet_implemented_custom_text, QuoteStyle};
+use crate::QuoteStyle;
 use bitflags::bitflags;
-use ruff_formatter::{write, FormatError};
+use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{ExprConstant, Ranged};
+use rustpython_parser::lexer::lex_starts_at;
+use rustpython_parser::{Mode, Tok};
 use std::borrow::Cow;
 
-pub(super) struct FormatString {
-    string_range: TextRange,
+#[derive(Copy, Clone, Debug)]
+pub enum StringLayout {
+    Default(Option<Parentheses>),
+
+    /// Enforces that implicit continuation strings are printed on a single line even if they exceed
+    /// the configured line width.  
+    Flat,
 }
 
-impl FormatString {
-    pub(super) fn new(constant: &ExprConstant) -> Self {
+impl Default for StringLayout {
+    fn default() -> Self {
+        Self::Default(None)
+    }
+}
+
+pub(super) struct FormatString<'a> {
+    constant: &'a ExprConstant,
+    layout: StringLayout,
+}
+
+impl<'a> FormatString<'a> {
+    pub(super) fn new(constant: &'a ExprConstant, layout: StringLayout) -> Self {
         debug_assert!(constant.value.is_str());
-        Self {
-            string_range: constant.range(),
+        Self { constant, layout }
+    }
+}
+
+impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let string_range = self.constant.range();
+        let string_content = f.context().locator().slice(string_range);
+
+        if is_implicit_concatenation(string_content) {
+            let format_continuation = FormatStringContinuation::new(self.constant, self.layout);
+
+            if let StringLayout::Default(Some(Parentheses::Custom)) = self.layout {
+                optional_parentheses(&format_continuation).fmt(f)
+            } else {
+                format_continuation.fmt(f)
+            }
+        } else {
+            FormatStringPart::new(string_range).fmt(f)
         }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatString {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let string_content = f.context().locator().slice(self.string_range);
+struct FormatStringContinuation<'a> {
+    constant: &'a ExprConstant,
+    layout: StringLayout,
+}
 
-        if is_implicit_concatenation(string_content) {
-            not_yet_implemented_custom_text(r#""NOT_YET_IMPLEMENTED" "IMPLICIT_CONCATENATION""#)
-                .fmt(f)
-        } else {
-            FormatStringPart::new(self.string_range).fmt(f)
+impl<'a> FormatStringContinuation<'a> {
+    fn new(constant: &'a ExprConstant, layout: StringLayout) -> Self {
+        debug_assert!(constant.value.is_str());
+        Self { constant, layout }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let comments = f.context().comments().clone();
+        let locator = f.context().locator();
+        let mut dangling_comments = comments.dangling_comments(self.constant);
+
+        let string_range = self.constant.range();
+        let string_content = locator.slice(string_range);
+
+        // The AST parses implicit concatenation as a single string.
+        // Call into the lexer to extract the individual chunks and format each string on its own.
+        // This code does not yet implement the automatic joining of strings that fit on the same line
+        // because this is a black preview style.
+        let lexer = lex_starts_at(string_content, Mode::Module, string_range.start());
+
+        let separator = format_with(|f| match self.layout {
+            StringLayout::Default(_) => soft_line_break_or_space().fmt(f),
+            StringLayout::Flat => space().fmt(f),
+        });
+
+        let mut joiner = f.join_with(separator);
+
+        for token in lexer {
+            let (token, token_range) = token.map_err(|_| FormatError::SyntaxError)?;
+
+            match token {
+                Tok::String { .. } => {
+                    // ```python
+                    // (
+                    //      "a"
+                    //      # leading
+                    //      "the comment above"
+                    // )
+                    // ```
+                    let leading_comments_end = dangling_comments
+                        .partition_point(|comment| comment.slice().start() <= token_range.start());
+
+                    let (leading_part_comments, rest) =
+                        dangling_comments.split_at(leading_comments_end);
+
+                    // ```python
+                    // (
+                    //      "a" # trailing comment
+                    //      "the comment above"
+                    // )
+                    // ```
+                    let trailing_comments_end = rest.partition_point(|comment| {
+                        comment.line_position().is_end_of_line()
+                            && !locator.contains_line_break(TextRange::new(
+                                token_range.end(),
+                                comment.slice().start(),
+                            ))
+                    });
+
+                    let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
+
+                    joiner.entry(&format_args![
+                        line_suffix_boundary(),
+                        leading_comments(leading_part_comments),
+                        FormatStringPart::new(token_range),
+                        trailing_comments(trailing_part_comments)
+                    ]);
+
+                    dangling_comments = rest;
+                }
+                Tok::Comment(_)
+                | Tok::NonLogicalNewline
+                | Tok::Newline
+                | Tok::Indent
+                | Tok::Dedent => continue,
+                token => unreachable!("Unexpected token {token:?}"),
+            }
         }
+
+        debug_assert!(dangling_comments.is_empty());
+
+        joiner.finish()
     }
 }
 
@@ -58,7 +175,8 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         let raw_content_range = relative_raw_content_range + self.part_range.start();
 
         let raw_content = &string_content[relative_raw_content_range];
-        let (preferred_quotes, contains_newlines) = preferred_quotes(raw_content, quotes);
+        let (preferred_quotes, contains_newlines) =
+            preferred_quotes(raw_content, quotes, f.options().quote_style());
 
         write!(f, [prefix, preferred_quotes])?;
 
@@ -148,14 +266,20 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 /// Detects the preferred quotes for `input`.
 /// * single quoted strings: The preferred quote style is the one that requires less escape sequences.
 /// * triple quoted strings: Use double quotes except the string contains a sequence of `"""`.
-fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, ContainsNewlines) {
+fn preferred_quotes(
+    input: &str,
+    quotes: StringQuotes,
+    configured_style: QuoteStyle,
+) -> (StringQuotes, ContainsNewlines) {
     let mut contains_newlines = ContainsNewlines::No;
 
     let preferred_style = if quotes.triple {
-        let mut use_single_quotes = false;
+        // True if the string contains a triple quote sequence of the configured quote style.
+        let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
 
         while let Some(c) = chars.next() {
+            let configured_quote_char = configured_style.as_char();
             match c {
                 '\n' | '\r' => contains_newlines = ContainsNewlines::Yes,
                 '\\' => {
@@ -163,24 +287,25 @@ fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, Contain
                         chars.next();
                     }
                 }
-                '"' => {
+                // `"` or `'`
+                c if c == configured_quote_char => {
                     match chars.peek().copied() {
-                        Some('"') => {
-                            // `""`
+                        Some(c) if c == configured_quote_char => {
+                            // `""` or `''`
                             chars.next();
 
-                            if chars.peek().copied() == Some('"') {
-                                // `"""`
+                            if chars.peek().copied() == Some(configured_quote_char) {
+                                // `"""` or `'''`
                                 chars.next();
-                                use_single_quotes = true;
+                                uses_triple_quotes = true;
                             }
                         }
                         Some(_) => {
-                            // Single quote, this is ok
+                            // A single quote char, this is ok
                         }
                         None => {
                             // Trailing quote at the end of the comment
-                            use_single_quotes = true;
+                            uses_triple_quotes = true;
                         }
                     }
                 }
@@ -188,10 +313,12 @@ fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, Contain
             }
         }
 
-        if use_single_quotes {
-            QuoteStyle::Single
+        if uses_triple_quotes {
+            // String contains a triple quote sequence of the configured quote style.
+            // Keep the existing quote style.
+            quotes.style
         } else {
-            QuoteStyle::Double
+            configured_style
         }
     } else {
         let mut single_quotes = 0u32;
@@ -215,10 +342,21 @@ fn preferred_quotes(input: &str, quotes: StringQuotes) -> (StringQuotes, Contain
             }
         }
 
-        if double_quotes > single_quotes {
-            QuoteStyle::Single
-        } else {
-            QuoteStyle::Double
+        match configured_style {
+            QuoteStyle::Single => {
+                if single_quotes > double_quotes {
+                    QuoteStyle::Double
+                } else {
+                    QuoteStyle::Single
+                }
+            }
+            QuoteStyle::Double => {
+                if double_quotes > single_quotes {
+                    QuoteStyle::Single
+                } else {
+                    QuoteStyle::Double
+                }
+            }
         }
     };
 
@@ -286,7 +424,7 @@ fn normalize_quotes(input: &str, quotes: StringQuotes) -> Cow<str> {
 
         let style = quotes.style;
         let preferred_quote = style.as_char();
-        let opposite_quote = style.opposite().as_char();
+        let opposite_quote = style.invert().as_char();
 
         let mut chars = input.char_indices();
 

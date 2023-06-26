@@ -11,7 +11,7 @@ use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::CheckArgs;
 use ruff_cli::resolve::resolve;
-use ruff_python_formatter::format_module;
+use ruff_python_formatter::{format_module, PyFormatOptions};
 use similar::{ChangeTag, TextDiff};
 use std::io::Write;
 use std::panic::catch_unwind;
@@ -276,7 +276,7 @@ impl From<anyhow::Error> for FormatterStabilityError {
 /// Run the formatter twice on the given file. Does not write back to the file
 fn check_file(input_path: &Path) -> Result<(), FormatterStabilityError> {
     let content = fs::read_to_string(input_path).context("Failed to read file")?;
-    let printed = match format_module(&content) {
+    let printed = match format_module(&content, PyFormatOptions::default()) {
         Ok(printed) => printed,
         Err(err) => {
             return if err
@@ -296,7 +296,7 @@ fn check_file(input_path: &Path) -> Result<(), FormatterStabilityError> {
     };
     let formatted = printed.as_code();
 
-    let reformatted = match format_module(formatted) {
+    let reformatted = match format_module(formatted, PyFormatOptions::default()) {
         Ok(reformatted) => reformatted,
         Err(err) => {
             return Err(FormatterStabilityError::InvalidSyntax {

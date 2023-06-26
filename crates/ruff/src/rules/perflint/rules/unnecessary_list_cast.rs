@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::prelude::Stmt;
+use rustpython_parser::ast::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

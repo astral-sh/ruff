@@ -87,10 +87,12 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
-use crate::comments::debug::{DebugComment, DebugComments};
-use crate::comments::map::MultiMap;
-use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::visitor::CommentsVisitor;
+use std::cell::Cell;
+use std::fmt::Debug;
+use std::rc::Rc;
+
+use rustpython_parser::ast::Mod;
+
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
     leading_node_comments, trailing_comments, trailing_node_comments,
@@ -98,10 +100,11 @@ pub(crate) use format::{
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::CommentRanges;
-use rustpython_parser::ast::Mod;
-use std::cell::Cell;
-use std::fmt::Debug;
-use std::rc::Rc;
+
+use crate::comments::debug::{DebugComment, DebugComments};
+use crate::comments::map::MultiMap;
+use crate::comments::node_key::NodeRefEqualityKey;
+use crate::comments::visitor::CommentsVisitor;
 
 mod debug;
 mod format;
@@ -404,13 +407,15 @@ struct CommentsData<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::comments::Comments;
     use insta::assert_debug_snapshot;
-    use ruff_formatter::SourceCode;
-    use ruff_python_ast::prelude::*;
-    use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder};
+    use rustpython_parser::ast::Mod;
     use rustpython_parser::lexer::lex;
     use rustpython_parser::{parse_tokens, Mode};
+
+    use ruff_formatter::SourceCode;
+    use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder};
+
+    use crate::comments::Comments;
 
     struct CommentsTestCase<'a> {
         module: Mod,

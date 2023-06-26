@@ -9,6 +9,38 @@ use crate::registry::Rule;
 
 use super::super::helpers::is_sys;
 
+/// ## What it does
+/// Checks for comparisons that test `sys.version` against string literals,
+/// such that the comparison will evaluate to `False` on Python 3.10 or later.
+///
+/// ## Why is this bad?
+/// Comparing `sys.version` to a string is error-prone and may cause subtle
+/// bugs, as the comparison will be performed lexicographically, not
+/// semantically. For example, `sys.version > "3.9"` will evaluate to `False`
+/// when using Python 3.10, as `"3.10"` is lexicographically "less" than
+/// `"3.9"`.
+///
+/// Instead, use `sys.version_info` to access the current major and minor
+/// version numbers as a tuple, which can be compared to other tuples
+/// without issue.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version > "3.9"  # `False` on Python 3.10.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// sys.version_info > (3, 9)  # `True` on Python 3.10.
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionCmpStr3;
 
@@ -19,6 +51,43 @@ impl Violation for SysVersionCmpStr3 {
     }
 }
 
+/// ## What it does
+/// Checks for equality comparisons against the major version returned by
+/// `sys.version_info` (e.g., `sys.version_info[0] == 3`).
+///
+/// ## Why is this bad?
+/// Using `sys.version_info[0] == 3` to verify that the major version is
+/// Python 3 or greater will fail if the major version number is ever
+/// incremented (e.g., to Python 4). This is likely unintended, as code
+/// that uses this comparison is likely intended to be run on Python 2,
+/// but would now run on Python 4 too.
+///
+/// Instead, use `>=` to check if the major version number is 3 or greater,
+/// to future-proof the code.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info[0] == 3:
+///     ...
+/// else:
+///     print("Python 2")  # This will be printed on Python 4.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// if sys.version_info >= (3,):
+///     ...
+/// else:
+///     print("Python 2")  # This will not be printed on Python 4.
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionInfo0Eq3;
 
@@ -29,6 +98,36 @@ impl Violation for SysVersionInfo0Eq3 {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons that test `sys.version_info[1]` against an integer.
+///
+/// ## Why is this bad?
+/// Comparisons based on the current minor version number alone can cause
+/// subtle bugs and would likely lead to unintended effects if the Python
+/// major version number were ever incremented (e.g., to Python 4).
+///
+/// Instead, compare `sys.version_info` to a tuple, including the major and
+/// minor version numbers, to future-proof the code.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info[1] < 7:
+///     print("Python 3.6 or earlier.")  # This will be printed on Python 4.0.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// if sys.version_info < (3, 7):
+///     print("Python 3.6 or earlier.")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionInfo1CmpInt;
 
@@ -42,6 +141,36 @@ impl Violation for SysVersionInfo1CmpInt {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons that test `sys.version_info.minor` against an integer.
+///
+/// ## Why is this bad?
+/// Comparisons based on the current minor version number alone can cause
+/// subtle bugs and would likely lead to unintended effects if the Python
+/// major version number were ever incremented (e.g., to Python 4).
+///
+/// Instead, compare `sys.version_info` to a tuple, including the major and
+/// minor version numbers, to future-proof the code.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info.minor < 7:
+///     print("Python 3.6 or earlier.")  # This will be printed on Python 4.0.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// if sys.version_info < (3, 7):
+///     print("Python 3.6 or earlier.")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionInfoMinorCmpInt;
 
@@ -55,6 +184,37 @@ impl Violation for SysVersionInfoMinorCmpInt {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons that test `sys.version` against string literals,
+/// such that the comparison would fail if the major version number were
+/// ever incremented to Python 10 or higher.
+///
+/// ## Why is this bad?
+/// Comparing `sys.version` to a string is error-prone and may cause subtle
+/// bugs, as the comparison will be performed lexicographically, not
+/// semantically.
+///
+/// Instead, use `sys.version_info` to access the current major and minor
+/// version numbers as a tuple, which can be compared to other tuples
+/// without issue.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version >= "3"  # `False` on Python 10.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// sys.version_info >= (3,)  # `True` on Python 10.
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionCmpStr10;
 

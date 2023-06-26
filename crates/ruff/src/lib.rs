@@ -9,6 +9,8 @@ pub use ruff_python_ast::source_code::round_trip;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod autofix;
 mod checkers;
 mod codes;

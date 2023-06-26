@@ -1,5 +1,4 @@
-use once_cell::sync::Lazy;
-use regex::Regex;
+use memchr::memchr_iter;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,18 +52,22 @@ impl Violation for EscapeSequenceInDocstring {
     }
 }
 
-static BACKSLASH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\[^(\r\n|\n)uN]").unwrap());
-
 /// D301
 pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
-    let contents = docstring.contents;
-
     // Docstring is already raw.
+    let contents = docstring.contents;
     if contents.starts_with('r') || contents.starts_with("ur") {
         return;
     }
 
-    if BACKSLASH_REGEX.is_match(contents) {
+    // Docstring contains at least one backslash.
+    let body = docstring.body();
+    let bytes = body.as_bytes();
+    if memchr_iter(b'\\', bytes).any(|position| {
+        let escaped_char = bytes.get(position.saturating_add(1));
+        // Allow continuations (backslashes followed by newlines) and Unicode escapes.
+        !matches!(escaped_char, Some(b'\r' | b'\n' | b'u' | b'N'))
+    }) {
         checker.diagnostics.push(Diagnostic::new(
             EscapeSequenceInDocstring,
             docstring.range(),

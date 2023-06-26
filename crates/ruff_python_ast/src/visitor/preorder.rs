@@ -1,4 +1,8 @@
-use crate::prelude::*;
+use rustpython_ast::{ArgWithDefault, Mod, TypeIgnore};
+use rustpython_parser::ast::{
+    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
+    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+};
 
 /// Visitor that traverses all nodes recursively in pre-order.
 pub trait PreorderVisitor<'a> {
@@ -100,7 +104,7 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match module {
-        Mod::Module(ModModule {
+        Mod::Module(ast::ModModule {
             body,
             range: _,
             type_ignores,
@@ -110,9 +114,9 @@ where
                 visitor.visit_type_ignore(ignore);
             }
         }
-        Mod::Interactive(ModInteractive { body, range: _ }) => visitor.visit_body(body),
-        Mod::Expression(ModExpression { body, range: _ }) => visitor.visit_expr(body),
-        Mod::FunctionType(ModFunctionType {
+        Mod::Interactive(ast::ModInteractive { body, range: _ }) => visitor.visit_body(body),
+        Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
+        Mod::FunctionType(ast::ModFunctionType {
             range: _,
             argtypes,
             returns,
@@ -140,19 +144,19 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match stmt {
-        Stmt::Expr(StmtExpr {
+        Stmt::Expr(ast::StmtExpr {
             value,
             range: _range,
         }) => visitor.visit_expr(value),
 
-        Stmt::FunctionDef(StmtFunctionDef {
+        Stmt::FunctionDef(ast::StmtFunctionDef {
             args,
             body,
             decorator_list,
             returns,
             ..
         })
-        | Stmt::AsyncFunctionDef(StmtAsyncFunctionDef {
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             args,
             body,
             decorator_list,
@@ -172,7 +176,7 @@ where
             visitor.visit_body(body);
         }
 
-        Stmt::ClassDef(StmtClassDef {
+        Stmt::ClassDef(ast::StmtClassDef {
             bases,
             keywords,
             body,
@@ -194,7 +198,7 @@ where
             visitor.visit_body(body);
         }
 
-        Stmt::Return(StmtReturn {
+        Stmt::Return(ast::StmtReturn {
             value,
             range: _range,
         }) => {
@@ -203,7 +207,7 @@ where
             }
         }
 
-        Stmt::Delete(StmtDelete {
+        Stmt::Delete(ast::StmtDelete {
             targets,
             range: _range,
         }) => {
@@ -212,7 +216,7 @@ where
             }
         }
 
-        Stmt::Assign(StmtAssign {
+        Stmt::Assign(ast::StmtAssign {
             targets,
             value,
             range: _,
@@ -225,7 +229,7 @@ where
             visitor.visit_expr(value);
         }
 
-        Stmt::AugAssign(StmtAugAssign {
+        Stmt::AugAssign(ast::StmtAugAssign {
             target,
             op,
             value,
@@ -236,7 +240,7 @@ where
             visitor.visit_expr(value);
         }
 
-        Stmt::AnnAssign(StmtAnnAssign {
+        Stmt::AnnAssign(ast::StmtAnnAssign {
             target,
             annotation,
             value,
@@ -250,14 +254,14 @@ where
             }
         }
 
-        Stmt::For(StmtFor {
+        Stmt::For(ast::StmtFor {
             target,
             iter,
             body,
             orelse,
             ..
         })
-        | Stmt::AsyncFor(StmtAsyncFor {
+        | Stmt::AsyncFor(ast::StmtAsyncFor {
             target,
             iter,
             body,
@@ -270,7 +274,7 @@ where
             visitor.visit_body(orelse);
         }
 
-        Stmt::While(StmtWhile {
+        Stmt::While(ast::StmtWhile {
             test,
             body,
             orelse,
@@ -281,7 +285,7 @@ where
             visitor.visit_body(orelse);
         }
 
-        Stmt::If(StmtIf {
+        Stmt::If(ast::StmtIf {
             test,
             body,
             orelse,
@@ -292,13 +296,13 @@ where
             visitor.visit_body(orelse);
         }
 
-        Stmt::With(StmtWith {
+        Stmt::With(ast::StmtWith {
             items,
             body,
             type_comment: _,
             range: _,
         })
-        | Stmt::AsyncWith(StmtAsyncWith {
+        | Stmt::AsyncWith(ast::StmtAsyncWith {
             items,
             body,
             type_comment: _,
@@ -310,7 +314,7 @@ where
             visitor.visit_body(body);
         }
 
-        Stmt::Match(StmtMatch {
+        Stmt::Match(ast::StmtMatch {
             subject,
             cases,
             range: _range,
@@ -321,7 +325,7 @@ where
             }
         }
 
-        Stmt::Raise(StmtRaise {
+        Stmt::Raise(ast::StmtRaise {
             exc,
             cause,
             range: _range,
@@ -334,14 +338,14 @@ where
             };
         }
 
-        Stmt::Try(StmtTry {
+        Stmt::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
             range: _range,
         })
-        | Stmt::TryStar(StmtTryStar {
+        | Stmt::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
@@ -356,7 +360,7 @@ where
             visitor.visit_body(finalbody);
         }
 
-        Stmt::Assert(StmtAssert {
+        Stmt::Assert(ast::StmtAssert {
             test,
             msg,
             range: _range,
@@ -367,7 +371,7 @@ where
             }
         }
 
-        Stmt::Import(StmtImport {
+        Stmt::Import(ast::StmtImport {
             names,
             range: _range,
         }) => {
@@ -376,7 +380,7 @@ where
             }
         }
 
-        Stmt::ImportFrom(StmtImportFrom {
+        Stmt::ImportFrom(ast::StmtImportFrom {
             range: _,
             module: _,
             names,
@@ -411,7 +415,7 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match expr {
-        Expr::BoolOp(ExprBoolOp {
+        Expr::BoolOp(ast::ExprBoolOp {
             op,
             values,
             range: _range,
@@ -428,7 +432,7 @@ where
             }
         },
 
-        Expr::NamedExpr(ExprNamedExpr {
+        Expr::NamedExpr(ast::ExprNamedExpr {
             target,
             value,
             range: _range,
@@ -437,7 +441,7 @@ where
             visitor.visit_expr(value);
         }
 
-        Expr::BinOp(ExprBinOp {
+        Expr::BinOp(ast::ExprBinOp {
             left,
             op,
             right,
@@ -448,7 +452,7 @@ where
             visitor.visit_expr(right);
         }
 
-        Expr::UnaryOp(ExprUnaryOp {
+        Expr::UnaryOp(ast::ExprUnaryOp {
             op,
             operand,
             range: _range,
@@ -457,7 +461,7 @@ where
             visitor.visit_expr(operand);
         }
 
-        Expr::Lambda(ExprLambda {
+        Expr::Lambda(ast::ExprLambda {
             args,
             body,
             range: _range,
@@ -466,7 +470,7 @@ where
             visitor.visit_expr(body);
         }
 
-        Expr::IfExp(ExprIfExp {
+        Expr::IfExp(ast::ExprIfExp {
             test,
             body,
             orelse,
@@ -477,7 +481,7 @@ where
             visitor.visit_expr(orelse);
         }
 
-        Expr::Dict(ExprDict {
+        Expr::Dict(ast::ExprDict {
             keys,
             values,
             range: _range,
@@ -490,7 +494,7 @@ where
             }
         }
 
-        Expr::Set(ExprSet {
+        Expr::Set(ast::ExprSet {
             elts,
             range: _range,
         }) => {
@@ -499,7 +503,7 @@ where
             }
         }
 
-        Expr::ListComp(ExprListComp {
+        Expr::ListComp(ast::ExprListComp {
             elt,
             generators,
             range: _range,
@@ -510,7 +514,7 @@ where
             }
         }
 
-        Expr::SetComp(ExprSetComp {
+        Expr::SetComp(ast::ExprSetComp {
             elt,
             generators,
             range: _range,
@@ -521,7 +525,7 @@ where
             }
         }
 
-        Expr::DictComp(ExprDictComp {
+        Expr::DictComp(ast::ExprDictComp {
             key,
             value,
             generators,
@@ -535,7 +539,7 @@ where
             }
         }
 
-        Expr::GeneratorExp(ExprGeneratorExp {
+        Expr::GeneratorExp(ast::ExprGeneratorExp {
             elt,
             generators,
             range: _range,
@@ -546,16 +550,16 @@ where
             }
         }
 
-        Expr::Await(ExprAwait {
+        Expr::Await(ast::ExprAwait {
             value,
             range: _range,
         })
-        | Expr::YieldFrom(ExprYieldFrom {
+        | Expr::YieldFrom(ast::ExprYieldFrom {
             value,
             range: _range,
         }) => visitor.visit_expr(value),
 
-        Expr::Yield(ExprYield {
+        Expr::Yield(ast::ExprYield {
             value,
             range: _range,
         }) => {
@@ -564,7 +568,7 @@ where
             }
         }
 
-        Expr::Compare(ExprCompare {
+        Expr::Compare(ast::ExprCompare {
             left,
             ops,
             comparators,
@@ -578,7 +582,7 @@ where
             }
         }
 
-        Expr::Call(ExprCall {
+        Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
@@ -593,7 +597,7 @@ where
             }
         }
 
-        Expr::FormattedValue(ExprFormattedValue {
+        Expr::FormattedValue(ast::ExprFormattedValue {
             value, format_spec, ..
         }) => {
             visitor.visit_expr(value);
@@ -603,7 +607,7 @@ where
             }
         }
 
-        Expr::JoinedStr(ExprJoinedStr {
+        Expr::JoinedStr(ast::ExprJoinedStr {
             values,
             range: _range,
         }) => {
@@ -612,13 +616,13 @@ where
             }
         }
 
-        Expr::Constant(ExprConstant {
+        Expr::Constant(ast::ExprConstant {
             value,
             range: _,
             kind: _,
         }) => visitor.visit_constant(value),
 
-        Expr::Attribute(ExprAttribute {
+        Expr::Attribute(ast::ExprAttribute {
             value,
             attr: _,
             ctx: _,
@@ -627,7 +631,7 @@ where
             visitor.visit_expr(value);
         }
 
-        Expr::Subscript(ExprSubscript {
+        Expr::Subscript(ast::ExprSubscript {
             value,
             slice,
             ctx: _,
@@ -636,7 +640,7 @@ where
             visitor.visit_expr(value);
             visitor.visit_expr(slice);
         }
-        Expr::Starred(ExprStarred {
+        Expr::Starred(ast::ExprStarred {
             value,
             ctx: _,
             range: _range,
@@ -644,13 +648,13 @@ where
             visitor.visit_expr(value);
         }
 
-        Expr::Name(ExprName {
+        Expr::Name(ast::ExprName {
             id: _,
             ctx: _,
             range: _,
         }) => {}
 
-        Expr::List(ExprList {
+        Expr::List(ast::ExprList {
             elts,
             ctx: _,
             range: _range,
@@ -659,7 +663,7 @@ where
                 visitor.visit_expr(expr);
             }
         }
-        Expr::Tuple(ExprTuple {
+        Expr::Tuple(ast::ExprTuple {
             elts,
             ctx: _,
             range: _range,
@@ -669,7 +673,7 @@ where
             }
         }
 
-        Expr::Slice(ExprSlice {
+        Expr::Slice(ast::ExprSlice {
             lower,
             upper,
             step,
@@ -716,7 +720,7 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match except_handler {
-        ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler {
+        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             range: _,
             type_,
             name: _,
@@ -812,19 +816,19 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match pattern {
-        Pattern::MatchValue(PatternMatchValue {
+        Pattern::MatchValue(ast::PatternMatchValue {
             value,
             range: _range,
         }) => visitor.visit_expr(value),
 
-        Pattern::MatchSingleton(PatternMatchSingleton {
+        Pattern::MatchSingleton(ast::PatternMatchSingleton {
             value,
             range: _range,
         }) => {
             visitor.visit_constant(value);
         }
 
-        Pattern::MatchSequence(PatternMatchSequence {
+        Pattern::MatchSequence(ast::PatternMatchSequence {
             patterns,
             range: _range,
         }) => {
@@ -833,7 +837,7 @@ where
             }
         }
 
-        Pattern::MatchMapping(PatternMatchMapping {
+        Pattern::MatchMapping(ast::PatternMatchMapping {
             keys,
             patterns,
             range: _,
@@ -845,7 +849,7 @@ where
             }
         }
 
-        Pattern::MatchClass(PatternMatchClass {
+        Pattern::MatchClass(ast::PatternMatchClass {
             cls,
             patterns,
             kwd_attrs: _,
@@ -864,7 +868,7 @@ where
 
         Pattern::MatchStar(_) => {}
 
-        Pattern::MatchAs(PatternMatchAs {
+        Pattern::MatchAs(ast::PatternMatchAs {
             pattern,
             range: _,
             name: _,
@@ -874,7 +878,7 @@ where
             }
         }
 
-        Pattern::MatchOr(PatternMatchOr {
+        Pattern::MatchOr(ast::PatternMatchOr {
             patterns,
             range: _range,
         }) => {
@@ -928,18 +932,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::{Debug, Write};
+
+    use insta::assert_snapshot;
+    use rustpython_parser::lexer::lex;
+    use rustpython_parser::{parse_tokens, Mode};
+
     use crate::node::AnyNodeRef;
     use crate::visitor::preorder::{
         walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
         walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_ignore,
         walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant,
         ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor, Stmt,
-        String, TypeIgnore, UnaryOp, WithItem,
+        TypeIgnore, UnaryOp, WithItem,
     };
-    use insta::assert_snapshot;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
-    use std::fmt::{Debug, Write};
 
     #[test]
     fn function_arguments() {

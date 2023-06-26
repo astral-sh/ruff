@@ -6,8 +6,8 @@ use rustpython_parser::{ast, lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::prelude::Ranged;
 use ruff_python_ast::source_code::Locator;
+use rustpython_parser::ast::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

@@ -6,8 +6,8 @@ use crate::trivia::{SimpleTokenizer, TokenKind};
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{hard_line_break, space, text};
 use ruff_formatter::{Format, FormatContext, FormatResult};
-use ruff_python_ast::prelude::UnaryOp;
 use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast::UnaryOp;
 use rustpython_parser::ast::{ExprUnaryOp, Ranged};
 
 #[derive(Default)]
