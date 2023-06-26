@@ -1969,6 +1969,7 @@ dependencies = [
  "ruff_cli",
  "ruff_diagnostics",
  "ruff_python_formatter",
+ "ruff_python_stdlib",
  "ruff_textwrap",
  "rustpython-format",
  "rustpython-parser",

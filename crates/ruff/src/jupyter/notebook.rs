@@ -39,15 +39,6 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     Ok(String::from_utf8(writer)?)
 }
 
-/// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
-pub fn is_jupyter_notebook(path: &Path) -> bool {
-    path.extension()
-        .map_or(false, |ext| ext == JUPYTER_NOTEBOOK_EXT)
-        // For now this is feature gated here, the long term solution depends on
-        // https://github.com/astral-sh/ruff/issues/3410
-        && cfg!(feature = "jupyter_notebook")
-}
-
 impl Cell {
     /// Return the [`SourceValue`] of the cell.
     fn source(&self) -> &SourceValue {
@@ -452,8 +443,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::jupyter::index::JupyterIndex;
-    #[cfg(feature = "jupyter_notebook")]
-    use crate::jupyter::is_jupyter_notebook;
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
@@ -510,16 +499,6 @@ mod tests {
     fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
         assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
         Ok(())
-    }
-
-    #[test]
-    #[cfg(feature = "jupyter_notebook")]
-    fn inclusions() {
-        let path = Path::new("foo/bar/baz");
-        assert!(!is_jupyter_notebook(path));
-
-        let path = Path::new("foo/bar/baz.ipynb");
-        assert!(is_jupyter_notebook(path));
     }
 
     #[test]
