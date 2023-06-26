@@ -1,0 +1,49 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtskip4.py
+---
+## Input
+
+```py
+a =   2
+# fmt: skip
+l = [1, 2, 3,]
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,7 +1,3 @@
+ a = 2
+ # fmt: skip
+-l = [
+-    1,
+-    2,
+-    3,
+-]
++l = [1, 2, 3]
+```
+
+## Ruff Output
+
+```py
+a = 2
+# fmt: skip
+l = [1, 2, 3]
+```
+
+## Black Output
+
+```py
+a = 2
+# fmt: skip
+l = [
+    1,
+    2,
+    3,
+]
+```
+
+

@@ -1,0 +1,45 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtskip7.py
+---
+## Input
+
+```py
+a =     "this is some code"
+b =     5  #fmt:skip
+c = 9  #fmt: skip
+d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  #fmt:skip
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,4 +1,4 @@
+ a = "this is some code"
+-b =     5  # fmt:skip
++b = 5  # fmt:skip
+ c = 9  # fmt: skip
+ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
+```
+
+## Ruff Output
+
+```py
+a = "this is some code"
+b = 5  # fmt:skip
+c = 9  # fmt: skip
+d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
+```
+
+## Black Output
+
+```py
+a = "this is some code"
+b =     5  # fmt:skip
+c = 9  # fmt: skip
+d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
+```
+
+

@@ -263,18 +263,12 @@ impl TryFrom<char> for QuoteStyle {
 
 #[cfg(test)]
 mod tests {
+    use crate::{format_module, format_node};
     use anyhow::Result;
     use insta::assert_snapshot;
     use ruff_python_ast::source_code::CommentRangesBuilder;
-    use ruff_testing_macros::fixture;
     use rustpython_parser::lexer::lex;
     use rustpython_parser::{parse_tokens, Mode};
-    use similar::TextDiff;
-    use std::fmt::{Formatter, Write};
-    use std::fs;
-    use std::path::Path;
-
-    use crate::{format_module, format_node};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -293,138 +287,6 @@ if True:
         let actual = format_module(input)?.as_code().to_string();
         assert_eq!(expected, actual);
         Ok(())
-    }
-
-    #[fixture(pattern = "resources/test/fixtures/black/**/*.py")]
-    #[test]
-    fn black_test(input_path: &Path) -> Result<()> {
-        let content = fs::read_to_string(input_path)?;
-
-        let printed = format_module(&content)?;
-
-        let expected_path = input_path.with_extension("py.expect");
-        let expected_output = fs::read_to_string(&expected_path)
-            .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
-
-        let formatted_code = printed.as_code();
-
-        ensure_stability_when_formatting_twice(formatted_code);
-
-        if formatted_code == expected_output {
-            // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
-            // already perfectly captures the expected output.
-            // The following code mimics insta's logic generating the snapshot name for a test.
-            let workspace_path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-            let snapshot_name = insta::_function_name!()
-                .strip_prefix(&format!("{}::", module_path!()))
-                .unwrap();
-            let module_path = module_path!().replace("::", "__");
-
-            let snapshot_path = Path::new(&workspace_path)
-                .join("src/snapshots")
-                .join(format!(
-                    "{module_path}__{}.snap",
-                    snapshot_name.replace(&['/', '\\'][..], "__")
-                ));
-
-            if snapshot_path.exists() && snapshot_path.is_file() {
-                // SAFETY: This is a convenience feature. That's why we don't want to abort
-                // when deleting a no longer needed snapshot fails.
-                fs::remove_file(&snapshot_path).ok();
-            }
-
-            let new_snapshot_path = snapshot_path.with_extension("snap.new");
-            if new_snapshot_path.exists() && new_snapshot_path.is_file() {
-                // SAFETY: This is a convenience feature. That's why we don't want to abort
-                // when deleting a no longer needed snapshot fails.
-                fs::remove_file(&new_snapshot_path).ok();
-            }
-        } else {
-            // Black and Ruff have different formatting. Write out a snapshot that covers the differences
-            // today.
-            let mut snapshot = String::new();
-            write!(snapshot, "{}", Header::new("Input"))?;
-            write!(snapshot, "{}", CodeFrame::new("py", &content))?;
-
-            write!(snapshot, "{}", Header::new("Black Differences"))?;
-
-            let diff = TextDiff::from_lines(expected_output.as_str(), formatted_code)
-                .unified_diff()
-                .header("Black", "Ruff")
-                .to_string();
-
-            write!(snapshot, "{}", CodeFrame::new("diff", &diff))?;
-
-            write!(snapshot, "{}", Header::new("Ruff Output"))?;
-            write!(snapshot, "{}", CodeFrame::new("py", formatted_code))?;
-
-            write!(snapshot, "{}", Header::new("Black Output"))?;
-            write!(snapshot, "{}", CodeFrame::new("py", &expected_output))?;
-
-            insta::with_settings!({ omit_expression => false, input_file => input_path }, {
-                insta::assert_snapshot!(snapshot);
-            });
-        }
-
-        Ok(())
-    }
-
-    #[fixture(pattern = "resources/test/fixtures/ruff/**/*.py")]
-    #[test]
-    fn ruff_test(input_path: &Path) -> Result<()> {
-        let content = fs::read_to_string(input_path)?;
-
-        let printed = format_module(&content)?;
-        let formatted_code = printed.as_code();
-
-        ensure_stability_when_formatting_twice(formatted_code);
-
-        let snapshot = format!(
-            r#"## Input
-{}
-
-## Output
-{}"#,
-            CodeFrame::new("py", &content),
-            CodeFrame::new("py", formatted_code)
-        );
-        assert_snapshot!(snapshot);
-
-        Ok(())
-    }
-
-    /// Format another time and make sure that there are no changes anymore
-    fn ensure_stability_when_formatting_twice(formatted_code: &str) {
-        let reformatted = match format_module(formatted_code) {
-            Ok(reformatted) => reformatted,
-            Err(err) => {
-                panic!(
-                    "Expected formatted code to be valid syntax: {err}:\
-                    \n---\n{formatted_code}---\n",
-                );
-            }
-        };
-
-        if reformatted.as_code() != formatted_code {
-            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
-                .unified_diff()
-                .header("Formatted once", "Formatted twice")
-                .to_string();
-            panic!(
-                r#"Reformatting the formatted code a second time resulted in formatting changes.
----
-{diff}---
-
-Formatted once:
----
-{formatted_code}---
-
-Formatted twice:
----
-{}---"#,
-                reformatted.as_code()
-            );
-        }
     }
 
     /// Use this test to debug the formatting of some snipped
@@ -548,42 +410,5 @@ if [
         .expect("Formatting to succeed");
 
         assert_snapshot!(output.print().expect("Printing to succeed").as_code());
-    }
-
-    struct Header<'a> {
-        title: &'a str,
-    }
-
-    impl<'a> Header<'a> {
-        fn new(title: &'a str) -> Self {
-            Self { title }
-        }
-    }
-
-    impl std::fmt::Display for Header<'_> {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            writeln!(f, "## {}", self.title)?;
-            writeln!(f)
-        }
-    }
-
-    struct CodeFrame<'a> {
-        language: &'a str,
-        code: &'a str,
-    }
-
-    impl<'a> CodeFrame<'a> {
-        fn new(language: &'a str, code: &'a str) -> Self {
-            Self { language, code }
-        }
-    }
-
-    impl std::fmt::Display for CodeFrame<'_> {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            writeln!(f, "```{}", self.language)?;
-            write!(f, "{}", self.code)?;
-            writeln!(f, "```")?;
-            writeln!(f)
-        }
     }
 }
