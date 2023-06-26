@@ -54,21 +54,14 @@ impl AlwaysAutofixableViolation for OSErrorAlias {
     }
 }
 
-const ALIASES: &[(&str, &str)] = &[
-    ("", "EnvironmentError"),
-    ("", "IOError"),
-    ("", "WindowsError"),
-    ("mmap", "error"),
-    ("select", "error"),
-    ("socket", "error"),
-];
-
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(expr).map_or(false, |call_path| {
-        ALIASES
-            .iter()
-            .any(|(module, member)| call_path.as_slice() == [*module, *member])
+        matches!(
+            call_path.as_slice(),
+            ["", "EnvironmentError" | "IOError" | "WindowsError"]
+                | ["mmap" | "select" | "socket", "error"]
+        )
     })
 }
 
