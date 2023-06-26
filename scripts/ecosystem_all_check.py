@@ -56,14 +56,14 @@ def main() -> None:
             errors += 1
             continue
 
-        try:  # noqa: PERF203
+        try:
             output = subprocess.run(
                 [ruff, *ruff_args, "."],
                 cwd=project_dir,
                 capture_output=True,
                 text=True,
             )
-        except CalledProcessError as e:
+        except CalledProcessError as e:  # noqa: PERF203
             tqdm.write(f"Ruff failed on {project_dir}: {e}")
             errors += 1
             continue
