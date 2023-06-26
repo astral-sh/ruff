@@ -9,6 +9,33 @@ use crate::registry::Rule;
 
 use super::super::helpers::is_sys;
 
+/// ## What it does
+/// Checks for comparisons of `sys.version` to a string that will evaluate
+/// incorrectly on Python 3.10 and later.
+///
+/// ## Why is this bad?
+/// Comparison of `sys.version` to a string is error-prone and may cause subtle
+/// bugs.
+///
+/// Instead, use `sys.version_info` to get the version information as a tuple.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version > "3.9"  # If using Python 3.10, this evaluates to `False`.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// sys.version_info > (3, 9)  # If using Python 3.10, this evaluates to `True`.
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionCmpStr3;
 
@@ -19,6 +46,41 @@ impl Violation for SysVersionCmpStr3 {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `sys.version_info[0] == 3`.
+///
+/// ## Why is this bad?
+/// `sys.version_info[0] == 3` will check if the major version number is 3. In
+/// Python 4 and greater, this will evaluate to `False`. This is likely
+/// unintended, and may cause code intended to be run on Python 2 to be
+/// executed on Python 4.
+///
+/// Instead, use `>=` to check if the major version number is 3 or greater.
+/// This is more future-proof.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info[0] == 3:
+///     ...
+/// else:
+///     print("Python 2")  # This will be printed on Python 4.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// if sys.version_info >= (3,):
+///     ...
+/// else:
+///     print("Python 2")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionInfo0Eq3;
 
@@ -29,6 +91,36 @@ impl Violation for SysVersionInfo0Eq3 {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons of `sys.version_info[1]` to an integer.
+///
+/// ## Why is this bad?
+/// Comparison of the minor version number of `sys.version_info` to an integer
+/// does not consider the major version number. This is likely unintended, and
+/// may cause bugs when run on Python 4 and greater.
+///
+/// Instead, compare `sys.version_info` to a tuple, including the major and
+/// minor version numbers. This is more future-proof.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info[1] < 7:
+///     print("Python 3.6 or earlier.")  # This will be printed on Python 4.0.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// if sys.version_info < (3, 7):
+///     print("Python 3.6 or earlier.")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionInfo1CmpInt;
 
@@ -42,6 +134,36 @@ impl Violation for SysVersionInfo1CmpInt {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons of `sys.version_info.minor` to an integer.
+///
+/// ## Why is this bad?
+/// Comparison of the minor version number of `sys.version_info` to an integer
+/// is independent of the major version number. This is likely unintended, and
+/// may cause bugs when run on Python 4 and greater.
+///
+/// Instead, compare `sys.version_info` to a tuple, including the major and
+/// minor version numbers. This is more future-proof.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info.minor < 7:
+///     print("Python 3.6 or earlier.")  # This will be printed on Python 4.0.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// if sys.version_info < (3, 7):
+///     print("Python 3.6 or earlier.")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionInfoMinorCmpInt;
 
@@ -55,6 +177,33 @@ impl Violation for SysVersionInfoMinorCmpInt {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons of `sys.version` to a string that will evaluate
+/// incorrectly on Python 10 and greater.
+///
+/// ## Why is this bad?
+/// Comparison of `sys.version` to a string is error-prone and may cause subtle
+/// bugs.
+///
+/// Instead, use `sys.version_info` to get the version information as a tuple.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version >= "3"  # This will evaluate to `False` on Python 10.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// sys.version_info >= (3,)  # This will evaluate to `True` on Python 10.
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionCmpStr10;
 

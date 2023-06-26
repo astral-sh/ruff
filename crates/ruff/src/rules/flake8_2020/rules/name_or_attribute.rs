@@ -5,6 +5,35 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of `six.PY3`.
+///
+/// ## Why is this bad?
+/// `six.PY3` will evaluate to `False` on Python 4 and greater. This is likely
+/// unintended, and may cause code intended to be run on Python 2 to be
+/// executed on Python 4.
+///
+/// Instead, use `not six.PY2` to check if the Python version is not 2. This is
+/// more future-proof.
+///
+/// ## Example
+/// ```python
+/// import six
+///
+/// six.PY3  # If using Python 4, this evaluates to `False`.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import six
+///
+/// not six.PY2  # If using Python 4, this evaluates to `True`.
+/// ```
+///
+/// ## References
+/// - [PyPI: `six`](https://pypi.org/project/six/)
+/// - [Six documentation: `six.PY3`](https://six.readthedocs.io/#six.PY3)
+/// - [Six documentation: `six.PY2`](https://six.readthedocs.io/#six.PY2)
 #[violation]
 pub struct SixPY3;
 

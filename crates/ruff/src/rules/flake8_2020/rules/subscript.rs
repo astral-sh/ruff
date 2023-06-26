@@ -8,6 +8,36 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_2020::helpers::is_sys;
 
+/// ## What it does
+/// Checks for uses of `sys.version[:3]`.
+///
+/// ## Why is this bad?
+/// `sys.version[:3]` will select the first three characters of the version
+/// string. If the major or minor version number consists of two digits, this
+/// will truncate the version number (e.g., `"3.10"` becomes `"3.1"`). This is
+/// likely unintended, and will cause problems if the version string is used to
+/// check for a specific version.
+///
+/// Instead, use `sys.version_info` to get the version information as a tuple.
+/// This is more future-proof and less error-prone.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version[:3]  # If using Python 3.10, this evaluates to "3.1".
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// "{}.{}".format(*sys.version_info)  # If using Python 3.10, this evaluates to "3.10".
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionSlice3;
 
@@ -18,6 +48,36 @@ impl Violation for SysVersionSlice3 {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `sys.version[2]`.
+///
+/// ## Why is this bad?
+/// `sys.version[2]` will select the third character of the version string.
+/// If the major or minor version number consists of two digits, this will
+/// select the first digit of the minor number only (e.g., `"3.10"` becomes
+/// `"1"`). This is likely unintended, and will cause problems if the version
+/// string is used to check for a minor version number.
+///
+/// Instead, use `sys.version_info.minor` to get the minor version number. This
+/// is more future-proof and less error-prone.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version[2]  # If using Python 3.10, this evaluates to "1".
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// f"{sys.version_info.minor}"  # If using Python 3.10, this evaluates to "10".
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersion2;
 
@@ -28,6 +88,37 @@ impl Violation for SysVersion2 {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `sys.version[0]`.
+///
+/// ## Why is this bad?
+/// `sys.version[0]` will select the first character of the version string.
+/// If the major version number consists of more than one digit, this will
+/// select the first digit of the major version number only (e.g., `"10.0"`
+/// becomes `"1"`). This is likely unintended, and will cause problems in
+/// future versions of Python if the version string is used to check for a
+/// major version number.
+///
+/// Instead, use `sys.version_info.major` to get the major version number. This
+/// is more future-proof and less error-prone.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version[0]  # If using Python 10, this evaluates to "1".
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// f"{sys.version_info.major}"  # If using Python 10, this evaluates to "10".
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersion0;
 
@@ -38,6 +129,37 @@ impl Violation for SysVersion0 {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `sys.version[:1]`.
+///
+/// ## Why is this bad?
+/// `sys.version[:1]` will select the first character of the version string.
+/// If the major version number consists of more than one digit, this will
+/// select the first digit of the major version number only (e.g., `"10.0"`
+/// becomes `"1"`). This is likely unintended, and will cause problems in
+/// future versions of Python if the version string is used to check for a
+/// major version number.
+///
+/// Instead, use `sys.version_info.major` to get the major version number. This
+/// is more future-proof and less error-prone.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// sys.version[:1]  # If using Python 10, this evaluates to "1".
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// f"{sys.version_info.major}"  # If using Python 10, this evaluates to "10".
+/// ```
+///
+/// ## References
+/// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct SysVersionSlice1;
 
