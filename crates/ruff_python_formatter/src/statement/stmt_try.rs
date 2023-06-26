@@ -53,14 +53,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         let comments_info = f.context().comments().clone();
         let mut dangling_comments = comments_info.dangling_comments(item.as_any_node_ref());
 
-        write!(
-            f,
-            [
-                text("try:"),
-                hard_line_break(),
-                block_indent(&body.format()),
-            ]
-        )?;
+        write!(f, [text("try:"), block_indent(&body.format())])?;
 
         let mut previous_node = body.last();
 
