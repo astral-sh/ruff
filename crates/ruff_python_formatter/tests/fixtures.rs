@@ -2,92 +2,90 @@ use ruff_python_formatter::format_module;
 use similar::TextDiff;
 use std::fmt::{Formatter, Write};
 use std::fs;
+use std::path::Path;
 
 #[test]
 fn black_compatibility() {
-    insta::glob!(
-        "../resources",
-        "test/fixtures/black/**/*.py",
-        |input_path| {
-            let content = fs::read_to_string(input_path).unwrap();
+    let test_file = |input_path: &Path| {
+        let content = fs::read_to_string(input_path).unwrap();
 
-            let printed = format_module(&content).expect("Formatting to succeed");
+        let printed = format_module(&content).expect("Formatting to succeed");
 
-            let expected_path = input_path.with_extension("py.expect");
-            let expected_output = fs::read_to_string(&expected_path).unwrap_or_else(|_| {
-                panic!("Expected Black output file '{expected_path:?}' to exist")
-            });
+        let expected_path = input_path.with_extension("py.expect");
+        let expected_output = fs::read_to_string(&expected_path)
+            .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
-            let formatted_code = printed.as_code();
+        let formatted_code = printed.as_code();
 
-            ensure_stability_when_formatting_twice(formatted_code);
+        ensure_stability_when_formatting_twice(formatted_code);
 
-            if formatted_code == expected_output {
-                // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
-                // already perfectly captures the expected output.
-                // The following code mimics insta's logic generating the snapshot name for a test.
-                let workspace_path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-                let snapshot_name = insta::_function_name!()
-                    .strip_prefix(&format!("{}::", module_path!()))
-                    .unwrap();
-                let module_path = module_path!().replace("::", "__");
+        if formatted_code == expected_output {
+            // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
+            // already perfectly captures the expected output.
+            // The following code mimics insta's logic generating the snapshot name for a test.
+            let workspace_path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+            let snapshot_name = insta::_function_name!()
+                .strip_prefix(&format!("{}::", module_path!()))
+                .unwrap();
+            let module_path = module_path!().replace("::", "__");
 
-                let snapshot_path = Path::new(&workspace_path)
-                    .join("src/snapshots")
-                    .join(format!(
-                        "{module_path}__{}.snap",
-                        snapshot_name.replace(&['/', '\\'][..], "__")
-                    ));
+            let snapshot_path = Path::new(&workspace_path)
+                .join("src/snapshots")
+                .join(format!(
+                    "{module_path}__{}.snap",
+                    snapshot_name.replace(&['/', '\\'][..], "__")
+                ));
 
-                if snapshot_path.exists() && snapshot_path.is_file() {
-                    // SAFETY: This is a convenience feature. That's why we don't want to abort
-                    // when deleting a no longer needed snapshot fails.
-                    fs::remove_file(&snapshot_path).ok();
-                }
-
-                let new_snapshot_path = snapshot_path.with_extension("snap.new");
-                if new_snapshot_path.exists() && new_snapshot_path.is_file() {
-                    // SAFETY: This is a convenience feature. That's why we don't want to abort
-                    // when deleting a no longer needed snapshot fails.
-                    fs::remove_file(&new_snapshot_path).ok();
-                }
-            } else {
-                // Black and Ruff have different formatting. Write out a snapshot that covers the differences
-                // today.
-                let mut snapshot = String::new();
-                write!(snapshot, "{}", Header::new("Input")).unwrap();
-                write!(snapshot, "{}", CodeFrame::new("py", &content)).unwrap();
-
-                write!(snapshot, "{}", Header::new("Black Differences")).unwrap();
-
-                let diff = TextDiff::from_lines(expected_output.as_str(), formatted_code)
-                    .unified_diff()
-                    .header("Black", "Ruff")
-                    .to_string();
-
-                write!(snapshot, "{}", CodeFrame::new("diff", &diff)).unwrap();
-
-                write!(snapshot, "{}", Header::new("Ruff Output")).unwrap();
-                write!(snapshot, "{}", CodeFrame::new("py", formatted_code)).unwrap();
-
-                write!(snapshot, "{}", Header::new("Black Output")).unwrap();
-                write!(snapshot, "{}", CodeFrame::new("py", &expected_output)).unwrap();
-
-                insta::with_settings!({
-                    omit_expression => true,
-                    input_file => input_path,
-                    prepend_module_to_snapshot => false,
-                }, {
-                    insta::assert_snapshot!(snapshot);
-                });
+            if snapshot_path.exists() && snapshot_path.is_file() {
+                // SAFETY: This is a convenience feature. That's why we don't want to abort
+                // when deleting a no longer needed snapshot fails.
+                fs::remove_file(&snapshot_path).ok();
             }
+
+            let new_snapshot_path = snapshot_path.with_extension("snap.new");
+            if new_snapshot_path.exists() && new_snapshot_path.is_file() {
+                // SAFETY: This is a convenience feature. That's why we don't want to abort
+                // when deleting a no longer needed snapshot fails.
+                fs::remove_file(&new_snapshot_path).ok();
+            }
+        } else {
+            // Black and Ruff have different formatting. Write out a snapshot that covers the differences
+            // today.
+            let mut snapshot = String::new();
+            write!(snapshot, "{}", Header::new("Input")).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("py", &content)).unwrap();
+
+            write!(snapshot, "{}", Header::new("Black Differences")).unwrap();
+
+            let diff = TextDiff::from_lines(expected_output.as_str(), formatted_code)
+                .unified_diff()
+                .header("Black", "Ruff")
+                .to_string();
+
+            write!(snapshot, "{}", CodeFrame::new("diff", &diff)).unwrap();
+
+            write!(snapshot, "{}", Header::new("Ruff Output")).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("py", formatted_code)).unwrap();
+
+            write!(snapshot, "{}", Header::new("Black Output")).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("py", &expected_output)).unwrap();
+
+            insta::with_settings!({
+                omit_expression => true,
+                input_file => input_path,
+                prepend_module_to_snapshot => false,
+            }, {
+                insta::assert_snapshot!(snapshot);
+            });
         }
-    );
+    };
+
+    insta::glob!("../resources", "test/fixtures/black/**/*.py", test_file);
 }
 
 #[test]
 fn format() {
-    insta::glob!("../resources", "test/fixtures/ruff/**/*.py", |input_path| {
+    let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
         let printed = format_module(&content).expect("Formatting to succeed");
@@ -112,7 +110,9 @@ fn format() {
         }, {
             insta::assert_snapshot!(snapshot);
         });
-    });
+    };
+
+    insta::glob!("../resources", "test/fixtures/ruff/**/*.py", test_file);
 }
 
 /// Format another time and make sure that there are no changes anymore
