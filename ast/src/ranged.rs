@@ -14,4 +14,13 @@ pub trait Ranged {
     }
 }
 
+impl<T> Ranged for &T
+where
+    T: Ranged,
+{
+    fn range(&self) -> TextRange {
+        T::range(self)
+    }
+}
+
 include!("gen/ranged.rs");
