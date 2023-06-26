@@ -13,18 +13,21 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for public module definitions that are missing docstrings.
+/// Checks for undocumented public module definitions.
 ///
 /// ## Why is this bad?
-/// Public modules should have docstrings so that users can understand their
-/// purpose and how to use them.
+/// Public modules should be documented via docstrings to outline their purpose
+/// and contents.
 ///
 /// Generally, module docstrings should describe the purpose of the module and
-/// summarise objects that are exported by the module. If the module is simple,
-/// a one-line docstring may be sufficient.
+/// list the classes, exceptions, functions, and other objects that are exported
+/// by the module, alongside a one-line summary of each.
 ///
-/// _If the codebase has a standard format for module docstrings, follow that
-/// format for consistency._
+/// If the module is a script, the docstring should be usable as its "usage"
+/// message.
+///
+/// If the codebase adheres to a standard format for module docstrings, follow
+/// that format for consistency.
 ///
 /// ## Example
 /// ```python
@@ -41,8 +44,8 @@ use crate::registry::Rule;
 /// """Utility functions and classes for calculating speed.
 ///
 /// This module provides:
-///     - FasterThanLightError: exception when FTL speed is calculated;
-///     - calculate_speed: calculate speed given distance and time.
+/// - FasterThanLightError: exception when FTL speed is calculated;
+/// - calculate_speed: calculate speed given distance and time.
 /// """
 ///
 ///
@@ -70,18 +73,17 @@ impl Violation for UndocumentedPublicModule {
 }
 
 /// ## What it does
-/// Checks for public class definitions that are missing docstrings.
+/// Checks for undocumented public class definitions.
 ///
 /// ## Why is this bad?
-/// Public classes should have docstrings so that users can understand their
-/// purpose and how to use them.
+/// Public classes should be documented via docstrings to outline their purpose
+/// and behavior.
 ///
-/// Generally, class docstrings should describe its behavior and list its public
-/// attributes and methods. If the class is simple, a one-line docstring may be
-/// sufficient.
+/// Generally, a class docstring should describe the class's purpose and list
+/// its public attributes and methods.
 ///
-/// _If the codebase has a standard format for class docstrings, follow that
-/// format for consistency._
+/// If the codebase adheres to a standard format for class docstrings, follow
+/// that format for consistency.
 ///
 /// ## Example
 /// ```python
@@ -94,7 +96,7 @@ impl Violation for UndocumentedPublicModule {
 ///         self.points += points
 /// ```
 ///
-/// Use instead (with NumPy docstring format):
+/// Use instead (in the NumPy docstring format):
 /// ```python
 /// class Player:
 ///     """A player in the game.
@@ -120,7 +122,7 @@ impl Violation for UndocumentedPublicModule {
 ///         self.points += points
 /// ```
 ///
-/// Or, using Google docstring format:
+/// Or (in the Google docstring format):
 /// ```python
 /// class Player:
 ///     """A player in the game.
@@ -154,19 +156,18 @@ impl Violation for UndocumentedPublicClass {
 }
 
 /// ## What it does
-/// Checks for public method definitions that are missing docstrings.
+/// Checks for undocumented public method definitions.
 ///
 /// ## Why is this bad?
-/// Public methods should have docstrings so that users can understand their
-/// purpose and how to use them.
+/// Public methods should be documented via docstrings to outline their purpose
+/// and behavior.
 ///
-/// Generally, method docstrings should describe its behavior, arguments, side
-/// effects, exceptions, return values, and any other information that is
-/// relevant to the user. If the method is simple, a one-line docstring may be
-/// sufficient.
+/// Generally, a method docstring should describe the method's behavior,
+/// arguments, side effects, exceptions, return values, and any other
+/// information that may be relevant to the user.
 ///
-/// _If the codebase has a standard format for method docstrings, follow that
-/// format for consistency._
+/// If the codebase adheres to a standard format for method docstrings, follow
+/// that format for consistency.
 ///
 /// ## Example
 /// ```python
@@ -178,7 +179,7 @@ impl Violation for UndocumentedPublicClass {
 ///             raise ValueError("Tried to greet an unhappy cat.")
 /// ```
 ///
-/// Use instead (with NumPy docstring format):
+/// Use instead (in the NumPy docstring format):
 /// ```python
 /// class Cat(Animal):
 ///     def greet(self, happy: bool = True):
@@ -200,7 +201,7 @@ impl Violation for UndocumentedPublicClass {
 ///             raise ValueError("Tried to greet an unhappy cat.")
 /// ```
 ///
-/// Or, using Google docstring format:
+/// Or (in the Google docstring format):
 /// ```python
 /// class Cat(Animal):
 ///     def greet(self, happy: bool = True):
@@ -234,19 +235,18 @@ impl Violation for UndocumentedPublicMethod {
 }
 
 /// ## What it does
-/// Checks for public function definitions that are missing docstrings.
+/// Checks for undocumented public function definitions.
 ///
 /// ## Why is this bad?
-/// Public functions should have docstrings so that users can understand their
-/// purpose and how to use them.
+/// Public functions should be documented via docstrings to outline their
+/// purpose and behavior.
 ///
-/// Generally, function docstrings should describe its behavior, arguments, side
-/// effects, exceptions, return values, and any other information that is
-/// relevant to the user. If the function is simple, a one-line docstring may
-/// be sufficient.
+/// Generally, a function docstring should describe the function's behavior,
+/// arguments, side effects, exceptions, return values, and any other
+/// information that may be relevant to the user.
 ///
-/// _If the codebase has a standard format for function docstrings, follow that
-/// format for consistency._
+/// If the codebase adheres to a standard format for function docstrings, follow
+/// that format for consistency.
 ///
 /// ## Example
 /// ```python
@@ -289,7 +289,7 @@ impl Violation for UndocumentedPublicMethod {
 /// ```python
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
-///     
+///
 ///     Args:
 ///         distance: Distance traveled.
 ///         time: Time spent traveling.
@@ -321,18 +321,17 @@ impl Violation for UndocumentedPublicFunction {
 }
 
 /// ## What it does
-/// Checks for public package definitions that are missing docstrings.
+/// Checks for undocumented public package definitions.
 ///
 /// ## Why is this bad?
-/// Public packages should have docstrings so that users can understand their
-/// purpose and how to use them.
+/// Public packages should be documented via docstrings to outline their
+/// purpose and contents.
 ///
 /// Generally, package docstrings should list the modules and subpackages that
-/// are exported by the package. If the of the package is simple, a one-line
-/// docstring may be sufficient.
+/// are exported by the package.
 ///
-/// _If the codebase has a standard format for package docstrings, follow that
-/// format for consistency._
+/// If the codebase adheres to a standard format for package docstrings, follow
+/// that format for consistency.
 ///
 /// ## Example
 /// ```python
@@ -365,21 +364,20 @@ impl Violation for UndocumentedPublicPackage {
 }
 
 /// ## What it does
-/// Checks for magic method definitions that are missing docstrings.
+/// Checks for undocumented magic method definitions.
 ///
 /// ## Why is this bad?
 /// Magic methods (methods with names that start and end with double
 /// underscores) are used to implement operator overloading and other special
-/// behavior. They should have docstrings so that users can understand their
-/// purpose and how to use them.
+/// behavior. Such methods should should be documented via docstrings to
+/// outline their behavior.
 ///
-/// Generally, magic method docstrings should describe its behavior, arguments,
-/// side effects, exceptions, return values, and any other information that is
-/// relevant to the user. If the method is simple, a one-line description may
-/// be sufficient.
+/// Generally, magic method docstrings should describe the method's behavior,
+/// arguments, side effects, exceptions, return values, and any other
+/// information that may be relevant to the user.
 ///
-/// _If the codebase has a standard format for magic method docstrings, follow
-/// that format for consistency._
+/// If the codebase adheres to a standard format for method docstrings, follow
+/// that format for consistency.
 ///
 /// ## Example
 /// ```python
@@ -420,17 +418,17 @@ impl Violation for UndocumentedMagicMethod {
 }
 
 /// ## What it does
-/// Checks for public class definitions that are missing docstrings.
+/// Checks for undocumented public class definitions, for nested classes.
 ///
 /// ## Why is this bad?
-/// Public classes should have docstrings so that users can understand their
-/// purpose and how to use them.
+/// Public classes should be documented via docstrings to outline their
+/// purpose and behavior.
 ///
 /// Nested classes do not inherit the docstring of their enclosing class, so
 /// they should have their own docstrings.
 ///
-/// _If the codebase has a standard format for nested class docstrings, follow
-/// that format for consistency._
+/// If the codebase adheres to a standard format for class docstrings, follow
+/// that format for consistency.
 ///
 /// ## Example
 /// ```python
@@ -478,15 +476,13 @@ impl Violation for UndocumentedPublicNestedClass {
 /// docstrings.
 ///
 /// ## Why is this bad?
-/// Public `__init__` methods are used to initialize objects. They should have
-/// docstrings so that users can understand how to use them.
+/// Public `__init__` methods are used to initialize objects. `__init__`
+/// methods should be documented via docstrings to describe the method's
+/// behavior, arguments, side effects, exceptions, and any other information
+/// that may be relevant to the user.
 ///
-/// Generally, `__init__` docstrings should describe its behavior, arguments,
-/// side effects, exceptions, and any other information that is relevant to the
-/// user. If the method is simple, a one-line description may be sufficient.
-///
-/// _If the codebase has a standard format for `__init__` docstrings, follow
-/// that format for consistency._
+/// If the codebase adheres to a standard format for `__init__` method docstrings,
+/// follow that format for consistency.
 ///
 /// ## Example
 /// ```python
