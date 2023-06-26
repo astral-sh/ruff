@@ -55,7 +55,6 @@ path-absolutize = { workspace = true, features = [
 ] }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
-petgraph = "0.6.3"
 phf = { version = "0.11", features = ["macros"] }
 pyproject-toml = { version = "0.6.0" }
 quick-junit = { version = "0.3.2" }
