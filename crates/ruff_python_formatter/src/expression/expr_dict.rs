@@ -5,8 +5,8 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::prelude::Ranged;
 use ruff_text_size::TextRange;
+use rustpython_parser::ast::Ranged;
 use rustpython_parser::ast::{Expr, ExprDict};
 
 #[derive(Default)]

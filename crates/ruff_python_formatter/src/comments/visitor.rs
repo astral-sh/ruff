@@ -1,17 +1,23 @@
-use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::placement::place_comment;
-use crate::comments::{CommentLinePosition, CommentsMap, SourceComment};
+use std::iter::Peekable;
+
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{
+    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
+    MatchCase, Mod, Pattern, Ranged, Stmt, WithItem,
+};
+
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::prelude::*;
 use ruff_python_ast::source_code::{CommentRanges, Locator};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
 use ruff_python_whitespace::is_python_whitespace;
-use ruff_text_size::TextRange;
-use std::iter::Peekable;
+
+use crate::comments::node_key::NodeRefEqualityKey;
+use crate::comments::placement::place_comment;
+use crate::comments::{CommentLinePosition, CommentsMap, SourceComment};
 
 /// Visitor extracting the comments from an AST.
 #[derive(Debug, Clone)]

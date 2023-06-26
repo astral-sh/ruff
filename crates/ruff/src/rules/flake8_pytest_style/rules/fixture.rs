@@ -2,6 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Decorator;
 use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -10,7 +11,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::prelude::Decorator;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;

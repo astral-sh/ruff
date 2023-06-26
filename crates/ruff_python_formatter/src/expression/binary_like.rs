@@ -1,10 +1,12 @@
 //! This module provides helper utilities to format an expression that has a left side, an operator,
 //! and a right side (binary like).
 
+use rustpython_parser::ast::{self, Expr};
+
+use ruff_formatter::{format_args, write};
+
 use crate::expression::parentheses::Parentheses;
 use crate::prelude::*;
-use ruff_formatter::{format_args, write};
-use rustpython_parser::ast::Expr;
 
 /// Trait to implement a binary like syntax that has a left operand, an operator, and a right operand.
 pub(super) trait FormatBinaryLike<'ast> {
@@ -133,25 +135,25 @@ pub(super) trait FormatBinaryLike<'ast> {
 }
 
 fn can_break_expr(expr: &Expr) -> bool {
-    use ruff_python_ast::prelude::*;
-
     match expr {
-        Expr::Tuple(ExprTuple {
+        Expr::Tuple(ast::ExprTuple {
             elts: expressions, ..
         })
-        | Expr::List(ExprList {
+        | Expr::List(ast::ExprList {
             elts: expressions, ..
         })
-        | Expr::Set(ExprSet {
+        | Expr::Set(ast::ExprSet {
             elts: expressions, ..
         })
-        | Expr::Dict(ExprDict {
+        | Expr::Dict(ast::ExprDict {
             values: expressions,
             ..
         }) => !expressions.is_empty(),
-        Expr::Call(ExprCall { args, keywords, .. }) => !(args.is_empty() && keywords.is_empty()),
+        Expr::Call(ast::ExprCall { args, keywords, .. }) => {
+            !(args.is_empty() && keywords.is_empty())
+        }
         Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::GeneratorExp(_) => true,
-        Expr::UnaryOp(ExprUnaryOp { operand, .. }) => match operand.as_ref() {
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => match operand.as_ref() {
             Expr::BinOp(_) => true,
             _ => can_break_expr(operand.as_ref()),
         },

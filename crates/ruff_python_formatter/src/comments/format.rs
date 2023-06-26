@@ -1,12 +1,13 @@
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
+
+use ruff_formatter::{format_args, write, FormatError, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{lines_after, lines_before, skip_trailing_trivia};
-use ruff_formatter::{format_args, write, FormatError, SourceCode};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::prelude::AstNode;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -69,7 +70,7 @@ where
 {
     FormatLeadingAlternateBranchComments {
         comments,
-        last_node: last_node.map(std::convert::Into::into),
+        last_node: last_node.map(Into::into),
     }
 }
 
