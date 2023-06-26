@@ -2065,8 +2065,9 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "rustpython-parser",
+ "serde",
+ "serde_json",
  "similar",
- "test-case",
 ]
 
 [[package]]

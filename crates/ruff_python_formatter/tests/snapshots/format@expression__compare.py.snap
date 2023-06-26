@@ -67,8 +67,6 @@ return 1 == 2 and (
 ]
 ```
 
-
-
 ## Output
 ```py
 a == b
@@ -185,5 +183,6 @@ return (
     ),
 ]
 ```
+
 
 

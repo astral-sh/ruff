@@ -2,6 +2,11 @@ use ruff_formatter::printer::{LineEnding, PrinterOptions};
 use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
 
 #[derive(Clone, Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(default)
+)]
 pub struct PyFormatOptions {
     /// Specifies the indent style:
     /// * Either a tab
@@ -9,6 +14,7 @@ pub struct PyFormatOptions {
     indent_style: IndentStyle,
 
     /// The preferred line width at which the formatter should wrap lines.
+    #[cfg_attr(feature = "serde", serde(default = "default_line_width"))]
     line_width: LineWidth,
 
     /// The preferred quote style to use (single vs double quotes).
@@ -16,6 +22,10 @@ pub struct PyFormatOptions {
 
     /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`
     magic_trailing_comma: MagicTrailingComma,
+}
+
+fn default_line_width() -> LineWidth {
+    LineWidth::try_from(88).unwrap()
 }
 
 impl PyFormatOptions {
@@ -34,6 +44,16 @@ impl PyFormatOptions {
 
     pub fn with_magic_trailing_comma(&mut self, trailing_comma: MagicTrailingComma) -> &mut Self {
         self.magic_trailing_comma = trailing_comma;
+        self
+    }
+
+    pub fn with_indent_style(&mut self, indent_style: IndentStyle) -> &mut Self {
+        self.indent_style = indent_style;
+        self
+    }
+
+    pub fn with_line_width(&mut self, line_width: LineWidth) -> &mut Self {
+        self.line_width = line_width;
         self
     }
 }
@@ -69,6 +89,11 @@ impl Default for PyFormatOptions {
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 pub enum QuoteStyle {
     Single,
     #[default]
@@ -105,14 +130,19 @@ impl TryFrom<char> for QuoteStyle {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 pub enum MagicTrailingComma {
     #[default]
-    Preserve,
-    Skip,
+    Respect,
+    Ignore,
 }
 
 impl MagicTrailingComma {
-    pub const fn is_preserve(self) -> bool {
-        matches!(self, Self::Preserve)
+    pub const fn is_respect(self) -> bool {
+        matches!(self, Self::Respect)
     }
 }

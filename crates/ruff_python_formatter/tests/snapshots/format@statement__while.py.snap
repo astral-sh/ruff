@@ -36,8 +36,6 @@ while (
     print("Do something")
 ```
 
-
-
 ## Output
 ```py
 while 34:  # trailing test comment
@@ -72,5 +70,6 @@ while (
 ):  # comment
     NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
+
 
 

@@ -42,8 +42,6 @@ class Test(Aaaa): # trailing comment
     pass
 ```
 
-
-
 ## Output
 ```py
 class Test(
@@ -93,5 +91,6 @@ class Test(
 class Test(Aaaa):  # trailing comment
     pass
 ```
+
 
 

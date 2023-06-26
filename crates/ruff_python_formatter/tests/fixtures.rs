@@ -1,16 +1,18 @@
+use ruff_formatter::FormatOptions;
 use ruff_python_formatter::{format_module, PyFormatOptions};
 use similar::TextDiff;
 use std::fmt::{Formatter, Write};
-use std::fs;
+use std::io::BufReader;
 use std::path::Path;
+use std::{fmt, fs};
 
 #[test]
 fn black_compatibility() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let printed =
-            format_module(&content, PyFormatOptions::default()).expect("Formatting to succeed");
+        let options = PyFormatOptions::default();
+        let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
 
         let expected_path = input_path.with_extension("py.expect");
         let expected_output = fs::read_to_string(&expected_path)
@@ -18,7 +20,7 @@ fn black_compatibility() {
 
         let formatted_code = printed.as_code();
 
-        ensure_stability_when_formatting_twice(formatted_code);
+        ensure_stability_when_formatting_twice(formatted_code, options);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -66,7 +68,7 @@ fn black_compatibility() {
             write!(snapshot, "{}", CodeFrame::new("diff", &diff)).unwrap();
 
             write!(snapshot, "{}", Header::new("Ruff Output")).unwrap();
-            write!(snapshot, "{}", CodeFrame::new("py", formatted_code)).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("py", &formatted_code)).unwrap();
 
             write!(snapshot, "{}", Header::new("Black Output")).unwrap();
             write!(snapshot, "{}", CodeFrame::new("py", &expected_output)).unwrap();
@@ -89,21 +91,52 @@ fn format() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let printed =
-            format_module(&content, PyFormatOptions::default()).expect("Formatting to succeed");
+        let options = PyFormatOptions::default();
+        let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
         let formatted_code = printed.as_code();
 
-        ensure_stability_when_formatting_twice(formatted_code);
+        ensure_stability_when_formatting_twice(formatted_code, options);
 
-        let snapshot = format!(
-            r#"## Input
-{}
+        let mut snapshot = format!("## Input\n{}", CodeFrame::new("py", &content));
 
-## Output
-{}"#,
-            CodeFrame::new("py", &content),
-            CodeFrame::new("py", formatted_code)
-        );
+        let options_path = input_path.with_extension("options.json");
+        if let Ok(options_file) = fs::File::open(options_path) {
+            let reader = BufReader::new(options_file);
+            let options: Vec<PyFormatOptions> =
+                serde_json::from_reader(reader).expect("Options to be a valid Json file");
+
+            writeln!(snapshot, "## Outputs").unwrap();
+
+            for (i, options) in options.into_iter().enumerate() {
+                let printed =
+                    format_module(&content, options.clone()).expect("Formatting to succeed");
+                let formatted_code = printed.as_code();
+
+                ensure_stability_when_formatting_twice(formatted_code, options.clone());
+
+                writeln!(
+                    snapshot,
+                    "### Output {}\n{}{}",
+                    i + 1,
+                    CodeFrame::new("", &DisplayPyOptions(&options)),
+                    CodeFrame::new("py", &formatted_code)
+                )
+                .unwrap();
+            }
+        } else {
+            let options = PyFormatOptions::default();
+            let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
+            let formatted_code = printed.as_code();
+
+            ensure_stability_when_formatting_twice(formatted_code, options);
+
+            writeln!(
+                snapshot,
+                "## Output\n{}",
+                CodeFrame::new("py", &formatted_code)
+            )
+            .unwrap();
+        }
 
         insta::with_settings!({
             omit_expression => true,
@@ -118,8 +151,8 @@ fn format() {
 }
 
 /// Format another time and make sure that there are no changes anymore
-fn ensure_stability_when_formatting_twice(formatted_code: &str) {
-    let reformatted = match format_module(formatted_code, PyFormatOptions::default()) {
+fn ensure_stability_when_formatting_twice(formatted_code: &str, options: PyFormatOptions) {
+    let reformatted = match format_module(formatted_code, options) {
         Ok(reformatted) => reformatted,
         Err(err) => {
             panic!(
@@ -170,11 +203,11 @@ impl std::fmt::Display for Header<'_> {
 
 struct CodeFrame<'a> {
     language: &'a str,
-    code: &'a str,
+    code: &'a dyn std::fmt::Display,
 }
 
 impl<'a> CodeFrame<'a> {
-    fn new(language: &'a str, code: &'a str) -> Self {
+    fn new(language: &'a str, code: &'a dyn std::fmt::Display) -> Self {
         Self { language, code }
     }
 }
@@ -185,5 +218,23 @@ impl std::fmt::Display for CodeFrame<'_> {
         write!(f, "{}", self.code)?;
         writeln!(f, "```")?;
         writeln!(f)
+    }
+}
+
+struct DisplayPyOptions<'a>(&'a PyFormatOptions);
+
+impl fmt::Display for DisplayPyOptions<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            r#"indent-style            = {indent_style}
+line-width              = {line_width}
+quote-style             = {quote_style:?}
+magic-trailing-comma    = {magic_trailing_comma:?}"#,
+            indent_style = self.0.indent_style(),
+            line_width = self.0.line_width().value(),
+            quote_style = self.0.quote_style(),
+            magic_trailing_comma = self.0.magic_trailing_comma()
+        )
     }
 }

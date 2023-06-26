@@ -38,8 +38,6 @@ while b == 20:
 e = 50  # one empty line before
 ```
 
-
-
 ## Output
 ```py
 # Removes the line above
@@ -77,5 +75,6 @@ while b == 20:
 
 e = 50  # one empty line before
 ```
+
 
 

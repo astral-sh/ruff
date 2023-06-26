@@ -88,8 +88,6 @@ e202 = "e"[a() :: a()]
 e210 = "e"[a() : 1 :]
 ```
 
-
-
 ## Output
 ```py
 # Handle comments both when lower and upper exist and when they don't
@@ -173,5 +171,6 @@ e201 = "e"[NOT_IMPLEMENTED_call() :: 1]
 e202 = "e"[NOT_IMPLEMENTED_call() :: NOT_IMPLEMENTED_call()]
 e210 = "e"[NOT_IMPLEMENTED_call() : 1 :]
 ```
+
 
 

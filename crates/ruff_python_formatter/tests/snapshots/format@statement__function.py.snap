@@ -239,8 +239,6 @@ def f42(
     pass
 ```
 
-
-
 ## Output
 ```py
 # Dangling comments
@@ -514,5 +512,6 @@ def f42(
 ):
     pass
 ```
+
 
 

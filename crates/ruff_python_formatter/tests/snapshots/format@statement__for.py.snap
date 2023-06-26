@@ -40,8 +40,6 @@ for x in (): # type: int
     ...
 ```
 
-
-
 ## Output
 ```py
 for x in y:  # trailing test comment
@@ -83,5 +81,6 @@ for x, y in (z, w):
 for x in ():  # type: int
     ...
 ```
+
 
 
