@@ -67,4 +67,17 @@ f(
     "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa"
 )
 
+f(
+    session,
+    b=1,
+    ** # oddly placed end-of-line comment
+    dict()
+)
+f(
+    session,
+    b=1,
+    **
+    # oddly placed own line comment
+    dict()
+)
 

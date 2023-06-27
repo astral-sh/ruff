@@ -986,10 +986,13 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
+    dbg!(comment.preceding_node());
+    dbg!(comment.following_node());
+    dbg!(comment.enclosing_node());
     match comment.enclosing_node() {
         // TODO: can maybe also add AnyNodeRef::Arguments here, but tricky to test due to
         // https://github.com/astral-sh/ruff/issues/5176
-        AnyNodeRef::ExprDict(_) => {}
+        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_) => {}
         _ => {
             return CommentPlacement::Default(comment);
         }
@@ -1015,12 +1018,22 @@ fn handle_dict_unpacking_comment<'a>(
     )
     .skip_trivia();
 
+    // if the remaining tokens from the previous node are exactly `**`,
+    // re-assign the comment to the one that follows the stars
+    let mut count = 0;
+
     // we start from the preceding node but we skip its token
     for token in tokens.by_ref() {
         // Skip closing parentheses that are not part of the node range
         if token.kind == TokenKind::RParen {
             continue;
         }
+        // The Keyword case
+        if token.kind == TokenKind::Star {
+            count += 1;
+            break;
+        }
+        // The dict case
         debug_assert!(
             matches!(
                 token,
@@ -1034,9 +1047,6 @@ fn handle_dict_unpacking_comment<'a>(
         break;
     }
 
-    // if the remaining tokens from the previous node is exactly `**`,
-    // re-assign the comment to the one that follows the stars
-    let mut count = 0;
     for token in tokens {
         if token.kind != TokenKind::Star {
             return CommentPlacement::Default(comment);

@@ -73,6 +73,19 @@ f(
     "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa"
 )
 
+f(
+    session,
+    b=1,
+    ** # oddly placed end-of-line comment
+    dict()
+)
+f(
+    session,
+    b=1,
+    **
+    # oddly placed own line comment
+    dict()
+)
 
 ```
 
@@ -144,6 +157,18 @@ result = session.query(models.Customer.id).filter(
 ).order_by(models.Customer.id.asc()).all()
 # TODO(konstin): Black has this special case for comment placement where everything stays in one line
 f("aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa")
+
+f(
+    session,
+    b=1,
+    **dict(),  # oddly placed end-of-line comment
+)
+f(
+    session,
+    b=1,
+    **dict(),
+    # oddly placed own line comment
+)
 ```
 
 

@@ -16,7 +16,7 @@ impl FormatNodeRule<Keyword> for FormatKeyword {
         if let Some(arg) = arg {
             write!(f, [arg.format(), text("="), value.format()])
         } else {
-            // TODO(konstin): dangling comments after the stars?
+            // Comments after the stars are reassigned as trailing value comments
             write!(f, [text("**"), value.format()])
         }
     }
