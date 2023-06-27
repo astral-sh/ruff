@@ -17,9 +17,15 @@ use crate::checkers::ast::Checker;
 /// internal structure to store the object's attributes, resulting in memory
 /// savings.
 ///
-/// Any non-string iterable may be assigned to`__slots__`. To use a single
-/// string attribute in `__slots__`, wrap the string in another iterable type
-/// (e.g., a `tuple`).
+/// Any string iterable may be assigned to `__slots__` (most commonly, a
+/// `tuple` of strings). If a string is assigned to `__slots__`, it is
+/// interpreted as a single attribute name, rather than an iterable of attribute
+/// names. This can cause confusion, as users that iterate over the `__slots__`
+/// value may expect to iterate over a sequence of attributes, but would instead
+/// iterate over the characters of the string.
+///
+/// To use a single string attribute in `__slots__`, wrap the string in an
+/// iterable container type, like a `tuple`.
 ///
 /// ## Example
 /// ```python
@@ -51,16 +57,6 @@ impl Violation for SingleStringSlots {
     }
 }
 
-fn is_string(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        })
-    )
-}
-
 /// PLC0205
 pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
     for stmt in &class.body {
@@ -68,10 +64,18 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 for target in targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
-                        if id.as_str() == "__slots__" && is_string(value) {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));
+                        if id.as_str() == "__slots__" {
+                            if matches!(
+                                value.as_ref(),
+                                Expr::Constant(ast::ExprConstant {
+                                    value: Constant::Str(_),
+                                    ..
+                                })
+                            ) {
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));
+                            }
                         }
                     }
                 }
@@ -82,10 +86,18 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                 ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    if id.as_str() == "__slots__" && is_string(value) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));
+                    if id.as_str() == "__slots__" {
+                        if matches!(
+                            value.as_ref(),
+                            Expr::Constant(ast::ExprConstant {
+                                value: Constant::Str(_),
+                                ..
+                            })
+                        ) {
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));
+                        }
                     }
                 }
             }

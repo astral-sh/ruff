@@ -1,6 +1,4 @@
 # Errors.
-
-
 class Foo:
     __slots__ = "bar"
 
@@ -16,8 +14,6 @@ class Foo:
 
 
 # Non-errors.
-
-
 class Foo:
     __slots__ = ("bar",)
 
