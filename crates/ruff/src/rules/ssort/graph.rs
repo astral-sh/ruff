@@ -386,4 +386,22 @@ mod tests {
         graph.insert_edge("a", "a", 1);
         assert_eq!(topological_sort(&graph), ["a"]);
     }
+
+    #[test]
+    fn topological_sort_with_large_unconnected() {
+        let mut graph = Graph::<i32, i32>::new();
+        for node in 0..100 {
+            graph.insert_node(node);
+        }
+        assert_eq!(topological_sort(&graph), (0..100).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn topological_sort_with_large_self_cycle() {
+        let mut graph = Graph::<i32, i32>::new();
+        for node in 0..100 {
+            graph.insert_edge(node, node, 1);
+        }
+        assert_eq!(topological_sort(&graph), (0..100).collect::<Vec<_>>())
+    }
 }
