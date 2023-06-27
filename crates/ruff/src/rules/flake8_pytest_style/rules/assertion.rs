@@ -200,8 +200,7 @@ pub(crate) fn unittest_assertion(
                         && !has_comments_in(expr.range(), checker.locator)
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 checker.generator().stmt(&stmt),
                                 expr.range(),
                             )));

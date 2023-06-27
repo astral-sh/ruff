@@ -59,7 +59,7 @@ func(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,25 +1,39 @@
+@@ -1,25 +1,58 @@
  # We should not remove the trailing comma in a single-element subscript.
 -a: tuple[int,]
 -b = tuple[int,]
@@ -95,10 +95,20 @@ func(
  
  # Trailing commas in multiple chained non-nested parens.
 -zero(one).two(three).four(five)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++zero(
++    one,
++).two(
++    three,
++).four(
++    five,
++)
  
 -func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++func1(arg1).func2(
++    arg2,
++).func3(arg3).func4(
++    arg4,
++).func5(arg5)
  
 -(a, b, c, d) = func1(arg1) and func2(arg2)
 +(
@@ -106,10 +116,19 @@ func(
 +    b,
 +    c,
 +    d,
-+) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++) = func1(arg1) and func2(arg2)
  
 -func(argument1, (one, two), argument4, argument5, argument6)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++func(
++    argument1,
++    (
++        one,
++        two,
++    ),
++    argument4,
++    argument5,
++    argument6,
++)
 ```
 
 ## Ruff Output
@@ -142,18 +161,37 @@ set_of_types = {tuple[(int,)]}
 small_tuple = (1,)
 
 # Trailing commas in multiple chained non-nested parens.
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+zero(
+    one,
+).two(
+    three,
+).four(
+    five,
+)
 
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+func1(arg1).func2(
+    arg2,
+).func3(arg3).func4(
+    arg4,
+).func5(arg5)
 
 (
     a,
     b,
     c,
     d,
-) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+) = func1(arg1) and func2(arg2)
 
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+func(
+    argument1,
+    (
+        one,
+        two,
+    ),
+    argument4,
+    argument5,
+    argument6,
+)
 ```
 
 ## Black Output

@@ -12,7 +12,7 @@ D.py:232:1: D207 [*] Docstring is under-indented
     |
     = help: Increase indentation
 
-ℹ Suggested fix
+ℹ Fix
 229 229 | def asdfsdf():
 230 230 |     """Summary.
 231 231 | 
@@ -31,7 +31,7 @@ D.py:244:1: D207 [*] Docstring is under-indented
     |
     = help: Increase indentation
 
-ℹ Suggested fix
+ℹ Fix
 241 241 | 
 242 242 |     Description.
 243 243 | 
@@ -51,7 +51,7 @@ D.py:440:1: D207 [*] Docstring is under-indented
     |
     = help: Increase indentation
 
-ℹ Suggested fix
+ℹ Fix
 437 437 | @expect('D213: Multi-line docstring summary should start at the second line')
 438 438 | def docstring_start_in_same_line(): """First Line.
 439 439 | 
@@ -69,7 +69,7 @@ D.py:441:1: D207 [*] Docstring is under-indented
     |
     = help: Increase indentation
 
-ℹ Suggested fix
+ℹ Fix
 438 438 | def docstring_start_in_same_line(): """First Line.
 439 439 | 
 440 440 |     Second Line

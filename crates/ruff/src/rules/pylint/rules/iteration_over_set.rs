@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -38,9 +38,15 @@ impl Violation for IterationOverSet {
 
 /// PLC0208
 pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
-    if expr.is_set_expr() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(IterationOverSet, expr.range()));
+    let Expr::Set(ast::ExprSet { elts, .. }) = expr else {
+        return;
+    };
+
+    if elts.iter().any(Expr::is_starred_expr) {
+        return;
     }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(IterationOverSet, expr.range()));
 }

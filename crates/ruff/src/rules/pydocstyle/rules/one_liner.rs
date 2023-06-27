@@ -51,8 +51,7 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 if !trimmed.ends_with(trailing.chars().last().unwrap())
                     && !trimmed.starts_with(leading.chars().last().unwrap())
                 {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                         format!("{leading}{trimmed}{trailing}"),
                         docstring.range(),
                     )));

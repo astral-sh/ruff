@@ -330,8 +330,10 @@ We're grateful to the maintainers of these tools for their work, and for all
 the value they've provided to the Python community.
 
 Ruff's autoformatter is built on a fork of Rome's [`rome_formatter`](https://github.com/rome/tools/tree/main/crates/rome_formatter),
-and again draws on both the APIs and implementation details of [Rome](https://github.com/rome/tools),
+and again draws on both API and implementation details from [Rome](https://github.com/rome/tools),
 [Prettier](https://github.com/prettier/prettier), and [Black](https://github.com/psf/black).
+
+Ruff's import resolver is based on the import resolution algorithm from [Pyright](https://github.com/microsoft/pyright).
 
 Ruff is also influenced by a number of tools outside the Python ecosystem, like
 [Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).

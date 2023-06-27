@@ -10,7 +10,7 @@ PT023.py:46:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    |
    = help: Add/remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 43 43 | # With parentheses
 44 44 | 
 45 45 | 
@@ -29,7 +29,7 @@ PT023.py:51:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    |
    = help: Add/remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 48 48 |     pass
 49 49 | 
 50 50 | 
@@ -49,7 +49,7 @@ PT023.py:58:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    |
    = help: Add/remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 55 55 | 
 56 56 | 
 57 57 | class TestClass:
@@ -69,7 +69,7 @@ PT023.py:64:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    |
    = help: Add/remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 61 61 | 
 62 62 | 
 63 63 | class TestClass:
@@ -90,7 +90,7 @@ PT023.py:72:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
    |
    = help: Add/remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 69 69 | 
 70 70 | class TestClass:
 71 71 |     class TestNestedClass:

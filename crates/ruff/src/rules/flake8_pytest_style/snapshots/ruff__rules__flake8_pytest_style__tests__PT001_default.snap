@@ -10,7 +10,7 @@ PT001.py:9:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
    = help: Add parentheses
 
-ℹ Suggested fix
+ℹ Fix
 6  6  | # `import pytest`
 7  7  | 
 8  8  | 
@@ -29,7 +29,7 @@ PT001.py:34:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
    = help: Add parentheses
 
-ℹ Suggested fix
+ℹ Fix
 31 31 | # `from pytest import fixture`
 32 32 | 
 33 33 | 
@@ -48,7 +48,7 @@ PT001.py:59:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
    = help: Add parentheses
 
-ℹ Suggested fix
+ℹ Fix
 56 56 | # `from pytest import fixture as aliased`
 57 57 | 
 58 58 | 

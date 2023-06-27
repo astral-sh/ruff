@@ -60,7 +60,7 @@ enum Command {
         #[clap(flatten)]
         log_level_args: ruff_cli::args::LogLevelArgs,
         /// Run this many times
-        #[clap(long, short = 'n')]
+        #[clap(long)]
         repeat: usize,
     },
     /// Format a repository twice and ensure that it looks that the first and second formatting

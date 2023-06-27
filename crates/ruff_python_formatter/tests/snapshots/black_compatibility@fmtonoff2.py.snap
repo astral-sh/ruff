@@ -52,7 +52,7 @@ def test_calculate_fades():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,40 +1,38 @@
+@@ -1,40 +1,44 @@
 -import pytest
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -68,11 +68,15 @@ def test_calculate_fades():
 -@pytest.mark.parametrize('test', [
 -
 -    # Test don't manage the volume
--    [
++@pytest.mark.parametrize(
++    "test",
+     [
 -        ('stuff', 'in')
--    ],
++        # Test don't manage the volume
++        [("stuff", "in")],
+     ],
 -])
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++)
  def test_fader(test):
      pass
  
@@ -120,7 +124,13 @@ TmEx = 2
 # Test data:
 #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
 
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@pytest.mark.parametrize(
+    "test",
+    [
+        # Test don't manage the volume
+        [("stuff", "in")],
+    ],
+)
 def test_fader(test):
     pass
 

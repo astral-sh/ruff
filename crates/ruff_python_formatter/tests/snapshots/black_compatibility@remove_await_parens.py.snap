@@ -93,31 +93,28 @@ async def main():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,66 +1,57 @@
+@@ -1,4 +1,4 @@
 -import asyncio
 +NOT_YET_IMPLEMENTED_StmtImport
  
  
  # Control example
- async def main():
--    await asyncio.sleep(1)
-+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
+@@ -8,59 +8,70 @@
  
  # Remove brackets for short coroutine/task
  async def main():
 -    await asyncio.sleep(1)
-+    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    await (asyncio.sleep(1))
  
  
  async def main():
 -    await asyncio.sleep(1)
-+    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    await (asyncio.sleep(1))
  
  
  async def main():
 -    await asyncio.sleep(1)
-+    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    await (asyncio.sleep(1))
  
  
  # Check comments
@@ -125,7 +122,7 @@ async def main():
 -    await asyncio.sleep(1)  # Hello
 +    (
 +        await # Hello
-+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        asyncio.sleep(1)
 +    )
  
  
@@ -133,14 +130,14 @@ async def main():
 -    await asyncio.sleep(1)  # Hello
 +    (
 +        await (
-+            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # Hello
++            asyncio.sleep(1)  # Hello
 +        )
 +    )
  
  
  async def main():
 -    await asyncio.sleep(1)  # Hello
-+    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))  # Hello
++    await (asyncio.sleep(1))  # Hello
  
  
  # Long lines
@@ -153,8 +150,17 @@ async def main():
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
--    )
-+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    (
++        await asyncio.gather(
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++        )
+     )
  
  
  # Same as above but with magic trailing comma in function
@@ -167,27 +173,27 @@ async def main():
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
--    )
-+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    (
++        await asyncio.gather(
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++        )
+     )
  
  
  # Cr@zY Br@ck3Tz
  async def main():
 -    await black(1)
-+    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
++    await (black(1))
  
  
  # Keep brackets around non power operations and nested awaits
-@@ -69,7 +60,7 @@
- 
- 
- async def main():
--    await (await asyncio.sleep(1))
-+    await (await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
- 
- 
- # It's awaits all the way down...
-@@ -78,16 +69,16 @@
+@@ -78,16 +89,16 @@
  
  
  async def main():
@@ -197,12 +203,12 @@ async def main():
  
  async def main():
 -    await (await asyncio.sleep(1))
-+    await (await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)))
++    await (await (asyncio.sleep(1)))
  
  
  async def main():
 -    await (await (await (await (await asyncio.sleep(1)))))
-+    await (await (await (await (await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))))))
++    await (await (await (await (await (asyncio.sleep(1))))))
  
  
  async def main():
@@ -218,55 +224,75 @@ NOT_YET_IMPLEMENTED_StmtImport
 
 # Control example
 async def main():
-    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    await asyncio.sleep(1)
 
 
 # Remove brackets for short coroutine/task
 async def main():
-    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    await (asyncio.sleep(1))
 
 
 async def main():
-    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    await (asyncio.sleep(1))
 
 
 async def main():
-    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    await (asyncio.sleep(1))
 
 
 # Check comments
 async def main():
     (
         await # Hello
-        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        asyncio.sleep(1)
     )
 
 
 async def main():
     (
         await (
-            NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # Hello
+            asyncio.sleep(1)  # Hello
         )
     )
 
 
 async def main():
-    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))  # Hello
+    await (asyncio.sleep(1))  # Hello
 
 
 # Long lines
 async def main():
-    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    (
+        await asyncio.gather(
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+        )
+    )
 
 
 # Same as above but with magic trailing comma in function
 async def main():
-    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    (
+        await asyncio.gather(
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+        )
+    )
 
 
 # Cr@zY Br@ck3Tz
 async def main():
-    await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    await (black(1))
 
 
 # Keep brackets around non power operations and nested awaits
@@ -275,7 +301,7 @@ async def main():
 
 
 async def main():
-    await (await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))
+    await (await asyncio.sleep(1))
 
 
 # It's awaits all the way down...
@@ -288,11 +314,11 @@ async def main():
 
 
 async def main():
-    await (await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)))
+    await (await (asyncio.sleep(1)))
 
 
 async def main():
-    await (await (await (await (await (NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg))))))
+    await (await (await (await (await (asyncio.sleep(1))))))
 
 
 async def main():

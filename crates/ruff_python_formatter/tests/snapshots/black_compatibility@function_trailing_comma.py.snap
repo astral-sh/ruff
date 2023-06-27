@@ -73,20 +73,16 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -24,18 +24,14 @@
- def f(
-     a: int = 1,
- ):
--    call(
--        arg={
--            "explode": "this",
+@@ -27,7 +27,7 @@
+     call(
+         arg={
+             "explode": "this",
 -        }
--    )
--    call2(
--        arg=[1, 2, 3],
--    )
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        },
+     )
+     call2(
+         arg=[1, 2, 3],
+@@ -35,7 +35,9 @@
      x = {
          "a": 1,
          "b": 2,
@@ -97,7 +93,7 @@ some_module.some_function(
      if (
          a
          == {
-@@ -47,22 +43,24 @@
+@@ -47,22 +49,24 @@
              "f": 6,
              "g": 7,
              "h": 8,
@@ -129,7 +125,7 @@ some_module.some_function(
      }
  
  
-@@ -80,35 +78,16 @@
+@@ -80,18 +84,14 @@
      pass
  
  
@@ -137,8 +133,9 @@ some_module.some_function(
 -    also_super_long_type_annotation_that_may_cause_an_AST_related_crash_in_black(
 -        this_shouldn_t_get_a_trailing_comma_too
 -    )
--):
-+def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++def func() -> also_super_long_type_annotation_that_may_cause_an_AST_related_crash_in_black(
++    this_shouldn_t_get_a_trailing_comma_too
+ ):
      pass
  
  
@@ -146,29 +143,11 @@ some_module.some_function(
 -    also_super_long_type_annotation_that_may_cause_an_AST_related_crash_in_black(
 -        this_shouldn_t_get_a_trailing_comma_too
 -    )
--):
-+def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
++def func() -> also_super_long_type_annotation_that_may_cause_an_AST_related_crash_in_black(
++    this_shouldn_t_get_a_trailing_comma_too
+ ):
      pass
  
- 
- # Make sure inner one-element tuple won't explode
--some_module.some_function(
--    argument1, (one_element_tuple,), argument4, argument5, argument6
--)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
- # Inner trailing comma causes outer to explode
--some_module.some_function(
--    argument1,
--    (
--        one,
--        two,
--    ),
--    argument4,
--    argument5,
--    argument6,
--)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -200,8 +179,14 @@ def f2(
 def f(
     a: int = 1,
 ):
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    call(
+        arg={
+            "explode": "this",
+        },
+    )
+    call2(
+        arg=[1, 2, 3],
+    )
     x = {
         "a": 1,
         "b": 2,
@@ -254,19 +239,34 @@ def some_method_with_a_really_long_name(
     pass
 
 
-def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+def func() -> also_super_long_type_annotation_that_may_cause_an_AST_related_crash_in_black(
+    this_shouldn_t_get_a_trailing_comma_too
+):
     pass
 
 
-def func() -> NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+def func() -> also_super_long_type_annotation_that_may_cause_an_AST_related_crash_in_black(
+    this_shouldn_t_get_a_trailing_comma_too
+):
     pass
 
 
 # Make sure inner one-element tuple won't explode
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+some_module.some_function(
+    argument1, (one_element_tuple,), argument4, argument5, argument6
+)
 
 # Inner trailing comma causes outer to explode
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+some_module.some_function(
+    argument1,
+    (
+        one,
+        two,
+    ),
+    argument4,
+    argument5,
+    argument6,
+)
 ```
 
 ## Black Output
