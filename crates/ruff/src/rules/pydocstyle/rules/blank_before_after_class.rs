@@ -92,6 +92,26 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
     }
 }
 
+/// ## What it does
+/// Checks for docstrings that are separated from the class definition by one
+/// blank line.
+///
+/// ## Why is this bad?
+/// Remove blank lines separating the docstring from the class definition for
+/// consistency.
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///
+///     """Metadata about a photo."""
+/// ```
 #[violation]
 pub struct BlankLineBeforeClass {
     lines: usize,
