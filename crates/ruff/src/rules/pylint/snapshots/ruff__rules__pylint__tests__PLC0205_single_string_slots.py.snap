@@ -1,0 +1,22 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+single_string_slots.py:5:5: PLC0205 Class `__slots__` should be a non-string iterable
+  |
+4 | class Foo:
+5 |     __slots__ = "bar"
+  |     ^^^^^^^^^^^^^^^^^ PLC0205
+6 | 
+7 |     def __init__(self, bar):
+  |
+
+single_string_slots.py:12:5: PLC0205 Class `__slots__` should be a non-string iterable
+   |
+11 | class Foo:
+12 |     __slots__: str = "bar"
+   |     ^^^^^^^^^^^^^^^^^^^^^^ PLC0205
+13 | 
+14 |     def __init__(self, bar):
+   |
+
+

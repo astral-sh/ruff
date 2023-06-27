@@ -770,6 +770,9 @@ where
                 if self.enabled(Rule::NoSlotsInNamedtupleSubclass) {
                     flake8_slots::rules::no_slots_in_namedtuple_subclass(self, stmt, class_def);
                 }
+                if self.enabled(Rule::SingleStringSlots) {
+                    pylint::rules::single_string_slots(self, class_def);
+                }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 if self.enabled(Rule::MultipleImportsOnOneLine) {

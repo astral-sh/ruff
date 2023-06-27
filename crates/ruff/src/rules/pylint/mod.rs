@@ -33,6 +33,7 @@ mod tests {
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_2.py"))]
