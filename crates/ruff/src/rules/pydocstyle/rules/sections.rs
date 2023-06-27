@@ -13,7 +13,7 @@ use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_whitespace::NewlineWithTrailingNewline;
+use ruff_python_whitespace::{NewlineWithTrailingNewline, PythonWhitespace};
 use ruff_textwrap::dedent;
 
 use crate::checkers::ast::Checker;
@@ -488,6 +488,10 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
+            let equal_line_found = non_blank_line
+                .chars()
+                .all(|char| char.is_whitespace() || char == '=');
+
             if checker.enabled(Rule::DashedUnderlineAfterSection) {
                 let mut diagnostic = Diagnostic::new(
                     DashedUnderlineAfterSection {
@@ -503,10 +507,23 @@ fn blanks_and_section_underline(
                         clean_space(docstring.indentation),
                         "-".repeat(context.section_name().len()),
                     );
-                    diagnostic.set_fix(Fix::automatic(Edit::insertion(
-                        content,
-                        context.summary_range().end(),
-                    )));
+                    if equal_line_found
+                        && non_blank_line.trim_whitespace().len() == context.section_name().len()
+                    {
+                        // If an existing underline is an equal sign line of the appropriate length,
+                        // replace it with a dashed line.
+                        diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                            content,
+                            context.summary_range().end(),
+                            non_blank_line.end(),
+                        )));
+                    } else {
+                        // Otherwise, insert a dashed line after the section header.
+                        diagnostic.set_fix(Fix::automatic(Edit::insertion(
+                            content,
+                            context.summary_range().end(),
+                        )));
+                    }
                 }
                 checker.diagnostics.push(diagnostic);
             }
