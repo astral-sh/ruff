@@ -304,6 +304,7 @@ impl Violation for UndocumentedPublicMethod {
 ///         return distance / time
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
+/// ```
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

@@ -7,6 +7,31 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for single-line docstrings that are broken across multiple lines.
+///
+/// ## Why is this bad?
+/// [PEP 257] recommends that docstrings that _can_ fit on one line should be
+/// formatted on a single line, for consistency and readability.
+///
+/// ## Example
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """
+///     Return the mean of the given values.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct FitsOnOneLine;
 

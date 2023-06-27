@@ -10,6 +10,37 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for docstrings on class definitions that are not preceded by a
+/// blank line.
+///
+/// ## Why is this bad?
+/// Use a blank line to separate the docstring from the class definition, for
+/// consistency.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is disabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
+///
+/// For an alternative, see [D211].
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///
+///     """Metadata about a photo."""
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// [D211]: https://beta.ruff.rs/docs/rules/blank-line-before-class
 #[violation]
 pub struct OneBlankLineBeforeClass {
     lines: usize,
@@ -26,6 +57,44 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
     }
 }
 
+/// ## What it does
+/// Checks for class methods that are not separated from the class's docstring
+/// by a blank line.
+///
+/// ## Why is this bad?
+/// [PEP 257] recommends the use of a blank line to separate a class's
+/// docstring its methods.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `google`
+/// convention, and disabled when using the `numpy` and `pep257` conventions.
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+///     def __init__(self, file: Path):
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+///
+///     def __init__(self, file: Path):
+///         ...
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct OneBlankLineAfterClass {
     lines: usize,
@@ -42,6 +111,37 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
     }
 }
 
+/// ## What it does
+/// Checks for docstrings on class definitions that are preceded by a blank
+/// line.
+///
+/// ## Why is this bad?
+/// Avoid introducing any blank lines between a class definition and its
+/// docstring, for consistency.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
+///
+/// For an alternative, see [D203].
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///
+///     """Metadata about a photo."""
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// [D203]: https://beta.ruff.rs/docs/rules/one-blank-line-before-class
 #[violation]
 pub struct BlankLineBeforeClass {
     lines: usize,
