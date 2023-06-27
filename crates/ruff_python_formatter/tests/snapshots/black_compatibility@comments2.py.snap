@@ -189,36 +189,16 @@ instruction()#comment with bad spacing
  
  # Please keep __all__ alphabetized within each category.
  
-@@ -37,31 +33,35 @@
-     # builtin types and objects
-     type,
-     object,
--    object(),
--    Exception(),
-+    NOT_IMPLEMENTED_call(),
-+    NOT_IMPLEMENTED_call(),
-     42,
-     100.0,
-     "spam",
+@@ -45,7 +41,7 @@
      # user-defined types and objects
      Cheese,
--    Cheese("Wensleydale"),
+     Cheese("Wensleydale"),
 -    SubBytes(b"spam"),
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
++    SubBytes(b"NOT_YET_IMPLEMENTED_BYTE_STRING"),
  ]
  
  if "PYTHON" in os.environ:
--    add_compiler(compiler_from_env())
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- else:
-     # for compiler in compilers.values():
-     # add_compiler(compiler)
--    add_compiler(compilers[(7.0, 32)])
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-     # add_compiler(compilers[(7.1, 64)])
- 
- 
+@@ -60,8 +56,12 @@
  # Comment before function.
  def inline_comments_in_brackets_ruin_everything():
      if typedargslist:
@@ -232,7 +212,7 @@ instruction()#comment with bad spacing
              children[0],
              body,
              children[-1],  # type: ignore
-@@ -72,14 +72,18 @@
+@@ -72,7 +72,11 @@
              body,
              parameters.children[-1],  # )2
          ]
@@ -245,42 +225,10 @@ instruction()#comment with bad spacing
      if (
          self._proc is not None
          # has the child process finished?
-         and self._returncode is None
-         # the child process has finished, but the
-         # transport hasn't been notified yet?
--        and self._proc.poll() is None
-+        and NOT_IMPLEMENTED_call() is None
-     ):
-         pass
-     # no newline before or after
-@@ -91,48 +95,14 @@
-     ]
- 
-     # no newline after
--    call(
--        arg1,
--        arg2,
--        """
--short
--""",
--        arg3=True,
--    )
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
-     ############################################################################
- 
--    call2(
--        # short
--        arg1,
--        # but
--        arg2,
--        # multiline
--        """
--short
--""",
--        # yup
--        arg3=True,
--    )
+@@ -114,25 +118,9 @@
+         # yup
+         arg3=True,
+     )
 -    lcomp = [
 -        element for element in collection if element is not None  # yup  # yup  # right
 -    ]
@@ -300,26 +248,25 @@ instruction()#comment with bad spacing
 -        # right
 -        if element is not None
 -    ]
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 +    lcomp = [i for i in []]
 +    lcomp2 = [i for i in []]
 +    lcomp3 = [i for i in []]
      while True:
          if False:
              continue
-@@ -141,10 +111,7 @@
-         # and round and round we go
- 
+@@ -143,7 +131,10 @@
      # let's return
--    return Node(
--        syms.simple_stmt,
+     return Node(
+         syms.simple_stmt,
 -        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
--    )
-+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        [
++            Node(statement, result),
++            Leaf(token.NEWLINE, "\n"),  # FIXME: \r\n?
++        ],
+     )
  
  
- CONFIG_FILES = (
-@@ -158,7 +125,11 @@
+@@ -158,7 +149,11 @@
  
  class Test:
      def _init_host(self, parsed) -> None:
@@ -327,20 +274,11 @@ instruction()#comment with bad spacing
 +        if (
 +            parsed.hostname
 +            is None  # type: ignore
-+            or not NOT_IMPLEMENTED_call()
++            or not parsed.hostname.strip()
 +        ):
              pass
  
  
-@@ -167,7 +138,7 @@
- #######################
- 
- 
--instruction()  # comment with bad spacing
-+NOT_IMPLEMENTED_call()  # comment with bad spacing
- 
- # END COMMENTS
- # MORE END COMMENTS
 ```
 
 ## Ruff Output
@@ -381,23 +319,23 @@ not_shareables = [
     # builtin types and objects
     type,
     object,
-    NOT_IMPLEMENTED_call(),
-    NOT_IMPLEMENTED_call(),
+    object(),
+    Exception(),
     42,
     100.0,
     "spam",
     # user-defined types and objects
     Cheese,
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
+    Cheese("Wensleydale"),
+    SubBytes(b"NOT_YET_IMPLEMENTED_BYTE_STRING"),
 ]
 
 if "PYTHON" in os.environ:
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    add_compiler(compiler_from_env())
 else:
     # for compiler in compilers.values():
     # add_compiler(compiler)
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    add_compiler(compilers[(7.0, 32)])
     # add_compiler(compilers[(7.1, 64)])
 
 
@@ -431,7 +369,7 @@ def inline_comments_in_brackets_ruin_everything():
         and self._returncode is None
         # the child process has finished, but the
         # transport hasn't been notified yet?
-        and NOT_IMPLEMENTED_call() is None
+        and self._proc.poll() is None
     ):
         pass
     # no newline before or after
@@ -443,11 +381,29 @@ def inline_comments_in_brackets_ruin_everything():
     ]
 
     # no newline after
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    call(
+        arg1,
+        arg2,
+        """
+short
+""",
+        arg3=True,
+    )
 
     ############################################################################
 
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    call2(
+        # short
+        arg1,
+        # but
+        arg2,
+        # multiline
+        """
+short
+""",
+        # yup
+        arg3=True,
+    )
     lcomp = [i for i in []]
     lcomp2 = [i for i in []]
     lcomp3 = [i for i in []]
@@ -459,7 +415,13 @@ def inline_comments_in_brackets_ruin_everything():
         # and round and round we go
 
     # let's return
-    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    return Node(
+        syms.simple_stmt,
+        [
+            Node(statement, result),
+            Leaf(token.NEWLINE, "\n"),  # FIXME: \r\n?
+        ],
+    )
 
 
 CONFIG_FILES = (
@@ -476,7 +438,7 @@ class Test:
         if (
             parsed.hostname
             is None  # type: ignore
-            or not NOT_IMPLEMENTED_call()
+            or not parsed.hostname.strip()
         ):
             pass
 
@@ -486,7 +448,7 @@ class Test:
 #######################
 
 
-NOT_IMPLEMENTED_call()  # comment with bad spacing
+instruction()  # comment with bad spacing
 
 # END COMMENTS
 # MORE END COMMENTS

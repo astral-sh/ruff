@@ -159,17 +159,17 @@ def a():
 
 e00 = "e"[:]
 e01 = "e"[:1]
-e02 = "e"[ : NOT_IMPLEMENTED_call()]
+e02 = "e"[ : a()]
 e10 = "e"[1:]
 e11 = "e"[1:1]
-e12 = "e"[1 : NOT_IMPLEMENTED_call()]
-e20 = "e"[NOT_IMPLEMENTED_call() :]
-e21 = "e"[NOT_IMPLEMENTED_call() : 1]
-e22 = "e"[NOT_IMPLEMENTED_call() : NOT_IMPLEMENTED_call()]
-e200 = "e"[NOT_IMPLEMENTED_call() : :]
-e201 = "e"[NOT_IMPLEMENTED_call() :: 1]
-e202 = "e"[NOT_IMPLEMENTED_call() :: NOT_IMPLEMENTED_call()]
-e210 = "e"[NOT_IMPLEMENTED_call() : 1 :]
+e12 = "e"[1 : a()]
+e20 = "e"[a() :]
+e21 = "e"[a() : 1]
+e22 = "e"[a() : a()]
+e200 = "e"[a() : :]
+e201 = "e"[a() :: 1]
+e202 = "e"[a() :: a()]
+e210 = "e"[a() : 1 :]
 ```
 
 

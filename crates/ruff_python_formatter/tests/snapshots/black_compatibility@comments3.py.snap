@@ -60,7 +60,7 @@ def func():
 ```diff
 --- Black
 +++ Ruff
-@@ -6,43 +6,16 @@
+@@ -6,14 +6,7 @@
      x = """
      a really long string
      """
@@ -74,40 +74,17 @@ def func():
 -    ]
 +    lcomp3 = [i for i in []]
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
--    if isinstance(exc_value, MultiError):
-+    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+     if isinstance(exc_value, MultiError):
          embedded = []
-         for exc in exc_value.exceptions:
-             if exc not in _seen:
--                embedded.append(
--                    # This should be left alone (before)
--                    traceback.TracebackException.from_exception(
--                        exc,
--                        limit=limit,
--                        lookup_lines=lookup_lines,
--                        capture_locals=capture_locals,
--                        # copy the set of _seen exceptions so that duplicates
--                        # shared between sub-exceptions are not omitted
--                        _seen=set(_seen),
+@@ -29,7 +22,7 @@
+                         # copy the set of _seen exceptions so that duplicates
+                         # shared between sub-exceptions are not omitted
+                         _seen=set(_seen),
 -                    )
--                    # This should be left alone (after)
--                )
-+                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++                    ),
+                     # This should be left alone (after)
+                 )
  
-     # everything is fine if the expression isn't nested
--    traceback.TracebackException.from_exception(
--        exc,
--        limit=limit,
--        lookup_lines=lookup_lines,
--        capture_locals=capture_locals,
--        # copy the set of _seen exceptions so that duplicates
--        # shared between sub-exceptions are not omitted
--        _seen=set(_seen),
--    )
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
- 
- # %%
 ```
 
 ## Ruff Output
@@ -123,14 +100,34 @@ def func():
     """
     lcomp3 = [i for i in []]
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
-    if NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+    if isinstance(exc_value, MultiError):
         embedded = []
         for exc in exc_value.exceptions:
             if exc not in _seen:
-                NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+                embedded.append(
+                    # This should be left alone (before)
+                    traceback.TracebackException.from_exception(
+                        exc,
+                        limit=limit,
+                        lookup_lines=lookup_lines,
+                        capture_locals=capture_locals,
+                        # copy the set of _seen exceptions so that duplicates
+                        # shared between sub-exceptions are not omitted
+                        _seen=set(_seen),
+                    ),
+                    # This should be left alone (after)
+                )
 
     # everything is fine if the expression isn't nested
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    traceback.TracebackException.from_exception(
+        exc,
+        limit=limit,
+        lookup_lines=lookup_lines,
+        capture_locals=capture_locals,
+        # copy the set of _seen exceptions so that duplicates
+        # shared between sub-exceptions are not omitted
+        _seen=set(_seen),
+    )
 
 
 # %%

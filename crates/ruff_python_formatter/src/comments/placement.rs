@@ -989,7 +989,7 @@ fn handle_dict_unpacking_comment<'a>(
     match comment.enclosing_node() {
         // TODO: can maybe also add AnyNodeRef::Arguments here, but tricky to test due to
         // https://github.com/astral-sh/ruff/issues/5176
-        AnyNodeRef::ExprDict(_) => {}
+        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_) => {}
         _ => {
             return CommentPlacement::Default(comment);
         }
@@ -1015,12 +1015,22 @@ fn handle_dict_unpacking_comment<'a>(
     )
     .skip_trivia();
 
+    // if the remaining tokens from the previous node are exactly `**`,
+    // re-assign the comment to the one that follows the stars
+    let mut count = 0;
+
     // we start from the preceding node but we skip its token
     for token in tokens.by_ref() {
         // Skip closing parentheses that are not part of the node range
         if token.kind == TokenKind::RParen {
             continue;
         }
+        // The Keyword case
+        if token.kind == TokenKind::Star {
+            count += 1;
+            break;
+        }
+        // The dict case
         debug_assert!(
             matches!(
                 token,
@@ -1034,9 +1044,6 @@ fn handle_dict_unpacking_comment<'a>(
         break;
     }
 
-    // if the remaining tokens from the previous node is exactly `**`,
-    // re-assign the comment to the one that follows the stars
-    let mut count = 0;
     for token in tokens {
         if token.kind != TokenKind::Star {
             return CommentPlacement::Default(comment);
@@ -1050,19 +1057,19 @@ fn handle_dict_unpacking_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-// Own line comments coming after the node are always dangling comments
-// ```python
-// (
-//      a
-//      # trailing a comment
-//      . # dangling comment
-//      # or this
-//      b
-// )
-// ```
+/// Own line comments coming after the node are always dangling comments
+/// ```python
+/// (
+///      a
+///      # trailing a comment
+///      . # dangling comment
+///      # or this
+///      b
+/// )
+/// ```
 fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
+    _locator: &Locator,
 ) -> CommentPlacement<'a> {
     let Some(attribute) = comment.enclosing_node().expr_attribute() else {
         return CommentPlacement::Default(comment);
@@ -1073,14 +1080,13 @@ fn handle_attribute_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let between_value_and_attr = TextRange::new(attribute.value.end(), attribute.attr.start());
-
-    let dot = SimpleTokenizer::new(locator.contents(), between_value_and_attr)
-        .skip_trivia()
-        .next()
-        .expect("Expected the `.` character after the value");
-
-    if TextRange::new(dot.end(), attribute.attr.start()).contains(comment.slice().start()) {
+    if TextRange::new(attribute.value.end(), attribute.attr.start())
+        .contains(comment.slice().start())
+    {
+        // ```text
+        // value   .   attr
+        //      ^^^^^^^ the range of dangling comments
+        // ```
         if comment.line_position().is_end_of_line() {
             // Attach to node with b
             // ```python

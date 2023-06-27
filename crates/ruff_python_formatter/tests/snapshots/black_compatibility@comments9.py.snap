@@ -151,33 +151,6 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -59,7 +59,7 @@
- @deco1
- # leading 2
- # leading 2 extra
--@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- # leading 3
- @deco3
- # leading 4
-@@ -73,7 +73,7 @@
- # leading 1
- @deco1
- # leading 2
--@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
- # leading 3 that already has an empty line
- @deco3
-@@ -88,7 +88,7 @@
- # leading 1
- @deco1
- # leading 2
--@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- # leading 3
- @deco3
- 
 @@ -106,7 +106,6 @@
          # Another leading comment
          def another_inline():
@@ -260,7 +233,7 @@ some = statement
 @deco1
 # leading 2
 # leading 2 extra
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@deco2(with_args=True)
 # leading 3
 @deco3
 # leading 4
@@ -274,7 +247,7 @@ some = statement
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@deco2(with_args=True)
 
 # leading 3 that already has an empty line
 @deco3
@@ -289,7 +262,7 @@ some = statement
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@deco2(with_args=True)
 # leading 3
 @deco3
 
