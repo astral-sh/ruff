@@ -1,0 +1,29 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     if True:
+%%         return 1
+%%     else:
+%%         return 0
+%%     return "unreachable"
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;unreachable#quot;\n"]
+  block1["return 1\n"]
+  block2["return 0\n"]
+  block3["if True:
+        return 1
+    else:
+        return 0\n"]
+
+  start --> block3
+  block3 -- "True" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+

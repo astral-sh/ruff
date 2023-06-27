@@ -1,0 +1,20 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     assert True, "oops"
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["assert True, #quot;oops#quot;\n"]
+
+  start --> block2
+  block2 -- "True" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+

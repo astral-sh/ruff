@@ -1,0 +1,34 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func(status):
+%%     match status:
+%%         case 1:
+%%             return 1
+%%         case _:
+%%             return 0
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return 0\n"]
+  block1["match status:
+        case 1:
+            return 1
+        case _:
+            return 0\n"]
+  block2["return 1\n"]
+  block3["match status:
+        case 1:
+            return 1
+        case _:
+            return 0\n"]
+
+  start --> block3
+  block3 -- "case 1" --> block2
+  block3 -- "else" --> block1
+  block2 --> return
+  block1 --> block0
+  block0 --> return
+

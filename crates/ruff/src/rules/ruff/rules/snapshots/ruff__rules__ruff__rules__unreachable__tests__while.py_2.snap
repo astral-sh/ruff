@@ -1,0 +1,29 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     while False:
+%%         return "unreachable"
+%%     else:
+%%         return 1
+%%     return "also unreachable"
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;also unreachable#quot;\n"]
+  block1["return #quot;unreachable#quot;\n"]
+  block2["return 1\n"]
+  block3["while False:
+        return #quot;unreachable#quot;
+    else:
+        return 1\n"]
+
+  start --> block3
+  block3 -- "False" --> block1
+  block3 -- "else" --> block2
+  block2 --> return
+  block1 --> return
+  block0 --> return
+

@@ -30,6 +30,7 @@ mod tests {
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
+    #[test_case(Rule::UnreachableCode, Path::new("RUF014.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

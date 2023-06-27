@@ -1,0 +1,107 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def where_is(point):
+%%     class Point:
+%%         x: int
+%%         y: int
+%% 
+%%     match point:
+%%         case Point(x=0, y=0):
+%%             print("Origin")
+%%         case Point(x=0, y=y):
+%%             print(f"Y={y}")
+%%         case Point(x=x, y=0):
+%%             print(f"X={x}")
+%%         case Point():
+%%             print("Somewhere else")
+%%         case _:
+%%             print("Not a point")
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;Not a point#quot;)\n"]
+  block2["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block3["print(#quot;Somewhere else#quot;)\n"]
+  block4["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block5["print(f#quot;X={x}#quot;)\n"]
+  block6["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block7["print(f#quot;Y={y}#quot;)\n"]
+  block8["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block9["print(#quot;Origin#quot;)\n"]
+  block10["match point:
+        case Point(x=0, y=0):
+            print(#quot;Origin#quot;)
+        case Point(x=0, y=y):
+            print(f#quot;Y={y}#quot;)
+        case Point(x=x, y=0):
+            print(f#quot;X={x}#quot;)
+        case Point():
+            print(#quot;Somewhere else#quot;)
+        case _:
+            print(#quot;Not a point#quot;)\n"]
+  block11["class Point:
+        x: int
+        y: int\n"]
+
+  start --> block11
+  block11 --> block10
+  block10 -- "case Point(x=0, y=0)" --> block9
+  block10 -- "else" --> block8
+  block9 --> block0
+  block8 -- "case Point(x=0, y=y)" --> block7
+  block8 -- "else" --> block6
+  block7 --> block0
+  block6 -- "case Point(x=x, y=0)" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "case Point()" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+

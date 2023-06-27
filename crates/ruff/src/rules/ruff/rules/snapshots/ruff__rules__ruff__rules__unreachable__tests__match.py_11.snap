@@ -1,0 +1,99 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func(points):
+%%     match points:
+%%         case []:
+%%             print("No points")
+%%         case [Point(0, 0)]:
+%%             print("The origin")
+%%         case [Point(x, y)]:
+%%             print(f"Single point {x}, {y}")
+%%         case [Point(0, y1), Point(0, y2)]:
+%%             print(f"Two on the Y axis at {y1}, {y2}")
+%%         case _:
+%%             print("Something else")
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;Something else#quot;)\n"]
+  block2["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block3["print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)\n"]
+  block4["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block5["print(f#quot;Single point {x}, {y}#quot;)\n"]
+  block6["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block7["print(#quot;The origin#quot;)\n"]
+  block8["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+  block9["print(#quot;No points#quot;)\n"]
+  block10["match points:
+        case []:
+            print(#quot;No points#quot;)
+        case [Point(0, 0)]:
+            print(#quot;The origin#quot;)
+        case [Point(x, y)]:
+            print(f#quot;Single point {x}, {y}#quot;)
+        case [Point(0, y1), Point(0, y2)]:
+            print(f#quot;Two on the Y axis at {y1}, {y2}#quot;)
+        case _:
+            print(#quot;Something else#quot;)\n"]
+
+  start --> block10
+  block10 -- "case []" --> block9
+  block10 -- "else" --> block8
+  block9 --> block0
+  block8 -- "case [Point(0, 0)]" --> block7
+  block8 -- "else" --> block6
+  block7 --> block0
+  block6 -- "case [Point(x, y)]" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "case [Point(0, y1), Point(0, y2)]" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> block0
+  block0 --> return
+

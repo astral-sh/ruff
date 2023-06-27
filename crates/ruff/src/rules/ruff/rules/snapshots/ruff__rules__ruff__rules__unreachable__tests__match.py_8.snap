@@ -1,0 +1,36 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func(point):
+%%     match point:
+%%         case (0, 0):
+%%             print("Origin")
+%%         case _:
+%%             raise ValueError("oops")
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["raise ValueError(#quot;oops#quot;)\n"]
+  block2["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case _:
+            raise ValueError(#quot;oops#quot;)\n"]
+  block3["print(#quot;Origin#quot;)\n"]
+  block4["match point:
+        case (0, 0):
+            print(#quot;Origin#quot;)
+        case _:
+            raise ValueError(#quot;oops#quot;)\n"]
+
+  start --> block4
+  block4 -- "case (0, 0)" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+

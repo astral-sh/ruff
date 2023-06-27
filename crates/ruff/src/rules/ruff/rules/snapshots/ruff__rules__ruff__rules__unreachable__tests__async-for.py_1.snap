@@ -1,0 +1,26 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     async for i in range(20):
+%%         print(i)
+%%     else:
+%%         return 0
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["print(i)\n"]
+  block1["return 0\n"]
+  block2["async for i in range(20):
+        print(i)
+    else:
+        return 0\n"]
+
+  start --> block2
+  block2 -- "range(20)" --> block0
+  block2 -- "else" --> block1
+  block1 --> return
+  block0 --> return
+

@@ -1,0 +1,22 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     while False:
+%%         break
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["break\n"]
+  block2["while False:
+        break\n"]
+
+  start --> block2
+  block2 -- "False" --> block1
+  block2 -- "else" --> block0
+  block1 --> block0
+  block0 --> return
+

@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     raise Exception
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["raise Exception\n"]
+
+  start --> block0
+  block0 --> return
+

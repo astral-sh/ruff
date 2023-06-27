@@ -1,0 +1,34 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     i = 0
+%%     while True:
+%%         if False:
+%%             print("ok")
+%%         i += 1
+%%     return i
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return i\n"]
+  block1["i += 1\n"]
+  block2["print(#quot;ok#quot;)\n"]
+  block3["if False:
+            print(#quot;ok#quot;)\n"]
+  block4["i = 0\nwhile True:
+        if False:
+            print(#quot;ok#quot;)
+        i += 1\n"]
+
+  start --> block4
+  block4 -- "True" --> block3
+  block4 -- "else" --> block0
+  block3 -- "False" --> block2
+  block3 -- "else" --> block1
+  block2 --> block1
+  block1 --> block4
+  block0 --> return
+

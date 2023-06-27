@@ -1,0 +1,33 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     if False:
+%%         return "unreached"
+%%     elif False:
+%%         return "also unreached"
+%%     return "reached"
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return #quot;reached#quot;\n"]
+  block1["return #quot;unreached#quot;\n"]
+  block2["return #quot;also unreached#quot;\n"]
+  block3["elif False:
+        return #quot;also unreached#quot;\n"]
+  block4["if False:
+        return #quot;unreached#quot;
+    elif False:
+        return #quot;also unreached#quot;\n"]
+
+  start --> block4
+  block4 -- "False" --> block1
+  block4 -- "else" --> block3
+  block3 -- "False" --> block2
+  block3 -- "else" --> block0
+  block2 --> return
+  block1 --> return
+  block0 --> return
+

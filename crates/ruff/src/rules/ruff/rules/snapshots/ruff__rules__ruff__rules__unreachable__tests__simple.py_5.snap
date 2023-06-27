@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     i = 0
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["i = 0\n"]
+
+  start --> block0
+  block0 --> return
+

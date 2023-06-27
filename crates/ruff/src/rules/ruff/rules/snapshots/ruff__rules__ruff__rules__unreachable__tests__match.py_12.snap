@@ -1,0 +1,37 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func(point):
+%%     match point:
+%%         case Point(x, y) if x == y:
+%%             print(f"Y=X at {x}")
+%%         case Point(x, y):
+%%             print(f"Not on the diagonal")
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(f#quot;Not on the diagonal#quot;)\n"]
+  block2["match point:
+        case Point(x, y) if x == y:
+            print(f#quot;Y=X at {x}#quot;)
+        case Point(x, y):
+            print(f#quot;Not on the diagonal#quot;)\n"]
+  block3["print(f#quot;Y=X at {x}#quot;)\n"]
+  block4["match point:
+        case Point(x, y) if x == y:
+            print(f#quot;Y=X at {x}#quot;)
+        case Point(x, y):
+            print(f#quot;Not on the diagonal#quot;)\n"]
+
+  start --> block4
+  block4 -- "case Point(x, y) if x == y" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 -- "case Point(x, y)" --> block1
+  block2 -- "else" --> block0
+  block1 --> block0
+  block0 --> return
+

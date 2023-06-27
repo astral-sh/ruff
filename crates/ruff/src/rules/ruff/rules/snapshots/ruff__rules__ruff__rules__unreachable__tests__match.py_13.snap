@@ -1,0 +1,67 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     from enum import Enum
+%%     class Color(Enum):
+%%         RED = 'red'
+%%         GREEN = 'green'
+%%         BLUE = 'blue'
+%% 
+%%     color = Color(input("Enter your choice of 'red', 'blue' or 'green': "))
+%% 
+%%     match color:
+%%         case Color.RED:
+%%             print("I see red!")
+%%         case Color.GREEN:
+%%             print("Grass is green")
+%%         case Color.BLUE:
+%%             print("I'm feeling the blues :(")
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block2["match color:
+        case Color.RED:
+            print(#quot;I see red!#quot;)
+        case Color.GREEN:
+            print(#quot;Grass is green#quot;)
+        case Color.BLUE:
+            print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block3["print(#quot;Grass is green#quot;)\n"]
+  block4["match color:
+        case Color.RED:
+            print(#quot;I see red!#quot;)
+        case Color.GREEN:
+            print(#quot;Grass is green#quot;)
+        case Color.BLUE:
+            print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block5["print(#quot;I see red!#quot;)\n"]
+  block6["match color:
+        case Color.RED:
+            print(#quot;I see red!#quot;)
+        case Color.GREEN:
+            print(#quot;Grass is green#quot;)
+        case Color.BLUE:
+            print(#quot;I'm feeling the blues :(#quot;)\n"]
+  block7["from enum import Enum\nclass Color(Enum):
+        RED = 'red'
+        GREEN = 'green'
+        BLUE = 'blue'\ncolor = Color(input(#quot;Enter your choice of 'red', 'blue' or 'green': #quot;))\n"]
+
+  start --> block7
+  block7 --> block6
+  block6 -- "case Color.RED" --> block5
+  block6 -- "else" --> block4
+  block5 --> block0
+  block4 -- "case Color.GREEN" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 -- "case Color.BLUE" --> block1
+  block2 -- "else" --> block0
+  block1 --> block0
+  block0 --> return
+

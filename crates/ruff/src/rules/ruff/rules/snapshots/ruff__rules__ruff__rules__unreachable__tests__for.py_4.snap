@@ -1,0 +1,22 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func():
+%%     for i in range(12):
+%%         continue
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["continue\n"]
+  block2["for i in range(12):
+        continue\n"]
+
+  start --> block2
+  block2 -- "range(12)" --> block1
+  block2 -- "else" --> block0
+  block1 --> block2
+  block0 --> return
+
