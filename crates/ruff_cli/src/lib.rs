@@ -58,7 +58,7 @@ enum ChangeKind {
 /// Returns `None` if no relevant changes were detected.
 fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
     // If any `.toml` files were modified, return `ChangeKind::Configuration`. Otherwise, return
-    // `ChangeKind::SourceFile` if any `.py`, `.pyi`, or `.pyw` files were modified.
+    // `ChangeKind::SourceFile` if any `.py`, `.pyi`, `.pyw`, or `.ipynb` files were modified.
     let mut source_file = false;
     for path in paths {
         if let Some(suffix) = path.extension() {
@@ -66,7 +66,7 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
                 Some("toml") => {
                     return Some(ChangeKind::Configuration);
                 }
-                Some("py" | "pyi" | "pyw") => source_file = true,
+                Some("py" | "pyi" | "pyw" | "ipynb") => source_file = true,
                 _ => {}
             }
         }
