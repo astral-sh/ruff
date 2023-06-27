@@ -1,6 +1,6 @@
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use std::cmp::Reverse;
+use std::cmp::{Ordering, Reverse};
 use std::collections::hash_map::Keys;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::Debug;
@@ -118,26 +118,77 @@ where
     }
 }
 
-pub(super) fn topological_sort<N, E>(graph: &Graph<N, E>) -> Vec<N>
+struct NodeWrapper<'a, N, Nc>
 where
-    N: Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    E: Copy + Ord + PartialOrd,
+    Nc: Fn(&N, &N) -> Ordering,
+{
+    node: N,
+    node_cost: &'a Nc,
+}
+
+impl<'a, N, Nc> PartialEq<Self> for NodeWrapper<'a, N, Nc>
+where
+    Nc: Fn(&N, &N) -> Ordering,
+{
+    fn eq(&self, other: &Self) -> bool {
+        (self.node_cost)(&self.node, &other.node) == Ordering::Equal
+    }
+}
+
+impl<'a, N, Nc> Eq for NodeWrapper<'a, N, Nc> where Nc: Fn(&N, &N) -> Ordering {}
+
+impl<'a, N, Nc> PartialOrd<Self> for NodeWrapper<'a, N, Nc>
+where
+    Nc: Fn(&N, &N) -> Ordering,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some((self.node_cost)(&self.node, &other.node))
+    }
+}
+
+impl<'a, N, Nc> Ord for NodeWrapper<'a, N, Nc>
+where
+    Nc: Fn(&N, &N) -> Ordering,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.node_cost)(&self.node, &other.node)
+    }
+}
+
+pub(super) fn topological_sort<N, E, Nc, Ec>(
+    graph: &Graph<N, E>,
+    node_cost: Nc,
+    edge_cost: Ec,
+) -> Vec<N>
+where
+    N: Copy + Eq + Hash + PartialEq,
+    E: Copy,
+    Nc: Fn(&N, &N) -> Ordering,
+    Ec: Fn(&(N, N, E), &(N, N, E)) -> Ordering,
 {
     let mut graph = graph.clone();
-    break_cycles(&mut graph);
+    break_cycles(&mut graph, edge_cost);
 
-    let mut pending: BinaryHeap<Reverse<N>> = graph
+    let mut pending: BinaryHeap<Reverse<NodeWrapper<N, Nc>>> = graph
         .nodes()
         .filter(|node| graph.incoming_neighbors(node).unwrap().next().is_none())
-        .map(|node| Reverse(*node))
+        .map(|node| {
+            Reverse(NodeWrapper {
+                node: *node,
+                node_cost: &node_cost,
+            })
+        })
         .collect();
 
     let mut result: Vec<N> = Vec::new();
     loop {
-        let Some(Reverse(node)) = pending.pop() else {break};
+        let Some(Reverse(NodeWrapper { node, .. })) = pending.pop() else {break};
         for neighbor in graph.outgoing_neighbors(&node).unwrap() {
             if graph.incoming_neighbor_count(neighbor) == 1 {
-                pending.push(Reverse(*neighbor));
+                pending.push(Reverse(NodeWrapper {
+                    node: *neighbor,
+                    node_cost: &node_cost,
+                }));
             }
         }
         graph.remove_node(&node);
@@ -148,22 +199,24 @@ where
     result
 }
 
-fn break_cycles<N, E>(graph: &mut Graph<N, E>)
+fn break_cycles<N, E, Ec>(graph: &mut Graph<N, E>, edge_cost: Ec)
 where
     N: Copy + Eq + Hash + PartialEq,
-    E: Ord + PartialOrd,
+    E: Copy,
+    Ec: Fn(&(N, N, E), &(N, N, E)) -> Ordering,
 {
     let mut subgraph: HashSet<_> = graph.nodes().copied().collect();
     loop {
         let Some(cycle) = find_cycle_in_subgraph(graph, &mut subgraph) else { return };
 
         let cycle_len = cycle.len();
-        let (source, target) = cycle
+        let (source, target, _) = cycle
             .into_iter()
             .cycle()
             .tuple_windows()
             .take(cycle_len + 1)
-            .max_by_key(|(source, target)| graph.edge(source, target))
+            .map(|(source, target)| (source, target, *graph.edge(&source, &target).unwrap()))
+            .max_by(|edge1, edge2| edge_cost(edge1, edge2))
             .unwrap();
 
         graph.remove_edge(&source, &target);
@@ -320,7 +373,7 @@ mod tests {
     #[test]
     fn break_cycles_with_empty_graph() {
         let mut graph = Graph::<&str, i32>::new();
-        break_cycles(&mut graph);
+        break_cycles(&mut graph, |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2));
         assert_eq!(graph.node_count(), 0);
     }
 
@@ -330,7 +383,7 @@ mod tests {
         graph.insert_edge("a", "b", 1);
         graph.insert_edge("b", "c", 2);
         graph.insert_edge("c", "d", 3);
-        break_cycles(&mut graph);
+        break_cycles(&mut graph, |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2));
         assert_eq!(graph.edge(&"a", &"b"), Some(&1));
         assert_eq!(graph.edge(&"b", &"c"), Some(&2));
         assert_eq!(graph.edge(&"c", &"d"), Some(&3));
@@ -342,7 +395,7 @@ mod tests {
         graph.insert_edge("a", "b", 1);
         graph.insert_edge("b", "c", 2);
         graph.insert_edge("c", "a", 3);
-        break_cycles(&mut graph);
+        break_cycles(&mut graph, |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2));
         assert_eq!(graph.edge(&"a", &"b"), Some(&1));
         assert_eq!(graph.edge(&"b", &"c"), Some(&2));
         assert_eq!(graph.edge(&"c", &"a"), None);
@@ -352,14 +405,21 @@ mod tests {
     fn break_cycles_with_self_cycle() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_edge("a", "a", 1);
-        break_cycles(&mut graph);
+        break_cycles(&mut graph, |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2));
         assert_eq!(graph.edge(&"a", &"a"), None);
     }
 
     #[test]
     fn topological_sort_with_empty_graph() {
         let mut graph = Graph::<&str, i32>::new();
-        assert_eq!(topological_sort(&graph), [] as [&str; 0]);
+        assert_eq!(
+            topological_sort(
+                &graph,
+                |node1, node2| node1.cmp(node2),
+                |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2)
+            ),
+            [] as [&str; 0]
+        );
     }
 
     #[test]
@@ -368,7 +428,14 @@ mod tests {
         graph.insert_edge("a", "b", 1);
         graph.insert_edge("b", "c", 2);
         graph.insert_edge("c", "d", 3);
-        assert_eq!(topological_sort(&graph), ["a", "b", "c", "d"]);
+        assert_eq!(
+            topological_sort(
+                &graph,
+                |node1, node2| node1.cmp(node2),
+                |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2)
+            ),
+            ["a", "b", "c", "d"]
+        );
     }
 
     #[test]
@@ -377,14 +444,28 @@ mod tests {
         graph.insert_edge("a", "b", 3);
         graph.insert_edge("b", "c", 2);
         graph.insert_edge("c", "a", 1);
-        assert_eq!(topological_sort(&graph), ["b", "c", "a"]);
+        assert_eq!(
+            topological_sort(
+                &graph,
+                |node1, node2| node1.cmp(node2),
+                |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2)
+            ),
+            ["b", "c", "a"]
+        );
     }
 
     #[test]
     fn topological_sort_with_self_cycle() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_edge("a", "a", 1);
-        assert_eq!(topological_sort(&graph), ["a"]);
+        assert_eq!(
+            topological_sort(
+                &graph,
+                |node1, node2| node1.cmp(node2),
+                |(_, _, edge1), (_, _, edge2)| edge1.cmp(edge2)
+            ),
+            ["a"]
+        );
     }
 
     #[test]
@@ -393,7 +474,11 @@ mod tests {
         for node in 0..100 {
             graph.insert_node(node);
         }
-        assert_eq!(topological_sort(&graph), (0..100).collect::<Vec<_>>())
+        assert_eq!(
+            topological_sort(&graph, i32::cmp, |(_, _, edge1), (_, _, edge2)| edge1
+                .cmp(edge2)),
+            (0..100).collect::<Vec<_>>()
+        )
     }
 
     #[test]
@@ -402,6 +487,10 @@ mod tests {
         for node in 0..100 {
             graph.insert_edge(node, node, 1);
         }
-        assert_eq!(topological_sort(&graph), (0..100).collect::<Vec<_>>())
+        assert_eq!(
+            topological_sort(&graph, i32::cmp, |(_, _, edge1), (_, _, edge2)| edge1
+                .cmp(edge2)),
+            (0..100).collect::<Vec<_>>()
+        )
     }
 }
