@@ -10,11 +10,10 @@ use crate::execution_environment::ExecutionEnvironment;
 use crate::implicit_imports::ImplicitImport;
 use crate::import_result::{ImportResult, ImportType};
 use crate::module_descriptor::ImportModuleDescriptor;
-use crate::search::get_typeshed_root;
 use crate::{host, implicit_imports, native_module, py_typed, search};
 
 #[allow(clippy::fn_params_excessive_bools)]
-fn _resolve_absolute_import(
+fn resolve_module_descriptor(
     root: &Path,
     module_descriptor: &ImportModuleDescriptor,
     allow_partial: bool,
@@ -220,7 +219,7 @@ fn resolve_absolute_import(
         // Search for packaged stubs first. PEP 561 indicates that package authors can ship
         // stubs separately from the package implementation by appending `-stubs` to its
         // top-level directory name.
-        let import_result = _resolve_absolute_import(
+        let import_result = resolve_module_descriptor(
             root,
             module_descriptor,
             allow_partial,
@@ -240,7 +239,7 @@ fn resolve_absolute_import(
     }
 
     // Search for a "real" package.
-    _resolve_absolute_import(
+    resolve_module_descriptor(
         root,
         module_descriptor,
         allow_partial,
@@ -257,7 +256,7 @@ fn resolve_absolute_import(
 ///
 /// For example, prefers local imports over third-party imports, and stubs over
 /// non-stubs.
-fn _resolve_best_absolute_import<Host: host::Host>(
+fn resolve_best_absolute_import<Host: host::Host>(
     execution_environment: &ExecutionEnvironment,
     module_descriptor: &ImportModuleDescriptor,
     allow_pyi: bool,
@@ -293,7 +292,7 @@ fn _resolve_best_absolute_import<Host: host::Host>(
                         .as_os_str()
                         .is_empty()
                 {
-                    if _is_namespace_package_resolved(
+                    if is_namespace_package_resolved(
                         module_descriptor,
                         &typings_import.implicit_imports,
                     ) {
@@ -342,7 +341,7 @@ fn _resolve_best_absolute_import<Host: host::Host>(
         );
         local_import.import_type = ImportType::Local;
 
-        best_result_so_far = Some(_pick_best_import(
+        best_result_so_far = Some(pick_best_import(
             best_result_so_far,
             local_import,
             module_descriptor,
@@ -350,7 +349,7 @@ fn _resolve_best_absolute_import<Host: host::Host>(
     }
 
     // Look for third-party imports in Python's `sys` path.
-    for search_path in search::find_python_search_paths(config, host) {
+    for search_path in search::python_search_paths(config, host) {
         debug!("Looking in Python search path: {}", search_path.display());
 
         let mut third_party_import = resolve_absolute_import(
@@ -364,7 +363,7 @@ fn _resolve_best_absolute_import<Host: host::Host>(
         );
         third_party_import.import_type = ImportType::ThirdParty;
 
-        best_result_so_far = Some(_pick_best_import(
+        best_result_so_far = Some(pick_best_import(
             best_result_so_far,
             third_party_import,
             module_descriptor,
@@ -374,7 +373,7 @@ fn _resolve_best_absolute_import<Host: host::Host>(
     // If a library is fully `py.typed`, prefer the current result. There's one exception:
     // we're executing from `typeshed` itself. In that case, use the `typeshed` lookup below,
     // rather than favoring `py.typed` libraries.
-    if let Some(typeshed_root) = get_typeshed_root(config, host) {
+    if let Some(typeshed_root) = search::typeshed_root(config, host) {
         debug!(
             "Looking in typeshed root directory: {}",
             typeshed_root.display()
@@ -392,7 +391,7 @@ fn _resolve_best_absolute_import<Host: host::Host>(
         // Check for a stdlib typeshed file.
         debug!("Looking for typeshed stdlib path: {}", import_name);
         if let Some(mut typeshed_stdilib_import) =
-            _find_typeshed_path(module_descriptor, true, config, host)
+            find_typeshed_path(module_descriptor, true, config, host)
         {
             typeshed_stdilib_import.is_stdlib_typeshed_file = true;
             return Some(typeshed_stdilib_import);
@@ -401,11 +400,11 @@ fn _resolve_best_absolute_import<Host: host::Host>(
         // Check for a third-party typeshed file.
         debug!("Looking for typeshed third-party path: {}", import_name);
         if let Some(mut typeshed_third_party_import) =
-            _find_typeshed_path(module_descriptor, false, config, host)
+            find_typeshed_path(module_descriptor, false, config, host)
         {
             typeshed_third_party_import.is_third_party_typeshed_file = true;
 
-            best_result_so_far = Some(_pick_best_import(
+            best_result_so_far = Some(pick_best_import(
                 best_result_so_far,
                 typeshed_third_party_import,
                 module_descriptor,
@@ -423,7 +422,7 @@ fn _resolve_best_absolute_import<Host: host::Host>(
 /// file, so the only way that symbols can be resolved is if submodules
 /// are present. If specific symbols were requested, make sure they
 /// are all satisfied by submodules (as listed in the implicit imports).
-fn _is_namespace_package_resolved(
+fn is_namespace_package_resolved(
     module_descriptor: &ImportModuleDescriptor,
     implicit_imports: &HashMap<String, ImplicitImport>,
 ) -> bool {
@@ -444,7 +443,7 @@ fn _is_namespace_package_resolved(
 /// Finds the `typeshed` path for the given module descriptor.
 ///
 /// Supports both standard library and third-party `typeshed` lookups.
-fn _find_typeshed_path<Host: host::Host>(
+fn find_typeshed_path<Host: host::Host>(
     module_descriptor: &ImportModuleDescriptor,
     is_std_lib: bool,
     config: &Config,
@@ -459,12 +458,12 @@ fn _find_typeshed_path<Host: host::Host>(
     let mut typeshed_paths = vec![];
 
     if is_std_lib {
-        if let Some(path) = search::get_stdlib_typeshed_path(config, host) {
+        if let Some(path) = search::stdlib_typeshed_path(config, host) {
             typeshed_paths.push(path);
         }
     } else {
         if let Some(paths) =
-            search::get_third_party_typeshed_package_paths(module_descriptor, config, host)
+            search::third_party_typeshed_package_paths(module_descriptor, config, host)
         {
             typeshed_paths.extend(paths);
         }
@@ -498,7 +497,7 @@ fn _find_typeshed_path<Host: host::Host>(
 
 /// Given a current "best" import and a newly discovered result, returns the
 /// preferred result.
-fn _pick_best_import(
+fn pick_best_import(
     best_import_so_far: Option<ImportResult>,
     new_import: ImportResult,
     module_descriptor: &ImportModuleDescriptor,
@@ -541,11 +540,11 @@ fn _pick_best_import(
         // imported symbols.
         if best_import_so_far.is_namespace_package && new_import.is_namespace_package {
             if !module_descriptor.imported_symbols.is_empty() {
-                if !_is_namespace_package_resolved(
+                if !is_namespace_package_resolved(
                     module_descriptor,
                     &best_import_so_far.implicit_imports,
                 ) {
-                    if _is_namespace_package_resolved(
+                    if is_namespace_package_resolved(
                         module_descriptor,
                         &new_import.implicit_imports,
                     ) {
@@ -614,7 +613,7 @@ fn _pick_best_import(
 }
 
 /// Resolve a relative import.
-fn _resolve_relative_import(
+fn resolve_relative_import(
     source_file: &Path,
     module_descriptor: &ImportModuleDescriptor,
 ) -> Option<ImportResult> {
@@ -654,7 +653,7 @@ fn _resolve_relative_import(
 }
 
 /// Resolve an absolute or relative import.
-fn _resolve_import_strict<Host: host::Host>(
+fn resolve_import_strict<Host: host::Host>(
     source_file: &Path,
     execution_environment: &ExecutionEnvironment,
     module_descriptor: &ImportModuleDescriptor,
@@ -666,7 +665,7 @@ fn _resolve_import_strict<Host: host::Host>(
     if module_descriptor.leading_dots > 0 {
         debug!("Resolving relative import for: {import_name}");
 
-        let relative_import = _resolve_relative_import(source_file, module_descriptor);
+        let relative_import = resolve_relative_import(source_file, module_descriptor);
 
         if let Some(mut relative_import) = relative_import {
             relative_import.is_relative = true;
@@ -675,7 +674,7 @@ fn _resolve_import_strict<Host: host::Host>(
     } else {
         debug!("Resolving best absolute import for: {import_name}");
 
-        let best_import = _resolve_best_absolute_import(
+        let best_import = resolve_best_absolute_import(
             execution_environment,
             module_descriptor,
             true,
@@ -688,7 +687,7 @@ fn _resolve_import_strict<Host: host::Host>(
                 debug!("Resolving best non-stub absolute import for: {import_name}");
 
                 best_import.non_stub_import_result = Some(Box::new(
-                    _resolve_best_absolute_import(
+                    resolve_best_absolute_import(
                         execution_environment,
                         module_descriptor,
                         false,
@@ -706,6 +705,15 @@ fn _resolve_import_strict<Host: host::Host>(
 }
 
 /// Resolves an import, given the current file and the import descriptor.
+///
+/// The algorithm is as follows:
+///
+/// 1. If the import is relative, convert it to an absolute import.
+/// 2. Find the "best" match for the import, allowing stub files. Search local imports, any
+///    configured search paths, the Python path, the typeshed path, etc.
+/// 3. If a stub file was found, find the "best" match for the import, disallowing stub files.
+/// 4. If the import wasn't resolved, try to resolve it in the parent directory, then the parent's
+///    parent, and so on, until the import root is reached.
 fn resolve_import<Host: host::Host>(
     source_file: &Path,
     execution_environment: &ExecutionEnvironment,
@@ -713,7 +721,7 @@ fn resolve_import<Host: host::Host>(
     config: &Config,
     host: &Host,
 ) -> ImportResult {
-    let import_result = _resolve_import_strict(
+    let import_result = resolve_import_strict(
         source_file,
         execution_environment,
         module_descriptor,
@@ -775,48 +783,61 @@ mod tests {
 
     use crate::config::Config;
     use crate::execution_environment::ExecutionEnvironment;
+    use crate::host;
     use crate::import_result::{ImportResult, ImportType};
     use crate::module_descriptor::ImportModuleDescriptor;
     use crate::python_platform::PythonPlatform;
     use crate::python_version::PythonVersion;
     use crate::resolver::resolve_import;
-    use crate::{host, SITE_PACKAGES};
 
-    struct PythonFile {
-        path: PathBuf,
-        content: String,
+    /// Create a file at the given path with the given content.
+    fn create(path: PathBuf, content: &str) -> io::Result<PathBuf> {
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent)?;
+        }
+        let mut f = File::create(&path)?;
+        f.write_all(content.as_bytes())?;
+        f.sync_all()?;
+
+        Ok(path)
     }
 
-    impl PythonFile {
-        fn new(path: impl Into<PathBuf>, content: impl Into<String>) -> Self {
-            Self {
-                path: path.into(),
-                content: content.into(),
-            }
-        }
-
-        fn create(&self, dir: impl AsRef<Path>) -> io::Result<PathBuf> {
-            let file_path = dir.as_ref().join(self.path.as_path());
-            if let Some(parent) = file_path.parent() {
-                create_dir_all(parent)?;
-            }
-            let mut f = File::create(&file_path)?;
-            f.write_all(self.content.as_bytes())?;
-            f.sync_all()?;
-
-            Ok(file_path)
-        }
+    /// Create an empty file at the given path.
+    fn empty(path: PathBuf) -> io::Result<PathBuf> {
+        create(path, "")
     }
 
-    fn _resolve<T: Into<PathBuf>>(
+    /// Create a partial `py.typed` file at the given path.
+    fn partial(path: PathBuf) -> io::Result<PathBuf> {
+        create(path, "partial\n")
+    }
+
+    /// Create a `py.typed` file at the given path.
+    fn typed(path: PathBuf) -> io::Result<PathBuf> {
+        create(path, "# typed")
+    }
+
+    #[derive(Debug, Default)]
+    struct ResolverOptions {
+        extra_paths: Vec<PathBuf>,
+        library: Option<PathBuf>,
+        stub_path: Option<PathBuf>,
+        typeshed_path: Option<PathBuf>,
+    }
+
+    fn resolve_options(
         source_file: impl AsRef<Path>,
         name: &str,
-        root: T,
-        extra_paths: Vec<PathBuf>,
-        library: Option<T>,
-        stub_path: Option<T>,
-        typeshed_path: Option<T>,
+        root: impl Into<PathBuf>,
+        options: ResolverOptions,
     ) -> ImportResult {
+        let ResolverOptions {
+            extra_paths,
+            library,
+            stub_path,
+            typeshed_path,
+        } = options;
+
         let execution_environment = ExecutionEnvironment {
             root: root.into(),
             python_version: PythonVersion::Py37,
@@ -837,16 +858,14 @@ mod tests {
         };
 
         let config = Config {
+            typeshed_path,
+            stub_path,
             venv_path: None,
             venv: None,
-            python_path: None,
-            typeshed_path: typeshed_path.map(Into::into),
-            stub_path: stub_path.map(Into::into),
-            default_python_version: None,
         };
 
         let host = host::StaticHost::new(if let Some(library) = library {
-            vec![library.into()]
+            vec![library]
         } else {
             Vec::new()
         });
@@ -860,94 +879,32 @@ mod tests {
         )
     }
 
-    fn resolve<T: Into<PathBuf>>(
-        source_file: impl AsRef<Path>,
-        name: &str,
-        root: T,
-    ) -> ImportResult {
-        _resolve(source_file, name, root, Vec::new(), None, None, None)
-    }
-
-    fn resolve_with_extra_paths<T: Into<PathBuf>>(
-        source_file: impl AsRef<Path>,
-        name: &str,
-        root: T,
-        extra_paths: Vec<PathBuf>,
-    ) -> ImportResult {
-        _resolve(source_file, name, root, extra_paths, None, None, None)
-    }
-
-    fn resolve_with_library<T: Into<PathBuf>>(
-        source_file: impl AsRef<Path>,
-        name: &str,
-        root: T,
-        library: T,
-    ) -> ImportResult {
-        _resolve(
-            source_file,
-            name,
-            root,
-            Vec::new(),
-            Some(library),
-            None,
-            None,
-        )
-    }
-
-    fn resolve_with_stub_path<T: Into<PathBuf>>(
-        source_file: impl AsRef<Path>,
-        name: &str,
-        root: T,
-        library: T,
-        stub_path: T,
-    ) -> ImportResult {
-        _resolve(
-            source_file,
-            name,
-            root,
-            Vec::new(),
-            Some(library),
-            Some(stub_path),
-            None,
-        )
-    }
-
-    fn resolve_with_typeshed_path<T: Into<PathBuf>>(
-        source_file: impl AsRef<Path>,
-        name: &str,
-        root: T,
-        library: T,
-        typeshed_path: T,
-    ) -> ImportResult {
-        _resolve(
-            source_file,
-            name,
-            root,
-            Vec::new(),
-            Some(library),
-            None,
-            Some(typeshed_path),
-        )
+    fn setup() {
+        env_logger::builder().is_test(true).try_init().ok();
     }
 
     #[test]
     fn partial_stub_file_exists() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let partial_stub_pyi =
-            PythonFile::new("myLib-stubs/partialStub.pyi", "def test(): ...").create(&library)?;
-        PythonFile::new("myLib-stubs/py.typed", "partial\n").create(&library)?;
-        let partial_stub_py =
-            PythonFile::new("myLib/partialStub.py", "def test(): ...").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_library(
+        partial(library.join("myLib-stubs/py.typed"))?;
+        let partial_stub_pyi = empty(library.join("myLib-stubs").join("partialStub.pyi"))?;
+        let partial_stub_py = empty(library.join("myLib/partialStub.py"))?;
+
+        let result = resolve_options(
             partial_stub_py,
             "myLib.partialStub",
-            dir.path(),
-            library.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                ..Default::default()
+            },
         );
 
         assert!(result.is_import_found);
@@ -965,19 +922,27 @@ mod tests {
 
     #[test]
     fn partial_stub_init_exists() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        PythonFile::new("myLib-stubs/py.typed", "partial\n").create(&library)?;
-        let partial_stub_init_pyi =
-            PythonFile::new("myLib-stubs/__init__.pyi", "def test(): ...").create(&library)?;
-        let partial_stub_init_py =
-            PythonFile::new("myLib/__init__.py", "def test(): ...").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result =
-            resolve_with_library(partial_stub_init_py, "myLib", dir.path(), library.as_path());
+        partial(library.join("myLib-stubs/py.typed"))?;
+        let partial_stub_init_pyi = empty(library.join("myLib-stubs/__init__.pyi"))?;
+        let partial_stub_init_py = empty(library.join("myLib/__init__.py"))?;
+
+        let result = resolve_options(
+            partial_stub_init_py,
+            "myLib",
+            root,
+            ResolverOptions {
+                library: Some(library),
+                ..Default::default()
+            },
+        );
 
         assert!(result.is_import_found);
         assert!(result.is_stub_file);
@@ -994,22 +959,30 @@ mod tests {
 
     #[test]
     fn side_by_side_files() -> io::Result<()> {
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let my_file = PythonFile::new("myFile.py", "# not used").create(dir.path())?;
-        let side_by_side_stub_file =
-            PythonFile::new("myLib-stubs/partialStub.pyi", "def test(): ...").create(&library)?;
-        PythonFile::new("myLib-stubs/py.typed", "partial\n").create(&library)?;
-        PythonFile::new("myLib/partialStub.pyi", "# empty").create(&library)?;
-        PythonFile::new("myLib/partialStub.py", "def test(): pass").create(&library)?;
-        let partial_stub_file =
-            PythonFile::new("myLib-stubs/partialStub2.pyi", "def test(): ...").create(&library)?;
-        PythonFile::new("myLib/partialStub2.py", "def test(): pass").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
+
+        partial(library.join("myLib-stubs/py.typed"))?;
+        empty(library.join("myLib/partialStub.pyi"))?;
+        empty(library.join("myLib/partialStub.py"))?;
+        empty(library.join("myLib/partialStub2.py"))?;
+        let my_file = empty(root.join("myFile.py"))?;
+        let side_by_side_stub_file = empty(library.join("myLib-stubs/partialStub.pyi"))?;
+        let partial_stub_file = empty(library.join("myLib-stubs/partialStub2.pyi"))?;
 
         // Stub package wins over original package (per PEP 561 rules).
-        let side_by_side_result =
-            resolve_with_library(&my_file, "myLib.partialStub", dir.path(), &library);
+        let side_by_side_result = resolve_options(
+            &my_file,
+            "myLib.partialStub",
+            root,
+            ResolverOptions {
+                library: Some(library.clone()),
+                ..Default::default()
+            },
+        );
         assert!(side_by_side_result.is_import_found);
         assert!(side_by_side_result.is_stub_file);
         assert_eq!(
@@ -1018,8 +991,15 @@ mod tests {
         );
 
         // Side by side stub doesn't completely disable partial stub.
-        let partial_stub_result =
-            resolve_with_library(&my_file, "myLib.partialStub2", dir.path(), &library);
+        let partial_stub_result = resolve_options(
+            &my_file,
+            "myLib.partialStub2",
+            root,
+            ResolverOptions {
+                library: Some(library),
+                ..Default::default()
+            },
+        );
         assert!(partial_stub_result.is_import_found);
         assert!(partial_stub_result.is_stub_file);
         assert_eq!(
@@ -1032,21 +1012,26 @@ mod tests {
 
     #[test]
     fn stub_package() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        PythonFile::new("myLib-stubs/stub.pyi", "# empty").create(&library)?;
-        PythonFile::new("myLib-stubs/__init__.pyi", "# empty").create(&library)?;
-        let partial_stub_py =
-            PythonFile::new("myLib/partialStub.py", "def test(): ...").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_library(
+        empty(library.join("myLib-stubs/stub.pyi"))?;
+        empty(library.join("myLib-stubs/__init__.pyi"))?;
+        let partial_stub_py = empty(library.join("myLib/partialStub.py"))?;
+
+        let result = resolve_options(
             partial_stub_py,
             "myLib.partialStub",
-            dir.path(),
-            library.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                ..Default::default()
+            },
         );
 
         // If fully typed stub package exists, that wins over the real package.
@@ -1057,20 +1042,25 @@ mod tests {
 
     #[test]
     fn stub_namespace_package() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        PythonFile::new("myLib-stubs/stub.pyi", "# empty").create(&library)?;
-        let partial_stub_py =
-            PythonFile::new("myLib/partialStub.py", "def test(): ...").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_library(
+        empty(library.join("myLib-stubs/stub.pyi"))?;
+        let partial_stub_py = empty(library.join("myLib/partialStub.py"))?;
+
+        let result = resolve_options(
             partial_stub_py.clone(),
             "myLib.partialStub",
-            dir.path(),
-            library.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                ..Default::default()
+            },
         );
 
         // If fully typed stub package exists, that wins over the real package.
@@ -1083,24 +1073,29 @@ mod tests {
 
     #[test]
     fn stub_in_typing_folder_over_partial_stub_package() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let typing_folder = dir.path().join("typing");
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
+        let typing_folder = root.join("typing");
 
-        PythonFile::new("myLib-stubs/py.typed", "partial\n").create(&library)?;
-        PythonFile::new("myLib-stubs/__init__.pyi", "").create(&library)?;
-        let my_lib_pyi = PythonFile::new("myLib.pyi", "# empty").create(&typing_folder)?;
-        let my_lib_init_py =
-            PythonFile::new("myLib/__init__.py", "def test(): pass").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_stub_path(
+        partial(library.join("myLib-stubs/py.typed"))?;
+        empty(library.join("myLib-stubs/__init__.pyi"))?;
+        let my_lib_pyi = empty(typing_folder.join("myLib.pyi"))?;
+        let my_lib_init_py = empty(library.join("myLib/__init__.py"))?;
+
+        let result = resolve_options(
             my_lib_init_py,
             "myLib",
-            dir.path(),
-            library.as_path(),
-            typing_folder.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                stub_path: Some(typing_folder),
+                ..Default::default()
+            },
         );
 
         // If the package exists in typing folder, that gets picked up first (so we resolve to
@@ -1114,24 +1109,28 @@ mod tests {
 
     #[test]
     fn partial_stub_package_in_typing_folder() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let typing_folder = dir.path().join("typing");
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
+        let typing_folder = root.join("typing");
 
-        PythonFile::new("myLib-stubs/py.typed", "partial\n").create(&typing_folder)?;
-        let my_lib_stubs_init_pyi = PythonFile::new("myLib-stubs/__init__.pyi", "def test(): ...")
-            .create(&typing_folder)?;
-        let my_lib_init_py =
-            PythonFile::new("myLib/__init__.py", "def test(): pass").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_stub_path(
+        partial(typing_folder.join("myLib-stubs/py.typed"))?;
+        let my_lib_stubs_init_pyi = empty(typing_folder.join("myLib-stubs/__init__.pyi"))?;
+        let my_lib_init_py = empty(library.join("myLib/__init__.py"))?;
+
+        let result = resolve_options(
             my_lib_init_py,
             "myLib",
-            dir.path(),
-            library.as_path(),
-            typing_folder.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                stub_path: Some(typing_folder),
+                ..Default::default()
+            },
         );
 
         // If the package exists in typing folder, that gets picked up first (so we resolve to
@@ -1145,25 +1144,29 @@ mod tests {
 
     #[test]
     fn typeshed_folder() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
-        let typeshed_folder = dir.path().join("ts");
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
+        let typeshed_folder = root.join("ts");
 
-        PythonFile::new("myLib-stubs/py.typed", "partial\n").create(&library)?;
-        let my_lib_stubs_init_pyi =
-            PythonFile::new("myLib-stubs/__init__.pyi", "def test(): ...").create(&library)?;
-        PythonFile::new("stubs/myLibPackage/myLib.pyi", "# empty").create(&typeshed_folder)?;
-        let my_lib_init_py =
-            PythonFile::new("myLib/__init__.py", "def test(): pass").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_typeshed_path(
+        empty(typeshed_folder.join("stubs/myLibPackage/myLib.pyi"))?;
+        partial(library.join("myLib-stubs/py.typed"))?;
+        let my_lib_stubs_init_pyi = empty(library.join("myLib-stubs/__init__.pyi"))?;
+        let my_lib_init_py = empty(library.join("myLib/__init__.py"))?;
+
+        let result = resolve_options(
             my_lib_init_py,
             "myLib",
-            dir.path(),
-            library.as_path(),
-            typeshed_folder.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                typeshed_path: Some(typeshed_folder),
+                ..Default::default()
+            },
         );
 
         // Stub packages win over typeshed.
@@ -1176,18 +1179,28 @@ mod tests {
 
     #[test]
     fn py_typed_file() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let partial_stub_init_pyi =
-            PythonFile::new("myLib-stubs/__init__.pyi", "def test(): ...").create(&library)?;
-        PythonFile::new("myLib-stubs/py.typed", "partial\n").create(&library)?;
-        PythonFile::new("myLib/__init__.py", "def test(): pass").create(&library)?;
-        let package_py_typed = PythonFile::new("myLib/py.typed", "# typed").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_library(package_py_typed, "myLib", dir.path(), library.as_path());
+        empty(library.join("myLib/__init__.py"))?;
+        partial(library.join("myLib-stubs/py.typed"))?;
+        let partial_stub_init_pyi = empty(library.join("myLib-stubs/__init__.pyi"))?;
+        let package_py_typed = typed(library.join("myLib/py.typed"))?;
+
+        let result = resolve_options(
+            package_py_typed,
+            "myLib",
+            root,
+            ResolverOptions {
+                library: Some(library),
+                ..Default::default()
+            },
+        );
 
         // Partial stub package always overrides original package.
         assert!(result.is_import_found);
@@ -1199,23 +1212,28 @@ mod tests {
 
     #[test]
     fn py_typed_library() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
-        let typeshed_folder = dir.path().join("ts");
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
+        let typeshed_folder = root.join("ts");
 
-        let init_py = PythonFile::new("os/__init__.py", "def test(): ...").create(&library)?;
-        PythonFile::new("os/py.typed", "").create(&library)?;
-        let typeshed_init_pyi =
-            PythonFile::new("stubs/os/os/__init__.pyi", "# empty").create(&typeshed_folder)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_typeshed_path(
+        typed(library.join("os/py.typed"))?;
+        let init_py = empty(library.join("os/__init__.py"))?;
+        let typeshed_init_pyi = empty(typeshed_folder.join("stubs/os/os/__init__.pyi"))?;
+
+        let result = resolve_options(
             typeshed_init_pyi,
             "os",
-            dir.path(),
-            library.as_path(),
-            typeshed_folder.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                typeshed_path: Some(typeshed_folder),
+                ..Default::default()
+            },
         );
 
         assert!(result.is_import_found);
@@ -1226,22 +1244,27 @@ mod tests {
 
     #[test]
     fn non_py_typed_library() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
-        let typeshed_folder = dir.path().join("ts");
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
+        let typeshed_folder = root.join("ts");
 
-        PythonFile::new("os/__init__.py", "def test(): ...").create(&library)?;
-        let typeshed_init_pyi =
-            PythonFile::new("stubs/os/os/__init__.pyi", "# empty").create(&typeshed_folder)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve_with_typeshed_path(
+        empty(library.join("os/__init__.py"))?;
+        let typeshed_init_pyi = empty(typeshed_folder.join("stubs/os/os/__init__.pyi"))?;
+
+        let result = resolve_options(
             typeshed_init_pyi.clone(),
             "os",
-            dir.path(),
-            library.as_path(),
-            typeshed_folder.as_path(),
+            root,
+            ResolverOptions {
+                library: Some(library),
+                typeshed_path: Some(typeshed_folder),
+                ..Default::default()
+            },
         );
 
         assert!(result.is_import_found);
@@ -1253,14 +1276,15 @@ mod tests {
 
     #[test]
     fn import_side_by_side_file_root() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let file1 = PythonFile::new("file1.py", "import file1").create(&dir)?;
-        let file2 = PythonFile::new("file2.py", "import file2").create(&dir)?;
+        let file1 = empty(root.join("file1.py"))?;
+        let file2 = empty(root.join("file2.py"))?;
 
-        let result = resolve(file2, "file1", dir.path());
+        let result = resolve_options(file2, "file1", root, ResolverOptions::default());
 
         assert!(result.is_import_found);
         assert_eq!(result.import_type, ImportType::Local);
@@ -1271,15 +1295,16 @@ mod tests {
 
     #[test]
     fn import_side_by_side_file_sub_folder() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let test_init = PythonFile::new("test/__init__.py", "").create(&dir)?;
-        let test_file1 = PythonFile::new("test/file1.py", "import file1").create(&dir)?;
-        let test_file2 = PythonFile::new("test/file2.py", "import file2").create(&dir)?;
+        let test_init = empty(root.join("test/__init__.py"))?;
+        let test_file1 = empty(root.join("test/file1.py"))?;
+        let test_file2 = empty(root.join("test/file2.py"))?;
 
-        let result = resolve(test_file2, "test.file1", dir.path());
+        let result = resolve_options(test_file2, "test.file1", root, ResolverOptions::default());
 
         assert!(result.is_import_found);
         assert_eq!(result.import_type, ImportType::Local);
@@ -1290,15 +1315,21 @@ mod tests {
 
     #[test]
     fn import_side_by_side_file_sub_under_src_folder() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let nested_init = PythonFile::new("src/nested/__init__.py", "").create(&dir)?;
-        let nested_file1 = PythonFile::new("src/nested/file1.py", "import file1").create(&dir)?;
-        let nested_file2 = PythonFile::new("src/nested/file2.py", "import file2").create(&dir)?;
+        let nested_init = empty(root.join("src/nested/__init__.py"))?;
+        let nested_file1 = empty(root.join("src/nested/file1.py"))?;
+        let nested_file2 = empty(root.join("src/nested/file2.py"))?;
 
-        let result = resolve(nested_file2, "nested.file1", dir.path());
+        let result = resolve_options(
+            nested_file2,
+            "nested.file1",
+            root,
+            ResolverOptions::default(),
+        );
 
         assert!(result.is_import_found);
         assert_eq!(result.import_type, ImportType::Local);
@@ -1309,16 +1340,15 @@ mod tests {
 
     #[test]
     fn import_file_sub_under_containing_folder() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let nested_file1 =
-            PythonFile::new("src/nested/file1.py", "def test1(): ... ").create(&dir)?;
-        let nested_file2 =
-            PythonFile::new("src/nested/nested2/file2.py", "def test2(): ...").create(&dir)?;
+        let nested_file1 = empty(root.join("src/nested/file1.py"))?;
+        let nested_file2 = empty(root.join("src/nested/nested2/file2.py"))?;
 
-        let result = resolve(nested_file2, "file1", dir.path());
+        let result = resolve_options(nested_file2, "file1", root, ResolverOptions::default());
 
         assert!(result.is_import_found);
         assert_eq!(result.import_type, ImportType::Local);
@@ -1329,15 +1359,18 @@ mod tests {
 
     #[test]
     fn import_side_by_side_file_sub_under_lib_folder() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
-        let library = TempDir::new()?.path().join("lib").join(SITE_PACKAGES);
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        PythonFile::new("myLib/file1.py", "def test1(): ...").create(&library)?;
-        let file2 = PythonFile::new("myLib/file2.py", "def test2(): ...").create(&library)?;
+        let temp_dir = TempDir::new()?;
+        let library = temp_dir.path().join("lib").join("site-packages");
 
-        let result = resolve(file2, "file1", dir.path());
+        empty(library.join("myLib/file1.py"))?;
+        let file2 = empty(library.join("myLib/file2.py"))?;
+
+        let result = resolve_options(file2, "file1", root, ResolverOptions::default());
 
         debug!("result: {:?}", result);
 
@@ -1349,22 +1382,26 @@ mod tests {
     #[test]
     fn nested_namespace_package_1() -> io::Result<()> {
         // See: https://github.com/microsoft/pyright/issues/5089.
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let file = PythonFile::new("package1/a/b/c/d.py", "def f(): pass").create(&dir)?;
-        let package1_init = PythonFile::new("package1/a/__init__.py", "").create(&dir)?;
-        let package2_init = PythonFile::new("package2/a/__init__.py", "").create(&dir)?;
+        let file = empty(root.join("package1/a/b/c/d.py"))?;
+        let package1_init = empty(root.join("package1/a/__init__.py"))?;
+        let package2_init = empty(root.join("package2/a/__init__.py"))?;
 
-        let package1 = dir.path().join("package1");
-        let package2 = dir.path().join("package2");
+        let package1 = root.join("package1");
+        let package2 = root.join("package2");
 
-        let result = resolve_with_extra_paths(
+        let result = resolve_options(
             package2_init,
             "a.b.c.d",
-            dir.path(),
-            vec![package1, package2],
+            root,
+            ResolverOptions {
+                extra_paths: vec![package1, package2],
+                ..Default::default()
+            },
         );
 
         assert!(result.is_import_found);
@@ -1380,22 +1417,26 @@ mod tests {
     #[test]
     fn nested_namespace_package_2() -> io::Result<()> {
         // See: https://github.com/microsoft/pyright/issues/5089.
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let file = PythonFile::new("package1/a/b/c/d.py", "def f(): pass").create(&dir)?;
-        let package1_init = PythonFile::new("package1/a/b/c/__init__.py", "").create(&dir)?;
-        let package2_init = PythonFile::new("package2/a/b/c/__init__.py", "").create(&dir)?;
+        let file = empty(root.join("package1/a/b/c/d.py"))?;
+        let package1_init = empty(root.join("package1/a/b/c/__init__.py"))?;
+        let package2_init = empty(root.join("package2/a/b/c/__init__.py"))?;
 
-        let package1 = dir.path().join("package1");
-        let package2 = dir.path().join("package2");
+        let package1 = root.join("package1");
+        let package2 = root.join("package2");
 
-        let result = resolve_with_extra_paths(
+        let result = resolve_options(
             package2_init,
             "a.b.c.d",
-            dir.path(),
-            vec![package1, package2],
+            root,
+            ResolverOptions {
+                extra_paths: vec![package1, package2],
+                ..Default::default()
+            },
         );
 
         assert!(result.is_import_found);
@@ -1411,21 +1452,25 @@ mod tests {
     #[test]
     fn nested_namespace_package_3() -> io::Result<()> {
         // See: https://github.com/microsoft/pyright/issues/5089.
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        PythonFile::new("package1/a/b/c/d.py", "def f(): pass").create(&dir)?;
-        let package2_init = PythonFile::new("package2/a/__init__.py", "").create(&dir)?;
+        empty(root.join("package1/a/b/c/d.py"))?;
+        let package2_init = empty(root.join("package2/a/__init__.py"))?;
 
-        let package1 = dir.path().join("package1");
-        let package2 = dir.path().join("package2");
+        let package1 = root.join("package1");
+        let package2 = root.join("package2");
 
-        let result = resolve_with_extra_paths(
+        let result = resolve_options(
             package2_init,
             "a.b.c.d",
-            dir.path(),
-            vec![package1, package2],
+            root,
+            ResolverOptions {
+                extra_paths: vec![package1, package2],
+                ..Default::default()
+            },
         );
 
         assert!(!result.is_import_found);
@@ -1436,23 +1481,27 @@ mod tests {
     #[test]
     fn nested_namespace_package_4() -> io::Result<()> {
         // See: https://github.com/microsoft/pyright/issues/5089.
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        PythonFile::new("package1/a/b/__init__.py", "").create(&dir)?;
-        PythonFile::new("package1/a/b/c.py", "def f(): pass").create(&dir)?;
-        PythonFile::new("package2/a/__init__.py", "").create(&dir)?;
-        let package2_a_b_init = PythonFile::new("package2/a/b/__init__.py", "").create(&dir)?;
+        empty(root.join("package1/a/b/__init__.py"))?;
+        empty(root.join("package1/a/b/c.py"))?;
+        empty(root.join("package2/a/__init__.py"))?;
+        let package2_a_b_init = empty(root.join("package2/a/b/__init__.py"))?;
 
-        let package1 = dir.path().join("package1");
-        let package2 = dir.path().join("package2");
+        let package1 = root.join("package1");
+        let package2 = root.join("package2");
 
-        let result = resolve_with_extra_paths(
+        let result = resolve_options(
             package2_a_b_init,
             "a.b.c",
-            dir.path(),
-            vec![package1, package2],
+            root,
+            ResolverOptions {
+                extra_paths: vec![package1, package2],
+                ..Default::default()
+            },
         );
 
         assert!(!result.is_import_found);
@@ -1463,14 +1512,15 @@ mod tests {
     // New tests, don't exist upstream.
     #[test]
     fn relative_import_side_by_side_file_root() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        let file1 = PythonFile::new("file1.py", "def test(): ...").create(&dir)?;
-        let file2 = PythonFile::new("file2.py", "def test(): ...").create(&dir)?;
+        let file1 = empty(root.join("file1.py"))?;
+        let file2 = empty(root.join("file2.py"))?;
 
-        let result = resolve(file2, ".file1", dir.path());
+        let result = resolve_options(file2, ".file1", root, ResolverOptions::default());
 
         assert!(result.is_import_found);
         assert_eq!(result.import_type, ImportType::Local);
@@ -1481,14 +1531,15 @@ mod tests {
 
     #[test]
     fn invalid_relative_import_side_by_side_file_root() -> io::Result<()> {
-        env_logger::builder().is_test(true).try_init().ok();
+        setup();
 
-        let dir = TempDir::new()?;
+        let temp_dir = TempDir::new()?;
+        let root = temp_dir.path();
 
-        PythonFile::new("file1.py", "def test(): ...").create(&dir)?;
-        let file2 = PythonFile::new("file2.py", "def test(): ...").create(&dir)?;
+        empty(root.join("file1.py"))?;
+        let file2 = empty(root.join("file2.py"))?;
 
-        let result = resolve(file2, "..file1", dir.path());
+        let result = resolve_options(file2, "..file1", root, ResolverOptions::default());
 
         assert!(!result.is_import_found);
 
