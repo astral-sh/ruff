@@ -149,7 +149,14 @@ impl Display for DisplayGroupedMessage<'_> {
         if self.show_source {
             use std::fmt::Write;
             let mut padded = PadAdapter::new(f);
-            writeln!(padded, "{}", MessageCodeFrame { message })?;
+            writeln!(
+                padded,
+                "{}",
+                MessageCodeFrame {
+                    message,
+                    jupyter_index: self.jupyter_index
+                }
+            )?;
         }
 
         Ok(())

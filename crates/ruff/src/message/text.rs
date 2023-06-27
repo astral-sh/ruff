@@ -11,7 +11,7 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 
 use crate::fs::relativize_path;
-use crate::jupyter::Notebook;
+use crate::jupyter::{JupyterIndex, Notebook};
 use crate::line_width::{LineWidth, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
@@ -72,13 +72,13 @@ impl Emitter for TextEmitter {
             )?;
 
             let start_location = message.compute_start_location();
-
-            // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location = if let Some(jupyter_index) = context
+            let jupyter_index = context
                 .source_kind(message.filename())
                 .and_then(SourceKind::notebook)
-                .map(Notebook::index)
-            {
+                .map(Notebook::index);
+
+            // Check if we're working on a jupyter notebook and translate positions with cell accordingly
+            let diagnostic_location = if let Some(jupyter_index) = jupyter_index {
                 write!(
                     writer,
                     "cell {cell}{sep}",
@@ -114,7 +114,14 @@ impl Emitter for TextEmitter {
             )?;
 
             if self.flags.contains(EmitterFlags::SHOW_SOURCE) {
-                writeln!(writer, "{}", MessageCodeFrame { message })?;
+                writeln!(
+                    writer,
+                    "{}",
+                    MessageCodeFrame {
+                        message,
+                        jupyter_index
+                    }
+                )?;
             }
 
             if self.flags.contains(EmitterFlags::SHOW_FIX_DIFF) {
@@ -158,6 +165,7 @@ impl Display for RuleCodeAndBody<'_> {
 
 pub(super) struct MessageCodeFrame<'a> {
     pub(crate) message: &'a Message,
+    pub(crate) jupyter_index: Option<&'a JupyterIndex>,
 }
 
 impl Display for MessageCodeFrame<'_> {
@@ -180,10 +188,25 @@ impl Display for MessageCodeFrame<'_> {
         let source_code = file.to_source_code();
 
         let content_start_index = source_code.line_index(range.start());
+        let content_start_cell = self
+            .jupyter_index
+            .and_then(|jupyter_index| jupyter_index.cell(content_start_index.get()));
         let mut start_index = content_start_index.saturating_sub(2);
 
-        // Trim leading empty lines.
+        // Trim leading empty lines or skip lines outside of the content cell
+        // for jupyter notebooks.
         while start_index < content_start_index {
+            if let Some(jupyter_index) = self.jupyter_index {
+                if let Some(content_start_cell) = content_start_cell {
+                    if jupyter_index
+                        .cell(start_index.get())
+                        .is_some_and(|start_index_cell| start_index_cell != content_start_cell)
+                    {
+                        start_index = start_index.saturating_add(1);
+                        continue;
+                    }
+                }
+            }
             if !source_code.line_text(start_index).trim().is_empty() {
                 break;
             }
@@ -191,12 +214,27 @@ impl Display for MessageCodeFrame<'_> {
         }
 
         let content_end_index = source_code.line_index(range.end());
+        let content_end_cell = self
+            .jupyter_index
+            .and_then(|jupyter_index| jupyter_index.cell(content_end_index.get()));
         let mut end_index = content_end_index
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
 
-        // Trim trailing empty lines
+        // Trim trailing empty lines or skip lines outside of the content cell
+        // for jupyter notebooks.
         while end_index > content_end_index {
+            if let Some(jupyter_index) = self.jupyter_index {
+                if let Some(content_end_cell) = content_end_cell {
+                    if jupyter_index
+                        .cell(end_index.get())
+                        .is_some_and(|start_index_cell| start_index_cell != content_end_cell)
+                    {
+                        end_index = end_index.saturating_sub(1);
+                        continue;
+                    }
+                }
+            }
             if !source_code.line_text(end_index).trim().is_empty() {
                 break;
             }
@@ -224,7 +262,14 @@ impl Display for MessageCodeFrame<'_> {
             title: None,
             slices: vec![Slice {
                 source: &source.text,
-                line_start: start_index.get(),
+                line_start: self.jupyter_index.map_or_else(
+                    || start_index.get(),
+                    |jupyter_index| {
+                        jupyter_index
+                            .cell_row(start_index.get())
+                            .map_or_else(|| start_index.get(), |cell| cell as usize)
+                    },
+                ),
                 annotations: vec![SourceAnnotation {
                     label: &label,
                     annotation_type: AnnotationType::Error,
