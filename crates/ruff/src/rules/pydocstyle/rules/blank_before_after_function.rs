@@ -12,6 +12,30 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for docstrings that are separated from the function definition by
+/// one or more blank lines.
+///
+/// ## Why is this bad?
+/// Remove any blank lines before the docstring for consistency.
+///
+/// ## Example
+/// ```python
+/// def average(values: list[float]) -> float:
+///
+///     """Return the mean of the given values."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct NoBlankLineBeforeFunction {
     num_lines: usize,
@@ -29,6 +53,32 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
     }
 }
 
+/// ## What it does
+/// Checks for function docstrings that are separated from the function
+/// body by one or more blank lines.
+///
+/// ## Why is this bad?
+/// Remove any blank lines after the docstring for consistency.
+///
+/// ## Example
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+///
+///     return sum(values) / len(values)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+///     return sum(values) / len(values)
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct NoBlankLineAfterFunction {
     num_lines: usize,

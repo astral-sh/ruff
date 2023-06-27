@@ -11,6 +11,35 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for docstring summaries that are not on the first line of the
+/// docstring.
+///
+/// ## Why is this bad?
+/// The docstring summary should be on the first line of the docstring for
+/// consistency.
+///
+///
+/// ## Example
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """
+///     Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the
+///     bubble sort algorithm.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the bubble
+///     sort algorithm.
+///     """
+/// ```
 #[violation]
 pub struct MultiLineSummaryFirstLine;
 
@@ -25,6 +54,35 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     }
 }
 
+/// ## What it does
+/// Checks for docstring summaries that are not on the second line of the
+/// docstring.
+///
+/// ## Why is this bad?
+/// The docstring summary should be on the second line of the docstring for
+/// consistency.
+///
+///
+/// ## Example
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the
+///     bubble sort algorithm.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """
+///     Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the bubble
+///     sort algorithm.
+///     """
+/// ```
 #[violation]
 pub struct MultiLineSummarySecondLine;
 

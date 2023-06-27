@@ -8,6 +8,62 @@ use ruff_python_semantic::{Definition, Member, MemberKind};
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
+/// ## What it does
+/// Checks for functions decorated with `@overload` that contain a docstring.
+///
+/// ## Why is this bad?
+/// `@overload` is used to define multiple signatures for a function. This is
+/// for type checkers only; the decorated function is overwritten by the the
+/// non-decorated function. Therefore, the docstring should be defined in the
+/// non-decorated function.
+///
+/// ## Example
+/// ```python
+/// from typing import overload
+///
+///
+/// @overload
+/// def factorial(n: int) -> int:
+///     """Return the factorial of n."""
+///
+///
+/// @overload
+/// def factorial(n: float) -> float:
+///     """Return the factorial of n."""
+///
+///
+/// def factorial(n):
+///     """Return the factorial of n."""
+///
+///
+/// factorial.__doc__  # "Return the factorial of n."
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import overload
+///
+///
+/// @overload
+/// def factorial(n: int) -> int:
+///     ...
+///
+///
+/// @overload
+/// def factorial(n: float) -> float:
+///     ...
+///
+///
+/// def factorial(n):
+///     """Return the factorial of n."""
+///
+///
+/// factorial.__doc__  # "Return the factorial of n."
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [Python documentation: `typing.overload`](https://docs.python.org/3/library/typing.html#typing.overload)
 #[violation]
 pub struct OverloadWithDocstring;
 

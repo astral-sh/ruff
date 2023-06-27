@@ -9,6 +9,28 @@ use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
+/// ## What it does
+/// Checks for surrounding whitespace in docstring text.
+///
+/// ## Why is this bad?
+/// Remove surrounding whitespace in docstring text for consistency.
+///
+/// ## Example
+/// ```python
+/// def factorial(n: int) -> int:
+///     """ Return the factorial of n. """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def factorial(n: int) -> int:
+///     """Return the factorial of n."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct SurroundingWhitespace;
 

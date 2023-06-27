@@ -10,6 +10,40 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for multi-line docstring closing quotes that are not on a separate
+/// line from the last paragraph.
+///
+/// ## Why is this bad?
+/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
+/// that the closing quotes of a multi-line docstring should be on a line by
+/// themselves. This is for consistency and compatibility development tools
+/// that parse docstrings.
+///
+///
+/// ## Example
+/// ```python
+/// def sort_list(l: List[int]) -> List[int]:
+///     """Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the
+///     bubble sort algorithm."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def sort_list(l: List[int]) -> List[int]:
+///     """Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the bubble
+///     sort algorithm.
+///     """
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct NewLineAfterLastParagraph;
 

@@ -10,6 +10,26 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for docstrings that are not separated from the class definition by one
+/// blank line.
+///
+/// ## Why is this bad?
+/// Use a blank line to separate the docstring from the class definition for
+/// consistency.
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///
+///     """Metadata about a photo."""
+/// ```
 #[violation]
 pub struct OneBlankLineBeforeClass {
     lines: usize,
@@ -26,6 +46,36 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
     }
 }
 
+/// ## What it does
+/// Checks for class methods that are not separated from the class docstring by
+/// one blank line.
+///
+/// ## Why is this bad?
+/// [PEP 256](https://peps.python.org/pep-0257/#multi-line-docstrings)
+/// recommends the use of a blank line to separate the class docstring from the
+/// class methods for consistency.
+///
+/// ## Example
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+///     def __init__(self, file: Path):
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class PhotoMetadata:
+///     """Metadata about a photo."""
+///
+///     def __init__(self, file: Path):
+///         ...
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct OneBlankLineAfterClass {
     lines: usize,
