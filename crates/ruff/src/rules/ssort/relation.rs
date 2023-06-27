@@ -1,7 +1,7 @@
 use crate::rules::ssort::builtins::CLASS_BUILTINS;
 use indexmap::IndexSet;
-use ruff_python_ast::prelude::*;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use rustpython_parser::ast::*;
 
 pub(super) fn stmt_relation(stmt: &Stmt) -> Relation {
     let mut visitor = RelationVisitor::default();
