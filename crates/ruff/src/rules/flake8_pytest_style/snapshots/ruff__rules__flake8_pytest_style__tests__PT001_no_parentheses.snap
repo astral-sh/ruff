@@ -10,7 +10,7 @@ PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 11 11 |     return 42
 12 12 | 
 13 13 | 
@@ -31,7 +31,7 @@ PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 21 21 |     return 42
 22 22 | 
 23 23 | 
@@ -52,7 +52,7 @@ PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 36 36 |     return 42
 37 37 | 
 38 38 | 
@@ -73,7 +73,7 @@ PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 46 46 |     return 42
 47 47 | 
 48 48 | 
@@ -94,7 +94,7 @@ PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 61 61 |     return 42
 62 62 | 
 63 63 | 
@@ -115,7 +115,7 @@ PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Suggested fix
+ℹ Fix
 71 71 |     return 42
 72 72 | 
 73 73 | 

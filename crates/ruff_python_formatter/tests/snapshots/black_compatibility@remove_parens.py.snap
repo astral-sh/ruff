@@ -67,15 +67,7 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,20 +1,12 @@
- x = 1
- x = 1.2
- 
--data = (
--    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--).encode()
-+data = NOT_IMPLEMENTED_call()
- 
+@@ -8,13 +8,7 @@
  
  async def show_status():
      while True:
@@ -90,7 +82,7 @@ def example8():
  
  
  def example():
-@@ -30,15 +22,11 @@
+@@ -30,15 +24,11 @@
  
  
  def example2():
@@ -108,7 +100,7 @@ def example8():
  
  
  def example4():
-@@ -50,35 +38,11 @@
+@@ -50,35 +40,11 @@
  
  
  def example6():
@@ -154,7 +146,9 @@ def example8():
 x = 1
 x = 1.2
 
-data = NOT_IMPLEMENTED_call()
+data = (
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+).encode()
 
 
 async def show_status():

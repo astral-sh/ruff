@@ -10,7 +10,7 @@ PT025.py:9:1: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
    |
    = help: Remove `pytest.mark.usefixtures`
 
-ℹ Suggested fix
+ℹ Fix
 6  6  |     pass
 7  7  | 
 8  8  | 
@@ -29,7 +29,7 @@ PT025.py:16:1: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
    |
    = help: Remove `pytest.mark.usefixtures`
 
-ℹ Suggested fix
+ℹ Fix
 13 13 | 
 14 14 | 
 15 15 | @pytest.fixture()

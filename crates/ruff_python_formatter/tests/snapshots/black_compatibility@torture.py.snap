@@ -64,16 +64,14 @@ assert (
  
  importA
  0
-@@ -24,35 +14,34 @@
- 
+@@ -25,34 +15,33 @@
  class A:
      def foo(self):
--        for _ in range(10):
+         for _ in range(10):
 -            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(
 -                xxxxxxxxxxxx
 -            )  # pylint: disable=no-member
-+        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
-+            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(xxxxxxxxxxxx)  # pylint: disable=no-member
  
  
  def test(self, othr):
@@ -146,8 +144,8 @@ importA
 
 class A:
     def foo(self):
-        for _ in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
-            aaaaaaaaaaaaaaaaaaa = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        for _ in range(10):
+            aaaaaaaaaaaaaaaaaaa = bbbbbbbbbbbbbbb.cccccccccc(xxxxxxxxxxxx)  # pylint: disable=no-member
 
 
 def test(self, othr):

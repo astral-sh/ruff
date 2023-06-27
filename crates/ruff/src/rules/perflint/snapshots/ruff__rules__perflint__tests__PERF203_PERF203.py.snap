@@ -1,0 +1,28 @@
+---
+source: crates/ruff/src/rules/perflint/mod.rs
+---
+PERF203.py:4:5: PERF203 `try`-`except` within a loop incurs performance overhead
+  |
+2 |       try:  # PERF203
+3 |           print(f"{i}")
+4 |       except:
+  |  _____^
+5 | |         print("error")
+  | |______________________^ PERF203
+6 |   
+7 |   try:
+  |
+
+PERF203.py:17:5: PERF203 `try`-`except` within a loop incurs performance overhead
+   |
+15 |       try:
+16 |           print(f"{i}")
+17 |       except:
+   |  _____^
+18 | |         print("error")
+   | |______________________^ PERF203
+19 |   
+20 |       i += 1
+   |
+
+

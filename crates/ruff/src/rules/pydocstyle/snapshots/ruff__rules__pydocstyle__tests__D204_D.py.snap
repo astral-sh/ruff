@@ -11,7 +11,7 @@ D.py:181:5: D204 [*] 1 blank line required after class docstring
     |
     = help: Insert 1 blank line after class docstring
 
-ℹ Suggested fix
+ℹ Fix
 179 179 | class TrailingSpace:
 180 180 | 
 181 181 |     """TrailingSpace."""
@@ -29,7 +29,7 @@ D.py:192:5: D204 [*] 1 blank line required after class docstring
     |
     = help: Insert 1 blank line after class docstring
 
-ℹ Suggested fix
+ℹ Fix
 190 190 | 
 191 191 | class LeadingAndTrailingSpaceMissing:
 192 192 |     """Leading and trailing space missing."""
