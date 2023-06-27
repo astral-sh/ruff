@@ -18,15 +18,15 @@ use rustpython_parser::text_size::{TextRange, TextSize};
 /// ## Example
 /// ```python
 /// def function()
-///     if False
-///         return 0
-///     return 1
+///     if False:
+///         return "unreachable"
+///     return "reachable"
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def function()
-///     return 1
+///     return "reachable"
 /// ```
 #[violation]
 pub struct UnreachableCode {
