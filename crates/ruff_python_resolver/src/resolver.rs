@@ -1,6 +1,6 @@
 //! Resolves Python imports to their corresponding files on disk.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use log::debug;
@@ -36,7 +36,7 @@ fn resolve_module_descriptor(
     let mut is_stub_package = false;
     let mut is_stub_file = false;
     let mut is_native_lib = false;
-    let mut implicit_imports = HashMap::new();
+    let mut implicit_imports = BTreeMap::new();
     let mut package_directory = None;
     let mut py_typed_info = None;
 
@@ -194,7 +194,7 @@ fn resolve_module_descriptor(
         is_third_party_typeshed_file: false,
         is_local_typings_file: false,
         implicit_imports,
-        filtered_implicit_imports: HashMap::default(),
+        filtered_implicit_imports: BTreeMap::default(),
         non_stub_import_result: None,
         py_typed_info,
         package_directory,
@@ -424,7 +424,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
 /// are all satisfied by submodules (as listed in the implicit imports).
 fn is_namespace_package_resolved(
     module_descriptor: &ImportModuleDescriptor,
-    implicit_imports: &HashMap<String, ImplicitImport>,
+    implicit_imports: &BTreeMap<String, ImplicitImport>,
 ) -> bool {
     if !module_descriptor.imported_symbols.is_empty() {
         // Pyright uses `!Array.from(moduleDescriptor.importedSymbols.keys()).some((symbol) => implicitImports.has(symbol))`.
@@ -774,6 +774,7 @@ fn resolve_import<Host: host::Host>(
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_debug_snapshot;
     use std::fs::{create_dir_all, File};
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
@@ -823,6 +824,8 @@ mod tests {
         library: Option<PathBuf>,
         stub_path: Option<PathBuf>,
         typeshed_path: Option<PathBuf>,
+        venv_path: Option<PathBuf>,
+        venv: Option<PathBuf>,
     }
 
     fn resolve_options(
@@ -836,6 +839,8 @@ mod tests {
             library,
             stub_path,
             typeshed_path,
+            venv_path,
+            venv,
         } = options;
 
         let execution_environment = ExecutionEnvironment {
@@ -860,8 +865,8 @@ mod tests {
         let config = Config {
             typeshed_path,
             stub_path,
-            venv_path: None,
-            venv: None,
+            venv_path,
+            venv,
         };
 
         let host = host::StaticHost::new(if let Some(library) = library {
@@ -1544,5 +1549,110 @@ mod tests {
         assert!(!result.is_import_found);
 
         Ok(())
+    }
+
+    #[test]
+    fn airflow_standard_library() {
+        setup();
+
+        let root = PathBuf::from("./resources/test/airflow");
+        let source_file = root.join("airflow/api/common/mark_tasks.py");
+
+        let result = resolve_options(
+            source_file,
+            "os",
+            root.clone(),
+            ResolverOptions {
+                venv_path: Some(root),
+                venv: Some(PathBuf::from("venv")),
+                ..Default::default()
+            },
+        );
+
+        assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn airflow_first_party() {
+        setup();
+
+        let root = PathBuf::from("./resources/test/airflow");
+        let source_file = root.join("airflow/api/common/mark_tasks.py");
+
+        let result = resolve_options(
+            source_file,
+            "airflow.jobs.scheduler_job_runner",
+            root.clone(),
+            ResolverOptions {
+                venv_path: Some(root),
+                venv: Some(PathBuf::from("venv")),
+                ..Default::default()
+            },
+        );
+
+        assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn airflow_stub_file() {
+        setup();
+
+        let root = PathBuf::from("./resources/test/airflow");
+        let source_file = root.join("airflow/api/common/mark_tasks.py");
+
+        let result = resolve_options(
+            source_file,
+            "airflow.compat.functools",
+            root.clone(),
+            ResolverOptions {
+                venv_path: Some(root),
+                venv: Some(PathBuf::from("venv")),
+                ..Default::default()
+            },
+        );
+
+        assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn airflow_namespace_package() {
+        setup();
+
+        let root = PathBuf::from("./resources/test/airflow");
+        let source_file = root.join("airflow/api/common/mark_tasks.py");
+
+        let result = resolve_options(
+            source_file,
+            "airflow.providers.google.cloud.hooks.gcs",
+            root.clone(),
+            ResolverOptions {
+                venv_path: Some(root),
+                venv: Some(PathBuf::from("venv")),
+                ..Default::default()
+            },
+        );
+
+        assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn airflow_third_party() {
+        setup();
+
+        let root = PathBuf::from("./resources/test/airflow");
+        let source_file = root.join("airflow/api/common/mark_tasks.py");
+
+        let result = resolve_options(
+            source_file,
+            "sqlalchemy.orm",
+            root.clone(),
+            ResolverOptions {
+                venv_path: Some(root),
+                venv: Some(PathBuf::from("venv")),
+                ..Default::default()
+            },
+        );
+
+        assert_debug_snapshot!(result);
     }
 }

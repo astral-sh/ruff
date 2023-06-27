@@ -12,5 +12,3 @@ mod python_platform;
 mod python_version;
 mod resolver;
 mod search;
-
-pub(crate) const SITE_PACKAGES: &str = "site-packages";
