@@ -309,7 +309,21 @@ src = ["../src", "../test"]
 
 ## Does Ruff support Jupyter Notebooks?
 
-Ruff is integrated into [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
+Ruff has experimental support for Jupyter Notebooks builtin. To enable it, include the
+Jupyter notebook file pattern in your [`include`](settings.md#include) option along with the existing patterns:
+
+```toml
+[tool.ruff]
+include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
+```
+
+Or, you can pass in the notebook file(s) directly on the command line:
+
+```console
+ruff check path/to/notebook.ipynb
+```
+
+Ruff is also integrated into [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
 code formatters over Jupyter Notebooks.
 
 After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
