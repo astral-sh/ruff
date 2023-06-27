@@ -20,4 +20,13 @@ single_string_slots.py:10:5: PLC0205 Class `__slots__` should be a non-string it
 12 |     def __init__(self, bar):
    |
 
+single_string_slots.py:17:5: PLC0205 Class `__slots__` should be a non-string iterable
+   |
+16 | class Foo:
+17 |     __slots__: str = f"bar"
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ PLC0205
+18 | 
+19 |     def __init__(self, bar):
+   |
+
 

@@ -70,7 +70,7 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                                 Expr::Constant(ast::ExprConstant {
                                     value: Constant::Str(_),
                                     ..
-                                })
+                                }) | Expr::JoinedStr(_)
                             ) {
                                 checker
                                     .diagnostics
@@ -92,7 +92,7 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                             Expr::Constant(ast::ExprConstant {
                                 value: Constant::Str(_),
                                 ..
-                            })
+                            }) | Expr::JoinedStr(_)
                         ) {
                             checker
                                 .diagnostics
