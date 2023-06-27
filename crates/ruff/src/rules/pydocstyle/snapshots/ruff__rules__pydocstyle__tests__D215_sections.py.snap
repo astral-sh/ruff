@@ -17,7 +17,7 @@ sections.py:156:5: D215 [*] Section underline is over-indented ("Returns")
     |
     = help: Remove over-indentation from "Returns" underline
 
-ℹ Suggested fix
+ℹ Fix
 156 156 |     """Toggle the gizmo.
 157 157 | 
 158 158 |     Returns
@@ -41,7 +41,7 @@ sections.py:170:5: D215 [*] Section underline is over-indented ("Returns")
     |
     = help: Remove over-indentation from "Returns" underline
 
-ℹ Suggested fix
+ℹ Fix
 170 170 |     """Toggle the gizmo.
 171 171 | 
 172 172 |     Returns
