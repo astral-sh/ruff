@@ -1,6 +1,7 @@
 use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
 use std::collections::hash_map::Keys;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 #[derive(Debug)]
@@ -70,8 +71,8 @@ where
 
 impl<N, E> Graph<N, E>
 where
-    N: Clone + Eq + Hash + PartialEq,
-    E: Clone,
+    N: Copy + Eq + Hash + PartialEq,
+    E: Copy,
 {
     fn insert_node(&mut self, node: N) {
         self.outgoing_edges.entry(node.clone()).or_default();
@@ -80,11 +81,11 @@ where
 
     fn insert_edge(&mut self, source: N, target: N, edge: E) {
         self.outgoing_edges
-            .entry(source.clone())
+            .entry(source)
             .or_default()
-            .insert(target.clone(), edge.clone());
+            .insert(target, edge);
         self.incoming_edges
-            .entry(target.clone())
+            .entry(target)
             .or_default()
             .insert(source, edge);
 
@@ -93,56 +94,63 @@ where
     }
 }
 
-fn find_cycle<N, E>(graph: &Graph<N, E>) -> Option<Vec<&N>>
+fn break_cycles<N, E>(graph: &mut Graph<N, E>)
 where
-    N: Eq + Hash + PartialEq,
+    N: Copy + Eq + Hash + PartialEq,
+    E: Ord + PartialOrd,
 {
-    let mut visited = HashSet::new();
-    find_cycle_with_visited(graph, &mut visited)
+    let mut subgraph: HashSet<_> = graph.nodes().copied().collect();
+    loop {
+        let Some(cycle) = find_cycle_in_subgraph(graph, &mut subgraph) else { return };
+
+        let cycle_len = cycle.len();
+        let (source, target) = cycle
+            .into_iter()
+            .cycle()
+            .tuple_windows()
+            .take(cycle_len + 1)
+            .max_by_key(|(source, target)| graph.edge(source, target))
+            .unwrap();
+
+        graph.remove_edge(&source, &target);
+    }
 }
 
-fn find_cycle_with_visited<'a, N, E>(
-    graph: &'a Graph<N, E>,
-    visited: &mut HashSet<&'a N>,
-) -> Option<Vec<&'a N>>
+fn find_cycle<N, E>(graph: &Graph<N, E>) -> Option<Vec<N>>
 where
-    N: Eq + Hash + PartialEq,
+    N: Copy + Eq + Hash + PartialEq,
 {
-    for node in graph.nodes() {
-        if visited.contains(node) {
-            continue;
-        }
+    let mut subgraph: HashSet<_> = graph.nodes().copied().collect();
+    find_cycle_in_subgraph(graph, &mut subgraph)
+}
 
-        let mut path: IndexSet<&'a N> = IndexSet::new();
+fn find_cycle_in_subgraph<N, E>(graph: &Graph<N, E>, subgraph: &mut HashSet<N>) -> Option<Vec<N>>
+where
+    N: Copy + Eq + Hash + PartialEq,
+{
+    loop {
+        let Some(node) = subgraph.iter().next() else { return None };
 
-        if let Some(path) = find_cycle_with_path(graph, visited, &mut path, node) {
+        let mut path = IndexSet::new();
+        if let Some(path) = find_cycle_in_subgraph_with_path(graph, subgraph, &mut path, *node) {
             return Some(path);
         }
     }
-
-    None
 }
 
-fn find_cycle_with_path<'a, N, E>(
-    graph: &'a Graph<N, E>,
-    visited: &mut HashSet<&'a N>,
-    path: &mut IndexSet<&'a N>,
-    node: &'a N,
-) -> Option<Vec<&'a N>>
+fn find_cycle_in_subgraph_with_path<N, E>(
+    graph: &Graph<N, E>,
+    subgraph: &mut HashSet<N>,
+    path: &mut IndexSet<N>,
+    node: N,
+) -> Option<Vec<N>>
 where
-    N: Eq + Hash + PartialEq,
+    N: Copy + Eq + Hash + PartialEq,
 {
-    visited.insert(node);
     path.insert(node);
 
-    for neighbor in graph.neighbors(node).unwrap() {
-        if !visited.contains(neighbor) {
-            if let Some(cycle) = find_cycle_with_path(graph, visited, path, neighbor) {
-                visited.remove(node);
-                return Some(cycle);
-            }
-        } else if let Some(index) = path.get_index_of(neighbor) {
-            visited.remove(node);
+    for neighbor in graph.neighbors(&node).unwrap() {
+        if let Some(index) = path.get_index_of(neighbor) {
             return Some(
                 path.get_range(index..)
                     .unwrap()
@@ -150,9 +158,15 @@ where
                     .copied()
                     .collect(),
             );
+        } else if subgraph.contains(neighbor) {
+            if let Some(cycle) = find_cycle_in_subgraph_with_path(graph, subgraph, path, *neighbor)
+            {
+                return Some(cycle);
+            }
         }
     }
 
+    subgraph.remove(&node);
     path.pop();
     None
 }
@@ -219,7 +233,23 @@ mod tests {
                 .unwrap()
                 .into_iter()
                 .collect::<HashSet<_>>(),
-            HashSet::from_iter(&["a", "b", "c", "d", "e"])
+            HashSet::from_iter(["a", "b", "c", "d", "e"])
         );
+    }
+
+    #[test]
+    fn test_break_cycles() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "b", 1);
+        graph.insert_edge("b", "c", 2);
+        graph.insert_edge("c", "d", 3);
+        graph.insert_edge("d", "e", 4);
+        graph.insert_edge("e", "a", 5);
+        break_cycles(&mut graph);
+        assert_eq!(graph.edge(&"a", &"b"), Some(&1));
+        assert_eq!(graph.edge(&"b", &"c"), Some(&2));
+        assert_eq!(graph.edge(&"c", &"d"), Some(&3));
+        assert_eq!(graph.edge(&"d", &"e"), Some(&4));
+        assert_eq!(graph.edge(&"e", &"a"), None);
     }
 }
