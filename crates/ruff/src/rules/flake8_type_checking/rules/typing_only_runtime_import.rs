@@ -250,8 +250,8 @@ pub(crate) fn typing_only_runtime_import(
             let import_type = match categorize(
                 qualified_name,
                 Some(level),
+                checker.path(),
                 &checker.settings.src,
-                checker.package(),
                 &checker.settings.isort.known_modules,
                 checker.settings.target_version,
             ) {

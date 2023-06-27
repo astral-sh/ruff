@@ -7,12 +7,12 @@ use crate::py_typed::PyTypedInfo;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)]
-pub(crate) struct ImportResult {
+pub struct ImportResult {
     /// Whether the import name was relative (e.g., ".foo").
     pub(crate) is_relative: bool,
 
     /// Whether the import was resolved to a file or module.
-    pub(crate) is_import_found: bool,
+    pub is_import_found: bool,
 
     /// The path was partially resolved, but the specific submodule
     /// defining the import was not found. For example, `foo.bar` was
@@ -32,7 +32,7 @@ pub(crate) struct ImportResult {
     pub(crate) is_stub_package: bool,
 
     /// The import resolved to a built-in, local, or third-party module.
-    pub(crate) import_type: ImportType,
+    pub import_type: ImportType,
 
     /// A vector of resolved absolute paths for each file in the module
     /// name. Typically includes a sequence of `__init__.py` files, followed
@@ -114,7 +114,7 @@ impl ImportResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ImportType {
+pub enum ImportType {
     BuiltIn,
     ThirdParty,
     Local,

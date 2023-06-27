@@ -1,6 +1,6 @@
 /// Enum to represent a Python version.
 #[derive(Debug, Copy, Clone)]
-pub(crate) enum PythonVersion {
+pub enum PythonVersion {
     Py37,
     Py38,
     Py39,

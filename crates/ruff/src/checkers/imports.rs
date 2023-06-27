@@ -103,9 +103,9 @@ pub(crate) fn check_imports(
     if settings.rules.enabled(Rule::UnsortedImports) {
         for block in &blocks {
             if !block.imports.is_empty() {
-                if let Some(diagnostic) = isort::rules::organize_imports(
-                    block, locator, stylist, indexer, settings, package,
-                ) {
+                if let Some(diagnostic) =
+                    isort::rules::organize_imports(block, locator, stylist, indexer, settings, path)
+                {
                     diagnostics.push(diagnostic);
                 }
             }

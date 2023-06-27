@@ -1,5 +1,14 @@
 #![allow(dead_code)]
 
+pub use config::*;
+pub use execution_environment::*;
+pub use host::*;
+pub use import_result::*;
+pub use module_descriptor::*;
+pub use python_platform::*;
+pub use python_version::*;
+pub use resolver::*;
+
 mod config;
 mod execution_environment;
 mod host;

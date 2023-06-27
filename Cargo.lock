@@ -1908,6 +1908,7 @@ dependencies = [
  "ruff_python_codegen",
  "ruff_python_index",
  "ruff_python_parser",
+ "ruff_python_resolver",
  "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_python_trivia",

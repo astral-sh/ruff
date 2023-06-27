@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ImportModuleDescriptor {
-    pub(crate) leading_dots: usize,
-    pub(crate) name_parts: Vec<String>,
-    pub(crate) imported_symbols: Vec<String>,
+pub struct ImportModuleDescriptor {
+    pub leading_dots: usize,
+    pub name_parts: Vec<String>,
+    pub imported_symbols: Vec<String>,
 }
 
 impl ImportModuleDescriptor {

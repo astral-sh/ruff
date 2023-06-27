@@ -70,8 +70,8 @@ pub(crate) fn format_imports(
     line_length: LineLength,
     indentation_width: LineWidth,
     stylist: &Stylist,
+    path: &Path,
     src: &[PathBuf],
-    package: Option<&Path>,
     combine_as_imports: bool,
     force_single_line: bool,
     force_sort_within_sections: bool,
@@ -113,8 +113,8 @@ pub(crate) fn format_imports(
             line_length,
             indentation_width,
             stylist,
+            path,
             src,
-            package,
             force_sort_within_sections,
             case_sensitive,
             force_wrap_aliases,
@@ -171,8 +171,8 @@ fn format_import_block(
     line_length: LineLength,
     indentation_width: LineWidth,
     stylist: &Stylist,
+    path: &Path,
     src: &[PathBuf],
-    package: Option<&Path>,
     force_sort_within_sections: bool,
     case_sensitive: bool,
     force_wrap_aliases: bool,
@@ -190,7 +190,7 @@ fn format_import_block(
     section_order: &[ImportSection],
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
-    let mut block_by_type = categorize_imports(block, src, package, known_modules, target_version);
+    let mut block_by_type = categorize_imports(block, path, src, known_modules, target_version);
 
     let mut output = String::new();
 

@@ -6,7 +6,7 @@ use crate::python_platform::PythonPlatform;
 use crate::python_version::PythonVersion;
 
 /// A trait to expose the host environment to the resolver.
-pub(crate) trait Host {
+pub trait Host {
     /// The search paths to use when resolving Python modules.
     fn python_search_paths(&self) -> Vec<PathBuf>;
 
@@ -18,12 +18,13 @@ pub(crate) trait Host {
 }
 
 /// A host that exposes a fixed set of search paths.
-pub(crate) struct StaticHost {
+#[derive(Debug, Default)]
+pub struct StaticHost {
     search_paths: Vec<PathBuf>,
 }
 
 impl StaticHost {
-    pub(crate) fn new(search_paths: Vec<PathBuf>) -> Self {
+    pub fn new(search_paths: Vec<PathBuf>) -> Self {
         Self { search_paths }
     }
 }

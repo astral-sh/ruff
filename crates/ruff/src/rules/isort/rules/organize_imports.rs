@@ -1,8 +1,7 @@
-use std::path::Path;
-
 use itertools::{EitherOrBoth, Itertools};
 use ruff_text_size::TextRange;
 use rustpython_ast::{Ranged, Stmt};
+use std::path::Path;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -86,7 +85,7 @@ pub(crate) fn organize_imports(
     stylist: &Stylist,
     indexer: &Indexer,
     settings: &Settings,
-    package: Option<&Path>,
+    path: &Path,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -121,8 +120,8 @@ pub(crate) fn organize_imports(
         settings.line_length,
         LineWidth::new(settings.tab_size).add_str(indentation),
         stylist,
+        path,
         &settings.src,
-        package,
         settings.isort.combine_as_imports,
         settings.isort.force_single_line,
         settings.isort.force_sort_within_sections,

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::hash::BuildHasherDefault;
+use std::iter;
 use std::path::{Path, PathBuf};
-use std::{fs, iter};
 
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use ruff_macros::CacheKey;
+use ruff_python_resolver;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
 use crate::settings::types::PythonVersion;
@@ -57,18 +58,16 @@ enum Reason<'a> {
     ExtraStandardLibrary,
     Future,
     KnownStandardLibrary,
-    SamePackage,
     SourceMatch(&'a Path),
     NoMatch,
     UserDefinedSection,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn categorize<'a>(
     module_name: &str,
     level: Option<u32>,
+    path: &Path,
     src: &[PathBuf],
-    package: Option<&Path>,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
 ) -> &'a ImportSection {
@@ -88,12 +87,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::StandardLibrary),
                 Reason::KnownStandardLibrary,
             )
-        } else if same_package(package, module_base) {
-            (
-                &ImportSection::Known(ImportType::FirstParty),
-                Reason::SamePackage,
-            )
-        } else if let Some(src) = match_sources(src, module_base) {
+        } else if let Some(src) = match_sources(module_name, path, src) {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
@@ -112,31 +106,44 @@ pub(crate) fn categorize<'a>(
     import_type
 }
 
-fn same_package(package: Option<&Path>, module_base: &str) -> bool {
-    package.map_or(false, |package| package.ends_with(module_base))
-}
-
-fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
-    for path in paths {
-        if let Ok(metadata) = fs::metadata(path.join(base)) {
-            if metadata.is_dir() {
-                return Some(path);
-            }
-        }
-        if let Ok(metadata) = fs::metadata(path.join(format!("{base}.py"))) {
-            if metadata.is_file() {
-                return Some(path);
+fn match_sources<'a>(module_name: &str, path: &Path, roots: &'a [PathBuf]) -> Option<&'a Path> {
+    for root in roots {
+        let import = ruff_python_resolver::resolve_import(
+            &root,
+            &ruff_python_resolver::ExecutionEnvironment {
+                root: root.clone(),
+                python_version: ruff_python_resolver::PythonVersion::Py37,
+                python_platform: ruff_python_resolver::PythonPlatform::Darwin,
+                extra_paths: vec![],
+            },
+            &ruff_python_resolver::ImportModuleDescriptor {
+                leading_dots: module_name.chars().take_while(|c| *c == '.').count(),
+                name_parts: module_name
+                    .chars()
+                    .skip_while(|c| *c == '.')
+                    .collect::<String>()
+                    .split('.')
+                    .map(std::string::ToString::to_string)
+                    .collect(),
+                imported_symbols: Vec::new(),
+            },
+            &ruff_python_resolver::Config::default(),
+            &ruff_python_resolver::StaticHost::default(),
+        );
+        if import.is_import_found {
+            if matches!(import.import_type, ruff_python_resolver::ImportType::Local) {
+                return Some(root);
             }
         }
     }
+
     None
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
+    path: &Path,
     src: &[PathBuf],
-    package: Option<&Path>,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
@@ -146,8 +153,8 @@ pub(crate) fn categorize_imports<'a>(
         let import_type = categorize(
             &alias.module_name(),
             None,
+            path,
             src,
-            package,
             known_modules,
             target_version,
         );
@@ -162,8 +169,8 @@ pub(crate) fn categorize_imports<'a>(
         let classification = categorize(
             &import_from.module_name(),
             import_from.level,
+            path,
             src,
-            package,
             known_modules,
             target_version,
         );
@@ -178,8 +185,8 @@ pub(crate) fn categorize_imports<'a>(
         let classification = categorize(
             &import_from.module_name(),
             import_from.level,
+            path,
             src,
-            package,
             known_modules,
             target_version,
         );
@@ -194,8 +201,8 @@ pub(crate) fn categorize_imports<'a>(
         let classification = categorize(
             &import_from.module_name(),
             import_from.level,
+            path,
             src,
-            package,
             known_modules,
             target_version,
         );
