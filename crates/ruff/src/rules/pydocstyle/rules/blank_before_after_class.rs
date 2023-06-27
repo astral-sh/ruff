@@ -19,8 +19,10 @@ use crate::registry::{AsRule, Rule};
 /// consistency.
 ///
 /// This rule may not apply to all projects; its applicability is a matter of
-/// convention (for example, this rule is typically enforced under the Google
-/// and NumPy docstring conventions). For an alternative, see [D211].
+/// convention. By default, this rule is disabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
+///
+/// For an alternative, see [D211].
 ///
 /// ## Example
 /// ```python
@@ -34,6 +36,9 @@ use crate::registry::{AsRule, Rule};
 ///
 ///     """Metadata about a photo."""
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// [D211]: https://beta.ruff.rs/docs/rules/blank-line-before-class
 #[violation]
@@ -60,6 +65,10 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 /// [PEP 257] recommends the use of a blank line to separate a class's
 /// docstring its methods.
 ///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `google`
+/// convention, and disabled when using the `numpy` and `pep257` conventions.
+///
 /// ## Example
 /// ```python
 /// class PhotoMetadata:
@@ -76,6 +85,9 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 ///     def __init__(self, file: Path):
 ///         ...
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -108,7 +120,10 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 /// docstring, for consistency.
 ///
 /// This rule may not apply to all projects; its applicability is a matter of
-/// convention. For an alternative, see [D203].
+/// convention. By default, this rule is enabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
+///
+/// For an alternative, see [D203].
 ///
 /// ## Example
 /// ```python
@@ -122,6 +137,9 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 ///
 ///     """Metadata about a photo."""
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// [D203]: https://beta.ruff.rs/docs/rules/one-blank-line-before-class
 #[violation]

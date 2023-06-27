@@ -15,6 +15,10 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 /// Hint: to rewrite the docstring in the imperative, phrase the first line as
 /// if it were a command.
 ///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `numpy`
+/// convention,, and disabled when using the `google` and `pep257` conventions.
+///
 /// ## Example
 /// ```python
 /// def average(values: list[float]) -> float:
@@ -26,6 +30,9 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 /// def average(values: list[float]) -> float:
 ///     """Return the mean of the given values."""
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

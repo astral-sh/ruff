@@ -19,6 +19,10 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// The first line of a docstring should end with a period, question mark, or
 /// exclamation point, for grammatical correctness and consistency.
 ///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `google`
+/// convention, and disabled when using the `numpy` and `pep257` conventions.
+///
 /// ## Example
 /// ```python
 /// def average(values: list[float]) -> float:
@@ -30,6 +34,9 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// def average(values: list[float]) -> float:
 ///     """Return the mean of the given values."""
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

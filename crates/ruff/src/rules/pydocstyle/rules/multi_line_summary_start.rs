@@ -24,8 +24,10 @@ use crate::registry::{AsRule, Rule};
 /// docstring, immediately after the opening quotes.
 ///
 /// This rule may not apply to all projects; its applicability is a matter of
-/// convention (for example, this rule is typically enforced under the Google
-/// docstring conventions). For an alternative, see [D213].
+/// convention. By default, this rule is enabled when using the `google`
+/// convention, and disabled when using the `numpy` and `pep257` conventions.
+///
+/// For an alternative, see [D213].
 ///
 /// ## Example
 /// ```python
@@ -76,7 +78,10 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
 /// docstring, immediately after the opening quotes and the blank line.
 ///
 /// This rule may not apply to all projects; its applicability is a matter of
-/// convention. For an alternative, see [D212].
+/// convention. By default, this rule is disabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
+///
+/// For an alternative, see [D212].
 ///
 /// ## Example
 /// ```python

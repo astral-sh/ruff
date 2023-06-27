@@ -24,10 +24,16 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for over-indented sections.
+/// Checks for over-indented sections in docstrings.
 ///
 /// ## Why is this bad?
-/// Remove over-indentation from sections for consistency.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Each section should use consistent indentation, with the section headers
+/// matching the indentation of the docstring's opening quotes, and the
+/// section bodies being indented one level further.
 ///
 /// ## Example
 /// ```python
@@ -71,6 +77,9 @@ use crate::rules::pydocstyle::settings::Convention;
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -95,14 +104,21 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
 }
 
 /// ## What it does
-/// Checks for over-indented section underlines.
+/// Checks for over-indented section underlines in docstrings.
 ///
 /// ## Why is this bad?
-/// Remove over-indentation from section underlines for consistency and to
-/// avoid syntax errors in reStructuredText.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
 ///
-/// This rule is enabled when using the `numpy` convention, and disabled
-/// when using the `google` or `pep257` conventions.
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
+///
+/// Avoid over-indenting the section underlines, as this can cause syntax
+/// errors in reStructuredText.
+///
+/// By default, this rule is enabled when using the `numpy` convention, and
+/// disabled when using the `google` or `pep257` conventions.
 ///
 /// ## Example
 /// ```python
@@ -160,6 +176,9 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -183,10 +202,15 @@ impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
 }
 
 /// ## What it does
-/// Checks for section names that do not begin with a capital letter.
+/// Checks for section headers in docstrings that do not begin with capital
+/// letters.
 ///
 /// ## Why is this bad?
-/// Section names should be capitalized for consistency.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Section headers should be capitalized, for consistency.
 ///
 /// ## Example
 /// ```python
@@ -230,6 +254,9 @@ impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -254,10 +281,16 @@ impl AlwaysAutofixableViolation for CapitalizeSectionName {
 }
 
 /// ## What it does
-/// Checks that section names are followed by a newline.
+/// Checks that section headers in docstrings that are not followed by a
+/// newline.
 ///
 /// ## Why is this bad?
-/// Section names should be followed by a newline for consistency.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Section headers should be followed by a newline, and not by another
+/// character (like a colon), for consistency.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -318,6 +351,9 @@ impl AlwaysAutofixableViolation for CapitalizeSectionName {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -341,11 +377,16 @@ impl AlwaysAutofixableViolation for NewLineAfterSectionName {
 }
 
 /// ## What it does
-/// Checks for section names that are not followed by a section underline.
+/// Checks for section headers in docstrings that are not followed by
+/// underlines.
 ///
 /// ## Why is this bad?
-/// Section names should be followed by a section underline for consistency
-/// and to format the name as a heading with reStructuredText.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -405,6 +446,9 @@ impl AlwaysAutofixableViolation for NewLineAfterSectionName {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -429,12 +473,19 @@ impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
 }
 
 /// ## What it does
-/// Checks for section underlines that are not on the line following the
-/// section name.
+/// Checks for section underlines in docstrings that are not on the line
+/// immediately following the section name.
 ///
 /// ## Why is this bad?
-/// Section underlines should be on the line following the section name for
-/// consistency and to avoid syntax errors in reStructuredText.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
+///
+/// When present, section underlines should be positioned on the line
+/// immediately following the section header.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -497,6 +548,9 @@ impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -521,12 +575,19 @@ impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
 }
 
 /// ## What it does
-/// Checks for section underlines that do not match the length of the section
-/// name.
+/// Checks for section underlines in docstrings that do not match the length of
+/// the corresponding section header.
 ///
 /// ## Why is this bad?
-/// Section underlines should match the length of the section name for
-/// consistency and to avoid syntax errors in reStructuredText.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
+///
+/// When present, section underlines should match the length of the
+/// corresponding section header.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -587,6 +648,9 @@ impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -610,11 +674,16 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
 }
 
 /// ## What it does
-/// Checks that sections are separated by a blank line.
+/// Checks for docstring sections that are not separated by a single blank
+/// line.
 ///
 /// ## Why is this bad?
-/// Sections should be separated by a blank line for consistency and to avoid
-/// syntax errors in reStructuredText.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Docstring sections should be separated by a blank line, for consistency and
+/// compatibility with documentation tooling.
 ///
 /// This rule is enabled when using the `numpy` and `google` conventions, and
 /// disabled when using the `pep257` convention.
@@ -672,6 +741,9 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -697,11 +769,15 @@ impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
 }
 
 /// ## What it does
-/// Checks that sections are separated by a blank line.
+/// Checks for docstring sections that are separated by a blank line.
 ///
 /// ## Why is this bad?
-/// Sections should be separated by a blank line for consistency and to avoid
-/// syntax errors in reStructuredText.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Docstring sections should be separated by a blank line, for consistency and
+/// compatibility with documentation tooling.
 ///
 /// This rule is enabled when using the `numpy` and `google` conventions, and
 /// disabled when using the `pep257` convention.
@@ -760,6 +836,9 @@ impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -783,11 +862,16 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 }
 
 /// ## What it does
-/// Checks for a missing blank line after the last section.
+/// Checks for missing blank lines after the last section of a multi-line
+/// docstring.
 ///
 /// ## Why is this bad?
-/// The last section should be followed by a blank line for consistency and to
-/// avoid syntax errors in reStructuredText.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// The last section in a docstring should be separated by a blank line, for
+/// consistency and compatibility with documentation tooling.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled when
 /// using the `pep257` and `google` conventions.
@@ -845,6 +929,9 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -868,10 +955,15 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
 }
 
 /// ## What it does
-/// Checks for docstrings with empty sections.
+/// Checks for docstrings that contain empty sections.
 ///
 /// ## Why is this bad?
-/// Empty sections are indicative of missing documentation.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Empty docstring sections are indicative of missing documentation. Empty
+/// sections should either be removed or filled in with relevant documentation.
 ///
 /// ## Example
 /// ```python
@@ -927,6 +1019,9 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -946,11 +1041,15 @@ impl Violation for EmptyDocstringSection {
 }
 
 /// ## What it does
-/// Checks for docstring section names that do not end with a colon.
+/// Checks for docstring section headers that do not end with a colon.
 ///
 /// ## Why is this bad?
-/// Section names should end with a colon for consistency and to avoid parsing
-/// errors.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// In a docstring, each section header should end with a colon, for
+/// consistency.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -997,6 +1096,9 @@ impl Violation for EmptyDocstringSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -1020,10 +1122,17 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
 }
 
 /// ## What it does
-/// Checks for docstrings with undocumented parameters.
+/// Checks for function docstrings that do not include documentation for all
+/// parameters in the function.
 ///
 /// ## Why is this bad?
-/// Undocumented parameters are indicative of missing documentation.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Function docstrings often include a section for function arguments, which
+/// should include documentation for every argument. Undocumented arguments are
+/// indicative of missing documentation.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1069,6 +1178,9 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+/// - `pydocstyle.convention`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -1093,11 +1205,16 @@ impl Violation for UndocumentedParam {
 }
 
 /// ## What it does
-/// Checks for docstrings with blank lines between section names and their
-/// content.
+/// Checks for docstring sections that contain blank lines between the section
+/// header and the section body.
 ///
 /// ## Why is this bad?
-/// Remove blank lines between section names and their content for consistency.
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Docstring sections should not contain blank lines between the section header
+/// and the section body, for consistency.
 ///
 /// ## Example
 /// ```python
@@ -1141,6 +1258,9 @@ impl Violation for UndocumentedParam {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

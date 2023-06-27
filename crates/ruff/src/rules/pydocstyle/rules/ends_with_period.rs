@@ -18,6 +18,10 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// [PEP 257] recommends that the first line of a docstring is written in the
 /// form of a command, ending in a period.
 ///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `numpy` and
+/// `pep257` conventions, and disabled when using the `google` convention.
+///
 /// ## Example
 /// ```python
 /// def average(values: list[float]) -> float:
@@ -29,6 +33,9 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// def average(values: list[float]) -> float:
 ///     """Return the mean of the given values."""
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

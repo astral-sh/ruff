@@ -17,6 +17,10 @@ use crate::docstrings::Docstring;
 /// docstring. Instead, consider using type annotations as a form of
 /// documentation for the function's parameters and return value.
 ///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is enabled when using the `google` and
+/// `pep257` conventions, and disabled when using the `numpy` convention.
+///
 /// ## Example
 /// ```python
 /// def foo(a, b):
@@ -28,6 +32,9 @@ use crate::docstrings::Docstring;
 /// def foo(a: int, b: int) -> list[int]:
 ///     """Return a list of a and b."""
 /// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
