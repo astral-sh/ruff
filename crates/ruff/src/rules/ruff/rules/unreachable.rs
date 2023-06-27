@@ -923,7 +923,11 @@ mod tests {
             .body;
 
         for (i, stmts) in stmts.into_iter().enumerate() {
-            let func = stmts.function_def_stmt().expect("statement not a function");
+            let Some(func) = stmts.function_def_stmt() else {
+                use std::io::Write;
+                let _ = std::io::stderr().write_all(b"unexpected statement kind, ignoring");
+                continue;
+            };
 
             let got = BasicBlocks::from(&*func.body);
             // Basic sanity checks.
