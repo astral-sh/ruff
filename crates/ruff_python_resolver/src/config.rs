@@ -1,11 +1,6 @@
 use std::path::PathBuf;
 
-use crate::python_version::PythonVersion;
-
 pub(crate) struct Config {
-    /// Path to python interpreter.
-    pub(crate) python_path: Option<PathBuf>,
-
     /// Path to use for typeshed definitions.
     pub(crate) typeshed_path: Option<PathBuf>,
 
@@ -20,7 +15,4 @@ pub(crate) struct Config {
 
     /// Default venv environment.
     pub(crate) venv: Option<PathBuf>,
-
-    /// Default Python version. Can be overridden by ExecutionEnvironment.
-    pub(crate) default_python_version: Option<PythonVersion>,
 }

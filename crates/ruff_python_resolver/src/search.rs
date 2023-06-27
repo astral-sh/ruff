@@ -92,7 +92,7 @@ fn find_site_packages_path(
     Some(default_dir.join(SITE_PACKAGES))
 }
 
-fn get_paths_from_pth_files(parent_dir: &Path) -> Vec<PathBuf> {
+fn find_paths_from_pth_files(parent_dir: &Path) -> Vec<PathBuf> {
     fs::read_dir(parent_dir)
         .unwrap()
         .flatten()
@@ -133,21 +133,16 @@ fn get_paths_from_pth_files(parent_dir: &Path) -> Vec<PathBuf> {
 }
 
 /// Find the Python search paths for the given virtual environment.
-pub(crate) fn find_python_search_paths<Host: host::Host>(
-    config: &Config,
-    host: &Host,
-) -> Vec<PathBuf> {
+fn find_python_search_paths<Host: host::Host>(config: &Config, host: &Host) -> Vec<PathBuf> {
     if let Some(venv_path) = config.venv_path.as_ref() {
         if let Some(venv) = config.venv.as_ref() {
             let mut found_paths = vec![];
 
             for lib_name in ["lib", "Lib", "lib64"] {
                 let lib_path = venv_path.join(venv).join(lib_name);
-                if let Some(site_packages_path) =
-                    find_site_packages_path(&lib_path, config.default_python_version)
-                {
+                if let Some(site_packages_path) = find_site_packages_path(&lib_path, None) {
                     // Add paths from any `.pth` files in each of the `site-packages` directories.
-                    found_paths.extend(get_paths_from_pth_files(&site_packages_path));
+                    found_paths.extend(find_paths_from_pth_files(&site_packages_path));
 
                     // Add the `site-packages` directory to the search path.
                     found_paths.push(site_packages_path);
@@ -173,13 +168,13 @@ pub(crate) fn find_python_search_paths<Host: host::Host>(
 }
 
 /// Determine the relevant Python search paths.
-fn get_python_search_paths<Host: host::Host>(config: &Config, host: &Host) -> Vec<PathBuf> {
+pub(crate) fn python_search_paths<Host: host::Host>(config: &Config, host: &Host) -> Vec<PathBuf> {
     // TODO(charlie): Cache search paths.
     find_python_search_paths(config, host)
 }
 
 /// Determine the root of the `typeshed` directory.
-pub(crate) fn get_typeshed_root<Host: host::Host>(config: &Config, host: &Host) -> Option<PathBuf> {
+pub(crate) fn typeshed_root<Host: host::Host>(config: &Config, host: &Host) -> Option<PathBuf> {
     if let Some(typeshed_path) = config.typeshed_path.as_ref() {
         // Did the user specify a typeshed path?
         if typeshed_path.is_dir() {
@@ -187,7 +182,7 @@ pub(crate) fn get_typeshed_root<Host: host::Host>(config: &Config, host: &Host) 
         }
     } else {
         // If not, we'll look in the Python search paths.
-        for python_search_path in get_python_search_paths(config, host) {
+        for python_search_path in python_search_paths(config, host) {
             let possible_typeshed_path = python_search_path.join("typeshed");
             if possible_typeshed_path.is_dir() {
                 return Some(possible_typeshed_path);
@@ -198,32 +193,19 @@ pub(crate) fn get_typeshed_root<Host: host::Host>(config: &Config, host: &Host) 
     None
 }
 
-/// Format the expected `typeshed` subdirectory.
-fn format_typeshed_subdirectory(typeshed_path: &Path, is_stdlib: bool) -> PathBuf {
-    typeshed_path.join(if is_stdlib { "stdlib" } else { "stubs" })
-}
-
 /// Determine the current `typeshed` subdirectory.
-fn get_typeshed_subdirectory<Host: host::Host>(
+fn typeshed_subdirectory<Host: host::Host>(
     is_stdlib: bool,
     config: &Config,
     host: &Host,
 ) -> Option<PathBuf> {
-    let typeshed_path = get_typeshed_root(config, host)?;
-    let typeshed_path = format_typeshed_subdirectory(&typeshed_path, is_stdlib);
+    let typeshed_path =
+        typeshed_root(config, host)?.join(if is_stdlib { "stdlib" } else { "stubs" });
     if typeshed_path.is_dir() {
         Some(typeshed_path)
     } else {
         None
     }
-}
-
-/// Determine the current `typeshed` subdirectory for the standard library.
-pub(crate) fn get_stdlib_typeshed_path<Host: host::Host>(
-    config: &Config,
-    host: &Host,
-) -> Option<PathBuf> {
-    get_typeshed_subdirectory(true, config, host)
 }
 
 /// Generate a map from PyPI-registered package name to a list of paths
@@ -270,13 +252,21 @@ fn build_typeshed_third_party_package_map(third_party_dir: &Path) -> HashMap<Str
 }
 
 /// Determine the current `typeshed` subdirectory for a third-party package.
-pub(crate) fn get_third_party_typeshed_package_paths<Host: host::Host>(
+pub(crate) fn third_party_typeshed_package_paths<Host: host::Host>(
     module_descriptor: &ImportModuleDescriptor,
     config: &Config,
     host: &Host,
 ) -> Option<Vec<PathBuf>> {
-    let typeshed_path = get_typeshed_subdirectory(false, config, host)?;
+    let typeshed_path = typeshed_subdirectory(false, config, host)?;
     let package_paths = build_typeshed_third_party_package_map(&typeshed_path);
     let first_name_part = module_descriptor.name_parts.first().map(String::as_str)?;
     package_paths.get(first_name_part).cloned()
+}
+
+/// Determine the current `typeshed` subdirectory for the standard library.
+pub(crate) fn stdlib_typeshed_path<Host: host::Host>(
+    config: &Config,
+    host: &Host,
+) -> Option<PathBuf> {
+    typeshed_subdirectory(true, config, host)
 }
