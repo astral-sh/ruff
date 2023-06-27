@@ -50,7 +50,7 @@ toml = { version = "0.7.2" }
 # v0.0.1
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e5beb532fdd1e209ad2dbb470438" }
 
-# Please tag the RustPython version everytime you update its revision here.
+# Please tag the RustPython version everytime you update its revision here and in fuzz/Cargo.toml
 # Tagging the version ensures that older ruff versions continue to build from source even when we rebase our RustPython fork.
 # Current tag: v0.0.7
 ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "c174bbf1f29527edd43d432326327f16f47ab9e0" }
