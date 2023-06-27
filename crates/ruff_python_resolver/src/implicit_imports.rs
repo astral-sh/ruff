@@ -64,12 +64,7 @@ pub(crate) fn find(dir_path: &Path, exclusions: &[&Path]) -> BTreeMap<String, Im
                     .exists()
             {
                 // E.g., `foo.abi3.so` becomes `foo`.
-                let file_stem = path
-                    .file_stem()
-                    .and_then(OsStr::to_str)
-                    .and_then(|file_stem| {
-                        file_stem.split_once('.').map(|(file_stem, _)| file_stem)
-                    });
+                let file_stem = native_module::native_module_name(&path);
                 let is_native_lib = true;
                 (file_stem, is_native_lib)
             } else {
