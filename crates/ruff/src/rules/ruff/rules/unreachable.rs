@@ -217,7 +217,7 @@ struct BasicBlocks<'stmt> {
     /// themselves. To support this we insert *empty*/fake blocks before the end
     /// of the function that we can link to.
     ///
-    /// Finally `BasicBlock` can also be a sentinal node, see the associated
+    /// Finally `BasicBlock` can also be a sentinel node, see the associated
     /// constants of [`BasicBlock`].
     blocks: Vec<BasicBlock<'stmt>>,
 }
@@ -303,13 +303,13 @@ impl<'stmt> Ranged for Condition<'stmt> {
 type BlockIndex = usize;
 
 impl<'stmt> BasicBlock<'stmt> {
-    /// A sentinal block indicating an empty termination block.
+    /// A sentinel block indicating an empty termination block.
     const EMPTY: BasicBlock<'static> = BasicBlock {
         stmts: &[],
         next: NextBlock::Terminate,
     };
 
-    /// A sentinal block indicating an exception was raised.
+    /// A sentinel block indicating an exception was raised.
     const EXCEPTION: BasicBlock<'static> = BasicBlock {
         stmts: &[Stmt::Return(StmtReturn {
             range: TextRange::new(TextSize::new(0), TextSize::new(0)),
@@ -318,7 +318,7 @@ impl<'stmt> BasicBlock<'stmt> {
         next: NextBlock::Terminate,
     };
 
-    /// Return true if the block is a sentinal or fake block.
+    /// Return true if the block is a sentinel or fake block.
     fn is_sentinel(&self) -> bool {
         self.is_empty() || self.is_exception()
     }
@@ -545,7 +545,7 @@ fn match_case<'stmt>(
     };
     // TODO: handle named arguments, e.g.
     // ```python
-    // match $subjet:
+    // match $subject:
     //   case $binding:
     //     print($binding)
     // ```
@@ -667,8 +667,8 @@ fn change_next_block(
     }
 
     loop {
-        match &blocks[fixup_index].next {
-            NextBlock::Always(next) => {
+        match blocks.get(fixup_index).map(|b| &b.next) {
+            Some(NextBlock::Always(next)) => {
                 let next = *next;
                 if is_target(&blocks[fixup_index], next, from, check_condition) {
                     // Found our target, change it.
@@ -676,11 +676,11 @@ fn change_next_block(
                 }
                 return;
             }
-            NextBlock::If {
+            Some(NextBlock::If {
                 condition,
                 next,
                 orelse,
-            } => {
+            }) => {
                 let idx = fixup_index;
                 let condition = condition.clone();
                 let next = *next;
@@ -723,7 +723,7 @@ fn change_next_block(
                     orelse,
                 };
             }
-            NextBlock::Terminate => return,
+            Some(NextBlock::Terminate) | None => return,
         }
     }
 }
@@ -841,7 +841,7 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
             } else {
                 for stmt in block.stmts {
                     let code_line = &self.source[stmt.range()].trim();
-                    mermaid_write_qouted_str(f, code_line)?;
+                    mermaid_write_quoted_str(f, code_line)?;
                     write!(f, "\\n")?;
                 }
             }
@@ -871,8 +871,8 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
     }
 }
 
-/// Escape double qoutes (`"`) in `value` using `#quot;`.
-fn mermaid_write_qouted_str(f: &mut fmt::Formatter<'_>, value: &str) -> fmt::Result {
+/// Escape double quotes (`"`) in `value` using `#quot;`.
+fn mermaid_write_quoted_str(f: &mut fmt::Formatter<'_>, value: &str) -> fmt::Result {
     let mut parts = value.split('"');
     if let Some(v) = parts.next() {
         write!(f, "{v}")?;
