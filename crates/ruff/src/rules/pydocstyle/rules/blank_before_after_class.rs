@@ -11,12 +11,16 @@ use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 /// ## What it does
-/// Checks for docstrings that are not separated from the class definition by one
+/// Checks for docstrings on class definitions that are not preceded by a
 /// blank line.
 ///
 /// ## Why is this bad?
-/// Use a blank line to separate the docstring from the class definition for
+/// Use a blank line to separate the docstring from the class definition, for
 /// consistency.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention (for example, this rule is typically enforced under the Google
+/// and NumPy docstring conventions). For an alternative, see [D211].
 ///
 /// ## Example
 /// ```python
@@ -30,6 +34,8 @@ use crate::registry::{AsRule, Rule};
 ///
 ///     """Metadata about a photo."""
 /// ```
+///
+/// [D211]: https://beta.ruff.rs/docs/rules/blank-line-before-class
 #[violation]
 pub struct OneBlankLineBeforeClass {
     lines: usize,
@@ -47,13 +53,12 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 }
 
 /// ## What it does
-/// Checks for class methods that are not separated from the class docstring by
-/// one blank line.
+/// Checks for class methods that are not separated from the class's docstring
+/// by a blank line.
 ///
 /// ## Why is this bad?
-/// [PEP 256](https://peps.python.org/pep-0257/#multi-line-docstrings)
-/// recommends the use of a blank line to separate the class docstring from the
-/// class methods for consistency.
+/// [PEP 257] recommends the use of a blank line to separate a class's
+/// docstring its methods.
 ///
 /// ## Example
 /// ```python
@@ -76,6 +81,8 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct OneBlankLineAfterClass {
     lines: usize,
@@ -93,12 +100,15 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 }
 
 /// ## What it does
-/// Checks for docstrings that are separated from the class definition by one
-/// blank line.
+/// Checks for docstrings on class definitions that are preceded by a blank
+/// line.
 ///
 /// ## Why is this bad?
-/// Remove blank lines separating the docstring from the class definition for
-/// consistency.
+/// Avoid introducing any blank lines between a class definition and its
+/// docstring, for consistency.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. For an alternative, see [D203].
 ///
 /// ## Example
 /// ```python
@@ -112,6 +122,8 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 ///
 ///     """Metadata about a photo."""
 /// ```
+///
+/// [D203]: https://beta.ruff.rs/docs/rules/one-blank-line-before-class
 #[violation]
 pub struct BlankLineBeforeClass {
     lines: usize,

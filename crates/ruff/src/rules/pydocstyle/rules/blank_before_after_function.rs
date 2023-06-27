@@ -13,11 +13,12 @@ use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 /// ## What it does
-/// Checks for docstrings that are separated from the function definition by
-/// one or more blank lines.
+/// Checks for docstrings on functions that are separated by one or more blank
+/// lines from the function definition.
 ///
 /// ## Why is this bad?
-/// Remove any blank lines before the docstring for consistency.
+/// Remove any blank lines between the function definition and its docstring,
+/// for consistency.
 ///
 /// ## Example
 /// ```python
@@ -54,11 +55,12 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
 }
 
 /// ## What it does
-/// Checks for function docstrings that are separated from the function
-/// body by one or more blank lines.
+/// Checks for docstrings on functions that are separated by one or more blank
+/// lines from the function body.
 ///
 /// ## Why is this bad?
-/// Remove any blank lines after the docstring for consistency.
+/// Remove any blank lines between the function body and the function
+/// docstring, for consistency.
 ///
 /// ## Example
 /// ```python

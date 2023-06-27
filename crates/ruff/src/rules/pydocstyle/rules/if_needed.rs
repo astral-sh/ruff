@@ -9,13 +9,17 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
 /// ## What it does
-/// Checks for functions decorated with `@overload` that contain a docstring.
+/// Checks for `@overload` function definitions that contain a docstring.
 ///
 /// ## Why is this bad?
-/// `@overload` is used to define multiple signatures for a function. This is
-/// for type checkers only; the decorated function is overwritten by the the
-/// non-decorated function. Therefore, the docstring should be defined in the
-/// non-decorated function.
+/// The `@overload` decorator is used to define multiple compatible signatures
+/// for a given function, to support type-checking. A series of `@overload`
+/// definitions should be followed by a single non-decorated definition that
+/// contains the implementation of the function.
+///
+/// `@overload` function definitions should not contain a docstring; instead,
+/// the docstring should be placed on the non-decorated definition that contains
+/// the implementation.
 ///
 /// ## Example
 /// ```python

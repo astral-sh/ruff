@@ -21,10 +21,10 @@ static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 /// Checks for docstring first lines that are not in an imperative mood.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/) recommends that the first line
-/// of a docstring is in an imperative mood for consistency.
+/// [PEP 257] recommends that the first line of a docstring be written in the
+/// imperative mood, for consistency.
 ///
-/// To re-write the docstring in an imperative mood, phrase the first line as
+/// Hint: to rewrite the docstring in the imperative, phrase the first line as
 /// if it were a command.
 ///
 /// ## Example
@@ -41,6 +41,8 @@ static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct NonImperativeMood {
     first_line: String,

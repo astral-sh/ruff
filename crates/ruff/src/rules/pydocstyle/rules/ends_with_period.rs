@@ -12,11 +12,11 @@ use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::logical_line;
 
 /// ## What it does
-/// Checks for the first line of a docstring that does not end with a period.
+/// Checks for docstrings in which the first line does not end in a period.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/) recommends that the first line
-/// of a docstring is a phrase in the form of a command, ending in a period.
+/// [PEP 257] recommends that the first line of a docstring is written in the
+/// form of a command, ending in a period.
 ///
 /// ## Example
 /// ```python
@@ -34,6 +34,8 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct EndsInPeriod;
 

@@ -12,13 +12,20 @@ use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 /// ## What it does
-/// Checks for docstring summaries that are not on the first line of the
-/// docstring.
+/// Checks for docstring summary lines that are not positioned on the first
+/// physical line of the docstring.
 ///
 /// ## Why is this bad?
-/// The docstring summary should be on the first line of the docstring for
-/// consistency.
+/// [PEP 257] recommends that multi-line docstrings consist of "a summary line
+/// just like a one-line docstring, followed by a blank line, followed by a
+/// more elaborate description."
 ///
+/// The summary line should be located on the first physical line of the
+/// docstring, immediately after the opening quotes.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention (for example, this rule is typically enforced under the Google
+/// docstring conventions). For an alternative, see [D213].
 ///
 /// ## Example
 /// ```python
@@ -40,6 +47,8 @@ use crate::registry::{AsRule, Rule};
 ///     sort algorithm.
 ///     """
 /// ```
+///
+/// [D213]: https://beta.ruff.rs/docs/rules/multi-line-summary-second-line
 #[violation]
 pub struct MultiLineSummaryFirstLine;
 
@@ -55,13 +64,19 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
 }
 
 /// ## What it does
-/// Checks for docstring summaries that are not on the second line of the
-/// docstring.
+/// Checks for docstring summary lines that are not positioned on the second
+/// physical line of the docstring.
 ///
 /// ## Why is this bad?
-/// The docstring summary should be on the second line of the docstring for
-/// consistency.
+/// [PEP 257] recommends that multi-line docstrings consist of "a summary line
+/// just like a one-line docstring, followed by a blank line, followed by a
+/// more elaborate description."
 ///
+/// The summary line should be located on the second physical line of the
+/// docstring, immediately after the opening quotes and the blank line.
+///
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. For an alternative, see [D212].
 ///
 /// ## Example
 /// ```python
@@ -83,6 +98,8 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
 ///     sort algorithm.
 ///     """
 /// ```
+///
+/// [D212]: https://beta.ruff.rs/docs/rules/multi-line-summary-first-line
 #[violation]
 pub struct MultiLineSummarySecondLine;
 

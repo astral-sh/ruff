@@ -56,10 +56,8 @@ impl Violation for IndentWithSpaces {
 /// Checks for under-indented docstrings.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
-/// that docstrings be indented to the same level as the quotes on the first
-/// line.
-///
+/// [PEP 257] recommends that docstrings be indented to the same level as their
+/// opening quotes. Avoid under-indenting docstrings, for consistency.
 ///
 /// ## Example
 /// ```python
@@ -85,6 +83,8 @@ impl Violation for IndentWithSpaces {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct UnderIndentation;
 
@@ -103,10 +103,8 @@ impl AlwaysAutofixableViolation for UnderIndentation {
 /// Checks for over-indented docstrings.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
-/// that docstrings be indented to the same level as the quotes on the first
-/// line.
-///
+/// [PEP 257] recommends that docstrings be indented to the same level as their
+/// opening quotes. Avoid over-indenting docstrings, for consistency.
 ///
 /// ## Example
 /// ```python
@@ -132,6 +130,8 @@ impl AlwaysAutofixableViolation for UnderIndentation {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct OverIndentation;
 

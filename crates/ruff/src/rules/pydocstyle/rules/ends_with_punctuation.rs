@@ -12,12 +12,12 @@ use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::logical_line;
 
 /// ## What it does
-/// Checks for the first line of a docstring that does not end with a period,
-/// question mark, or exclamation point.
+/// Checks for docstrings in which the first line does not end in a punctuation
+/// mark, such as a period, question mark, or exclamation point.
 ///
 /// ## Why is this bad?
 /// The first line of a docstring should end with a period, question mark, or
-/// exclamation point for grammatical correctness and consistency.
+/// exclamation point, for grammatical correctness and consistency.
 ///
 /// ## Example
 /// ```python

@@ -11,15 +11,13 @@ use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for multi-line docstring closing quotes that are not on a separate
-/// line from the last paragraph.
+/// Checks for multi-line docstrings whose closing quotes are not on their
+/// own line.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
-/// that the closing quotes of a multi-line docstring should be on a line by
-/// themselves. This is for consistency and compatibility development tools
-/// that parse docstrings.
-///
+/// [PEP 257] recommends that the closing quotes of a multi-line docstring be
+/// on their own line, for consistency and compatibility with documentation
+/// tools that may need to parse the docstring.
 ///
 /// ## Example
 /// ```python
@@ -44,6 +42,8 @@ use crate::registry::AsRule;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct NewLineAfterLastParagraph;
 

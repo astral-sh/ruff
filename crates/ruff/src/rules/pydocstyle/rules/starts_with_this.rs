@@ -9,10 +9,10 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 /// Checks for docstrings that start with `This`.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/) recommends that the first line
-/// of a docstring is in imperative mood for consistency.
+/// [PEP 257] recommends that the first line of a docstring be written in the
+/// imperative mood, for consistency.
 ///
-/// To re-write the docstring in an imperative mood, phrase the first line as
+/// Hint: to rewrite the docstring in the imperative, phrase the first line as
 /// if it were a command.
 ///
 /// ## Example
@@ -29,6 +29,8 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct DocstringStartsWithThis;
 

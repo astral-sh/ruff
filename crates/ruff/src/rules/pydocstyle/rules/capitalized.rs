@@ -13,9 +13,8 @@ use crate::registry::AsRule;
 /// Checks for docstrings that do not start with a capital letter.
 ///
 /// ## Why is this bad?
-/// The first line should be a short description of the object’s purpose. The
-/// first character should be capitalized for grammatical correctness and
-/// consistency.
+/// The first character in a docstring should be capitalized for, grammatical
+/// correctness and consistency.
 ///
 /// ## Example
 /// ```python

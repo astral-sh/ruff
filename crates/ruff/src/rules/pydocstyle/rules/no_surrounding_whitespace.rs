@@ -10,10 +10,10 @@ use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
 /// ## What it does
-/// Checks for surrounding whitespace in docstring text.
+/// Checks for surrounding whitespace in docstrings.
 ///
 /// ## Why is this bad?
-/// Remove surrounding whitespace in docstring text for consistency.
+/// Remove surrounding whitespace from the docstring, for consistency.
 ///
 /// ## Example
 /// ```python

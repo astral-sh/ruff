@@ -8,13 +8,11 @@ use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for docstrings that fit on one line but are written on multiple
-/// lines.
+/// Checks for single-line docstrings that are broken across multiple lines.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/#one-line-docstrings) recommends
-/// that docstrings that fit on one line should be written on one line, for
-/// consistency and readability.
+/// [PEP 257] recommends that docstrings that _can_ fit on one line should be
+/// formatted on a single line, for consistency and readability.
 ///
 /// ## Example
 /// ```python
@@ -32,6 +30,8 @@ use crate::registry::AsRule;
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct FitsOnOneLine;
 

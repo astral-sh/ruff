@@ -9,25 +9,23 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
 /// ## What it does
-/// Checks for the function's signature in the first line of the docstring.
+/// Checks for function docstrings that include the function's signature in
+/// the summary line.
 ///
 /// ## Why is this bad?
-/// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
-/// against including the function's signature in the docstring.
-///
-/// Instead, consider using type annotations for the function's parameters and
-/// return value.
-///
+/// [PEP 257] recommends against including a function's signature in its
+/// docstring. Instead, consider using type annotations as a form of
+/// documentation for the function's parameters and return value.
 ///
 /// ## Example
 /// ```python
-/// def function(a, b):
-///     """function(a: int, b: int) -> list"""
+/// def foo(a, b):
+///     """foo(a: int, b: int) -> list[int]"""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def function(a: int, b: int) -> list:
+/// def foo(a: int, b: int) -> list[int]:
 ///     """Return a list of a and b."""
 /// ```
 ///
@@ -35,7 +33,8 @@ use crate::docstrings::Docstring;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-/// - [PEP 484 – Type Hints](https://peps.python.org/pep-0484/)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct NoSignature;
 
