@@ -453,4 +453,48 @@ sections.py:499:9: D407 [*] Missing dashed underline after section ("Args")
 505 506 | 
 506 507 |         """
 
+sections.py:519:5: D407 [*] Missing dashed underline after section ("Parameters")
+    |
+518 |   def replace_equals_with_dash():
+519 |       """Equal length equals should be replaced with dashes.
+    |  _____^
+520 | | 
+521 | |     Parameters
+522 | |     ==========
+523 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Parameters"
+
+ℹ Suggested fix
+519 519 |     """Equal length equals should be replaced with dashes.
+520 520 | 
+521 521 |     Parameters
+522     |-    ==========
+    522 |+    ----------
+523 523 |     """
+524 524 | 
+525 525 | 
+
+sections.py:527:5: D407 [*] Missing dashed underline after section ("Parameters")
+    |
+526 |   def replace_equals_with_dash2():
+527 |       """Here, the length of equals is not the same.
+    |  _____^
+528 | | 
+529 | |     Parameters
+530 | |     ===========
+531 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Parameters"
+
+ℹ Suggested fix
+527 527 |     """Here, the length of equals is not the same.
+528 528 | 
+529 529 |     Parameters
+    530 |+    ----------
+530 531 |     ===========
+531 532 |     """
+
 
