@@ -986,9 +986,6 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    dbg!(comment.preceding_node());
-    dbg!(comment.following_node());
-    dbg!(comment.enclosing_node());
     match comment.enclosing_node() {
         // TODO: can maybe also add AnyNodeRef::Arguments here, but tricky to test due to
         // https://github.com/astral-sh/ruff/issues/5176
