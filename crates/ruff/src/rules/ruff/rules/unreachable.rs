@@ -17,7 +17,7 @@ use rustpython_parser::text_size::{TextRange, TextSize};
 ///
 /// ## Example
 /// ```python
-/// def function()
+/// def function():
 ///     if False:
 ///         return "unreachable"
 ///     return "reachable"
@@ -25,7 +25,7 @@ use rustpython_parser::text_size::{TextRange, TextSize};
 ///
 /// Use instead:
 /// ```python
-/// def function()
+/// def function():
 ///     return "reachable"
 /// ```
 #[violation]
