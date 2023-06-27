@@ -466,7 +466,7 @@ sections.py:519:5: D407 [*] Missing dashed underline after section ("Parameters"
     |
     = help: Add dashed line under "Parameters"
 
-ℹ Suggested fix
+ℹ Fix
 519 519 |     """Equal length equals should be replaced with dashes.
 520 520 | 
 521 521 |     Parameters
@@ -489,7 +489,7 @@ sections.py:527:5: D407 [*] Missing dashed underline after section ("Parameters"
     |
     = help: Add dashed line under "Parameters"
 
-ℹ Suggested fix
+ℹ Fix
 527 527 |     """Here, the length of equals is not the same.
 528 528 | 
 529 529 |     Parameters
