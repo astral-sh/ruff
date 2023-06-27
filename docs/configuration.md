@@ -11,8 +11,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
-select = ["E", "F"]
+# Enable pycodestyle (`E`), Pyflakes (`F`), and McCabe complexity check by default. 
+select = ["E", "F", "C90"]
 ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
