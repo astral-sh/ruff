@@ -360,11 +360,11 @@ fn create_blocks<'stmt>(
             | Stmt::Expr(_)
             | Stmt::Break(_)
             | Stmt::Continue(_) // NOTE: the next branch gets fixed up in `change_next_block`.
-            | Stmt::Pass(_) => unconditional_next_block(blocks),
+            | Stmt::Pass(_) => unconditional_next_block(blocks, after),
             // Statements that (can) divert the control flow.
             Stmt::If(stmt) => {
-                let next_after_block = after.unwrap_or_else(|| maybe_next_block_index(blocks, || needs_next_block(&stmt.body)));
-                let orelse_after_block = after.unwrap_or_else(|| maybe_next_block_index(blocks, || needs_next_block(&stmt.orelse)));
+                let next_after_block = maybe_next_block_index(blocks, after, || needs_next_block(&stmt.body));
+                let orelse_after_block = maybe_next_block_index(blocks, after, || needs_next_block(&stmt.orelse));
                 let next = append_blocks_if_not_empty(blocks, &stmt.body, next_after_block);
                 let orelse = append_blocks_if_not_empty(blocks, &stmt.orelse, orelse_after_block);
                 NextBlock::If {
@@ -401,7 +401,7 @@ fn create_blocks<'stmt>(
                 // very carefully.
                 // For now we'll skip over it.
                 let _ = (body, handlers, orelse, finalbody); // Silence unused code warnings.
-                unconditional_next_block(blocks)
+                unconditional_next_block(blocks, after)
             }
             Stmt::With(StmtWith { items, body, type_comment, .. })
             | Stmt::AsyncWith(StmtAsyncWith { items, body, type_comment, .. }) => {
@@ -411,10 +411,10 @@ fn create_blocks<'stmt>(
                 // to a `try` statement.
                 // For now we'll skip over it.
                 let _ = (items, body, type_comment); // Silence unused code warnings.
-                unconditional_next_block(blocks)
+                unconditional_next_block(blocks, after)
             }
             Stmt::Match(StmtMatch { subject, cases, .. }) => {
-                let next_after_block = maybe_next_block_index(blocks, || {
+                let next_after_block = maybe_next_block_index(blocks, after, || {
                     // We don't need need a next block if all cases don't need a
                     // next block, i.e. if no cases need a next block, and we
                     // have a wildcard case (to ensure one of the block is
@@ -492,7 +492,7 @@ fn loop_block<'stmt>(
     orelse: &'stmt [Stmt],
     after: Option<BlockIndex>,
 ) -> NextBlock<'stmt> {
-    let after_block = maybe_next_block_index(blocks, || orelse.is_empty());
+    let after_block = maybe_next_block_index(blocks, after, || orelse.is_empty());
     // NOTE: a while loop's body must not be empty, so we can safely
     // create at least one block from it.
     debug_assert!(!body.is_empty());
@@ -596,7 +596,14 @@ fn append_blocks_if_not_empty<'stmt>(
 }
 
 /// Select the next block from `blocks` unconditonally.
-fn unconditional_next_block(blocks: &[BasicBlock<'_>]) -> NextBlock<'static> {
+fn unconditional_next_block(
+    blocks: &[BasicBlock<'_>],
+    after: Option<BlockIndex>,
+) -> NextBlock<'static> {
+    if let Some(after) = after {
+        return NextBlock::Always(after);
+    }
+
     // Either we continue with the next block (that is the last block `blocks`).
     // Or it's the last statement, thus we terminate.
     blocks
@@ -608,7 +615,7 @@ fn unconditional_next_block(blocks: &[BasicBlock<'_>]) -> NextBlock<'static> {
 /// Select the next block index from `blocks`. If there is no next block it will
 /// add a fake/empty block.
 fn force_next_block_index(blocks: &mut Vec<BasicBlock<'_>>) -> BlockIndex {
-    maybe_next_block_index(blocks, || true)
+    maybe_next_block_index(blocks, None, || true)
 }
 
 /// Select the next block index from `blocks`. If there is no next block it will
@@ -616,10 +623,15 @@ fn force_next_block_index(blocks: &mut Vec<BasicBlock<'_>>) -> BlockIndex {
 /// false the returned index may not be used.
 fn maybe_next_block_index(
     blocks: &mut Vec<BasicBlock<'_>>,
+    after: Option<BlockIndex>,
     condition: impl FnOnce() -> bool,
 ) -> BlockIndex {
-    // Either we continue with the next block (that is the last block in `blocks`).
-    if let Some(idx) = blocks.len().checked_sub(1) {
+    if let Some(after) = after {
+        // Next block is already determined.
+        after
+    } else if let Some(idx) = blocks.len().checked_sub(1) {
+        // Otherwise we either continue with the next block (that is the last
+        // block in `blocks`).
         idx
     } else if condition() {
         // Or if there are no blocks, but need one based on `condition` than we

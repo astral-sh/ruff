@@ -1,0 +1,67 @@
+---
+source: crates/ruff/src/rules/ruff/rules/unreachable.rs
+---
+%% Source code:
+%% def func(self, obj: BytesRep) -> bytes:
+%%     data = obj["data"]
+%% 
+%%     if isinstance(data, str):
+%%         return base64.b64decode(data)
+%%     elif isinstance(data, Buffer):
+%%         buffer = data
+%%     else:
+%%         id = data["id"]
+%% 
+%%         if id in self._buffers:
+%%             buffer = self._buffers[id]
+%%         else:
+%%             self.error(f"can't resolve buffer '{id}'")
+%% 
+%%     return buffer.data
+
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0["return buffer.data\n"]
+  block1["return base64.b64decode(data)\n"]
+  block2["buffer = data\n"]
+  block3["buffer = self._buffers[id]\n"]
+  block4["self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+  block5["id = data[#quot;id#quot;]\nif id in self._buffers:
+            buffer = self._buffers[id]
+        else:
+            self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+  block6["elif isinstance(data, Buffer):
+        buffer = data
+    else:
+        id = data[#quot;id#quot;]
+
+        if id in self._buffers:
+            buffer = self._buffers[id]
+        else:
+            self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+  block7["data = obj[#quot;data#quot;]\nif isinstance(data, str):
+        return base64.b64decode(data)
+    elif isinstance(data, Buffer):
+        buffer = data
+    else:
+        id = data[#quot;id#quot;]
+
+        if id in self._buffers:
+            buffer = self._buffers[id]
+        else:
+            self.error(f#quot;can't resolve buffer '{id}'#quot;)\n"]
+
+  start --> block7
+  block7 -- "isinstance(data, str)" --> block1
+  block7 -- "else" --> block6
+  block6 -- "isinstance(data, Buffer)" --> block2
+  block6 -- "else" --> block5
+  block5 -- "id in self._buffers" --> block3
+  block5 -- "else" --> block4
+  block4 --> block0
+  block3 --> block0
+  block2 --> block0
+  block1 --> return
+  block0 --> return
+
