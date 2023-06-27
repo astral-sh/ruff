@@ -24,18 +24,18 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// class Person:
-///     __slots__ = "name"
+///     __slots__: str = "name"
 ///
-///     def __init__(self, name: string):
+///     def __init__(self, name: string) -> None:
 ///         self.name = name
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Person:
-///     __slots__ = ("name",)
+///     __slots__: tuple[str, ...] = ("name",)
 ///
-///     def __init__(self, name: string):
+///     def __init__(self, name: string) -> None:
 ///         self.name = name
 /// ```
 ///
