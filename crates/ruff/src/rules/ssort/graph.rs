@@ -1,10 +1,12 @@
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use std::cmp::Reverse;
 use std::collections::hash_map::Keys;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::fmt::Debug;
 use std::hash::Hash;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Graph<N, E> {
     outgoing_edges: HashMap<N, HashMap<N, E>>,
     incoming_edges: HashMap<N, HashMap<N, E>>,
@@ -16,6 +18,10 @@ impl<N, E> Graph<N, E> {
             outgoing_edges: HashMap::new(),
             incoming_edges: HashMap::new(),
         }
+    }
+
+    fn node_count(&self) -> usize {
+        self.outgoing_edges.len()
     }
 }
 
@@ -48,8 +54,26 @@ where
         self.outgoing_edges.keys()
     }
 
-    fn neighbors(&self, node: &N) -> Option<impl Iterator<Item = &N>> {
+    fn outgoing_neighbors(&self, node: &N) -> Option<impl Iterator<Item = &N>> {
         self.outgoing_edges.get(node).map(|edges| edges.keys())
+    }
+
+    fn incoming_neighbors(&self, node: &N) -> Option<impl Iterator<Item = &N>> {
+        self.incoming_edges.get(node).map(|edges| edges.keys())
+    }
+
+    fn outgoing_neighbor_count(&self, node: &N) -> usize {
+        self.outgoing_edges
+            .get(node)
+            .map(|edges| edges.len())
+            .unwrap_or(0)
+    }
+
+    fn incoming_neighbor_count(&self, node: &N) -> usize {
+        self.incoming_edges
+            .get(node)
+            .map(|edges| edges.len())
+            .unwrap_or(0)
     }
 
     fn remove_edge(&mut self, source: &N, target: &N) {
@@ -89,9 +113,39 @@ where
             .or_default()
             .insert(source, edge);
 
-        // outgoing_edges is used to track all nodes, so make sure the target exists there.
         self.outgoing_edges.entry(target).or_default();
+        self.incoming_edges.entry(source).or_default();
     }
+}
+
+pub(super) fn topological_sort<N, E>(graph: &Graph<N, E>) -> Vec<N>
+where
+    N: Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    E: Copy + Ord + PartialOrd,
+{
+    let mut graph = graph.clone();
+    break_cycles(&mut graph);
+
+    let mut pending: BinaryHeap<Reverse<N>> = graph
+        .nodes()
+        .filter(|node| graph.incoming_neighbors(node).unwrap().next().is_none())
+        .map(|node| Reverse(*node))
+        .collect();
+
+    let mut result: Vec<N> = Vec::new();
+    loop {
+        let Some(Reverse(node)) = pending.pop() else {break};
+        for neighbor in graph.outgoing_neighbors(&node).unwrap() {
+            if graph.incoming_neighbor_count(neighbor) == 1 {
+                pending.push(Reverse(*neighbor));
+            }
+        }
+        graph.remove_node(&node);
+        result.push(node);
+    }
+
+    assert!(graph.node_count() == 0);
+    result
 }
 
 fn break_cycles<N, E>(graph: &mut Graph<N, E>)
@@ -149,7 +203,7 @@ where
 {
     path.insert(node);
 
-    for neighbor in graph.neighbors(&node).unwrap() {
+    for neighbor in graph.outgoing_neighbors(&node).unwrap() {
         if let Some(index) = path.get_index_of(neighbor) {
             return Some(
                 path.get_range(index..)
@@ -177,21 +231,21 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_graph_insert_node() {
+    fn graph_insert_node() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_node("a");
         assert!(graph.contains_node(&"a"));
     }
 
     #[test]
-    fn test_graph_insert_edge() {
+    fn graph_insert_edge() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_edge("a", "b", 1);
         assert_eq!(graph.edge(&"a", &"b"), Some(&1));
     }
 
     #[test]
-    fn test_graph_remove_node() {
+    fn graph_remove_node() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_edge("a", "b", 1);
         graph.insert_edge("a", "c", 2);
@@ -206,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn test_graph_remove_edge() {
+    fn graph_remove_edge() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_edge("a", "b", 1);
         graph.insert_edge("a", "c", 2);
@@ -221,35 +275,115 @@ mod tests {
     }
 
     #[test]
-    fn test_find_cycle() {
+    fn find_cycle_with_empty_graph() {
+        let mut graph = Graph::<&str, i32>::new();
+        assert_eq!(find_cycle(&graph), None);
+    }
+
+    #[test]
+    fn find_cycle_with_no_cycles() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_edge("a", "b", 1);
-        graph.insert_edge("b", "c", 1);
-        graph.insert_edge("c", "d", 1);
-        graph.insert_edge("d", "e", 1);
-        graph.insert_edge("e", "a", 1);
+        graph.insert_edge("b", "c", 2);
+        graph.insert_edge("c", "d", 3);
+        assert_eq!(find_cycle(&graph), None);
+    }
+
+    #[test]
+    fn find_cycle_with_one_cycle() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "b", 1);
+        graph.insert_edge("b", "c", 2);
+        graph.insert_edge("c", "a", 3);
         assert_eq!(
             find_cycle(&graph)
                 .unwrap()
                 .into_iter()
                 .collect::<HashSet<_>>(),
-            HashSet::from_iter(["a", "b", "c", "d", "e"])
+            HashSet::from_iter(["a", "b", "c"])
         );
     }
 
     #[test]
-    fn test_break_cycles() {
+    fn find_cycle_with_self_cycle() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "a", 1);
+        assert_eq!(
+            find_cycle(&graph)
+                .unwrap()
+                .into_iter()
+                .collect::<HashSet<_>>(),
+            HashSet::from_iter(["a"])
+        );
+    }
+
+    #[test]
+    fn break_cycles_with_empty_graph() {
+        let mut graph = Graph::<&str, i32>::new();
+        break_cycles(&mut graph);
+        assert_eq!(graph.node_count(), 0);
+    }
+
+    #[test]
+    fn break_cycles_with_no_cycles() {
         let mut graph = Graph::<&str, i32>::new();
         graph.insert_edge("a", "b", 1);
         graph.insert_edge("b", "c", 2);
         graph.insert_edge("c", "d", 3);
-        graph.insert_edge("d", "e", 4);
-        graph.insert_edge("e", "a", 5);
         break_cycles(&mut graph);
         assert_eq!(graph.edge(&"a", &"b"), Some(&1));
         assert_eq!(graph.edge(&"b", &"c"), Some(&2));
         assert_eq!(graph.edge(&"c", &"d"), Some(&3));
-        assert_eq!(graph.edge(&"d", &"e"), Some(&4));
-        assert_eq!(graph.edge(&"e", &"a"), None);
+    }
+
+    #[test]
+    fn break_cycles_with_one_cycle() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "b", 1);
+        graph.insert_edge("b", "c", 2);
+        graph.insert_edge("c", "a", 3);
+        break_cycles(&mut graph);
+        assert_eq!(graph.edge(&"a", &"b"), Some(&1));
+        assert_eq!(graph.edge(&"b", &"c"), Some(&2));
+        assert_eq!(graph.edge(&"c", &"a"), None);
+    }
+
+    #[test]
+    fn break_cycles_with_self_cycle() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "a", 1);
+        break_cycles(&mut graph);
+        assert_eq!(graph.edge(&"a", &"a"), None);
+    }
+
+    #[test]
+    fn topological_sort_with_empty_graph() {
+        let mut graph = Graph::<&str, i32>::new();
+        assert_eq!(topological_sort(&graph), [] as [&str; 0]);
+    }
+
+    #[test]
+    fn topological_sort_with_no_cycles() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "b", 1);
+        graph.insert_edge("b", "c", 2);
+        graph.insert_edge("c", "d", 3);
+        assert_eq!(topological_sort(&graph), ["a", "b", "c", "d"]);
+    }
+
+    #[test]
+    fn topological_sort_with_one_cycle() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "b", 3);
+        graph.insert_edge("b", "c", 2);
+        graph.insert_edge("c", "a", 1);
+        assert_eq!(topological_sort(&graph), ["b", "c", "a"]);
+    }
+
+    #[test]
+    fn topological_sort_with_self_cycle() {
+        let mut graph = Graph::<&str, i32>::new();
+        graph.insert_edge("a", "a", 1);
+        assert_eq!(topological_sort(&graph), ["a"]);
     }
 }
