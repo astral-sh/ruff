@@ -200,7 +200,7 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
 
     if following.is_except_handler() {
         // Attach it to the following except handler (which has a node) as leading
-        return CommentPlacement::leading(following, comment);
+        CommentPlacement::leading(following, comment)
     } else {
         // No following except handler; attach it to the `try` statement.as dangling
         CommentPlacement::dangling(comment.enclosing_node(), comment)
