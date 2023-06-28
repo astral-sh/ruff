@@ -173,8 +173,11 @@ fn resolve_module_descriptor(
         resolved_paths.len() == module_descriptor.name_parts.len()
     };
 
-    let is_partly_resolved =
-        !resolved_paths.is_empty() && resolved_paths.len() < module_descriptor.name_parts.len();
+    let is_partly_resolved = if resolved_paths.is_empty() {
+        false
+    } else {
+        resolved_paths.len() < module_descriptor.name_parts.len()
+    };
 
     ImportResult {
         is_relative: false,
@@ -286,9 +289,10 @@ fn resolve_best_absolute_import<Host: host::Host>(
                 // If we resolved to a namespace package, ensure that all imported symbols are
                 // present in the namespace package's "implicit" imports.
                 if typings_import.is_namespace_package
-                    && typings_import.resolved_paths[typings_import.resolved_paths.len() - 1]
-                        .as_os_str()
-                        .is_empty()
+                    && typings_import
+                        .resolved_paths
+                        .last()
+                        .map_or(false, |path| path.as_os_str().is_empty())
                 {
                     if typings_import
                         .implicit_imports
