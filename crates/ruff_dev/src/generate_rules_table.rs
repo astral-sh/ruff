@@ -8,17 +8,24 @@ use ruff::settings::options::Options;
 use ruff_diagnostics::AutofixKind;
 
 const FIX_SYMBOL: &str = "🛠";
+const NURSERY_SYMBOL: &str = "🌅";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
-    table_out.push_str("| Code | Name | Message | Fix |");
+    table_out.push_str("| Code | Name | Message | Status |");
     table_out.push('\n');
-    table_out.push_str("| ---- | ---- | ------- | --- |");
+    table_out.push_str("| ---- | ---- | ------- | ------ |");
     table_out.push('\n');
     for rule in rules {
         let fix_token = match rule.autofixable() {
             AutofixKind::None => "",
             AutofixKind::Always | AutofixKind::Sometimes => FIX_SYMBOL,
         };
+        let nursery_token = if rule.is_nursery() {
+            NURSERY_SYMBOL
+        } else {
+            ""
+        };
+        let status_token = format!("{fix_token} {nursery_token}");
 
         let rule_name = rule.as_ref();
 
@@ -32,7 +39,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 .then_some(format_args!("[{rule_name}](rules/{rule_name}.md)"))
                 .unwrap_or(format_args!("{rule_name}")),
             rule.message_formats()[0],
-            fix_token
+            status_token,
         ));
         table_out.push('\n');
     }
@@ -41,7 +48,10 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
 
 pub(crate) fn generate() -> String {
     // Generate the table string.
-    let mut table_out = format!("The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option.\n\n");
+    let mut table_out = format!(
+        "The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option.\n\
+        The {NURSERY_SYMBOL} emoji indicates that a rule is part of the nursery, a collection of newer lints that are still under development.\n\n"
+    );
     for linter in Linter::iter() {
         let codes_csv: String = match linter.common_prefix() {
             "" => linter
@@ -105,7 +115,7 @@ pub(crate) fn generate() -> String {
                 generate_table(&mut table_out, prefix.clone().rules(), &linter);
             }
         } else {
-            generate_table(&mut table_out, linter.rules(), &linter);
+            generate_table(&mut table_out, linter.all_rules(), &linter);
         }
     }
 
