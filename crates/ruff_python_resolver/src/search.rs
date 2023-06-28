@@ -8,9 +8,11 @@ use std::path::{Path, PathBuf};
 use log::debug;
 
 use crate::config::Config;
+use crate::host;
 use crate::module_descriptor::ImportModuleDescriptor;
 use crate::python_version::PythonVersion;
-use crate::{host, SITE_PACKAGES};
+
+const SITE_PACKAGES: &str = "site-packages";
 
 /// Find the `site-packages` directory for the specified Python version.
 fn find_site_packages_path(
