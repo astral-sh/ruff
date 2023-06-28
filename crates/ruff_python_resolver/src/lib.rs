@@ -896,4 +896,46 @@ mod tests {
 
         assert_debug_snapshot!(result);
     }
+
+    #[test]
+    fn airflow_explicit_native_module() {
+        setup();
+
+        let root = PathBuf::from("./resources/test/airflow");
+        let source_file = root.join("airflow/api/common/mark_tasks.py");
+
+        let result = resolve_options(
+            source_file,
+            "_watchdog_fsevents",
+            root.clone(),
+            ResolverOptions {
+                venv_path: Some(root),
+                venv: Some(PathBuf::from("venv")),
+                ..Default::default()
+            },
+        );
+
+        assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn airflow_implicit_native_module() {
+        setup();
+
+        let root = PathBuf::from("./resources/test/airflow");
+        let source_file = root.join("airflow/api/common/mark_tasks.py");
+
+        let result = resolve_options(
+            source_file,
+            "orjson",
+            root.clone(),
+            ResolverOptions {
+                venv_path: Some(root),
+                venv: Some(PathBuf::from("venv")),
+                ..Default::default()
+            },
+        );
+
+        assert_debug_snapshot!(result);
+    }
 }

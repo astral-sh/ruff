@@ -1,6 +1,7 @@
 //! Resolves Python imports to their corresponding files on disk.
 
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use log::debug;
@@ -66,22 +67,22 @@ fn resolve_module_descriptor(
             let is_last_part = i == module_descriptor.name_parts.len() - 1;
 
             // Extend the directory path with the next segment.
-            if use_stub_package && is_first_part {
-                dir_path = dir_path.join(format!("{part}-stubs"));
+            let module_dir_path = if use_stub_package && is_first_part {
                 is_stub_package = true;
+                dir_path.join(format!("{part}-stubs"))
             } else {
-                dir_path = dir_path.join(part);
-            }
+                dir_path.join(part)
+            };
 
-            let found_directory = dir_path.is_dir();
+            let found_directory = module_dir_path.is_dir();
             if found_directory {
                 if is_first_part {
-                    package_directory = Some(dir_path.clone());
+                    package_directory = Some(module_dir_path.clone());
                 }
 
                 // Look for an `__init__.py[i]` in the directory.
-                let py_file_path = dir_path.join("__init__.py");
-                let pyi_file_path = dir_path.join("__init__.pyi");
+                let py_file_path = module_dir_path.join("__init__.py");
+                let pyi_file_path = module_dir_path.join("__init__.pyi");
                 is_init_file_present = false;
 
                 if allow_pyi && pyi_file_path.is_file() {
@@ -99,7 +100,7 @@ fn resolve_module_descriptor(
 
                 if look_for_py_typed {
                     py_typed_info =
-                        py_typed_info.or_else(|| py_typed::get_py_typed_info(&dir_path));
+                        py_typed_info.or_else(|| py_typed::get_py_typed_info(&module_dir_path));
                 }
 
                 // We haven't reached the end of the import, and we found a matching directory.
@@ -110,12 +111,14 @@ fn resolve_module_descriptor(
                         is_namespace_package = true;
                         py_typed_info = None;
                     }
+
+                    dir_path = module_dir_path;
                     continue;
                 }
 
                 if is_init_file_present {
                     implicit_imports =
-                        implicit_imports::find(&dir_path, &[&py_file_path, &pyi_file_path]);
+                        implicit_imports::find(&module_dir_path, &[&py_file_path, &pyi_file_path]);
                     break;
                 }
             }
@@ -123,8 +126,8 @@ fn resolve_module_descriptor(
             // We couldn't find a matching directory, or the directory didn't contain an
             // `__init__.py[i]` file. Look for an `.py[i]` file with the same name as the
             // segment, in lieu of a directory.
-            let py_file_path = dir_path.with_extension("py");
-            let pyi_file_path = dir_path.with_extension("pyi");
+            let py_file_path = module_dir_path.with_extension("py");
+            let pyi_file_path = module_dir_path.with_extension("pyi");
 
             if allow_pyi && pyi_file_path.is_file() {
                 debug!("Resolved import with file: {pyi_file_path:?}");
@@ -138,10 +141,14 @@ fn resolve_module_descriptor(
             } else {
                 if allow_native_lib && dir_path.is_dir() {
                     // We couldn't find a `.py[i]` file; search for a native library.
-                    if let Some(native_lib_path) = native_module::find_native_module(&dir_path) {
-                        debug!("Resolved import with file: {native_lib_path:?}");
-                        is_native_lib = true;
-                        resolved_paths.push(native_lib_path);
+                    if let Some(module_name) = module_dir_path.file_name().and_then(OsStr::to_str) {
+                        if let Ok(Some(native_lib_path)) =
+                            native_module::find_native_module(module_name, &dir_path)
+                        {
+                            debug!("Resolved import with file: {native_lib_path:?}");
+                            is_native_lib = true;
+                            resolved_paths.push(native_lib_path);
+                        }
                     }
                 }
 
@@ -153,10 +160,9 @@ fn resolve_module_descriptor(
                             implicit_imports::find(&dir_path, &[&py_file_path, &pyi_file_path]);
                         is_namespace_package = true;
                     }
-                } else if is_native_lib {
-                    debug!("Did not find file {py_file_path:?} or {pyi_file_path:?}");
                 }
             }
+
             break;
         }
     }
