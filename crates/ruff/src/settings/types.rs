@@ -269,6 +269,6 @@ impl Deref for Version {
 /// luckily this not relevant since identifiers don't contains slashes.
 ///
 /// For reference pep8-naming uses
-/// [`fnmatch`](https://docs.python.org/3.11/library/fnmatch.html) for
+/// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
