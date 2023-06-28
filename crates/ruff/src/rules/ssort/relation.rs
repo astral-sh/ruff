@@ -816,7 +816,7 @@ mod tests {
     }
 
     #[test]
-    fn function_def_del_in_body() {
+    fn function_def_with_del() {
         let stmt = parse(
             r#"
                 def a():
@@ -1069,7 +1069,7 @@ mod tests {
     }
 
     #[test]
-    fn async_function_def_del_in_body() {
+    fn async_function_def_with_del() {
         let stmt = parse(
             r#"
                 async def a():
@@ -1197,7 +1197,7 @@ mod tests {
     }
 
     #[test]
-    fn class_def_del_in_body() {
+    fn class_def_with_del() {
         let stmt = parse(
             r#"
                 class a:
@@ -1757,7 +1757,7 @@ mod tests {
     }
 
     #[test]
-    fn for_references_bindings_in_conditional() {
+    fn for_references_bindings_in_orelse() {
         let stmt = parse(
             r#"
                 for a in (b := c)[b]:
@@ -1782,6 +1782,71 @@ mod tests {
                     is_deferred: false,
                     context: RequirementContext::Local
                 }
+            ]
+        );
+    }
+
+    #[test]
+    fn for_with_del_in_body() {
+        let stmt = parse(
+            r#"
+                for a in b:
+                    del c
+                else:
+                    c = d
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn for_with_del_in_orelse() {
+        let stmt = parse(
+            r#"
+                for a in b:
+                    c = d
+                else:
+                    del c
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["c"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
             ]
         );
     }
@@ -1880,7 +1945,7 @@ mod tests {
     }
 
     #[test]
-    fn async_for_references_bindings_in_conditional() {
+    fn async_for_references_bindings_in_orelse() {
         let stmt = parse(
             r#"
                 async for a in (b := c)[b]:
@@ -1905,6 +1970,71 @@ mod tests {
                     is_deferred: false,
                     context: RequirementContext::Local
                 }
+            ]
+        );
+    }
+
+    #[test]
+    fn async_for_with_del_in_body() {
+        let stmt = parse(
+            r#"
+                async for a in b:
+                    del c
+                else:
+                    c = d
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn async_for_with_del_in_orelse() {
+        let stmt = parse(
+            r#"
+                async for a in b:
+                    c = d
+                else:
+                    del c
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["c"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
             ]
         );
     }
@@ -2003,7 +2133,7 @@ mod tests {
     }
 
     #[test]
-    fn while_references_bindings_in_conditional() {
+    fn while_references_bindings_in_orelse() {
         let stmt = parse(
             r#"
                 while (a := b)[a]:
@@ -2159,7 +2289,7 @@ mod tests {
     }
 
     #[test]
-    fn if_references_bindings_in_conditional() {
+    fn if_references_bindings_in_orelse() {
         let stmt = parse(
             r#"
                 if a:
@@ -2629,7 +2759,7 @@ mod tests {
     }
 
     #[test]
-    fn try_references_bindings_in_conditional() {
+    fn try_references_bindings_in_orelse() {
         let stmt = parse(
             r#"
                 try:
@@ -2821,7 +2951,7 @@ mod tests {
     }
 
     #[test]
-    fn try_star_references_bindings_in_conditional() {
+    fn try_star_references_bindings_in_orelse() {
         let stmt = parse(
             r#"
                 try:
@@ -3500,7 +3630,7 @@ mod tests {
     }
 
     #[test]
-    fn if_exp_references_bindings_in_conditional() {
+    fn if_exp_references_bindings_in_orelse() {
         let stmt = parse(r#"(a := b)[a][c][e] if (c := d)[c] else (e := f)[a][c][e]"#);
         let relation = stmt_relation(&stmt);
         assert_eq!(Vec::from_iter(relation.bindings), ["c", "a", "e"]);
