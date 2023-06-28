@@ -67,22 +67,18 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -8,13 +8,7 @@
- 
- async def show_status():
+@@ -10,9 +10,7 @@
      while True:
--        try:
--            if report_host:
+         try:
+             if report_host:
 -                data = (
 -                    f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -                ).encode()
--        except Exception as e:
--            pass
-+        NOT_YET_IMPLEMENTED_StmtTry
++                data = (NOT_YET_IMPLEMENTED_ExprJoinedStr).encode()
+         except Exception as e:
+             pass
  
- 
- def example():
-@@ -30,15 +24,11 @@
+@@ -30,15 +28,11 @@
  
  
  def example2():
@@ -100,7 +96,7 @@ def example8():
  
  
  def example4():
-@@ -50,35 +40,11 @@
+@@ -50,35 +44,11 @@
  
  
  def example6():
@@ -153,7 +149,11 @@ data = (
 
 async def show_status():
     while True:
-        NOT_YET_IMPLEMENTED_StmtTry
+        try:
+            if report_host:
+                data = (NOT_YET_IMPLEMENTED_ExprJoinedStr).encode()
+        except Exception as e:
+            pass
 
 
 def example():

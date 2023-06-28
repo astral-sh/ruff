@@ -29,6 +29,7 @@ pub(super) fn place_comment<'a>(
         handle_trailing_body_comment,
         handle_trailing_end_of_line_body_comment,
         handle_trailing_end_of_line_condition_comment,
+        handle_trailing_end_of_line_except_comment,
         handle_module_level_own_line_comment_before_class_or_function_comment,
         handle_arguments_separator_comment,
         handle_trailing_binary_expression_left_or_operator_comment,
@@ -158,44 +159,52 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.line_position().is_end_of_line() || comment.following_node().is_none() {
+    if comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
     }
 
-    if let Some(AnyNodeRef::ExceptHandlerExceptHandler(except_handler)) = comment.preceding_node() {
-        // it now depends on the indentation level of the comment if it is a leading comment for e.g.
-        // the following `elif` or indeed a trailing comment of the previous body's last statement.
-        let comment_indentation =
-            whitespace::indentation_at_offset(locator, comment.slice().range().start())
-                .map(str::len)
-                .unwrap_or_default();
+    let (Some(AnyNodeRef::ExceptHandlerExceptHandler(preceding_except_handler)), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+        return CommentPlacement::Default(comment);
+    };
 
-        if let Some(except_indentation) =
-            whitespace::indentation(locator, except_handler).map(str::len)
+    // it now depends on the indentation level of the comment if it is a leading comment for e.g.
+    // the following `finally` or indeed a trailing comment of the previous body's last statement.
+    let comment_indentation =
+        whitespace::indentation_at_offset(locator, comment.slice().range().start())
+            .map(str::len)
+            .unwrap_or_default();
+
+    let Some(except_indentation) =
+            whitespace::indentation(locator, preceding_except_handler).map(str::len) else
         {
-            return if comment_indentation <= except_indentation {
-                // It has equal, or less indent than the `except` handler. It must be a comment
-                // of the following `finally` or `else` block
-                //
-                // ```python
-                // try:
-                //     pass
-                // except Exception:
-                //     print("noop")
-                // # leading
-                // finally:
-                //     pass
-                // ```
-                // Attach it to the `try` statement.
-                CommentPlacement::dangling(comment.enclosing_node(), comment)
-            } else {
-                // Delegate to `handle_trailing_body_comment`
-                CommentPlacement::Default(comment)
-            };
-        }
+            return CommentPlacement::Default(comment);
+        };
+
+    if comment_indentation > except_indentation {
+        // Delegate to `handle_trailing_body_comment`
+        return CommentPlacement::Default(comment);
     }
 
-    CommentPlacement::Default(comment)
+    // It has equal, or less indent than the `except` handler. It must be a comment of a subsequent
+    // except handler or of the following `finally` or `else` block
+    //
+    // ```python
+    // try:
+    //     pass
+    // except Exception:
+    //     print("noop")
+    // # leading
+    // finally:
+    //     pass
+    // ```
+
+    if following.is_except_handler() {
+        // Attach it to the following except handler (which has a node) as leading
+        CommentPlacement::leading(following, comment)
+    } else {
+        // No following except handler; attach it to the `try` statement.as dangling
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    }
 }
 
 /// Handles own line comments between the last statement and the first statement of two bodies.
@@ -666,6 +675,40 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     }
 
     CommentPlacement::Default(comment)
+}
+
+/// Handles end of line comments after the `:` of an except clause
+///
+/// ```python
+/// try:
+///    ...
+/// except: # comment
+///     pass
+/// ```
+///
+/// It attaches the comment as dangling comment to the enclosing except handler.
+fn handle_trailing_end_of_line_except_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
+    let AnyNodeRef::ExceptHandlerExceptHandler(handler) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Must be an end of line comment
+    if comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let Some(first_body_statement) = handler.body.first() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    if comment.slice().start() < first_body_statement.range().start() {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Attaches comments for the positional only arguments separator `/` or the keywords only arguments
