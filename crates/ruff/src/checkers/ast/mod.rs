@@ -11,7 +11,7 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
-use ruff_python_ast::helpers::{extract_handled_exceptions, is_docstring_stmt, to_module_path};
+use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::identifier::{Identifier, TryIdentifier};
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
@@ -3270,10 +3270,7 @@ where
                 if self.enabled(Rule::UnicodeKindPrefix) {
                     pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
                 }
-                if self.is_stub
-                    && self.enabled(Rule::StringOrBytesTooLong)
-                    && !is_docstring_stmt(self.semantic.stmt())
-                {
+                if self.is_stub && self.enabled(Rule::StringOrBytesTooLong) {
                     flake8_pyi::rules::string_or_bytes_too_long(self, expr);
                 }
             }

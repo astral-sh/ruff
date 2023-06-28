@@ -102,6 +102,6 @@ PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters
    30 |+qux: bytes = ...  # Error: PYI053
 31 31 | 
 32 32 | class Demo:
-33 33 |   """Docstrings are excluded from this rule. Some more padding."""  # OK
+33 33 |     """Docstrings are excluded from this rule. Some padding."""  # OK
 
 

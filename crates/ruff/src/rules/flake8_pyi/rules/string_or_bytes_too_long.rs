@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_docstring_stmt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -41,6 +42,11 @@ impl AlwaysAutofixableViolation for StringOrBytesTooLong {
 
 /// PYI053
 pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
+    // Ignore docstrings.
+    if is_docstring_stmt(checker.semantic().stmt()) {
+        return;
+    }
+
     let length = match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(s),
