@@ -2,6 +2,7 @@ use crate::rules::ssort::builtins::CLASS_BUILTINS;
 use indexmap::IndexSet;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use rustpython_parser::ast::*;
+use std::collections::HashSet;
 
 pub(super) fn stmt_relation(stmt: &Stmt) -> Relation {
     let mut visitor = RelationVisitor::default();
@@ -44,11 +45,11 @@ impl<'a> RelationVisitor<'a> {
 
     fn insert_binding(&mut self, binding: &'a str) {
         self.relation.bindings.insert(binding);
-        self.relation.unbindings.remove(binding);
+        self.relation.unbindings.shift_remove(binding);
     }
 
     fn insert_unbinding(&mut self, binding: &'a str) {
-        self.relation.bindings.remove(binding);
+        self.relation.bindings.shift_remove(binding);
         self.relation.unbindings.insert(binding);
     }
 
@@ -149,17 +150,25 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 self.insert_binding(name);
 
-                let mut cumulative_bindings = IndexSet::new();
+                let mut cumulative_bindings = HashSet::new();
 
                 for stmt in body {
                     let requirements = std::mem::take(&mut self.relation.requirements);
                     let bindings = std::mem::take(&mut self.relation.bindings);
+                    let unbindings = std::mem::take(&mut self.relation.unbindings);
 
                     self.visit_stmt(stmt);
 
                     let requirements =
                         std::mem::replace(&mut self.relation.requirements, requirements);
                     let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                    let unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
+
+                    if !unbindings.is_empty() {
+                        for unbinding in unbindings {
+                            cumulative_bindings.remove(unbinding);
+                        }
+                    }
 
                     for requirement in requirements {
                         if requirement.is_deferred
@@ -170,6 +179,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                             self.insert_requirement(requirement);
                         }
                     }
+
                     cumulative_bindings.extend(bindings);
                 }
             }
@@ -267,7 +277,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                                         self.insert_requirement(requirement);
                                     }
                                 }
-                                bindings.remove(name.as_str());
+                                bindings.shift_remove(name.as_str());
                             } else {
                                 for requirement in requirements {
                                     if !self.relation.bindings.contains(requirement.name) {
@@ -1179,6 +1189,36 @@ mod tests {
                 },
                 Requirement {
                     name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn class_def_del_in_body() {
+        let stmt = parse(
+            r#"
+                class a:
+                    b = c
+                    del b
+                    d = b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
