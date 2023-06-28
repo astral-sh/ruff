@@ -108,3 +108,13 @@ test_particular = [
     '1.0000000000000000000000000000000000000000000010000' #...
     '0000000000000000000000000000000000000000025',
 ]
+
+# Parenthesized string continuation with messed up indentation
+{
+    "key": (
+        [],
+    'a'
+        'b'
+    'c'
+    )
+}

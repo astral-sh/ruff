@@ -8,7 +8,7 @@ use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{ExprConstant, Ranged};
-use rustpython_parser::lexer::lex_starts_at;
+use rustpython_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use rustpython_parser::{Mode, Tok};
 use std::borrow::Cow;
 
@@ -17,7 +17,7 @@ pub enum StringLayout {
     Default(Option<Parentheses>),
 
     /// Enforces that implicit continuation strings are printed on a single line even if they exceed
-    /// the configured line width.  
+    /// the configured line width.
     Flat,
 }
 
@@ -83,7 +83,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // Call into the lexer to extract the individual chunks and format each string on its own.
         // This code does not yet implement the automatic joining of strings that fit on the same line
         // because this is a black preview style.
-        let lexer = lex_starts_at(string_content, Mode::Module, string_range.start());
+        let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
 
         let separator = format_with(|f| match self.layout {
             StringLayout::Default(_) => soft_line_break_or_space().fmt(f),
@@ -93,7 +93,31 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let mut joiner = f.join_with(separator);
 
         for token in lexer {
-            let (token, token_range) = token.map_err(|_| FormatError::SyntaxError)?;
+            let (token, token_range) = match token {
+                Ok(spanned) => spanned,
+                Err(LexicalError {
+                    error: LexicalErrorType::IndentationError,
+                    ..
+                }) => {
+                    // This can happen if the string continuation appears anywhere inside of a parenthesized expression
+                    // because the lexer doesn't know about the parentheses. For example, the following snipped triggers an Indentation error
+                    // ```python
+                    // {
+                    //     "key": (
+                    //         [],
+                    //         'a'
+                    //             'b'
+                    //          'c'
+                    //     )
+                    // }
+                    // ```
+                    // Ignoring the error here is *safe* because we know that the program once parsed to a valid AST.
+                    continue;
+                }
+                Err(_) => {
+                    return Err(FormatError::SyntaxError);
+                }
+            };
 
             match token {
                 Tok::String { .. } => {
