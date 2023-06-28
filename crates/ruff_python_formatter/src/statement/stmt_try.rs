@@ -5,15 +5,95 @@ use crate::prelude::*;
 use crate::statement::FormatRefWithRule;
 use crate::statement::Stmt;
 use crate::{FormatNodeRule, PyFormatter};
+use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::{ExceptHandler, Ranged, StmtTry, Suite};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{ExceptHandler, Ranged, StmtTry, StmtTryStar, Suite};
+
+pub(super) enum AnyStatementTry<'a> {
+    Try(&'a StmtTry),
+    TryStar(&'a StmtTryStar),
+}
+impl<'a> AnyStatementTry<'a> {
+    const fn is_star(&self) -> bool {
+        matches!(self, AnyStatementTry::TryStar(_))
+    }
+
+    fn body(&self) -> &Suite {
+        match self {
+            AnyStatementTry::Try(try_) => &try_.body,
+            AnyStatementTry::TryStar(try_) => &try_.body,
+        }
+    }
+
+    fn handlers(&self) -> &[ExceptHandler] {
+        match self {
+            AnyStatementTry::Try(try_) => try_.handlers.as_slice(),
+            AnyStatementTry::TryStar(try_) => try_.handlers.as_slice(),
+        }
+    }
+    fn orelse(&self) -> &Suite {
+        match self {
+            AnyStatementTry::Try(try_) => &try_.orelse,
+            AnyStatementTry::TryStar(try_) => &try_.orelse,
+        }
+    }
+
+    fn finalbody(&self) -> &Suite {
+        match self {
+            AnyStatementTry::Try(try_) => &try_.finalbody,
+            AnyStatementTry::TryStar(try_) => &try_.finalbody,
+        }
+    }
+}
+
+impl Ranged for AnyStatementTry<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            AnyStatementTry::Try(with) => with.range(),
+            AnyStatementTry::TryStar(with) => with.range(),
+        }
+    }
+}
+
+impl<'a> From<&'a StmtTry> for AnyStatementTry<'a> {
+    fn from(value: &'a StmtTry) -> Self {
+        AnyStatementTry::Try(value)
+    }
+}
+
+impl<'a> From<&'a StmtTryStar> for AnyStatementTry<'a> {
+    fn from(value: &'a StmtTryStar) -> Self {
+        AnyStatementTry::TryStar(value)
+    }
+}
+
+impl<'a> From<&AnyStatementTry<'a>> for AnyNodeRef<'a> {
+    fn from(value: &AnyStatementTry<'a>) -> Self {
+        match value {
+            AnyStatementTry::Try(with) => AnyNodeRef::StmtTry(with),
+            AnyStatementTry::TryStar(with) => AnyNodeRef::StmtTryStar(with),
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct FormatStmtTry;
 
 #[derive(Copy, Clone, Default)]
-pub struct FormatExceptHandler;
+pub struct FormatExceptHandler {
+    is_star: bool,
+}
+
+impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
+    type Options = bool;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.is_star = options;
+        self
+    }
+}
 
 impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
     fn fmt(
@@ -22,7 +102,7 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
         f: &mut Formatter<PyFormatContext<'_>>,
     ) -> FormatResult<()> {
         match item {
-            ExceptHandler::ExceptHandler(x) => x.format().fmt(f),
+            ExceptHandler::ExceptHandler(x) => x.format().with_options(self.is_star).fmt(f),
         }
     }
 }
@@ -39,19 +119,14 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
         FormatRefWithRule::new(self, FormatExceptHandler::default())
     }
 }
-
-impl FormatNodeRule<StmtTry> for FormatStmtTry {
-    fn fmt_fields(&self, item: &StmtTry, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtTry {
-            range: _,
-            body,
-            handlers,
-            orelse,
-            finalbody,
-        } = item;
-
+impl Format<PyFormatContext<'_>> for AnyStatementTry<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments_info = f.context().comments().clone();
-        let mut dangling_comments = comments_info.dangling_comments(item.as_any_node_ref());
+        let mut dangling_comments = comments_info.dangling_comments(self);
+        let body = self.body();
+        let handlers = self.handlers();
+        let orelse = self.orelse();
+        let finalbody = self.finalbody();
 
         write!(f, [text("try:"), block_indent(&body.format())])?;
 
@@ -63,7 +138,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
                 f,
                 [
                     leading_alternate_branch_comments(handler_comments, previous_node),
-                    &handler.format()
+                    &handler.format().with_options(self.is_star()),
                 ]
             )?;
             previous_node = match handler {
@@ -78,9 +153,15 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 
         write!(f, [comments::dangling_comments(dangling_comments)])
     }
+}
+
+impl FormatNodeRule<StmtTry> for FormatStmtTry {
+    fn fmt_fields(&self, item: &StmtTry, f: &mut PyFormatter) -> FormatResult<()> {
+        AnyStatementTry::from(item).fmt(f)
+    }
 
     fn fmt_dangling_comments(&self, _node: &StmtTry, _f: &mut PyFormatter) -> FormatResult<()> {
-        // dangling comments are formatted as part of fmt_fields
+        // dangling comments are formatted as part of AnyStatementTry::fmt
         Ok(())
     }
 }
