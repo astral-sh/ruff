@@ -188,25 +188,24 @@ impl Display for MessageCodeFrame<'_> {
         let source_code = file.to_source_code();
 
         let content_start_index = source_code.line_index(range.start());
-        let content_start_cell = self
-            .jupyter_index
-            .and_then(|jupyter_index| jupyter_index.cell(content_start_index.get()));
         let mut start_index = content_start_index.saturating_sub(2);
 
-        // Trim leading empty lines or skip lines outside of the content cell
-        // for jupyter notebooks.
-        while start_index < content_start_index {
-            if let Some(jupyter_index) = self.jupyter_index {
-                if let Some(content_start_cell) = content_start_cell {
-                    if jupyter_index
-                        .cell(start_index.get())
-                        .is_some_and(|start_index_cell| start_index_cell != content_start_cell)
-                    {
-                        start_index = start_index.saturating_add(1);
-                        continue;
-                    }
+        // If we're working on a jupyter notebook, skip the lines which are
+        // outside of the cell containing the diagnostic.
+        if let Some(jupyter_index) = self.jupyter_index {
+            let content_start_cell = jupyter_index
+                .cell(content_start_index.get())
+                .unwrap_or_default();
+            while start_index < content_start_index {
+                if jupyter_index.cell(start_index.get()).unwrap_or_default() == content_start_cell {
+                    break;
                 }
+                start_index = start_index.saturating_add(1);
             }
+        }
+
+        // Trim leading empty lines.
+        while start_index < content_start_index {
             if !source_code.line_text(start_index).trim().is_empty() {
                 break;
             }
@@ -214,27 +213,26 @@ impl Display for MessageCodeFrame<'_> {
         }
 
         let content_end_index = source_code.line_index(range.end());
-        let content_end_cell = self
-            .jupyter_index
-            .and_then(|jupyter_index| jupyter_index.cell(content_end_index.get()));
         let mut end_index = content_end_index
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
 
-        // Trim trailing empty lines or skip lines outside of the content cell
-        // for jupyter notebooks.
-        while end_index > content_end_index {
-            if let Some(jupyter_index) = self.jupyter_index {
-                if let Some(content_end_cell) = content_end_cell {
-                    if jupyter_index
-                        .cell(end_index.get())
-                        .is_some_and(|start_index_cell| start_index_cell != content_end_cell)
-                    {
-                        end_index = end_index.saturating_sub(1);
-                        continue;
-                    }
+        // If we're working on a jupyter notebook, skip the lines which are
+        // outside of the cell containing the diagnostic.
+        if let Some(jupyter_index) = self.jupyter_index {
+            let content_end_cell = jupyter_index
+                .cell(content_end_index.get())
+                .unwrap_or_default();
+            while end_index < content_end_index {
+                if jupyter_index.cell(end_index.get()).unwrap_or_default() == content_end_cell {
+                    break;
                 }
+                end_index = end_index.saturating_sub(1);
             }
+        }
+
+        // Trim trailing empty lines.
+        while end_index > content_end_index {
             if !source_code.line_text(end_index).trim().is_empty() {
                 break;
             }
@@ -267,7 +265,7 @@ impl Display for MessageCodeFrame<'_> {
                     |jupyter_index| {
                         jupyter_index
                             .cell_row(start_index.get())
-                            .map_or_else(|| start_index.get(), |cell| cell as usize)
+                            .unwrap_or_default() as usize
                     },
                 ),
                 annotations: vec![SourceAnnotation {
