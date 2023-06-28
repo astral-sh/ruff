@@ -257,6 +257,7 @@ TODO(konstin): The CPython checks needs to be integrated into the CI.
 It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we only do this occasionally:
 
 ```shell
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
 python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
 cargo run --bin ruff_dev -- check-formatter-stability --multi-project target/checkouts
 ```
