@@ -202,11 +202,11 @@ d={'a':1,
  #!/usr/bin/env python3
 -import asyncio
 -import sys
--
--from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImport
 +NOT_YET_IMPLEMENTED_StmtImport
  
+-from third_party import X, Y, Z
+-
 -from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
@@ -240,10 +240,10 @@ d={'a':1,
 +        NOT_YET_IMPLEMENTED_StmtRaise
 +    if False:
 +        ...
-+    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
-+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    for i in range(10):
++        print(i)
 +        continue
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    exec("new-style exec", {}, {})
 +    return None
 +
 +
@@ -254,7 +254,7 @@ d={'a':1,
 - await asyncio.sleep(1)
 +    "Single-line docstring. Multiline is harder to reformat."
 +    NOT_YET_IMPLEMENTED_StmtAsyncWith
-+    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    await asyncio.sleep(1)
 +
 +
  @asyncio.coroutine
@@ -264,7 +264,7 @@ d={'a':1,
 -)
 -def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
 - return text[number:-1]
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++@some_decorator(with_args=True, many_args=[1, 2, 3])
 +def function_signature_stress_test(
 +    number: int,
 +    no_annotation=None,
@@ -291,12 +291,12 @@ d={'a':1,
 +    h="",
 +    i=r"",
 +):
-+    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    offset = attr.ib(default=attr.Factory(lambda x: True))
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-@@ -51,68 +72,66 @@
+@@ -51,7 +72,7 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -305,13 +305,7 @@ d={'a':1,
      h: str = "",
      i: str = r"",
  ):
-     ...
- 
- 
--def spaces2(result=_core.Value(None)):
-+def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
-     ...
- 
+@@ -64,55 +85,55 @@
  
  something = {
      # fmt: off
@@ -381,11 +375,13 @@ d={'a':1,
 -                models.Customer.email == email_address)\
 -        .order_by(models.Customer.id.asc())\
 -        .all()
-+    result = NOT_IMPLEMENTED_call()
++    result = session.query(models.Customer.id).filter(
++        models.Customer.account_id == account_id, models.Customer.email == email_address
++    ).order_by(models.Customer.id.asc()).all()
      # fmt: on
  
  
-@@ -133,10 +152,10 @@
+@@ -133,10 +154,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -393,92 +389,41 @@ d={'a':1,
 -    and_=indeed . it  is  not  formatted
 -    because . the . handling . inside . generate_ignored_nodes()
 -    now . considers . multiple . fmt . directives . within . one . prefix
-+    this = NOT_IMPLEMENTED_call()
++    this = should.not_be.formatted()
 +    and_ = indeed.it is not formatted
-+    NOT_IMPLEMENTED_call()
++    because.the.handling.inside.generate_ignored_nodes()
 +    now.considers.multiple.fmt.directives.within.one.prefix
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -145,43 +164,11 @@
- 
- def long_lines():
-     if True:
--        typedargslist.extend(
--            gen_annotated_params(
--                ast_args.kwonlyargs,
--                ast_args.kw_defaults,
--                parameters,
--                implicit_default=True,
+@@ -151,12 +172,10 @@
+                 ast_args.kw_defaults,
+                 parameters,
+                 implicit_default=True,
 -            )
--        )
--        # fmt: off
++            ),
+         )
+         # fmt: off
 -        a = (
 -            unnecessary_bracket()
 -        )
--        # fmt: on
--    _type_comment_re = re.compile(
--        r"""
--        ^
--        [\t ]*
--        \#[ ]type:[ ]*
--        (?P<type>
--            [^#\t\n]+?
--        )
--        (?<!ignore)     # note: this will force the non-greedy + in <type> to match
--                        # a trailing space which is why we need the silliness below
--        (?<!ignore[ ]{1})(?<!ignore[ ]{2})(?<!ignore[ ]{3})(?<!ignore[ ]{4})
--        (?<!ignore[ ]{5})(?<!ignore[ ]{6})(?<!ignore[ ]{7})(?<!ignore[ ]{8})
--        (?<!ignore[ ]{9})(?<!ignore[ ]{10})
--        [\t ]*
--        (?P<nl>
--            (?:\#[^\n]*)?
--            \n?
--        )
--        $
--        """,
-+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++        a = unnecessary_bracket()
+         # fmt: on
+     _type_comment_re = re.compile(
+         r"""
+@@ -179,7 +198,8 @@
+         $
+         """,
          # fmt: off
 -        re.MULTILINE|re.VERBOSE
-+        a = NOT_IMPLEMENTED_call()
++        re.MULTILINE
++        | re.VERBOSE,
          # fmt: on
--    )
-+    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+     )
  
- 
- def single_literal_yapf_disable():
-@@ -189,36 +176,9 @@
-     BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
- 
- 
--cfg.rule(
--    "Default",
--    "address",
--    xxxx_xxxx=["xxx-xxxxxx-xxxxxxxxxx"],
--    xxxxxx="xx_xxxxx",
--    xxxxxxx="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
--    xxxxxxxxx_xxxx=True,
--    xxxxxxxx_xxxxxxxxxx=False,
--    xxxxxx_xxxxxx=2,
--    xxxxxx_xxxxx_xxxxxxxx=70,
--    xxxxxx_xxxxxx_xxxxx=True,
--    # fmt: off
--    xxxxxxx_xxxxxxxxxxxx={
--        "xxxxxxxx": {
--            "xxxxxx": False,
--            "xxxxxxx": False,
--            "xxxx_xxxxxx": "xxxxx",
--        },
--        "xxxxxxxx-xxxxx": {
--            "xxxxxx": False,
--            "xxxxxxx": True,
--            "xxxx_xxxxxx": "xxxxxx",
--        },
--    },
--    # fmt: on
--    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
--)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@@ -217,8 +237,7 @@
+     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
+ )
  # fmt: off
 -yield  'hello'
 +NOT_YET_IMPLEMENTED_ExprYield
@@ -518,21 +463,21 @@ def func_no_args():
         NOT_YET_IMPLEMENTED_StmtRaise
     if False:
         ...
-    for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
-        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    for i in range(10):
+        print(i)
         continue
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    exec("new-style exec", {}, {})
     return None
 
 
 async def coroutine(arg, exec=False):
     "Single-line docstring. Multiline is harder to reformat."
     NOT_YET_IMPLEMENTED_StmtAsyncWith
-    await NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    await asyncio.sleep(1)
 
 
 @asyncio.coroutine
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@some_decorator(with_args=True, many_args=[1, 2, 3])
 def function_signature_stress_test(
     number: int,
     no_annotation=None,
@@ -556,7 +501,7 @@ def spaces(
     h="",
     i=r"",
 ):
-    offset = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    offset = attr.ib(default=attr.Factory(lambda x: True))
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -574,7 +519,7 @@ def spaces_types(
     ...
 
 
-def spaces2(result=NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)):
+def spaces2(result=_core.Value(None)):
     ...
 
 
@@ -626,7 +571,9 @@ def yield_expr():
 
 def example(session):
     # fmt: off
-    result = NOT_IMPLEMENTED_call()
+    result = session.query(models.Customer.id).filter(
+        models.Customer.account_id == account_id, models.Customer.email == email_address
+    ).order_by(models.Customer.id.asc()).all()
     # fmt: on
 
 
@@ -647,9 +594,9 @@ def on_and_off_broken():
     """Another known limitation."""
     # fmt: on
     # fmt: off
-    this = NOT_IMPLEMENTED_call()
+    this = should.not_be.formatted()
     and_ = indeed.it is not formatted
-    NOT_IMPLEMENTED_call()
+    because.the.handling.inside.generate_ignored_nodes()
     now.considers.multiple.fmt.directives.within.one.prefix
     # fmt: on
     # fmt: off
@@ -659,11 +606,42 @@ def on_and_off_broken():
 
 def long_lines():
     if True:
-        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        typedargslist.extend(
+            gen_annotated_params(
+                ast_args.kwonlyargs,
+                ast_args.kw_defaults,
+                parameters,
+                implicit_default=True,
+            ),
+        )
         # fmt: off
-        a = NOT_IMPLEMENTED_call()
+        a = unnecessary_bracket()
         # fmt: on
-    _type_comment_re = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    _type_comment_re = re.compile(
+        r"""
+        ^
+        [\t ]*
+        \#[ ]type:[ ]*
+        (?P<type>
+            [^#\t\n]+?
+        )
+        (?<!ignore)     # note: this will force the non-greedy + in <type> to match
+                        # a trailing space which is why we need the silliness below
+        (?<!ignore[ ]{1})(?<!ignore[ ]{2})(?<!ignore[ ]{3})(?<!ignore[ ]{4})
+        (?<!ignore[ ]{5})(?<!ignore[ ]{6})(?<!ignore[ ]{7})(?<!ignore[ ]{8})
+        (?<!ignore[ ]{9})(?<!ignore[ ]{10})
+        [\t ]*
+        (?P<nl>
+            (?:\#[^\n]*)?
+            \n?
+        )
+        $
+        """,
+        # fmt: off
+        re.MULTILINE
+        | re.VERBOSE,
+        # fmt: on
+    )
 
 
 def single_literal_yapf_disable():
@@ -671,7 +649,33 @@ def single_literal_yapf_disable():
     BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
 
 
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+cfg.rule(
+    "Default",
+    "address",
+    xxxx_xxxx=["xxx-xxxxxx-xxxxxxxxxx"],
+    xxxxxx="xx_xxxxx",
+    xxxxxxx="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    xxxxxxxxx_xxxx=True,
+    xxxxxxxx_xxxxxxxxxx=False,
+    xxxxxx_xxxxxx=2,
+    xxxxxx_xxxxx_xxxxxxxx=70,
+    xxxxxx_xxxxxx_xxxxx=True,
+    # fmt: off
+    xxxxxxx_xxxxxxxxxxxx={
+        "xxxxxxxx": {
+            "xxxxxx": False,
+            "xxxxxxx": False,
+            "xxxx_xxxxxx": "xxxxx",
+        },
+        "xxxxxxxx-xxxxx": {
+            "xxxxxx": False,
+            "xxxxxxx": True,
+            "xxxx_xxxxxx": "xxxxxx",
+        },
+    },
+    # fmt: on
+    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
+)
 # fmt: off
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file

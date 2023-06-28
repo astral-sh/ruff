@@ -59,16 +59,16 @@ while (
 else:
     ...
 
-while NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and anotherCondition or aThirdCondition:  # comment
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+while some_condition(unformatted, args) and anotherCondition or aThirdCondition:  # comment
+    print("Do something")
 
 
 while (
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)  # trailing some condition
+    some_condition(unformatted, args)  # trailing some condition
     and anotherCondition
     or aThirdCondition  # trailing third condition
 ):  # comment
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    print("Do something")
 ```
 
 

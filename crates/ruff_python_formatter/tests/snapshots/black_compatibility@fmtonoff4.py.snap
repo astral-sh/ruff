@@ -25,27 +25,30 @@ def f(): pass
 ```diff
 --- Black
 +++ Ruff
-@@ -1,20 +1,10 @@
+@@ -1,8 +1,12 @@
  # fmt: off
 -@test([
 -    1, 2,
 -    3, 4,
 -])
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++@test(
++    [
++        1,
++        2,
++        3,
++        4,
++    ],
++)
  # fmt: on
  def f():
      pass
- 
- 
--@test(
--    [
--        1,
--        2,
--        3,
--        4,
+@@ -14,7 +18,7 @@
+         2,
+         3,
+         4,
 -    ]
--)
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    ],
+ )
  def f():
      pass
 ```
@@ -54,13 +57,27 @@ def f(): pass
 
 ```py
 # fmt: off
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@test(
+    [
+        1,
+        2,
+        3,
+        4,
+    ],
+)
 # fmt: on
 def f():
     pass
 
 
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@test(
+    [
+        1,
+        2,
+        3,
+        4,
+    ],
+)
 def f():
     pass
 ```

@@ -22,7 +22,7 @@ sections.py:76:5: D411 [*] Missing blank line before section ("Yields")
    |
    = help: Add blank line before "Yields"
 
-ℹ Suggested fix
+ℹ Fix
 77 77 | 
 78 78 |     Returns
 79 79 |     -------
@@ -48,7 +48,7 @@ sections.py:131:5: D411 [*] Missing blank line before section ("Returns")
     |
     = help: Add blank line before "Returns"
 
-ℹ Suggested fix
+ℹ Fix
 131 131 |     """Toggle the gizmo.
 132 132 | 
 133 133 |     The function's description.
@@ -81,7 +81,7 @@ sections.py:216:5: D411 [*] Missing blank line before section ("Raises")
     |
     = help: Add blank line before "Raises"
 
-ℹ Suggested fix
+ℹ Fix
 224 224 |     Returns
 225 225 |     ------
 226 226 |     Many many wonderful things.

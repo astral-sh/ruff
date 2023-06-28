@@ -156,6 +156,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyflakes, "901") => (RuleGroup::Unspecified, rules::pyflakes::rules::RaiseNotImplemented),
 
         // pylint
+        (Pylint, "C0205") => (RuleGroup::Unspecified, rules::pylint::rules::SingleStringSlots),
         (Pylint, "C0414") => (RuleGroup::Unspecified, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Unspecified, rules::pylint::rules::UnnecessaryDirectLambdaCall),
@@ -786,6 +787,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // perflint
         (Perflint, "101") => (RuleGroup::Unspecified, rules::perflint::rules::UnnecessaryListCast),
         (Perflint, "102") => (RuleGroup::Unspecified, rules::perflint::rules::IncorrectDictIterator),
+        (Perflint, "203") => (RuleGroup::Unspecified, rules::perflint::rules::TryExceptInLoop),
 
         // flake8-fixme
         (Flake8Fixme, "001") => (RuleGroup::Unspecified, rules::flake8_fixme::rules::LineContainsFixme),

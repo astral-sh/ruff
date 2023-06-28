@@ -770,6 +770,9 @@ where
                 if self.enabled(Rule::NoSlotsInNamedtupleSubclass) {
                     flake8_slots::rules::no_slots_in_namedtuple_subclass(self, stmt, class_def);
                 }
+                if self.enabled(Rule::SingleStringSlots) {
+                    pylint::rules::single_string_slots(self, class_def);
+                }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 if self.enabled(Rule::MultipleImportsOnOneLine) {
@@ -1430,6 +1433,9 @@ where
                 if self.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
+                if self.enabled(Rule::TryExceptInLoop) {
+                    perflint::rules::try_except_in_loop(self, body);
+                }
             }
             Stmt::For(ast::StmtFor {
                 target,
@@ -1476,6 +1482,9 @@ where
                     }
                     if self.enabled(Rule::InDictKeys) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
+                    }
+                    if self.enabled(Rule::TryExceptInLoop) {
+                        perflint::rules::try_except_in_loop(self, body);
                     }
                 }
                 if self.enabled(Rule::IncorrectDictIterator) {

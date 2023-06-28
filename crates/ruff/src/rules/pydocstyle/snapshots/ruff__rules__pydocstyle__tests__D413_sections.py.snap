@@ -13,7 +13,7 @@ sections.py:65:5: D413 [*] Missing blank line after last section ("Returns")
    |
    = help: Add blank line after "Returns"
 
-ℹ Suggested fix
+ℹ Fix
 64 64 | def no_underline_and_no_newline():  # noqa: D416
 65 65 |     """Toggle the gizmo.
 66 66 | 

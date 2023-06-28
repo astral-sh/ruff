@@ -123,12 +123,11 @@ if True:
 -}
 +c = {1, 2, 3}
  x = (1,)
--y = (narf(),)
+ y = (narf(),)
 -nested = {
 -    (1, 2, 3),
 -    (4, 5, 6),
 -}
-+y = (NOT_IMPLEMENTED_call(),)
 +nested = {(1, 2, 3), (4, 5, 6)}
  nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
  nested_long_lines = [
@@ -145,48 +144,6 @@ if True:
  
  # looping over a 1-tuple should also not get wrapped
  for x in (1,):
-@@ -63,14 +42,10 @@
- for (x,) in (1,), (2,), (3,):
-     pass
- 
--[
--    1,
--    2,
--    3,
--]
-+[1, 2, 3]
- 
- division_result_tuple = (6 / 2,)
--print("foo %r", (foo.bar,))
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
- if True:
-     IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
-@@ -79,21 +54,6 @@
-     )
- 
- if True:
--    ec2client.get_waiter("instance_stopped").wait(
--        InstanceIds=[instance.id],
--        WaiterConfig={
--            "Delay": 5,
--        },
--    )
--    ec2client.get_waiter("instance_stopped").wait(
--        InstanceIds=[instance.id],
--        WaiterConfig={
--            "Delay": 5,
--        },
--    )
--    ec2client.get_waiter("instance_stopped").wait(
--        InstanceIds=[instance.id],
--        WaiterConfig={
--            "Delay": 5,
--        },
--    )
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
 ```
 
 ## Ruff Output
@@ -209,7 +166,7 @@ a = {1, 2, 3}
 b = {1, 2, 3}
 c = {1, 2, 3}
 x = (1,)
-y = (NOT_IMPLEMENTED_call(),)
+y = (narf(),)
 nested = {(1, 2, 3), (4, 5, 6)}
 nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
 nested_long_lines = [
@@ -236,10 +193,14 @@ for x in (1,):
 for (x,) in (1,), (2,), (3,):
     pass
 
-[1, 2, 3]
+[
+    1,
+    2,
+    3,
+]
 
 division_result_tuple = (6 / 2,)
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+print("foo %r", (foo.bar,))
 
 if True:
     IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
@@ -248,9 +209,24 @@ if True:
     )
 
 if True:
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    ec2client.get_waiter("instance_stopped").wait(
+        InstanceIds=[instance.id],
+        WaiterConfig={
+            "Delay": 5,
+        },
+    )
+    ec2client.get_waiter("instance_stopped").wait(
+        InstanceIds=[instance.id],
+        WaiterConfig={
+            "Delay": 5,
+        },
+    )
+    ec2client.get_waiter("instance_stopped").wait(
+        InstanceIds=[instance.id],
+        WaiterConfig={
+            "Delay": 5,
+        },
+    )
 ```
 
 ## Black Output

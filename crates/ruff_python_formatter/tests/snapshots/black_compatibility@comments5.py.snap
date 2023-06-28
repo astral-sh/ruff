@@ -85,73 +85,15 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,6 @@
- while True:
-     if something.changed:
--        do.stuff()  # trailing comment
-+        NOT_IMPLEMENTED_call()  # trailing comment
-         # Comment belongs to the `if` block.
-     # This one belongs to the `while` block.
- 
-@@ -8,26 +8,26 @@
- 
- # This one is properly standalone now.
- 
--for i in range(100):
-+for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
-     # first we do this
-     if i % 33 == 0:
-         break
- 
-     # then we do this
--    print(i)
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-     # and finally we loop around
- 
--with open(some_temp_file) as f:
--    data = f.read()
-+with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as f:
-+    data = NOT_IMPLEMENTED_call()
- 
- try:
--    with open(some_other_file) as w:
--        w.write(data)
-+    with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as w:
-+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
+@@ -27,7 +27,7 @@
  except OSError:
--    print("problems")
-+    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+     print("problems")
  
 -import sys
 +NOT_YET_IMPLEMENTED_StmtImport
  
  
  # leading function comment
-@@ -42,7 +42,7 @@
- # leading 1
- @deco1
- # leading 2
--@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- # leading 3
- @deco3
- def decorated1():
-@@ -52,7 +52,7 @@
- # leading 1
- @deco1
- # leading 2
--@deco2(with_args=True)
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- # leading function comment
- def decorated1():
-     ...
-@@ -70,4 +70,4 @@
- 
- 
- if __name__ == "__main__":
--    main()
-+    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
@@ -159,7 +101,7 @@ if __name__ == "__main__":
 ```py
 while True:
     if something.changed:
-        NOT_IMPLEMENTED_call()  # trailing comment
+        do.stuff()  # trailing comment
         # Comment belongs to the `if` block.
     # This one belongs to the `while` block.
 
@@ -167,24 +109,24 @@ while True:
 
 # This one is properly standalone now.
 
-for i in NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg):
+for i in range(100):
     # first we do this
     if i % 33 == 0:
         break
 
     # then we do this
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    print(i)
     # and finally we loop around
 
-with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as f:
-    data = NOT_IMPLEMENTED_call()
+with open(some_temp_file) as f:
+    data = f.read()
 
 try:
-    with NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) as w:
-        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    with open(some_other_file) as w:
+        w.write(data)
 
 except OSError:
-    NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    print("problems")
 
 NOT_YET_IMPLEMENTED_StmtImport
 
@@ -201,7 +143,7 @@ def wat():
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@deco2(with_args=True)
 # leading 3
 @deco3
 def decorated1():
@@ -211,7 +153,7 @@ def decorated1():
 # leading 1
 @deco1
 # leading 2
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@deco2(with_args=True)
 # leading function comment
 def decorated1():
     ...
@@ -229,7 +171,7 @@ def g():
 
 
 if __name__ == "__main__":
-    NOT_IMPLEMENTED_call()
+    main()
 ```
 
 ## Black Output

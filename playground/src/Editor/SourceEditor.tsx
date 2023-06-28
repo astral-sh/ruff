@@ -54,7 +54,7 @@ export default function SourceEditor({
         provideCodeActions: function (model, position) {
           const actions = diagnostics
             .filter((check) => position.startLineNumber === check.location.row)
-            .filter((check) => check.fix)
+            .filter(({ fix }) => fix)
             .map((check) => ({
               title: check.fix
                 ? check.fix.message
@@ -71,11 +71,11 @@ export default function SourceEditor({
                       edit: {
                         range: {
                           startLineNumber: edit.location.row,
-                          startColumn: edit.location.column + 1,
+                          startColumn: edit.location.column,
                           endLineNumber: edit.end_location.row,
-                          endColumn: edit.end_location.column + 1,
+                          endColumn: edit.end_location.column,
                         },
-                        text: edit.content,
+                        text: edit.content || "",
                       },
                     })),
                   }

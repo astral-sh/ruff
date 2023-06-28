@@ -10,7 +10,7 @@ D.py:170:5: D211 [*] No blank lines allowed before class docstring
     |
     = help: Remove blank line(s) before class docstring
 
-ℹ Suggested fix
+ℹ Fix
 166 166 | 
 167 167 | 
 168 168 | class WithLeadingSpace:
@@ -29,7 +29,7 @@ D.py:181:5: D211 [*] No blank lines allowed before class docstring
     |
     = help: Remove blank line(s) before class docstring
 
-ℹ Suggested fix
+ℹ Fix
 177 177 | 
 178 178 | 
 179 179 | class TrailingSpace:

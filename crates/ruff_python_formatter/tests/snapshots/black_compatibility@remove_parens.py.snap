@@ -67,28 +67,18 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,18 +1,14 @@
- x = 1
- x = 1.2
- 
--data = (
--    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--).encode()
-+data = NOT_IMPLEMENTED_call()
- 
- 
- async def show_status():
+@@ -10,9 +10,7 @@
      while True:
          try:
              if report_host:
 -                data = (
 -                    f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -                ).encode()
-+                data = NOT_IMPLEMENTED_call()
++                data = (NOT_YET_IMPLEMENTED_ExprJoinedStr).encode()
          except Exception as e:
              pass
  
-@@ -30,15 +26,11 @@
+@@ -30,15 +28,11 @@
  
  
  def example2():
@@ -106,7 +96,7 @@ def example8():
  
  
  def example4():
-@@ -50,35 +42,11 @@
+@@ -50,35 +44,11 @@
  
  
  def example6():
@@ -152,14 +142,16 @@ def example8():
 x = 1
 x = 1.2
 
-data = NOT_IMPLEMENTED_call()
+data = (
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+).encode()
 
 
 async def show_status():
     while True:
         try:
             if report_host:
-                data = NOT_IMPLEMENTED_call()
+                data = (NOT_YET_IMPLEMENTED_ExprJoinedStr).encode()
         except Exception as e:
             pass
 

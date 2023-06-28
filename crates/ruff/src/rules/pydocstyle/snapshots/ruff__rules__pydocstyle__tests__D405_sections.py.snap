@@ -17,7 +17,7 @@ sections.py:17:5: D405 [*] Section name should be properly capitalized ("returns
    |
    = help: Capitalize "returns"
 
-ℹ Suggested fix
+ℹ Fix
 16 16 | def not_capitalized():  # noqa: D416
 17 17 |     """Toggle the gizmo.
 18 18 | 
@@ -51,7 +51,7 @@ sections.py:216:5: D405 [*] Section name should be properly capitalized ("Short 
     |
     = help: Capitalize "Short summary"
 
-ℹ Suggested fix
+ℹ Fix
 215 215 | def multiple_sections():  # noqa: D416
 216 216 |     """Toggle the gizmo.
 217 217 | 
