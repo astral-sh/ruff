@@ -159,23 +159,23 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.line_position().is_end_of_line() || comment.following_node().is_none() {
+    if comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
     }
 
-    let Some(AnyNodeRef::ExceptHandlerExceptHandler(except_handler)) = comment.preceding_node() else {
+    let (Some(AnyNodeRef::ExceptHandlerExceptHandler(preceding_except_handler)), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
         return CommentPlacement::Default(comment);
     };
 
     // it now depends on the indentation level of the comment if it is a leading comment for e.g.
-    // the following `elif` or indeed a trailing comment of the previous body's last statement.
+    // the following `finally` or indeed a trailing comment of the previous body's last statement.
     let comment_indentation =
         whitespace::indentation_at_offset(locator, comment.slice().range().start())
             .map(str::len)
             .unwrap_or_default();
 
     let Some(except_indentation) =
-            whitespace::indentation(locator, except_handler).map(str::len) else
+            whitespace::indentation(locator, preceding_except_handler).map(str::len) else
         {
             return CommentPlacement::Default(comment);
         };
@@ -198,15 +198,13 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
     //     pass
     // ```
 
-    if let Some(following) = comment.following_node() {
-        if let AnyNodeRef::ExceptHandlerExceptHandler(_) = following {
-            // Attach it to the following except handler (which has a node) as leading
-
-            return CommentPlacement::leading(following, comment);
-        }
+    if following.is_except_handler() {
+        // Attach it to the following except handler (which has a node) as leading
+        return CommentPlacement::leading(following, comment);
+    } else {
+        // No following except handler; attach it to the `try` statement.as dangling
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
-    // No following except handler; attach it to the `try` statement.as dangling
-    CommentPlacement::dangling(comment.enclosing_node(), comment)
 }
 
 /// Handles own line comments between the last statement and the first statement of two bodies.
@@ -703,15 +701,14 @@ fn handle_trailing_end_of_line_except_comment<'a>(
     }
 
     let Some(first_body_statement) = handler.body.first() else {
-        debug_assert!(false); // handlers must have a body
         return CommentPlacement::Default(comment);
     };
 
-    if comment.slice().start() > first_body_statement.range().end() {
-        return CommentPlacement::Default(comment);
+    if comment.slice().start() < first_body_statement.range().start() {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
     }
-
-    return CommentPlacement::dangling(comment.enclosing_node(), comment);
 }
 
 /// Attaches comments for the positional only arguments separator `/` or the keywords only arguments
