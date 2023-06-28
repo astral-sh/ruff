@@ -1,6 +1,5 @@
 //! Resolves Python imports to their corresponding files on disk.
 
-use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -8,10 +7,10 @@ use log::debug;
 
 use crate::config::Config;
 use crate::execution_environment::ExecutionEnvironment;
-use crate::implicit_imports::ImplicitImport;
+use crate::implicit_imports::ImplicitImports;
 use crate::import_result::{ImportResult, ImportType};
 use crate::module_descriptor::ImportModuleDescriptor;
-use crate::{host, implicit_imports, native_module, py_typed, search};
+use crate::{host, native_module, py_typed, search};
 
 #[allow(clippy::fn_params_excessive_bools)]
 fn resolve_module_descriptor(
@@ -37,7 +36,7 @@ fn resolve_module_descriptor(
     let mut is_stub_package = false;
     let mut is_stub_file = false;
     let mut is_native_lib = false;
-    let mut implicit_imports = BTreeMap::new();
+    let mut implicit_imports = None;
     let mut package_directory = None;
     let mut py_typed_info = None;
 
@@ -60,7 +59,7 @@ fn resolve_module_descriptor(
             is_namespace_package = true;
         }
 
-        implicit_imports = implicit_imports::find(&dir_path, &[&py_file_path, &pyi_file_path]);
+        implicit_imports = ImplicitImports::find(&dir_path, &[&py_file_path, &pyi_file_path]).ok();
     } else {
         for (i, part) in module_descriptor.name_parts.iter().enumerate() {
             let is_first_part = i == 0;
@@ -118,7 +117,8 @@ fn resolve_module_descriptor(
 
                 if is_init_file_present {
                     implicit_imports =
-                        implicit_imports::find(&module_dir_path, &[&py_file_path, &pyi_file_path]);
+                        ImplicitImports::find(&module_dir_path, &[&py_file_path, &pyi_file_path])
+                            .ok();
                     break;
                 }
             }
@@ -157,7 +157,7 @@ fn resolve_module_descriptor(
                     resolved_paths.push(PathBuf::new());
                     if is_last_part {
                         implicit_imports =
-                            implicit_imports::find(&dir_path, &[&py_file_path, &pyi_file_path]);
+                            ImplicitImports::find(&dir_path, &[&py_file_path, &pyi_file_path]).ok();
                         is_namespace_package = true;
                     }
                 }
@@ -191,8 +191,8 @@ fn resolve_module_descriptor(
         is_stdlib_typeshed_file: false,
         is_third_party_typeshed_file: false,
         is_local_typings_file: false,
-        implicit_imports,
-        filtered_implicit_imports: BTreeMap::default(),
+        implicit_imports: implicit_imports.unwrap_or_default(),
+        filtered_implicit_imports: ImplicitImports::default(),
         non_stub_import_result: None,
         py_typed_info,
         package_directory,
@@ -290,10 +290,10 @@ fn resolve_best_absolute_import<Host: host::Host>(
                         .as_os_str()
                         .is_empty()
                 {
-                    if is_namespace_package_resolved(
-                        module_descriptor,
-                        &typings_import.implicit_imports,
-                    ) {
+                    if typings_import
+                        .implicit_imports
+                        .resolves_namespace_package(&module_descriptor.imported_symbols)
+                    {
                         return Some(typings_import);
                     }
                 } else {
@@ -415,34 +415,6 @@ fn resolve_best_absolute_import<Host: host::Host>(
     best_result_so_far
 }
 
-/// Determines whether a namespace package resolves all of the symbols
-/// requested in the module descriptor. Namespace packages have no "__init__.py"
-/// file, so the only way that symbols can be resolved is if submodules
-/// are present. If specific symbols were requested, make sure they
-/// are all satisfied by submodules (as listed in the implicit imports).
-fn is_namespace_package_resolved(
-    module_descriptor: &ImportModuleDescriptor,
-    implicit_imports: &BTreeMap<String, ImplicitImport>,
-) -> bool {
-    if !module_descriptor.imported_symbols.is_empty() {
-        // TODO(charlie): Pyright uses:
-        //
-        // ```typescript
-        // !Array.from(moduleDescriptor.importedSymbols.keys()).some((symbol) => implicitImports.has(symbol))`
-        // ```
-        //
-        // However, that only checks if _any_ of the symbols are in the implicit imports.
-        for symbol in &module_descriptor.imported_symbols {
-            if !implicit_imports.contains_key(symbol) {
-                return false;
-            }
-        }
-    } else if implicit_imports.is_empty() {
-        return false;
-    }
-    true
-}
-
 /// Finds the `typeshed` path for the given module descriptor.
 ///
 /// Supports both standard library and third-party `typeshed` lookups.
@@ -543,14 +515,14 @@ fn pick_best_import(
         // imported symbols.
         if best_import_so_far.is_namespace_package && new_import.is_namespace_package {
             if !module_descriptor.imported_symbols.is_empty() {
-                if !is_namespace_package_resolved(
-                    module_descriptor,
-                    &best_import_so_far.implicit_imports,
-                ) {
-                    if is_namespace_package_resolved(
-                        module_descriptor,
-                        &new_import.implicit_imports,
-                    ) {
+                if !best_import_so_far
+                    .implicit_imports
+                    .resolves_namespace_package(&module_descriptor.imported_symbols)
+                {
+                    if new_import
+                        .implicit_imports
+                        .resolves_namespace_package(&module_descriptor.imported_symbols)
+                    {
                         return new_import;
                     }
 
@@ -759,10 +731,10 @@ pub(crate) fn resolve_import<Host: host::Host>(
             );
 
             if result.is_import_found {
-                if let Some(implicit_imports) = implicit_imports::filter(
-                    &result.implicit_imports,
-                    &module_descriptor.imported_symbols,
-                ) {
+                if let Some(implicit_imports) = result
+                    .implicit_imports
+                    .filter(&module_descriptor.imported_symbols)
+                {
                     result.implicit_imports = implicit_imports;
                 }
                 return result;

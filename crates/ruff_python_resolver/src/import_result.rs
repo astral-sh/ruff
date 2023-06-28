@@ -1,9 +1,8 @@
 //! Interface that describes the output of the import resolver.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::implicit_imports::ImplicitImport;
+use crate::implicit_imports::ImplicitImports;
 use crate::py_typed::PyTypedInfo;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,11 +68,11 @@ pub(crate) struct ImportResult {
 
     /// A map from file to resolved path, for all implicitly imported
     /// modules that are part of a namespace package.
-    pub(crate) implicit_imports: BTreeMap<String, ImplicitImport>,
+    pub(crate) implicit_imports: ImplicitImports,
 
     /// Any implicit imports whose symbols were explicitly imported (i.e., via
     /// a `from x import y` statement).
-    pub(crate) filtered_implicit_imports: BTreeMap<String, ImplicitImport>,
+    pub(crate) filtered_implicit_imports: ImplicitImports,
 
     /// If the import resolved to a type hint (i.e., a `.pyi` file), then
     /// a non-type-hint resolution will be stored here.
@@ -105,8 +104,8 @@ impl ImportResult {
             is_stdlib_typeshed_file: false,
             is_third_party_typeshed_file: false,
             is_local_typings_file: false,
-            implicit_imports: BTreeMap::default(),
-            filtered_implicit_imports: BTreeMap::default(),
+            implicit_imports: ImplicitImports::default(),
+            filtered_implicit_imports: ImplicitImports::default(),
             non_stub_import_result: None,
             py_typed_info: None,
             package_directory: None,
