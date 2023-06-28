@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/list_comp.py
+---
+## Input
+```py
+[i for i in []]
+
+[i for i in [1,]]
+
+[
+    a  # a
+    for # for
+    c  # c
+    in  # in
+    e  # e
+]
+
+[
+    # before a
+    a  # a
+    # before for
+    for # for
+    # before c
+    c  # c
+    # before in
+    in  # in
+    # before e
+    e
+    # before end
+]
+```
+
+## Output
+```py
+[i for i in []]
+
+[
+    i for
+    i
+    in
+    [
+        1,
+    ]
+]
+
+[
+    a for  # a  # for
+    c  # c
+    in  # in
+    e  # e
+]
+
+[
+    # before a
+    a   # a
+    # before for
+    for  # for
+    # before c
+    c  # c
+    # before in
+    in  # in
+    # before e
+    e
+    # before end
+]
+```
+
+
+

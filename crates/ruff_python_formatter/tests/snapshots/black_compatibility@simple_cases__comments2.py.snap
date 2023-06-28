@@ -224,36 +224,44 @@ instruction()#comment with bad spacing
      if (
          self._proc is not None
          # has the child process finished?
-@@ -114,25 +122,9 @@
-         # yup
+@@ -115,23 +123,31 @@
          arg3=True,
      )
--    lcomp = [
+     lcomp = [
 -        element for element in collection if element is not None  # yup  # yup  # right
--    ]
--    lcomp2 = [
--        # hello
++        element for  # yup
++        element
++        in
++        collection  # yup
++        if element is not None  # right
+     ]
+     lcomp2 = [
+         # hello
 -        element
--        # yup
--        for element in collection
--        # right
++        element 
+         # yup
+         for element in collection
+         # right
 -        if element is not None
--    ]
--    lcomp3 = [
--        # This one is actually too long to fit in a single line.
++        if
++        element
++        is not None
+     ]
+     lcomp3 = [
+         # This one is actually too long to fit in a single line.
 -        element.split("\n", 1)[0]
--        # yup
--        for element in collection.select_elements()
--        # right
++        element.split("\n", 1)[0] 
+         # yup
+         for element in collection.select_elements()
+         # right
 -        if element is not None
--    ]
-+    lcomp = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+    lcomp2 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
++        if
++        element
++        is not None
+     ]
      while True:
          if False:
-             continue
-@@ -143,7 +135,10 @@
+@@ -143,7 +159,10 @@
      # let's return
      return Node(
          syms.simple_stmt,
@@ -265,7 +273,7 @@ instruction()#comment with bad spacing
      )
  
  
-@@ -158,7 +153,11 @@
+@@ -158,7 +177,11 @@
  
  class Test:
      def _init_host(self, parsed) -> None:
@@ -407,9 +415,33 @@ short
         # yup
         arg3=True,
     )
-    lcomp = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-    lcomp2 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+    lcomp = [
+        element for  # yup
+        element
+        in
+        collection  # yup
+        if element is not None  # right
+    ]
+    lcomp2 = [
+        # hello
+        element 
+        # yup
+        for element in collection
+        # right
+        if
+        element
+        is not None
+    ]
+    lcomp3 = [
+        # This one is actually too long to fit in a single line.
+        element.split("\n", 1)[0] 
+        # yup
+        for element in collection.select_elements()
+        # right
+        if
+        element
+        is not None
+    ]
     while True:
         if False:
             continue

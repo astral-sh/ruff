@@ -277,10 +277,9 @@ aaaaaaaaaaaaaa + {
     dddddddddddddddd,
     eeeeeee,
 }
-(
-    aaaaaaaaaaaaaa
-    + [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-)
+aaaaaaaaaaaaaa + [
+    a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+]
 (
     aaaaaaaaaaaaaa
     + (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])

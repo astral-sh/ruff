@@ -42,7 +42,7 @@ def make_arange(n):
 ```diff
 --- Black
 +++ Ruff
-@@ -2,29 +2,21 @@
+@@ -2,29 +2,24 @@
  
  
  def f():
@@ -60,13 +60,14 @@ def make_arange(n):
  
  async def func():
      if test:
--        out_batched = [
+         out_batched = [
 -            i
 -            async for i in aitertools._async_map(
 -                self.async_inc, arange(8), batch_size=3
 -            )
--        ]
-+        out_batched = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
++            i async
++            for i in aitertools._async_map(self.async_inc, arange(8), batch_size=3)
+         ]
  
  
  def awaited_generator_value(n):
@@ -95,7 +96,10 @@ def g():
 
 async def func():
     if test:
-        out_batched = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+        out_batched = [
+            i async
+            for i in aitertools._async_map(self.async_inc, arange(8), batch_size=3)
+        ]
 
 
 def awaited_generator_value(n):

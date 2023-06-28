@@ -1,8 +1,11 @@
 use crate::comments::Comments;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
+use crate::prelude::*;
+use crate::AsFormat;
+use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprListComp;
 
@@ -10,11 +13,25 @@ use rustpython_parser::ast::ExprListComp;
 pub struct FormatExprListComp;
 
 impl FormatNodeRule<ExprListComp> for FormatExprListComp {
-    fn fmt_fields(&self, _item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprListComp {
+            range: _,
+            elt,
+            generators,
+        } = item;
+
+        let joined = format_with(|f| {
+            f.join_with(soft_line_break_or_space())
+                .entries(generators.iter().formatted())
+                .finish()
+        });
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]"
+            [parenthesized(
+                "[",
+                &group(&self::format_args!(&elt.format(), space(), group(&joined))),
+                "]"
             )]
         )
     }
