@@ -328,19 +328,23 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
-## Jupyter notebook discovery
+## Jupyter Notebook discovery
 
-Jupyter notebook (`.ipynb`) files are not discovered automatically by Ruff as it's
-considered an experimental feature. For Ruff to lint such files, a user needs to
-explicitly opt-in by using the [`include`](settings.md#include) setting as follows:
+Ruff has built-in experimental support for linting [Jupyter Notebooks](https://jupyter.org/).
+
+To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
+[`include`](settings.md#include) setting, like so:
 
 ```toml
 [tool.ruff]
 include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
 ```
 
-Or, the notebook file(s) can be passed directly to `ruff` on the command-line.
-For example, `ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`.
+This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
+directories, and lint them accordingly.
+
+Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
+`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`.
 
 ## Rule selection
 
