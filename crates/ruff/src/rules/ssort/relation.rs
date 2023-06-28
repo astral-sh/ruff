@@ -51,6 +51,33 @@ impl<'a> RelationVisitor<'a> {
         self.relation.bindings.remove(binding);
         self.relation.unbindings.insert(binding);
     }
+
+    fn insert_deferred_requirements(
+        &mut self,
+        requirements: IndexSet<Requirement<'a>>,
+        bindings: IndexSet<&'a str>,
+        unbindings: IndexSet<&'a str>,
+    ) {
+        for mut requirement in requirements {
+            match requirement.context {
+                RequirementContext::Global => {
+                    self.insert_requirement(requirement);
+                }
+                RequirementContext::NonLocal => {
+                    requirement.context = RequirementContext::Local;
+                    self.insert_requirement(requirement);
+                }
+                RequirementContext::Local => {
+                    if !self.relation.bindings.contains(requirement.name)
+                        && !bindings.contains(requirement.name)
+                        && !unbindings.contains(requirement.name)
+                    {
+                        self.insert_requirement(requirement);
+                    }
+                }
+            };
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for RelationVisitor<'a> {
@@ -86,6 +113,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 let requirements = std::mem::take(&mut self.relation.requirements);
                 let bindings = std::mem::take(&mut self.relation.bindings);
+                let unbindings = std::mem::take(&mut self.relation.unbindings);
                 let is_deferred = std::mem::replace(&mut self.is_deferred, true);
 
                 add_arguments_to_bindings(&mut self.relation.bindings, args);
@@ -94,26 +122,10 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
                 let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                let unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
                 self.is_deferred = is_deferred;
 
-                for mut requirement in requirements {
-                    match requirement.context {
-                        RequirementContext::Global => {
-                            self.insert_requirement(requirement);
-                        }
-                        RequirementContext::NonLocal => {
-                            requirement.context = RequirementContext::Local;
-                            self.insert_requirement(requirement);
-                        }
-                        RequirementContext::Local => {
-                            if !self.relation.bindings.contains(requirement.name)
-                                && !bindings.contains(requirement.name)
-                            {
-                                self.insert_requirement(requirement);
-                            }
-                        }
-                    };
-                }
+                self.insert_deferred_requirements(requirements, bindings, unbindings);
             }
             Stmt::ClassDef(StmtClassDef {
                 name,
@@ -321,6 +333,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 let requirements = std::mem::take(&mut self.relation.requirements);
                 let bindings = std::mem::take(&mut self.relation.bindings);
+                let unbindings = std::mem::take(&mut self.relation.unbindings);
                 let is_deferred = std::mem::replace(&mut self.is_deferred, true);
 
                 add_arguments_to_bindings(&mut self.relation.bindings, args);
@@ -329,26 +342,10 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
                 let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                let unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
                 self.is_deferred = is_deferred;
 
-                for mut requirement in requirements {
-                    match requirement.context {
-                        RequirementContext::Global => {
-                            self.insert_requirement(requirement);
-                        }
-                        RequirementContext::NonLocal => {
-                            requirement.context = RequirementContext::Local;
-                            self.insert_requirement(requirement);
-                        }
-                        RequirementContext::Local => {
-                            if !self.relation.bindings.contains(requirement.name)
-                                && !bindings.contains(requirement.name)
-                            {
-                                self.insert_requirement(requirement);
-                            }
-                        }
-                    };
-                }
+                self.insert_deferred_requirements(requirements, bindings, unbindings);
             }
             Expr::IfExp(ExprIfExp {
                 test, body, orelse, ..
@@ -809,6 +806,22 @@ mod tests {
     }
 
     #[test]
+    fn function_def_del_in_body() {
+        let stmt = parse(
+            r#"
+                def a():
+                    b = 1
+                    del b
+                    return b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(Vec::from_iter(relation.requirements), []);
+    }
+
+    #[test]
     fn async_function_def() {
         let stmt = parse(
             r#"
@@ -1043,6 +1056,22 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn async_function_def_del_in_body() {
+        let stmt = parse(
+            r#"
+                async def a():
+                    b = 1
+                    del b
+                    return b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(Vec::from_iter(relation.requirements), []);
     }
 
     #[test]
