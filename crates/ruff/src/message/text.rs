@@ -223,7 +223,7 @@ impl Display for MessageCodeFrame<'_> {
             let content_end_cell = jupyter_index
                 .cell(content_end_index.get())
                 .unwrap_or_default();
-            while end_index < content_end_index {
+            while end_index > content_end_index {
                 if jupyter_index.cell(end_index.get()).unwrap_or_default() == content_end_cell {
                     break;
                 }
