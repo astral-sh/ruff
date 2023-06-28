@@ -13,6 +13,7 @@ pub(super) fn stmt_relation(stmt: &Stmt) -> Relation {
 pub(super) struct Relation<'a> {
     pub requirements: IndexSet<Requirement<'a>>,
     pub bindings: IndexSet<&'a str>,
+    pub unbindings: IndexSet<&'a str>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -34,6 +35,22 @@ struct RelationVisitor<'a> {
     relation: Relation<'a>,
     is_expr_context_inverted: bool,
     is_deferred: bool,
+}
+
+impl<'a> RelationVisitor<'a> {
+    fn insert_requirement(&mut self, requirement: Requirement<'a>) {
+        self.relation.requirements.insert(requirement);
+    }
+
+    fn insert_binding(&mut self, binding: &'a str) {
+        self.relation.bindings.insert(binding);
+        self.relation.unbindings.remove(binding);
+    }
+
+    fn insert_unbinding(&mut self, binding: &'a str) {
+        self.relation.bindings.remove(binding);
+        self.relation.unbindings.insert(binding);
+    }
 }
 
 impl<'a> Visitor<'a> for RelationVisitor<'a> {
@@ -65,7 +82,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     self.visit_annotation(expr);
                 }
 
-                self.relation.bindings.insert(name);
+                self.insert_binding(name);
 
                 let requirements = std::mem::take(&mut self.relation.requirements);
                 let bindings = std::mem::take(&mut self.relation.bindings);
@@ -82,17 +99,17 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 for mut requirement in requirements {
                     match requirement.context {
                         RequirementContext::Global => {
-                            self.relation.requirements.insert(requirement);
+                            self.insert_requirement(requirement);
                         }
                         RequirementContext::NonLocal => {
                             requirement.context = RequirementContext::Local;
-                            self.relation.requirements.insert(requirement);
+                            self.insert_requirement(requirement);
                         }
                         RequirementContext::Local => {
                             if !self.relation.bindings.contains(requirement.name)
                                 && !bindings.contains(requirement.name)
                             {
-                                self.relation.requirements.insert(requirement);
+                                self.insert_requirement(requirement);
                             }
                         }
                     };
@@ -118,7 +135,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     self.visit_keyword(keyword);
                 }
 
-                self.relation.bindings.insert(name);
+                self.insert_binding(name);
 
                 let mut cumulative_bindings = IndexSet::new();
 
@@ -138,7 +155,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                                 && !cumulative_bindings.contains(requirement.name)
                                 && !CLASS_BUILTINS.contains(&requirement.name))
                         {
-                            self.relation.requirements.insert(requirement);
+                            self.insert_requirement(requirement);
                         }
                     }
                     cumulative_bindings.extend(bindings);
@@ -170,7 +187,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 for requirement in requirements {
                     if !self.relation.bindings.contains(requirement.name) {
-                        self.relation.requirements.insert(requirement);
+                        self.insert_requirement(requirement);
                     }
                 }
 
@@ -184,7 +201,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 for requirement in requirements {
                     if !self.relation.bindings.contains(requirement.name) {
-                        self.relation.requirements.insert(requirement);
+                        self.insert_requirement(requirement);
                     }
                 }
 
@@ -235,14 +252,14 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                                     if requirement.name != name.as_str()
                                         && !self.relation.bindings.contains(requirement.name)
                                     {
-                                        self.relation.requirements.insert(requirement);
+                                        self.insert_requirement(requirement);
                                     }
                                 }
                                 bindings.remove(name.as_str());
                             } else {
                                 for requirement in requirements {
                                     if !self.relation.bindings.contains(requirement.name) {
-                                        self.relation.requirements.insert(requirement);
+                                        self.insert_requirement(requirement);
                                     }
                                 }
                             }
@@ -262,7 +279,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 for requirement in requirements {
                     if !self.relation.bindings.contains(requirement.name) {
-                        self.relation.requirements.insert(requirement);
+                        self.insert_requirement(requirement);
                     }
                 }
 
@@ -275,22 +292,22 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
             }
             Stmt::Global(StmtGlobal { names, .. }) => {
                 for name in names {
-                    self.relation.requirements.insert(Requirement {
+                    self.insert_requirement(Requirement {
                         name,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::Global,
                     });
-                    self.relation.bindings.insert(name);
+                    self.insert_binding(name);
                 }
             }
             Stmt::Nonlocal(StmtNonlocal { names, .. }) => {
                 for name in names {
-                    self.relation.requirements.insert(Requirement {
+                    self.insert_requirement(Requirement {
                         name,
                         is_deferred: self.is_deferred,
                         context: RequirementContext::NonLocal,
                     });
-                    self.relation.bindings.insert(name);
+                    self.insert_binding(name);
                 }
             }
             stmt => walk_stmt(self, stmt),
@@ -317,17 +334,17 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 for mut requirement in requirements {
                     match requirement.context {
                         RequirementContext::Global => {
-                            self.relation.requirements.insert(requirement);
+                            self.insert_requirement(requirement);
                         }
                         RequirementContext::NonLocal => {
                             requirement.context = RequirementContext::Local;
-                            self.relation.requirements.insert(requirement);
+                            self.insert_requirement(requirement);
                         }
                         RequirementContext::Local => {
                             if !self.relation.bindings.contains(requirement.name)
                                 && !bindings.contains(requirement.name)
                             {
-                                self.relation.requirements.insert(requirement);
+                                self.insert_requirement(requirement);
                             }
                         }
                     };
@@ -348,7 +365,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 for requirement in requirements {
                     if !self.relation.bindings.contains(requirement.name) {
-                        self.relation.requirements.insert(requirement);
+                        self.insert_requirement(requirement);
                     }
                 }
 
@@ -362,7 +379,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 for requirement in requirements {
                     if !self.relation.bindings.contains(requirement.name) {
-                        self.relation.requirements.insert(requirement);
+                        self.insert_requirement(requirement);
                     }
                 }
 
@@ -403,7 +420,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     if !self.relation.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
                     {
-                        self.relation.requirements.insert(requirement);
+                        self.insert_requirement(requirement);
                     }
                 }
             }
@@ -439,22 +456,44 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     if !self.relation.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
                     {
-                        self.relation.requirements.insert(requirement);
+                        self.insert_requirement(requirement);
                     }
                 }
             }
             Expr::Name(ExprName { id, ctx, .. }) => {
-                let store = (ctx == &ExprContext::Store) != self.is_expr_context_inverted;
+                let ctx = if self.is_expr_context_inverted {
+                    match ctx {
+                        ExprContext::Load => ExprContext::Store,
+                        ExprContext::Store => ExprContext::Load,
+                        ExprContext::Del => ExprContext::Del,
+                    }
+                } else {
+                    *ctx
+                };
 
-                if !store && !self.relation.bindings.contains(id.as_str()) {
-                    self.relation.requirements.insert(Requirement {
-                        name: id,
-                        is_deferred: self.is_deferred,
-                        context: RequirementContext::Local,
-                    });
-                }
-                if store {
-                    self.relation.bindings.insert(id);
+                match ctx {
+                    ExprContext::Load => {
+                        if !self.relation.bindings.contains(id.as_str()) {
+                            self.insert_requirement(Requirement {
+                                name: id,
+                                is_deferred: self.is_deferred,
+                                context: RequirementContext::Local,
+                            });
+                        }
+                    }
+                    ExprContext::Store => {
+                        self.insert_binding(id);
+                    }
+                    ExprContext::Del => {
+                        if !self.relation.bindings.contains(id.as_str()) {
+                            self.insert_requirement(Requirement {
+                                name: id,
+                                is_deferred: self.is_deferred,
+                                context: RequirementContext::Local,
+                            });
+                        }
+                        self.insert_unbinding(id.as_str());
+                    }
                 }
             }
             expr => walk_expr(self, expr),
@@ -463,10 +502,10 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
     fn visit_alias(&mut self, alias: &'a Alias) {
         match &alias.asname {
-            Some(asname) => self.relation.bindings.insert(asname),
+            Some(asname) => self.insert_binding(asname),
             None => match alias.name.split_once('.') {
-                Some((prefix, _)) => self.relation.bindings.insert(prefix),
-                _ => self.relation.bindings.insert(&alias.name),
+                Some((prefix, _)) => self.insert_binding(prefix),
+                _ => self.insert_binding(&alias.name),
             },
         };
     }
@@ -475,7 +514,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
         match pattern {
             Pattern::MatchStar(PatternMatchStar { name, .. }) => {
                 if let Some(name) = name {
-                    self.relation.bindings.insert(name);
+                    self.insert_binding(name);
                 }
             }
             Pattern::MatchMapping(PatternMatchMapping {
@@ -489,7 +528,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.relation.bindings.insert(rest);
+                    self.insert_binding(rest);
                 }
             }
             Pattern::MatchAs(PatternMatchAs { pattern, name, .. }) => {
@@ -497,7 +536,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(name) = name {
-                    self.relation.bindings.insert(name);
+                    self.insert_binding(name);
                 }
             }
             pattern => walk_pattern(self, pattern),
@@ -1260,7 +1299,7 @@ mod tests {
         let stmt =
             parse(r#"del a, (b := c).d, (e := f)[(g := h) : (i := j) : (k := l)], b, e, g, i, k"#);
         let relation = stmt_relation(&stmt);
-        assert_eq!(Vec::from_iter(relation.bindings), ["b", "e", "g", "i", "k"]);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
