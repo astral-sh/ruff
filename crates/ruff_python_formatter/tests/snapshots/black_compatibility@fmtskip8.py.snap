@@ -74,7 +74,7 @@ async def test_async_with():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,62 +1,61 @@
+@@ -1,62 +1,62 @@
  # Make sure a leading comment is not removed.
 -def some_func(  unformatted,  args  ):  # fmt: skip
 +def some_func(unformatted, args):  # fmt: skip
@@ -153,8 +153,8 @@ async def test_async_with():
  
  async def test_async_with():
 -    async  with  give_me_async_context(  unformatted,  args  ):  # fmt: skip
--        print("Do something")
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith  # fmt: skip
++    async with give_me_async_context(unformatted, args):  # fmt: skip
+         print("Do something")
 ```
 
 ## Ruff Output
@@ -220,7 +220,8 @@ with give_me_context(unformatted, args):  # fmt: skip
 
 
 async def test_async_with():
-    NOT_YET_IMPLEMENTED_StmtAsyncWith  # fmt: skip
+    async with give_me_async_context(unformatted, args):  # fmt: skip
+        print("Do something")
 ```
 
 ## Black Output

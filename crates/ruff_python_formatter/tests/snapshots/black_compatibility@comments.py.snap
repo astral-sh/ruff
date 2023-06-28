@@ -140,17 +140,7 @@ async def wat():
  
      if inner_imports.are_evil():
          # Explains why we have this if.
-@@ -82,8 +82,7 @@
- async def wat():
-     # This comment, for some reason \
-     # contains a trailing backslash.
--    async with X.open_async() as x:  # Some more comments
--        result = await x.method1()
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
-     # Comment after ending a block.
-     if result:
-         print("A OK", file=sys.stdout)
-@@ -93,4 +92,4 @@
+@@ -93,4 +93,4 @@
  
  # Some closing comments.
  # Maybe Vim or Emacs directives for formatting.
@@ -246,7 +236,8 @@ class Foo:
 async def wat():
     # This comment, for some reason \
     # contains a trailing backslash.
-    NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
+    async with X.open_async() as x:  # Some more comments
+        result = await x.method1()
     # Comment after ending a block.
     if result:
         print("A OK", file=sys.stdout)
