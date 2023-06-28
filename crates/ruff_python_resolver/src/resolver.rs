@@ -1,7 +1,6 @@
 //! Resolves Python imports to their corresponding files on disk.
 
 use std::collections::BTreeMap;
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use log::debug;
@@ -139,21 +138,10 @@ fn resolve_module_descriptor(
             } else {
                 if allow_native_lib && dir_path.is_dir() {
                     // We couldn't find a `.py[i]` file; search for a native library.
-                    if let Some(module_name) = dir_path.file_name().and_then(OsStr::to_str) {
-                        if let Some(native_lib_path) = dir_path
-                            .read_dir()
-                            .unwrap()
-                            .flatten()
-                            .filter(|entry| entry.file_type().map_or(false, |ft| ft.is_file()))
-                            .map(|entry| entry.path())
-                            .find(|path| {
-                                native_module::is_native_module_file_name(module_name, path)
-                            })
-                        {
-                            debug!("Resolved import with file: {native_lib_path:?}");
-                            is_native_lib = true;
-                            resolved_paths.push(native_lib_path);
-                        }
+                    if let Some(native_lib_path) = native_module::find_native_module(&dir_path) {
+                        debug!("Resolved import with file: {native_lib_path:?}");
+                        is_native_lib = true;
+                        resolved_paths.push(native_lib_path);
                     }
                 }
 

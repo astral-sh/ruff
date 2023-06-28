@@ -55,14 +55,7 @@ pub(crate) fn find(dir_path: &Path, exclusions: &[&Path]) -> BTreeMap<String, Im
                 let file_stem = path.file_stem().and_then(OsStr::to_str);
                 let is_native_lib = false;
                 (file_stem, is_native_lib)
-            } else if native_module::is_native_module_file_extension(extension)
-                && !path
-                    .with_extension(format!("{}.py", extension.to_str().unwrap()))
-                    .exists()
-                && !path
-                    .with_extension(format!("{}.pyi", extension.to_str().unwrap()))
-                    .exists()
-            {
+            } else if native_module::is_native_module_file_extension(extension) {
                 // E.g., `foo.abi3.so` becomes `foo`.
                 let file_stem = native_module::native_module_name(&path);
                 let is_native_lib = true;
