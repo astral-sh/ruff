@@ -13,14 +13,14 @@ pub(super) struct Graph<N, E> {
 }
 
 impl<N, E> Graph<N, E> {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Graph {
             outgoing_edges: HashMap::new(),
             incoming_edges: HashMap::new(),
         }
     }
 
-    fn node_count(&self) -> usize {
+    pub(super) fn node_count(&self) -> usize {
         self.outgoing_edges.len()
     }
 }
@@ -29,7 +29,7 @@ impl<N, E> Graph<N, E>
 where
     N: Eq + Hash + PartialEq,
 {
-    fn remove_node(&mut self, node: &N) {
+    pub(super) fn remove_node(&mut self, node: &N) {
         let outgoing_edges = self.outgoing_edges.remove(node).unwrap_or_default();
         let incoming_edges = self.incoming_edges.remove(node).unwrap_or_default();
 
@@ -46,37 +46,37 @@ where
         }
     }
 
-    fn contains_node(&self, node: &N) -> bool {
+    pub(super) fn contains_node(&self, node: &N) -> bool {
         self.outgoing_edges.contains_key(node)
     }
 
-    fn nodes(&self) -> impl Iterator<Item = &N> {
+    pub(super) fn nodes(&self) -> impl Iterator<Item = &N> {
         self.outgoing_edges.keys()
     }
 
-    fn outgoing_neighbors(&self, node: &N) -> Option<impl Iterator<Item = &N>> {
+    pub(super) fn outgoing_neighbors(&self, node: &N) -> Option<impl Iterator<Item = &N>> {
         self.outgoing_edges.get(node).map(|edges| edges.keys())
     }
 
-    fn incoming_neighbors(&self, node: &N) -> Option<impl Iterator<Item = &N>> {
+    pub(super) fn incoming_neighbors(&self, node: &N) -> Option<impl Iterator<Item = &N>> {
         self.incoming_edges.get(node).map(|edges| edges.keys())
     }
 
-    fn outgoing_neighbor_count(&self, node: &N) -> usize {
+    pub(super) fn outgoing_neighbor_count(&self, node: &N) -> usize {
         self.outgoing_edges
             .get(node)
             .map(|edges| edges.len())
             .unwrap_or(0)
     }
 
-    fn incoming_neighbor_count(&self, node: &N) -> usize {
+    pub(super) fn incoming_neighbor_count(&self, node: &N) -> usize {
         self.incoming_edges
             .get(node)
             .map(|edges| edges.len())
             .unwrap_or(0)
     }
 
-    fn remove_edge(&mut self, source: &N, target: &N) {
+    pub(super) fn remove_edge(&mut self, source: &N, target: &N) {
         self.outgoing_edges
             .get_mut(source)
             .map(|edges| edges.remove(target));
@@ -85,7 +85,7 @@ where
             .map(|edges| edges.remove(source));
     }
 
-    fn edge(&self, source: &N, target: &N) -> Option<&E> {
+    pub(super) fn edge(&self, source: &N, target: &N) -> Option<&E> {
         self.outgoing_edges
             .get(source)
             .map(|edges| edges.get(target))
@@ -98,12 +98,12 @@ where
     N: Copy + Eq + Hash + PartialEq,
     E: Copy,
 {
-    fn insert_node(&mut self, node: N) {
+    pub(super) fn insert_node(&mut self, node: N) {
         self.outgoing_edges.entry(node.clone()).or_default();
         self.incoming_edges.entry(node).or_default();
     }
 
-    fn insert_edge(&mut self, source: N, target: N, edge: E) {
+    pub(super) fn insert_edge(&mut self, source: N, target: N, edge: E) {
         self.outgoing_edges
             .entry(source)
             .or_default()
