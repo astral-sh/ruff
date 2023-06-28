@@ -1,6 +1,7 @@
 use crate::comments;
 use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
+use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
 use crate::statement::FormatRefWithRule;
 use crate::statement::Stmt;
@@ -16,8 +17,11 @@ pub(super) enum AnyStatementTry<'a> {
     TryStar(&'a StmtTryStar),
 }
 impl<'a> AnyStatementTry<'a> {
-    const fn is_star(&self) -> bool {
-        matches!(self, AnyStatementTry::TryStar(_))
+    const fn except_handler_kind(&self) -> ExceptHandlerKind {
+        match self {
+            AnyStatementTry::Try(_) => ExceptHandlerKind::Regular,
+            AnyStatementTry::TryStar(_) => ExceptHandlerKind::Starred,
+        }
     }
 
     fn body(&self) -> &Suite {
@@ -83,14 +87,14 @@ pub struct FormatStmtTry;
 
 #[derive(Copy, Clone, Default)]
 pub struct FormatExceptHandler {
-    is_star: bool,
+    except_handler_kind: ExceptHandlerKind,
 }
 
 impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
-    type Options = bool;
+    type Options = ExceptHandlerKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.is_star = options;
+        self.except_handler_kind = options;
         self
     }
 }
@@ -102,7 +106,9 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
         f: &mut Formatter<PyFormatContext<'_>>,
     ) -> FormatResult<()> {
         match item {
-            ExceptHandler::ExceptHandler(x) => x.format().with_options(self.is_star).fmt(f),
+            ExceptHandler::ExceptHandler(x) => {
+                x.format().with_options(self.except_handler_kind).fmt(f)
+            }
         }
     }
 }
@@ -138,7 +144,7 @@ impl Format<PyFormatContext<'_>> for AnyStatementTry<'_> {
                 f,
                 [
                     leading_alternate_branch_comments(handler_comments, previous_node),
-                    &handler.format().with_options(self.is_star()),
+                    &handler.format().with_options(self.except_handler_kind()),
                 ]
             )?;
             previous_node = match handler {

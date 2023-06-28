@@ -7,18 +7,25 @@ use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AstNode;
 use rustpython_parser::ast::ExceptHandlerExceptHandler;
 
+#[derive(Copy, Clone, Default)]
+pub enum ExceptHandlerKind {
+    #[default]
+    Regular,
+    Starred,
+}
+
 #[derive(Default)]
 pub struct FormatExceptHandlerExceptHandler {
-    has_star: bool,
+    except_handler_kind: ExceptHandlerKind,
 }
 
 impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
     for FormatExceptHandlerExceptHandler
 {
-    type Options = bool;
+    type Options = ExceptHandlerKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.has_star = options;
+        self.except_handler_kind = options;
         self
     }
 }
@@ -39,7 +46,16 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         let comments_info = f.context().comments().clone();
         let dangling_comments = comments_info.dangling_comments(item.as_any_node_ref());
 
-        write!(f, [text("except"), self.has_star.then(|| text("*"))])?;
+        write!(
+            f,
+            [
+                text("except"),
+                match self.except_handler_kind {
+                    ExceptHandlerKind::Regular => None,
+                    ExceptHandlerKind::Starred => Some(text("*")),
+                }
+            ]
+        )?;
 
         if let Some(type_) = type_ {
             write!(
