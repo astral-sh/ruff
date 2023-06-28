@@ -12,7 +12,7 @@ D.py:252:1: D208 [*] Docstring is over-indented
     |
     = help: Remove over-indentation
 
-ℹ Suggested fix
+ℹ Fix
 249 249 | def asdfsdsdf24():
 250 250 |     """Summary.
 251 251 | 
@@ -31,7 +31,7 @@ D.py:264:1: D208 [*] Docstring is over-indented
     |
     = help: Remove over-indentation
 
-ℹ Suggested fix
+ℹ Fix
 261 261 | 
 262 262 |     Description.
 263 263 | 
@@ -52,7 +52,7 @@ D.py:272:1: D208 [*] Docstring is over-indented
     |
     = help: Remove over-indentation
 
-ℹ Suggested fix
+ℹ Fix
 269 269 | def asdfsdfsdsdsdfsdf24():
 270 270 |     """Summary.
 271 271 | 

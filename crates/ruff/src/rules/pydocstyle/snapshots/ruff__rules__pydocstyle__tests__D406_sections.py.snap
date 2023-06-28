@@ -17,7 +17,7 @@ sections.py:30:5: D406 [*] Section name should end with a newline ("Returns")
    |
    = help: Add newline after "Returns"
 
-ℹ Suggested fix
+ℹ Fix
 29 29 | def superfluous_suffix():  # noqa: D416
 30 30 |     """Toggle the gizmo.
 31 31 | 
@@ -51,7 +51,7 @@ sections.py:216:5: D406 [*] Section name should end with a newline ("Raises")
     |
     = help: Add newline after "Raises"
 
-ℹ Suggested fix
+ℹ Fix
 224 224 |     Returns
 225 225 |     ------
 226 226 |     Many many wonderful things.

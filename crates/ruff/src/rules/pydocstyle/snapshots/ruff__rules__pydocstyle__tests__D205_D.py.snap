@@ -29,7 +29,7 @@ D.py:210:5: D205 [*] 1 blank line required between summary line and description 
     |
     = help: Insert single blank line
 
-ℹ Suggested fix
+ℹ Fix
 209 209 | def multi_line_two_separating_blanks():
 210 210 |     """Summary.
 211 211 | 

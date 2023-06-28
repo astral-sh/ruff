@@ -45,47 +45,29 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,50 +1,26 @@
--zero(
--    one,
--).two(
--    three,
--).four(
--    five,
--)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
--func1(arg1).func2(
--    arg2,
--).func3(arg3).func4(
--    arg4,
--).func5(arg5)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
- # Inner one-element tuple shouldn't explode
--func1(arg1).func2(arg1, (one_tuple,)).func3(arg3)
-+NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- 
- (
-     a,
+@@ -20,9 +20,7 @@
      b,
      c,
      d,
 -) = func1(
 -    arg1
 -) and func2(arg2)
-+) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++) = func1(arg1) and func2(arg2)
  
  
  # Example from https://github.com/psf/black/issues/3229
- def refresh_token(self, device_family, refresh_token, api_key):
--    return self.orchestration.refresh_token(
--        data={
--            "refreshToken": refresh_token,
--        },
--        api_key=api_key,
+@@ -32,19 +30,18 @@
+             "refreshToken": refresh_token,
+         },
+         api_key=api_key,
 -    )["extensions"]["sdk"]["token"]
-+    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)["extensions"]["sdk"]["token"]
++    )[
++        "extensions"
++    ][
++        "sdk"
++    ][
++        "token"
++    ]
  
  
  # Edge case where a bug in a working-in-progress version of
@@ -108,24 +90,45 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ## Ruff Output
 
 ```py
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+zero(
+    one,
+).two(
+    three,
+).four(
+    five,
+)
 
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+func1(arg1).func2(
+    arg2,
+).func3(arg3).func4(
+    arg4,
+).func5(arg5)
 
 # Inner one-element tuple shouldn't explode
-NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+func1(arg1).func2(arg1, (one_tuple,)).func3(arg3)
 
 (
     a,
     b,
     c,
     d,
-) = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) and NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+) = func1(arg1) and func2(arg2)
 
 
 # Example from https://github.com/psf/black/issues/3229
 def refresh_token(self, device_family, refresh_token, api_key):
-    return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)["extensions"]["sdk"]["token"]
+    return self.orchestration.refresh_token(
+        data={
+            "refreshToken": refresh_token,
+        },
+        api_key=api_key,
+    )[
+        "extensions"
+    ][
+        "sdk"
+    ][
+        "token"
+    ]
 
 
 # Edge case where a bug in a working-in-progress version of

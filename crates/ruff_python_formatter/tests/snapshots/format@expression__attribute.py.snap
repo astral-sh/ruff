@@ -113,31 +113,30 @@ x53 = (
 ```py
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
-a = NOT_IMPLEMENTED_call()
+a = Namespace()
 
 (
-    a
+    a.
     # comment
-    .b  # trailing comment
+    b  # trailing comment
 )
 
 (
-    a
+    a.
     # comment
-    .b  # trailing dot comment  # trailing identifier comment
+    b  # trailing dot comment  # trailing identifier comment
 )
 
 (
-    a
+    a.
     # comment
-    .b  # trailing identifier comment
+    b  # trailing identifier comment
 )
 
 
 (
-    a
+    a.
     # comment
-    .
     # in between
     b  # trailing dot comment  # trailing identifier comment
 )
@@ -150,9 +149,8 @@ a.aaaaaaaaaaaaaaaaaaaaa.lllllllllllllllllllllllllllloooooooooong.chaaaaaaaaaaaaa
 # chain if and only if we need them, that is if there are own line comments inside
 # the chain.
 x1 = (
-    a.b
+    a.b.
     # comment 1
-    .
     # comment 3
     c.d  # comment 2
 )
@@ -163,15 +161,15 @@ x21 = (
     a.b  # trailing name end-of-line
 )
 x22 = (
-    a
+    a.
     # outermost leading own line
-    .b  # outermost trailing end-of-line
+    b  # outermost trailing end-of-line
 )
 
 x31 = (
-    a
+    a.
     # own line between nodes 1
-    .b
+    b
 )
 x321 = a.b  # end-of-line dot comment
 x322 = a.b.c  # end-of-line dot comment 2
@@ -181,9 +179,9 @@ x331 = (
     b
 )
 x332 = (
-    ""
+    "".
     # own line between nodes
-    .find
+    find
 )
 
 x8 = (a + a).b

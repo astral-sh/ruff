@@ -28,3 +28,9 @@ bar: str = "51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI05
 baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
 
 qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
+
+class Demo:
+    """Docstrings are excluded from this rule. Some padding."""  # OK
+
+def func() -> None:
+    """Docstrings are excluded from this rule. Some padding."""  # OK

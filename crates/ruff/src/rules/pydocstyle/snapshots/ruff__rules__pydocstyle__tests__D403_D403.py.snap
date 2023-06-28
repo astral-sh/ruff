@@ -11,7 +11,7 @@ D403.py:2:5: D403 [*] First word of the first line should be capitalized: `this`
   |
   = help: Capitalize `this` to `This`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | def bad_function():
 2   |-    """this docstring is not capitalized"""
   2 |+    """This docstring is not capitalized"""

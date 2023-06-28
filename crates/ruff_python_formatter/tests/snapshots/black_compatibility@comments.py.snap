@@ -130,57 +130,16 @@ async def wat():
  
  
  # Some comment before a function.
-@@ -35,20 +32,24 @@
+@@ -35,7 +32,7 @@
      Possibly many lines.
      """
      # FIXME: Some comment about why this function is crap but still in production.
 -    import inner_imports
 +    NOT_YET_IMPLEMENTED_StmtImport
  
--    if inner_imports.are_evil():
-+    if NOT_IMPLEMENTED_call():
+     if inner_imports.are_evil():
          # Explains why we have this if.
-         # In great detail indeed.
--        x = X()
--        return x.method1()  # type: ignore
-+        x = NOT_IMPLEMENTED_call()
-+        return NOT_IMPLEMENTED_call()  # type: ignore
- 
-     # This return is also commented for some reason.
-     return default
- 
- 
- # Explains why we use global state.
--GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
-+GLOBAL_STATE = {
-+    "a": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-+    "b": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-+    "c": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-+}
- 
- 
- # Another comment!
-@@ -78,19 +79,19 @@
- #' <h1>This is pweave!</h1>
- 
- 
--@fast(really=True)
-+@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
- async def wat():
-     # This comment, for some reason \
-     # contains a trailing backslash.
--    async with X.open_async() as x:  # Some more comments
--        result = await x.method1()
-+    async with NOT_IMPLEMENTED_call() as x:  # Some more comments
-+        result = await NOT_IMPLEMENTED_call()
-     # Comment after ending a block.
-     if result:
--        print("A OK", file=sys.stdout)
-+        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
-         # Comment between things.
--        print()
-+        NOT_IMPLEMENTED_call()
- 
+@@ -93,4 +90,4 @@
  
  # Some closing comments.
  # Maybe Vim or Emacs directives for formatting.
@@ -228,22 +187,18 @@ def function(default=None):
     # FIXME: Some comment about why this function is crap but still in production.
     NOT_YET_IMPLEMENTED_StmtImport
 
-    if NOT_IMPLEMENTED_call():
+    if inner_imports.are_evil():
         # Explains why we have this if.
         # In great detail indeed.
-        x = NOT_IMPLEMENTED_call()
-        return NOT_IMPLEMENTED_call()  # type: ignore
+        x = X()
+        return x.method1()  # type: ignore
 
     # This return is also commented for some reason.
     return default
 
 
 # Explains why we use global state.
-GLOBAL_STATE = {
-    "a": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-    "b": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-    "c": NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg),
-}
+GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
 
 
 # Another comment!
@@ -273,17 +228,17 @@ class Foo:
 #' <h1>This is pweave!</h1>
 
 
-@NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+@fast(really=True)
 async def wat():
     # This comment, for some reason \
     # contains a trailing backslash.
-    async with NOT_IMPLEMENTED_call() as x:  # Some more comments
-        result = await NOT_IMPLEMENTED_call()
+    async with X.open_async() as x:  # Some more comments
+        result = await x.method1()
     # Comment after ending a block.
     if result:
-        NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+        print("A OK", file=sys.stdout)
         # Comment between things.
-        NOT_IMPLEMENTED_call()
+        print()
 
 
 # Some closing comments.

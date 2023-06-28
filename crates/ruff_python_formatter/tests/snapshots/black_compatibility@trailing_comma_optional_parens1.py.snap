@@ -37,7 +37,7 @@ class A:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,34 +1,32 @@
+@@ -1,18 +1,16 @@
 -if e1234123412341234.winerror not in (
 -    _winapi.ERROR_SEM_TIMEOUT,
 -    _winapi.ERROR_PIPE_BUSY,
@@ -45,7 +45,7 @@ class A:
 +if (
 +    e1234123412341234.winerror
 +    not in (_winapi.ERROR_SEM_TIMEOUT, _winapi.ERROR_PIPE_BUSY)
-+    or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
++    or _check_timeout(t)
 +):
      pass
  
@@ -58,20 +58,14 @@ class A:
 -            )
 -            + 1
 -        )
-+        new_id = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) + 1
++        new_id = max(
++            Vegetable.objects.order_by("-id")[0].id,
++            Mineral.objects.order_by("-id")[0].id,
++        ) + 1
  
  
  class X:
-     def get_help_text(self):
--        return ngettext(
--            "Your password must contain at least %(min_length)d character.",
--            "Your password must contain at least %(min_length)d characters.",
--            self.min_length,
--        ) % {"min_length": self.min_length}
-+        return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
-+            "min_length": self.min_length,
-+        }
- 
+@@ -26,9 +24,14 @@
  
  class A:
      def b(self):
@@ -99,20 +93,25 @@ class A:
 if (
     e1234123412341234.winerror
     not in (_winapi.ERROR_SEM_TIMEOUT, _winapi.ERROR_PIPE_BUSY)
-    or NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg)
+    or _check_timeout(t)
 ):
     pass
 
 if x:
     if y:
-        new_id = NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) + 1
+        new_id = max(
+            Vegetable.objects.order_by("-id")[0].id,
+            Mineral.objects.order_by("-id")[0].id,
+        ) + 1
 
 
 class X:
     def get_help_text(self):
-        return NOT_IMPLEMENTED_call(NOT_IMPLEMENTED_arg) % {
-            "min_length": self.min_length,
-        }
+        return ngettext(
+            "Your password must contain at least %(min_length)d character.",
+            "Your password must contain at least %(min_length)d characters.",
+            self.min_length,
+        ) % {"min_length": self.min_length}
 
 
 class A:

@@ -89,6 +89,8 @@ PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters
 29 | 
 30 | qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+31 | 
+32 | class Demo:
    |
    = help: Replace with `...`
 
@@ -98,5 +100,8 @@ PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters
 29 29 | 
 30    |-qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
    30 |+qux: bytes = ...  # Error: PYI053
+31 31 | 
+32 32 | class Demo:
+33 33 |     """Docstrings are excluded from this rule. Some padding."""  # OK
 
 
