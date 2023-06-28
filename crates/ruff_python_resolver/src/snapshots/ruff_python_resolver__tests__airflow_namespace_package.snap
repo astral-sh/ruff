@@ -1,19 +1,22 @@
 ---
-source: crates/ruff_python_resolver/src/resolver.rs
+source: crates/ruff_python_resolver/src/lib.rs
 expression: result
 ---
 ImportResult {
     is_relative: false,
     is_import_found: true,
     is_partly_resolved: false,
-    is_namespace_package: false,
+    is_namespace_package: true,
     is_init_file_present: true,
     is_stub_package: false,
     import_type: Local,
     resolved_paths: [
         "./resources/test/airflow/airflow/__init__.py",
-        "./resources/test/airflow/airflow/jobs/__init__.py",
-        "./resources/test/airflow/airflow/jobs/scheduler_job_runner.py",
+        "",
+        "./resources/test/airflow/airflow/providers/google/__init__.py",
+        "./resources/test/airflow/airflow/providers/google/cloud/__init__.py",
+        "./resources/test/airflow/airflow/providers/google/cloud/hooks/__init__.py",
+        "./resources/test/airflow/airflow/providers/google/cloud/hooks/gcs.py",
     ],
     search_path: Some(
         "./resources/test/airflow",
