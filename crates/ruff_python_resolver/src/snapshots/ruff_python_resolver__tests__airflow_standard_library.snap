@@ -17,8 +17,12 @@ ImportResult {
     is_stdlib_typeshed_file: false,
     is_third_party_typeshed_file: false,
     is_local_typings_file: false,
-    implicit_imports: {},
-    filtered_implicit_imports: {},
+    implicit_imports: ImplicitImports(
+        {},
+    ),
+    filtered_implicit_imports: ImplicitImports(
+        {},
+    ),
     non_stub_import_result: None,
     py_typed_info: None,
     package_directory: None,

@@ -22,30 +22,31 @@ ImportResult {
     is_stdlib_typeshed_file: false,
     is_third_party_typeshed_file: false,
     is_local_typings_file: false,
-    implicit_imports: {
-        "base": ImplicitImport {
-            is_stub_file: false,
-            is_native_lib: false,
-            name: "base",
-            path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/base.py",
-            py_typed: None,
+    implicit_imports: ImplicitImports(
+        {
+            "base": ImplicitImport {
+                is_stub_file: false,
+                is_native_lib: false,
+                path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/base.py",
+                py_typed: None,
+            },
+            "dependency": ImplicitImport {
+                is_stub_file: false,
+                is_native_lib: false,
+                path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/dependency.py",
+                py_typed: None,
+            },
+            "query": ImplicitImport {
+                is_stub_file: false,
+                is_native_lib: false,
+                path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py",
+                py_typed: None,
+            },
         },
-        "dependency": ImplicitImport {
-            is_stub_file: false,
-            is_native_lib: false,
-            name: "dependency",
-            path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/dependency.py",
-            py_typed: None,
-        },
-        "query": ImplicitImport {
-            is_stub_file: false,
-            is_native_lib: false,
-            name: "query",
-            path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py",
-            py_typed: None,
-        },
-    },
-    filtered_implicit_imports: {},
+    ),
+    filtered_implicit_imports: ImplicitImports(
+        {},
+    ),
     non_stub_import_result: None,
     py_typed_info: None,
     package_directory: Some(

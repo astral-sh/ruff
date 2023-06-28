@@ -21,16 +21,19 @@ ImportResult {
     is_stdlib_typeshed_file: false,
     is_third_party_typeshed_file: false,
     is_local_typings_file: false,
-    implicit_imports: {
-        "orjson": ImplicitImport {
-            is_stub_file: false,
-            is_native_lib: true,
-            name: "orjson",
-            path: "./resources/test/airflow/venv/lib/python3.11/site-packages/orjson/orjson.cpython-311-darwin.so",
-            py_typed: None,
+    implicit_imports: ImplicitImports(
+        {
+            "orjson": ImplicitImport {
+                is_stub_file: false,
+                is_native_lib: true,
+                path: "./resources/test/airflow/venv/lib/python3.11/site-packages/orjson/orjson.cpython-311-darwin.so",
+                py_typed: None,
+            },
         },
-    },
-    filtered_implicit_imports: {},
+    ),
+    filtered_implicit_imports: ImplicitImports(
+        {},
+    ),
     non_stub_import_result: Some(
         ImportResult {
             is_relative: false,
@@ -51,16 +54,19 @@ ImportResult {
             is_stdlib_typeshed_file: false,
             is_third_party_typeshed_file: false,
             is_local_typings_file: false,
-            implicit_imports: {
-                "orjson": ImplicitImport {
-                    is_stub_file: false,
-                    is_native_lib: true,
-                    name: "orjson",
-                    path: "./resources/test/airflow/venv/lib/python3.11/site-packages/orjson/orjson.cpython-311-darwin.so",
-                    py_typed: None,
+            implicit_imports: ImplicitImports(
+                {
+                    "orjson": ImplicitImport {
+                        is_stub_file: false,
+                        is_native_lib: true,
+                        path: "./resources/test/airflow/venv/lib/python3.11/site-packages/orjson/orjson.cpython-311-darwin.so",
+                        py_typed: None,
+                    },
                 },
-            },
-            filtered_implicit_imports: {},
+            ),
+            filtered_implicit_imports: ImplicitImports(
+                {},
+            ),
             non_stub_import_result: None,
             py_typed_info: Some(
                 PyTypedInfo {
