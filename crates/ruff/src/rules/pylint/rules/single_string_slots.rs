@@ -32,7 +32,7 @@ use crate::checkers::ast::Checker;
 /// class Person:
 ///     __slots__: str = "name"
 ///
-///     def __init__(self, name: string) -> None:
+///     def __init__(self, name: str) -> None:
 ///         self.name = name
 /// ```
 ///
@@ -41,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// class Person:
 ///     __slots__: tuple[str, ...] = ("name",)
 ///
-///     def __init__(self, name: string) -> None:
+///     def __init__(self, name: str) -> None:
 ///         self.name = name
 /// ```
 ///
