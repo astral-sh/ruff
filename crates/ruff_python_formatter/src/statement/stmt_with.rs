@@ -1,28 +1,77 @@
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::{StmtWith, WithItem};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{Ranged, StmtAsyncWith, StmtWith, Suite, WithItem};
 
 use crate::builders::optional_parentheses;
 use crate::comments::trailing_comments;
 use crate::prelude::*;
-use crate::statement::Stmt;
-use crate::{FormatNodeRule, PyFormatter};
+use crate::FormatNodeRule;
 
-pub(super) trait FormatWithLike<'ast>: ruff_python_ast::node::AstNode {
-    // whether this is `with` or `async with`
-    const ASYNC: bool;
+pub(super) enum AnyStatementWith<'a> {
+    With(&'a StmtWith),
+    AsyncWith(&'a StmtAsyncWith),
+}
 
-    // extract the items and the body
-    fn destruct(&self) -> (&Vec<WithItem>, &Vec<Stmt>);
+impl<'a> AnyStatementWith<'a> {
+    const fn is_async(&self) -> bool {
+        matches!(self, AnyStatementWith::AsyncWith(_))
+    }
 
-    fn fmt_with(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let (items, body) = self.destruct();
+    fn items(&self) -> &[WithItem] {
+        match self {
+            AnyStatementWith::With(with) => with.items.as_slice(),
+            AnyStatementWith::AsyncWith(with) => with.items.as_slice(),
+        }
+    }
 
+    fn body(&self) -> &Suite {
+        match self {
+            AnyStatementWith::With(with) => &with.body,
+            AnyStatementWith::AsyncWith(with) => &with.body,
+        }
+    }
+}
+
+impl Ranged for AnyStatementWith<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            AnyStatementWith::With(with) => with.range(),
+            AnyStatementWith::AsyncWith(with) => with.range(),
+        }
+    }
+}
+
+impl<'a> From<&'a StmtWith> for AnyStatementWith<'a> {
+    fn from(value: &'a StmtWith) -> Self {
+        AnyStatementWith::With(value)
+    }
+}
+
+impl<'a> From<&'a StmtAsyncWith> for AnyStatementWith<'a> {
+    fn from(value: &'a StmtAsyncWith) -> Self {
+        AnyStatementWith::AsyncWith(value)
+    }
+}
+
+impl<'a> From<&AnyStatementWith<'a>> for AnyNodeRef<'a> {
+    fn from(value: &AnyStatementWith<'a>) -> Self {
+        match value {
+            AnyStatementWith::With(with) => AnyNodeRef::StmtWith(with),
+            AnyStatementWith::AsyncWith(with) => AnyNodeRef::StmtAsyncWith(with),
+        }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(self.as_any_node_ref());
+        let dangling_comments = comments.dangling_comments(self);
 
-        let joined_items = format_with(|f| f.join_comma_separated().nodes(items.iter()).finish());
+        let joined_items =
+            format_with(|f| f.join_comma_separated().nodes(self.items().iter()).finish());
 
-        if Self::ASYNC {
+        if self.is_async() {
             write!(f, [text("async"), space()])?;
         }
 
@@ -34,7 +83,7 @@ pub(super) trait FormatWithLike<'ast>: ruff_python_ast::node::AstNode {
                 group(&optional_parentheses(&joined_items)),
                 text(":"),
                 trailing_comments(dangling_comments),
-                block_indent(&body.format())
+                block_indent(&self.body().format())
             ]
         )
     }
@@ -43,17 +92,9 @@ pub(super) trait FormatWithLike<'ast>: ruff_python_ast::node::AstNode {
 #[derive(Default)]
 pub struct FormatStmtWith;
 
-impl<'ast> FormatWithLike<'ast> for StmtWith {
-    const ASYNC: bool = false;
-
-    fn destruct(&self) -> (&Vec<WithItem>, &Vec<Stmt>) {
-        (&self.items, &self.body)
-    }
-}
-
 impl FormatNodeRule<StmtWith> for FormatStmtWith {
     fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
-        item.fmt_with(f)
+        AnyStatementWith::from(item).fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &StmtWith, _f: &mut PyFormatter) -> FormatResult<()> {
