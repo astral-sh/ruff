@@ -1,6 +1,7 @@
 //! Support for native Python extension modules.
 
 use std::ffi::OsStr;
+use std::io;
 use std::path::{Path, PathBuf};
 
 /// Returns `true` if the given file extension is that of a native module.
@@ -37,15 +38,16 @@ pub(crate) fn is_native_module_file_name(module_name: &str, file_name: &Path) ->
 }
 
 /// Find the native module within the namespace package at the given path.
-pub(crate) fn find_native_module(dir_path: &Path) -> Option<PathBuf> {
-    let module_name = dir_path.file_name()?.to_str()?;
-    dir_path
-        .read_dir()
-        .ok()?
+pub(crate) fn find_native_module(
+    module_name: &str,
+    dir_path: &Path,
+) -> io::Result<Option<PathBuf>> {
+    Ok(dir_path
+        .read_dir()?
         .flatten()
         .filter(|entry| entry.file_type().map_or(false, |ft| ft.is_file()))
         .map(|entry| entry.path())
-        .find(|path| is_native_module_file_name(module_name, path))
+        .find(|path| is_native_module_file_name(module_name, path)))
 }
 
 #[cfg(test)]
