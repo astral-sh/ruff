@@ -108,7 +108,7 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -9,16 +9,13 @@
+@@ -9,16 +9,16 @@
  Possibly also many, many lines.
  """
  
@@ -122,15 +122,16 @@ async def wat():
 +NOT_YET_IMPLEMENTED_StmtImport
 +NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
  
--try:
+ try:
 -    import fast
--except ImportError:
++    NOT_YET_IMPLEMENTED_StmtImport
+ except ImportError:
 -    import slow as fast
-+NOT_YET_IMPLEMENTED_StmtTry
++    NOT_YET_IMPLEMENTED_StmtImport
  
  
  # Some comment before a function.
-@@ -35,7 +32,7 @@
+@@ -35,7 +35,7 @@
      Possibly many lines.
      """
      # FIXME: Some comment about why this function is crap but still in production.
@@ -139,17 +140,7 @@ async def wat():
  
      if inner_imports.are_evil():
          # Explains why we have this if.
-@@ -82,8 +79,7 @@
- async def wat():
-     # This comment, for some reason \
-     # contains a trailing backslash.
--    async with X.open_async() as x:  # Some more comments
--        result = await x.method1()
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
-     # Comment after ending a block.
-     if result:
-         print("A OK", file=sys.stdout)
-@@ -93,4 +89,4 @@
+@@ -93,4 +93,4 @@
  
  # Some closing comments.
  # Maybe Vim or Emacs directives for formatting.
@@ -178,7 +169,10 @@ NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
 
-NOT_YET_IMPLEMENTED_StmtTry
+try:
+    NOT_YET_IMPLEMENTED_StmtImport
+except ImportError:
+    NOT_YET_IMPLEMENTED_StmtImport
 
 
 # Some comment before a function.
@@ -242,7 +236,8 @@ class Foo:
 async def wat():
     # This comment, for some reason \
     # contains a trailing backslash.
-    NOT_YET_IMPLEMENTED_StmtAsyncWith  # Some more comments
+    async with X.open_async() as x:  # Some more comments
+        result = await x.method1()
     # Comment after ending a block.
     if result:
         print("A OK", file=sys.stdout)

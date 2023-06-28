@@ -8,9 +8,11 @@ use std::path::{Path, PathBuf};
 use log::debug;
 
 use crate::config::Config;
+use crate::host;
 use crate::module_descriptor::ImportModuleDescriptor;
 use crate::python_version::PythonVersion;
-use crate::{host, SITE_PACKAGES};
+
+const SITE_PACKAGES: &str = "site-packages";
 
 /// Find the `site-packages` directory for the specified Python version.
 fn find_site_packages_path(
@@ -138,7 +140,7 @@ fn find_python_search_paths<Host: host::Host>(config: &Config, host: &Host) -> V
         if let Some(venv) = config.venv.as_ref() {
             let mut found_paths = vec![];
 
-            for lib_name in ["lib", "Lib", "lib64"] {
+            for lib_name in host.python_platform().lib_names() {
                 let lib_path = venv_path.join(venv).join(lib_name);
                 if let Some(site_packages_path) = find_site_packages_path(&lib_path, None) {
                     // Add paths from any `.pth` files in each of the `site-packages` directories.

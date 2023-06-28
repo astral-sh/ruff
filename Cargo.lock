@@ -2095,6 +2095,7 @@ name = "ruff_python_resolver"
 version = "0.0.0"
 dependencies = [
  "env_logger",
+ "insta",
  "log",
  "tempfile",
 ]

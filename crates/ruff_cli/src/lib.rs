@@ -77,6 +77,27 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
     None
 }
 
+/// Returns true if the linter should read from standard input.
+fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
+    // If the user provided a `--stdin-filename`, always read from standard input.
+    if stdin_filename.is_some() {
+        if let Some(file) = files.iter().find(|file| file.as_path() != Path::new("-")) {
+            warn_user_once!(
+                "Ignoring file {} in favor of standard input.",
+                file.display()
+            );
+        }
+        return true;
+    }
+
+    // If the user provided exactly `-`, read from standard input.
+    if files.len() == 1 && files[0] == Path::new("-") {
+        return true;
+    }
+
+    false
+}
+
 pub fn run(
     Args {
         command,
@@ -329,7 +350,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             }
         }
     } else {
-        let is_stdin = cli.files == vec![PathBuf::from("-")];
+        let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
 
         // Generate lint violations.
         let diagnostics = if is_stdin {

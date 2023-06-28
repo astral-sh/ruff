@@ -65,7 +65,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -32,34 +32,20 @@
+@@ -32,34 +32,28 @@
  
  
  if os.name == "posix":
@@ -76,18 +76,18 @@ with hmm_but_this_should_get_two_preceding_newlines():
          pass
 -
  elif os.name == "nt":
--    try:
+     try:
 -        import msvcrt
--
--        def i_should_be_followed_by_only_one_newline():
--            pass
-+    NOT_YET_IMPLEMENTED_StmtTry
++        NOT_YET_IMPLEMENTED_StmtImport
  
--    except ImportError:
+         def i_should_be_followed_by_only_one_newline():
+             pass
+ 
+     except ImportError:
 -
--        def i_should_be_followed_by_only_one_newline():
--            pass
--
+         def i_should_be_followed_by_only_one_newline():
+             pass
+ 
  elif False:
 -
      class IHopeYouAreHavingALovelyDay:
@@ -146,7 +146,15 @@ if os.name == "posix":
     def i_should_be_followed_by_only_one_newline():
         pass
 elif os.name == "nt":
-    NOT_YET_IMPLEMENTED_StmtTry
+    try:
+        NOT_YET_IMPLEMENTED_StmtImport
+
+        def i_should_be_followed_by_only_one_newline():
+            pass
+
+    except ImportError:
+        def i_should_be_followed_by_only_one_newline():
+            pass
 
 elif False:
     class IHopeYouAreHavingALovelyDay:

@@ -107,25 +107,25 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,20 +1,19 @@
+@@ -1,12 +1,11 @@
  #!/usr/bin/env python3
 -import asyncio
 -import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
- 
+-
 -from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
  
 -from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
  
 -f"trigger 3.6 mode"
--
++NOT_YET_IMPLEMENTED_StmtImportFrom
++NOT_YET_IMPLEMENTED_ExprJoinedStr
+ 
  
  def func_no_args():
-     a
+@@ -14,7 +13,7 @@
      b
      c
      if True:
@@ -134,17 +134,7 @@ def __await__(): return (yield)
      if False:
          ...
      for i in range(10):
-@@ -26,8 +25,7 @@
- 
- async def coroutine(arg, exec=False):
-     "Single-line docstring. Multiline is harder to reformat."
--    async with some_connection() as conn:
--        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith
-     await asyncio.sleep(1)
- 
- 
-@@ -41,12 +39,22 @@
+@@ -41,12 +40,22 @@
      debug: bool = False,
      **kwargs,
  ) -> str:
@@ -171,7 +161,7 @@ def __await__(): return (yield)
  
  
  def spaces_types(
-@@ -56,7 +64,7 @@
+@@ -56,7 +65,7 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -180,7 +170,7 @@ def __await__(): return (yield)
      h: str = "",
      i: str = r"",
  ):
-@@ -64,19 +72,16 @@
+@@ -64,19 +73,16 @@
  
  
  def spaces2(result=_core.Value(None)):
@@ -207,7 +197,7 @@ def __await__(): return (yield)
  
  
  def long_lines():
-@@ -87,7 +92,7 @@
+@@ -87,7 +93,7 @@
                  ast_args.kw_defaults,
                  parameters,
                  implicit_default=True,
@@ -216,7 +206,7 @@ def __await__(): return (yield)
          )
          typedargslist.extend(
              gen_annotated_params(
-@@ -96,7 +101,7 @@
+@@ -96,7 +102,7 @@
                  parameters,
                  implicit_default=True,
                  # trailing standalone comment
@@ -225,7 +215,7 @@ def __await__(): return (yield)
          )
      _type_comment_re = re.compile(
          r"""
-@@ -118,7 +123,8 @@
+@@ -118,7 +124,8 @@
          )
          $
          """,
@@ -235,7 +225,7 @@ def __await__(): return (yield)
      )
  
  
-@@ -135,14 +141,8 @@
+@@ -135,14 +142,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -284,7 +274,8 @@ def func_no_args():
 
 async def coroutine(arg, exec=False):
     "Single-line docstring. Multiline is harder to reformat."
-    NOT_YET_IMPLEMENTED_StmtAsyncWith
+    async with some_connection() as conn:
+        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
     await asyncio.sleep(1)
 
 

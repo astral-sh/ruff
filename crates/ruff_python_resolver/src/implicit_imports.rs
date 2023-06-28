@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,8 +24,8 @@ pub(crate) struct ImplicitImport {
 }
 
 /// Find the "implicit" imports within the namespace package at the given path.
-pub(crate) fn find(dir_path: &Path, exclusions: &[&Path]) -> HashMap<String, ImplicitImport> {
-    let mut implicit_imports = HashMap::new();
+pub(crate) fn find(dir_path: &Path, exclusions: &[&Path]) -> BTreeMap<String, ImplicitImport> {
+    let mut implicit_imports = BTreeMap::new();
 
     // Enumerate all files and directories in the path, expanding links.
     let Ok(entries) = fs::read_dir(dir_path) else {
@@ -64,12 +64,7 @@ pub(crate) fn find(dir_path: &Path, exclusions: &[&Path]) -> HashMap<String, Imp
                     .exists()
             {
                 // E.g., `foo.abi3.so` becomes `foo`.
-                let file_stem = path
-                    .file_stem()
-                    .and_then(OsStr::to_str)
-                    .and_then(|file_stem| {
-                        file_stem.split_once('.').map(|(file_stem, _)| file_stem)
-                    });
+                let file_stem = native_module::native_module_name(&path);
                 let is_native_lib = true;
                 (file_stem, is_native_lib)
             } else {
@@ -128,14 +123,14 @@ pub(crate) fn find(dir_path: &Path, exclusions: &[&Path]) -> HashMap<String, Imp
 
 /// Filter a map of implicit imports to only include those that were actually imported.
 pub(crate) fn filter(
-    implicit_imports: &HashMap<String, ImplicitImport>,
+    implicit_imports: &BTreeMap<String, ImplicitImport>,
     imported_symbols: &[String],
-) -> Option<HashMap<String, ImplicitImport>> {
+) -> Option<BTreeMap<String, ImplicitImport>> {
     if implicit_imports.is_empty() || imported_symbols.is_empty() {
         return None;
     }
 
-    let mut filtered_imports = HashMap::new();
+    let mut filtered_imports = BTreeMap::new();
     for implicit_import in implicit_imports.values() {
         if imported_symbols.contains(&implicit_import.name) {
             filtered_imports.insert(implicit_import.name.clone(), implicit_import.clone());

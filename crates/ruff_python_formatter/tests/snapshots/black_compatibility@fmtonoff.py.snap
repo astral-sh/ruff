@@ -221,7 +221,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,30 +16,53 @@
+@@ -18,30 +16,54 @@
  
  # fmt: off
  def func_no_args():
@@ -253,7 +253,8 @@ d={'a':1,
 -     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
 - await asyncio.sleep(1)
 +    "Single-line docstring. Multiline is harder to reformat."
-+    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    async with some_connection() as conn:
++        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
 +    await asyncio.sleep(1)
 +
 +
@@ -296,7 +297,7 @@ d={'a':1,
  
  
  def spaces_types(
-@@ -51,7 +72,7 @@
+@@ -51,7 +73,7 @@
      d: dict = {},
      e: bool = True,
      f: int = -1,
@@ -305,7 +306,7 @@ d={'a':1,
      h: str = "",
      i: str = r"",
  ):
-@@ -64,55 +85,55 @@
+@@ -64,55 +86,55 @@
  
  something = {
      # fmt: off
@@ -381,7 +382,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -133,10 +154,10 @@
+@@ -133,10 +155,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -396,7 +397,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -151,12 +172,10 @@
+@@ -151,12 +173,10 @@
                  ast_args.kw_defaults,
                  parameters,
                  implicit_default=True,
@@ -411,7 +412,7 @@ d={'a':1,
          # fmt: on
      _type_comment_re = re.compile(
          r"""
-@@ -179,7 +198,8 @@
+@@ -179,7 +199,8 @@
          $
          """,
          # fmt: off
@@ -421,7 +422,7 @@ d={'a':1,
          # fmt: on
      )
  
-@@ -217,8 +237,7 @@
+@@ -217,8 +238,7 @@
      xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
  )
  # fmt: off
@@ -472,7 +473,8 @@ def func_no_args():
 
 async def coroutine(arg, exec=False):
     "Single-line docstring. Multiline is harder to reformat."
-    NOT_YET_IMPLEMENTED_StmtAsyncWith
+    async with some_connection() as conn:
+        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
     await asyncio.sleep(1)
 
 
