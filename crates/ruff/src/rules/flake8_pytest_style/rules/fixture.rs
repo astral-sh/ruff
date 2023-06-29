@@ -2,6 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Decorator;
 use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -10,7 +11,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::prelude::Decorator;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -295,8 +295,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                #[allow(deprecated)]
-                let fix = Fix::unspecified(Edit::deletion(func.end(), decorator.end()));
+                let fix = Fix::automatic(Edit::deletion(func.end(), decorator.end()));
                 pytest_fixture_parentheses(
                     checker,
                     decorator,
@@ -346,8 +345,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
                 && checker.settings.flake8_pytest_style.fixture_parentheses
             {
-                #[allow(deprecated)]
-                let fix = Fix::unspecified(Edit::insertion(
+                let fix = Fix::automatic(Edit::insertion(
                     Parentheses::Empty.to_string(),
                     decorator.end(),
                 ));
@@ -406,8 +404,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
                             stmt.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                                 "return".to_string(),
                                 TextRange::at(stmt.start(), "yield".text_len()),
                             )));
@@ -486,8 +483,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let range = checker.locator.full_lines_range(expr.range());
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
+                    diagnostic.set_fix(Fix::automatic(Edit::range_deletion(range)));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -499,8 +495,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let line_range = checker.locator.full_lines_range(expr.range());
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(line_range)));
+                    diagnostic.set_fix(Fix::automatic(Edit::range_deletion(line_range)));
                 }
                 checker.diagnostics.push(diagnostic);
             }

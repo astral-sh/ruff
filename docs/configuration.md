@@ -11,12 +11,14 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+# Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
 select = ["E", "F"]
 ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
-fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
+fixable = ["ALL"]
 unfixable = []
 
 # Exclude a variety of commonly ignored directories.
@@ -53,10 +55,6 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 # Assume Python 3.10.
 target-version = "py310"
-
-[tool.ruff.mccabe]
-# Unlike Flake8, default to a complexity level of 10.
-max-complexity = 10
 ```
 
 As an example, the following would configure Ruff to: (1) enforce flake8-bugbear rules, in addition
@@ -327,6 +325,24 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
+
+## Jupyter Notebook discovery
+
+Ruff has built-in experimental support for linting [Jupyter Notebooks](https://jupyter.org/).
+
+To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
+[`include`](settings.md#include) setting, like so:
+
+```toml
+[tool.ruff]
+include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
+```
+
+This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
+directories, and lint them accordingly.
+
+Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
+`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`.
 
 ## Rule selection
 

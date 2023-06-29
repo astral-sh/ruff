@@ -1,7 +1,9 @@
+use crate::builders::optional_parentheses;
 use crate::comments::Comments;
 use crate::context::NodeLevel;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, Parentheses, Parenthesize};
+use crate::expression::string::StringLayout;
 use crate::prelude::*;
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
@@ -37,6 +39,7 @@ pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
 pub(crate) mod parentheses;
+pub(crate) mod string;
 
 #[derive(Default)]
 pub struct FormatExpr {
@@ -76,11 +79,14 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Await(expr) => expr.format().fmt(f),
             Expr::Yield(expr) => expr.format().fmt(f),
             Expr::YieldFrom(expr) => expr.format().fmt(f),
-            Expr::Compare(expr) => expr.format().fmt(f),
+            Expr::Compare(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::JoinedStr(expr) => expr.format().fmt(f),
-            Expr::Constant(expr) => expr.format().fmt(f),
+            Expr::Constant(expr) => expr
+                .format()
+                .with_options(StringLayout::Default(Some(parentheses)))
+                .fmt(f),
             Expr::Attribute(expr) => expr.format().fmt(f),
             Expr::Subscript(expr) => expr.format().fmt(f),
             Expr::Starred(expr) => expr.format().fmt(f),
@@ -108,16 +114,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
                 )
             }
             // Add optional parentheses. Ignore if the item renders parentheses itself.
-            Parentheses::Optional => {
-                write!(
-                    f,
-                    [group(&format_args![
-                        if_group_breaks(&text("(")),
-                        soft_block_indent(&format_expr),
-                        if_group_breaks(&text(")"))
-                    ])]
-                )
-            }
+            Parentheses::Optional => optional_parentheses(&format_expr).fmt(f),
             Parentheses::Custom | Parentheses::Never => Format::fmt(&format_expr, f),
         };
 

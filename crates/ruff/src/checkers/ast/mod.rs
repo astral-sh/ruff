@@ -770,6 +770,9 @@ where
                 if self.enabled(Rule::NoSlotsInNamedtupleSubclass) {
                     flake8_slots::rules::no_slots_in_namedtuple_subclass(self, stmt, class_def);
                 }
+                if self.enabled(Rule::SingleStringSlots) {
+                    pylint::rules::single_string_slots(self, class_def);
+                }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 if self.enabled(Rule::MultipleImportsOnOneLine) {
@@ -1430,6 +1433,9 @@ where
                 if self.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
+                if self.enabled(Rule::TryExceptInLoop) {
+                    perflint::rules::try_except_in_loop(self, body);
+                }
             }
             Stmt::For(ast::StmtFor {
                 target,
@@ -1476,6 +1482,9 @@ where
                     }
                     if self.enabled(Rule::InDictKeys) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
+                    }
+                    if self.enabled(Rule::TryExceptInLoop) {
+                        perflint::rules::try_except_in_loop(self, body);
                     }
                 }
                 if self.enabled(Rule::IncorrectDictIterator) {
@@ -4150,88 +4159,6 @@ impl<'a> Checker<'a> {
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);
-        let binding = self.semantic.binding(binding_id);
-
-        // Determine whether the binding shadows any existing bindings.
-        if let Some((stack_index, shadowed_id)) = self
-            .semantic
-            .scopes
-            .ancestors(self.semantic.scope_id)
-            .enumerate()
-            .find_map(|(stack_index, scope)| {
-                scope.get(name).and_then(|binding_id| {
-                    let binding = self.semantic.binding(binding_id);
-                    if binding.is_unbound() {
-                        None
-                    } else {
-                        Some((stack_index, binding_id))
-                    }
-                })
-            })
-        {
-            let shadowed = self.semantic.binding(shadowed_id);
-            let in_current_scope = stack_index == 0;
-            if !shadowed.kind.is_builtin()
-                && shadowed.source.map_or(true, |left| {
-                    binding.source.map_or(true, |right| {
-                        !branch_detection::different_forks(left, right, &self.semantic.stmts)
-                    })
-                })
-            {
-                let shadows_import = matches!(
-                    shadowed.kind,
-                    BindingKind::Import(..)
-                        | BindingKind::FromImport(..)
-                        | BindingKind::SubmoduleImport(..)
-                        | BindingKind::FutureImport
-                );
-                if binding.kind.is_loop_var() && shadows_import {
-                    if self.enabled(Rule::ImportShadowedByLoopVar) {
-                        #[allow(deprecated)]
-                        let line = self.locator.compute_line_index(shadowed.range.start());
-
-                        self.diagnostics.push(Diagnostic::new(
-                            pyflakes::rules::ImportShadowedByLoopVar {
-                                name: name.to_string(),
-                                line,
-                            },
-                            binding.range,
-                        ));
-                    }
-                } else if in_current_scope {
-                    if !shadowed.is_used()
-                        && binding.redefines(shadowed)
-                        && (!self.settings.dummy_variable_rgx.is_match(name) || shadows_import)
-                        && !(shadowed.kind.is_function_definition()
-                            && visibility::is_overload(
-                                cast::decorator_list(self.semantic.stmts[shadowed.source.unwrap()]),
-                                &self.semantic,
-                            ))
-                    {
-                        if self.enabled(Rule::RedefinedWhileUnused) {
-                            #[allow(deprecated)]
-                            let line = self.locator.compute_line_index(shadowed.range.start());
-
-                            let mut diagnostic = Diagnostic::new(
-                                pyflakes::rules::RedefinedWhileUnused {
-                                    name: name.to_string(),
-                                    line,
-                                },
-                                binding.range,
-                            );
-                            if let Some(range) = binding.parent_range(&self.semantic) {
-                                diagnostic.set_parent(range.start());
-                            }
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
-                } else if shadows_import && binding.redefines(shadowed) {
-                    self.semantic
-                        .shadowed_bindings
-                        .insert(binding_id, shadowed_id);
-                }
-            }
-        }
 
         // If there's an existing binding in this scope, copy its references.
         if let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
@@ -4265,6 +4192,21 @@ impl<'a> Checker<'a> {
 
                 self.semantic.bindings[binding_id].references = references;
             }
+        } else if let Some(shadowed_id) = self
+            .semantic
+            .scopes
+            .ancestors(scope_id)
+            .skip(1)
+            .find_map(|scope| scope.get(name))
+        {
+            // Otherwise, if there's an existing binding in a parent scope, mark it as shadowed.
+            let binding = self.semantic.binding(binding_id);
+            let shadowed = self.semantic.binding(shadowed_id);
+            if binding.redefines(shadowed) {
+                self.semantic
+                    .shadowed_bindings
+                    .insert(binding_id, shadowed_id);
+            }
         }
 
         // Add the binding to the scope.
@@ -4283,7 +4225,7 @@ impl<'a> Checker<'a> {
         {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
-            let scope = self.semantic.scope_mut();
+            let scope = self.semantic.global_scope_mut();
             scope.add(builtin, binding_id);
         }
     }
@@ -4687,17 +4629,19 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_scopes(&mut self) {
         if !self.any_enabled(&[
-            Rule::UnusedImport,
             Rule::GlobalVariableNotAssigned,
-            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::ImportShadowedByLoopVar,
             Rule::RedefinedWhileUnused,
             Rule::RuntimeImportInTypeCheckingBlock,
             Rule::TypingOnlyFirstPartyImport,
-            Rule::TypingOnlyThirdPartyImport,
             Rule::TypingOnlyStandardLibraryImport,
-            Rule::UndefinedExport,
+            Rule::TypingOnlyThirdPartyImport,
             Rule::UnaliasedCollectionsAbcSetImport,
             Rule::UnconventionalImportAlias,
+            Rule::UndefinedExport,
+            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::UnusedImport,
         ]) {
             return;
         }
@@ -4764,8 +4708,8 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope_id in self.deferred.scopes.iter().rev() {
-            let scope = &self.semantic.scopes[*scope_id];
+        for scope_id in self.deferred.scopes.iter().rev().copied() {
+            let scope = &self.semantic.scopes[scope_id];
 
             if scope.kind.is_module() {
                 // F822
@@ -4824,21 +4768,123 @@ impl<'a> Checker<'a> {
                 continue;
             }
 
-            // Look for any bindings that were redefined in another scope, and remain
-            // unused. Note that we only store references in `shadowed_bindings` if
-            // the bindings are in different scopes.
-            if self.enabled(Rule::RedefinedWhileUnused) {
+            // F402
+            if self.enabled(Rule::ImportShadowedByLoopVar) {
                 for (name, binding_id) in scope.bindings() {
-                    if let Some(shadowed_id) = self.semantic.shadowed_binding(binding_id) {
-                        let shadowed = self.semantic.binding(shadowed_id);
-                        if shadowed.is_used() {
+                    for shadow in self.semantic.shadowed_bindings(scope_id, binding_id) {
+                        // If the shadowing binding isn't a loop variable, abort.
+                        let binding = &self.semantic.bindings[shadow.binding_id()];
+                        if !binding.kind.is_loop_var() {
+                            continue;
+                        }
+
+                        // If the shadowed binding isn't an import, abort.
+                        let shadowed = &self.semantic.bindings[shadow.shadowed_id()];
+                        if !matches!(
+                            shadowed.kind,
+                            BindingKind::Import(..)
+                                | BindingKind::FromImport(..)
+                                | BindingKind::SubmoduleImport(..)
+                                | BindingKind::FutureImport
+                        ) {
+                            continue;
+                        }
+
+                        // If the bindings are in different forks, abort.
+                        if shadowed.source.map_or(true, |left| {
+                            binding.source.map_or(true, |right| {
+                                branch_detection::different_forks(left, right, &self.semantic.stmts)
+                            })
+                        }) {
                             continue;
                         }
 
                         #[allow(deprecated)]
                         let line = self.locator.compute_line_index(shadowed.range.start());
 
-                        let binding = self.semantic.binding(binding_id);
+                        self.diagnostics.push(Diagnostic::new(
+                            pyflakes::rules::ImportShadowedByLoopVar {
+                                name: name.to_string(),
+                                line,
+                            },
+                            binding.range,
+                        ));
+                    }
+                }
+            }
+
+            // F811
+            if self.enabled(Rule::RedefinedWhileUnused) {
+                for (name, binding_id) in scope.bindings() {
+                    for shadow in self.semantic.shadowed_bindings(scope_id, binding_id) {
+                        // If the shadowing binding is a loop variable, abort, to avoid overlap
+                        // with F402.
+                        let binding = &self.semantic.bindings[shadow.binding_id()];
+                        if binding.kind.is_loop_var() {
+                            continue;
+                        }
+
+                        // If the shadowed binding is used, abort.
+                        let shadowed = &self.semantic.bindings[shadow.shadowed_id()];
+                        if shadowed.is_used() {
+                            continue;
+                        }
+
+                        // If the shadowing binding isn't considered a "redefinition" of the
+                        // shadowed binding, abort.
+                        if !binding.redefines(shadowed) {
+                            continue;
+                        }
+
+                        if shadow.same_scope() {
+                            // If the symbol is a dummy variable, abort, unless the shadowed
+                            // binding is an import.
+                            if !matches!(
+                                shadowed.kind,
+                                BindingKind::Import(..)
+                                    | BindingKind::FromImport(..)
+                                    | BindingKind::SubmoduleImport(..)
+                                    | BindingKind::FutureImport
+                            ) && self.settings.dummy_variable_rgx.is_match(name)
+                            {
+                                continue;
+                            }
+
+                            // If this is an overloaded function, abort.
+                            if shadowed.kind.is_function_definition()
+                                && visibility::is_overload(
+                                    cast::decorator_list(
+                                        self.semantic.stmts[shadowed.source.unwrap()],
+                                    ),
+                                    &self.semantic,
+                                )
+                            {
+                                continue;
+                            }
+                        } else {
+                            // Only enforce cross-scope shadowing for imports.
+                            if !matches!(
+                                shadowed.kind,
+                                BindingKind::Import(..)
+                                    | BindingKind::FromImport(..)
+                                    | BindingKind::SubmoduleImport(..)
+                                    | BindingKind::FutureImport
+                            ) {
+                                continue;
+                            }
+                        }
+
+                        // If the bindings are in different forks, abort.
+                        if shadowed.source.map_or(true, |left| {
+                            binding.source.map_or(true, |right| {
+                                branch_detection::different_forks(left, right, &self.semantic.stmts)
+                            })
+                        }) {
+                            continue;
+                        }
+
+                        #[allow(deprecated)]
+                        let line = self.locator.compute_line_index(shadowed.range.start());
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::RedefinedWhileUnused {
                                 name: (*name).to_string(),
@@ -4860,7 +4906,7 @@ impl<'a> Checker<'a> {
                 } else {
                     self.semantic
                         .scopes
-                        .ancestor_ids(*scope_id)
+                        .ancestor_ids(scope_id)
                         .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
                         .copied()
                         .collect()

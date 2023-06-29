@@ -1,0 +1,88 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/skip_magic_trailing_comma.py
+---
+## Input
+```py
+(
+    "First entry",
+    "Second entry",
+    "last with trailing comma",
+)
+
+(
+    "First entry",
+    "Second entry",
+    "last without trailing comma"
+)
+
+(
+    "First entry",
+    "Second entry",
+    "third entry",
+    "fourth entry",
+    "fifth entry",
+    "sixt entry",
+    "seventh entry",
+    "eigth entry",
+)
+```
+
+## Outputs
+### Output 1
+```
+indent-style            = Spaces, size: 4
+line-width              = 88
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
+```py
+(
+    "First entry",
+    "Second entry",
+    "last with trailing comma",
+)
+
+("First entry", "Second entry", "last without trailing comma")
+
+(
+    "First entry",
+    "Second entry",
+    "third entry",
+    "fourth entry",
+    "fifth entry",
+    "sixt entry",
+    "seventh entry",
+    "eigth entry",
+)
+```
+
+
+### Output 2
+```
+indent-style            = Spaces, size: 4
+line-width              = 88
+quote-style             = Double
+magic-trailing-comma    = Ignore
+```
+
+```py
+("First entry", "Second entry", "last with trailing comma")
+
+("First entry", "Second entry", "last without trailing comma")
+
+(
+    "First entry",
+    "Second entry",
+    "third entry",
+    "fourth entry",
+    "fifth entry",
+    "sixt entry",
+    "seventh entry",
+    "eigth entry",
+)
+```
+
+
+

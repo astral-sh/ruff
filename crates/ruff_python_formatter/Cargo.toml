@@ -17,6 +17,7 @@ ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
+bitflags = { workspace = true }
 clap = { workspace = true }
 countme = "3.0.1"
 is-macro = { workspace = true }
@@ -24,10 +25,23 @@ itertools = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-ruff_testing_macros = { path = "../ruff_testing_macros" }
+ruff_formatter = { path = "../ruff_formatter", features = ["serde"]}
 
-insta = { workspace = true, features = [] }
-test-case = { workspace = true }
+insta = { workspace = true, features = ["glob"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
 similar = { workspace = true }
+
+[[test]]
+name = "ruff_python_formatter_fixtures"
+path = "tests/fixtures.rs"
+test = true
+required-features = [ "serde" ]
+
+
+[features]
+serde = ["dep:serde", "ruff_formatter/serde"]
+default = ["serde"]

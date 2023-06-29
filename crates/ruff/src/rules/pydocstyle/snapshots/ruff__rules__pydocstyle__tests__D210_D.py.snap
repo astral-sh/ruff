@@ -10,7 +10,7 @@ D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
     = help: Trim surrounding whitespace
 
-ℹ Suggested fix
+ℹ Fix
 285 285 | 
 286 286 | @expect('D210: No whitespaces allowed surrounding docstring text')
 287 287 | def endswith():
@@ -29,7 +29,7 @@ D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
     = help: Trim surrounding whitespace
 
-ℹ Suggested fix
+ℹ Fix
 290 290 | 
 291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
 292 292 | def around():
@@ -52,7 +52,7 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
     = help: Trim surrounding whitespace
 
-ℹ Suggested fix
+ℹ Fix
 296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
 297 297 | @expect('D213: Multi-line docstring summary should start at the second line')
 298 298 | def multiline():

@@ -82,6 +82,7 @@ mod tests {
     #[test_case(Rule::SectionUnderlineNotOverIndented, Path::new("sections.py"))]
     #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
+    #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

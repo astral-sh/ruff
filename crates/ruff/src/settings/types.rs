@@ -52,6 +52,14 @@ impl PythonVersion {
         }
     }
 
+    pub const fn major(&self) -> u32 {
+        self.as_tuple().0
+    }
+
+    pub const fn minor(&self) -> u32 {
+        self.as_tuple().1
+    }
+
     pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
         let mut minimum_version = None;
         for python_version in PythonVersion::iter() {
@@ -261,6 +269,6 @@ impl Deref for Version {
 /// luckily this not relevant since identifiers don't contains slashes.
 ///
 /// For reference pep8-naming uses
-/// [`fnmatch`](https://docs.python.org/3.11/library/fnmatch.html) for
+/// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;

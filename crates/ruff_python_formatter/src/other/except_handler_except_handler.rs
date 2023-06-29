@@ -1,5 +1,9 @@
-use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
+use crate::comments::trailing_comments;
+use crate::expression::parentheses::Parenthesize;
+use crate::prelude::*;
+use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AstNode;
 use rustpython_parser::ast::ExceptHandlerExceptHandler;
 
 #[derive(Default)]
@@ -11,6 +15,43 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         item: &ExceptHandlerExceptHandler,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
-        write!(f, [not_yet_implemented(item)])
+        let ExceptHandlerExceptHandler {
+            range: _,
+            type_,
+            name,
+            body,
+        } = item;
+
+        let comments_info = f.context().comments().clone();
+        let dangling_comments = comments_info.dangling_comments(item.as_any_node_ref());
+
+        write!(f, [text("except")])?;
+
+        if let Some(type_) = type_ {
+            write!(
+                f,
+                [space(), type_.format().with_options(Parenthesize::IfBreaks)]
+            )?;
+            if let Some(name) = name {
+                write!(f, [space(), text("as"), space(), name.format()])?;
+            }
+        }
+        write!(
+            f,
+            [
+                text(":"),
+                trailing_comments(dangling_comments),
+                block_indent(&body.format())
+            ]
+        )
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _node: &ExceptHandlerExceptHandler,
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // dangling comments are formatted as part of fmt_fields
+        Ok(())
     }
 }

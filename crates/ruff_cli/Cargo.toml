@@ -67,9 +67,6 @@ wild = { version = "2" }
 assert_cmd = { version = "2.0.8" }
 ureq = { version = "2.6.2", features = [] }
 
-[features]
-jupyter_notebook = ["ruff/jupyter_notebook"]
-
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = "0.1.34"
 

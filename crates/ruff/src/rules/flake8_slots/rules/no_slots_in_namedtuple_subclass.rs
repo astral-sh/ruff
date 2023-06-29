@@ -4,7 +4,7 @@ use rustpython_parser::ast::{Expr, StmtClassDef};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::prelude::Stmt;
+use rustpython_parser::ast::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -46,7 +46,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `__slots__`](https://docs.python.org/3.7/reference/datamodel.html#slots)
+/// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[violation]
 pub struct NoSlotsInNamedtupleSubclass;
 

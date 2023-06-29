@@ -18,10 +18,7 @@ use ruff::rules::{
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
-use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceLocation, Stylist};
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -39,7 +36,7 @@ export interface Diagnostic {
     fix: {
         message: string | null;
         edits: {
-            content: string;
+            content: string | null;
             location: {
                 row: number;
                 column: number;
@@ -54,18 +51,25 @@ export interface Diagnostic {
 "#;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
-pub struct ExpandedFix {
-    message: Option<String>,
-    edits: Vec<Edit>,
-}
-
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
     pub location: SourceLocation,
     pub end_location: SourceLocation,
     pub fix: Option<ExpandedFix>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedFix {
+    message: Option<String>,
+    edits: Vec<ExpandedEdit>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+struct ExpandedEdit {
+    location: SourceLocation,
+    end_location: SourceLocation,
+    content: Option<String>,
 }
 
 #[wasm_bindgen(start)]
@@ -87,7 +91,7 @@ pub fn run() {
 #[wasm_bindgen]
 #[allow(non_snake_case)]
 pub fn currentVersion() -> JsValue {
-    JsValue::from(VERSION)
+    JsValue::from(ruff::VERSION)
 }
 
 #[wasm_bindgen]
@@ -222,7 +226,15 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
                 end_location,
                 fix: message.fix.map(|fix| ExpandedFix {
                     message: message.kind.suggestion,
-                    edits: fix.into_edits(),
+                    edits: fix
+                        .into_edits()
+                        .into_iter()
+                        .map(|edit| ExpandedEdit {
+                            location: source_code.source_location(edit.start()),
+                            end_location: source_code.source_location(edit.end()),
+                            content: edit.content().map(ToString::to_string),
+                        })
+                        .collect(),
                 }),
             }
         })

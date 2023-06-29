@@ -104,7 +104,7 @@ pub enum Parentheses {
     Never,
 }
 
-fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
     matches!(
         first_non_trivia_token(expr.end(), contents),
         Some(Token {

@@ -10,7 +10,7 @@ SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
   |
   = help: Replace with `!=` operator
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # SIM201
 2   |-if not a == b:
   2 |+if a != b:
@@ -27,7 +27,7 @@ SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
   |
   = help: Replace with `!=` operator
 
-ℹ Suggested fix
+ℹ Fix
 3 3 |     pass
 4 4 | 
 5 5 | # SIM201
@@ -46,7 +46,7 @@ SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
    |
    = help: Replace with `!=` operator
 
-ℹ Suggested fix
+ℹ Fix
 7  7  |     pass
 8  8  | 
 9  9  | # SIM201

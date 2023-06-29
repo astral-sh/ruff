@@ -2,10 +2,9 @@
 
 pub mod preorder;
 
-use rustpython_ast::Decorator;
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
+    Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -20,7 +19,7 @@ pub trait Visitor<'a> {
         walk_stmt(self, stmt);
     }
     fn visit_annotation(&mut self, expr: &'a Expr) {
-        walk_expr(self, expr);
+        walk_annotation(self, expr);
     }
     fn visit_decorator(&mut self, decorator: &'a Decorator) {
         walk_decorator(self, decorator);
@@ -53,7 +52,7 @@ pub trait Visitor<'a> {
         walk_except_handler(self, except_handler);
     }
     fn visit_format_spec(&mut self, format_spec: &'a Expr) {
-        walk_expr(self, format_spec);
+        walk_format_spec(self, format_spec);
     }
     fn visit_arguments(&mut self, arguments: &'a Arguments) {
         walk_arguments(self, arguments);
@@ -167,9 +166,9 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             value,
             range: _range,
         }) => {
-            visitor.visit_expr(target);
-            visitor.visit_operator(op);
             visitor.visit_expr(value);
+            visitor.visit_operator(op);
+            visitor.visit_expr(target);
         }
         Stmt::AnnAssign(ast::StmtAnnAssign {
             target,
@@ -320,6 +319,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         }) => visitor.visit_expr(value),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => {}
     }
+}
+
+pub fn walk_annotation<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
+    visitor.visit_expr(expr);
 }
 
 pub fn walk_decorator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, decorator: &'a Decorator) {
@@ -600,6 +603,10 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
             visitor.visit_body(body);
         }
     }
+}
+
+pub fn walk_format_spec<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, format_spec: &'a Expr) {
+    visitor.visit_expr(format_spec);
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {

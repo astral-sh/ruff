@@ -67,7 +67,7 @@ PT006.py:29:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expe
    |
    = help: Use a `csv` for parameter names
 
-ℹ Suggested fix
+ℹ Fix
 26 26 |     ...
 27 27 | 
 28 28 | 
@@ -105,7 +105,7 @@ PT006.py:39:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expe
    |
    = help: Use a `csv` for parameter names
 
-ℹ Suggested fix
+ℹ Fix
 36 36 |     ...
 37 37 | 
 38 38 | 

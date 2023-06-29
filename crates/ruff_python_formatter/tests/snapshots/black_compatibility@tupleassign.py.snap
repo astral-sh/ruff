@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/tupleassign.py
+---
+## Input
+
+```py
+# This is a standalone comment.
+sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
+
+# This is as well.
+this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
+
+(a,) = call()
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -4,9 +4,9 @@
+     sdfjsdfjlksdljkfsdlkf,
+     sdfsdjfklsdfjlksdljkf,
+     sdsfsdfjskdflsfsdf,
+-) = (1, 2, 3)
++) = 1, 2, 3
+ 
+ # This is as well.
+-(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
++(this_will_be_wrapped_in_parens,) = struct.unpack(b"NOT_YET_IMPLEMENTED_BYTE_STRING")
+ 
+ (a,) = call()
+```
+
+## Ruff Output
+
+```py
+# This is a standalone comment.
+(
+    sdfjklsdfsjldkflkjsf,
+    sdfjsdfjlksdljkfsdlkf,
+    sdfsdjfklsdfjlksdljkf,
+    sdsfsdfjskdflsfsdf,
+) = 1, 2, 3
+
+# This is as well.
+(this_will_be_wrapped_in_parens,) = struct.unpack(b"NOT_YET_IMPLEMENTED_BYTE_STRING")
+
+(a,) = call()
+```
+
+## Black Output
+
+```py
+# This is a standalone comment.
+(
+    sdfjklsdfsjldkflkjsf,
+    sdfjsdfjlksdljkfsdlkf,
+    sdfsdjfklsdfjlksdljkf,
+    sdsfsdfjskdflsfsdf,
+) = (1, 2, 3)
+
+# This is as well.
+(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
+
+(a,) = call()
+```
+
+

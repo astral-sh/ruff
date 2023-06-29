@@ -12,6 +12,56 @@ use ruff_python_semantic::{Definition, Member, MemberKind, Module, ModuleKind};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for undocumented public module definitions.
+///
+/// ## Why is this bad?
+/// Public modules should be documented via docstrings to outline their purpose
+/// and contents.
+///
+/// Generally, module docstrings should describe the purpose of the module and
+/// list the classes, exceptions, functions, and other objects that are exported
+/// by the module, alongside a one-line summary of each.
+///
+/// If the module is a script, the docstring should be usable as its "usage"
+/// message.
+///
+/// If the codebase adheres to a standard format for module docstrings, follow
+/// that format for consistency.
+///
+/// ## Example
+/// ```python
+/// class FasterThanLightError(ZeroDivisionError):
+///     ...
+///
+///
+/// def calculate_speed(distance: float, time: float) -> float:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// """Utility functions and classes for calculating speed.
+///
+/// This module provides:
+/// - FasterThanLightError: exception when FTL speed is calculated;
+/// - calculate_speed: calculate speed given distance and time.
+/// """
+///
+///
+/// class FasterThanLightError(ZeroDivisionError):
+///     ...
+///
+///
+/// def calculate_speed(distance: float, time: float) -> float:
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedPublicModule;
 
@@ -22,6 +72,79 @@ impl Violation for UndocumentedPublicModule {
     }
 }
 
+/// ## What it does
+/// Checks for undocumented public class definitions.
+///
+/// ## Why is this bad?
+/// Public classes should be documented via docstrings to outline their purpose
+/// and behavior.
+///
+/// Generally, a class docstring should describe the class's purpose and list
+/// its public attributes and methods.
+///
+/// If the codebase adheres to a standard format for class docstrings, follow
+/// that format for consistency.
+///
+/// ## Example
+/// ```python
+/// class Player:
+///     def __init__(self, name: str, points: int = 0) -> None:
+///         self.name: str = name
+///         self.points: int = points
+///
+///     def add_points(self, points: int) -> None:
+///         self.points += points
+/// ```
+///
+/// Use instead (in the NumPy docstring format):
+/// ```python
+/// class Player:
+///     """A player in the game.
+///
+///     Attributes
+///     ----------
+///     name : str
+///         The name of the player.
+///     points : int
+///         The number of points the player has.
+///
+///     Methods
+///     -------
+///     add_points(points: int) -> None
+///         Add points to the player's score.
+///     """
+///
+///     def __init__(self, name: str, points: int = 0) -> None:
+///         self.name: str = name
+///         self.points: int = points
+///
+///     def add_points(self, points: int) -> None:
+///         self.points += points
+/// ```
+///
+/// Or (in the Google docstring format):
+/// ```python
+/// class Player:
+///     """A player in the game.
+///
+///     Attributes:
+///         name: The name of the player.
+///         points: The number of points the player has.
+///     """
+///
+///     def __init__(self, name: str, points: int = 0) -> None:
+///         self.name: str = name
+///         self.points: int = points
+///
+///     def add_points(self, points: int) -> None:
+///         self.points += points
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedPublicClass;
 
@@ -32,6 +155,75 @@ impl Violation for UndocumentedPublicClass {
     }
 }
 
+/// ## What it does
+/// Checks for undocumented public method definitions.
+///
+/// ## Why is this bad?
+/// Public methods should be documented via docstrings to outline their purpose
+/// and behavior.
+///
+/// Generally, a method docstring should describe the method's behavior,
+/// arguments, side effects, exceptions, return values, and any other
+/// information that may be relevant to the user.
+///
+/// If the codebase adheres to a standard format for method docstrings, follow
+/// that format for consistency.
+///
+/// ## Example
+/// ```python
+/// class Cat(Animal):
+///     def greet(self, happy: bool = True):
+///         if happy:
+///             print("Meow!")
+///         else:
+///             raise ValueError("Tried to greet an unhappy cat.")
+/// ```
+///
+/// Use instead (in the NumPy docstring format):
+/// ```python
+/// class Cat(Animal):
+///     def greet(self, happy: bool = True):
+///         """Print a greeting from the cat.
+///
+///         Parameters
+///         ----------
+///         happy : bool, optional
+///             Whether the cat is happy, is True by default.
+///
+///         Raises
+///         ------
+///         ValueError
+///             If the cat is not happy.
+///         """
+///         if happy:
+///             print("Meow!")
+///         else:
+///             raise ValueError("Tried to greet an unhappy cat.")
+/// ```
+///
+/// Or (in the Google docstring format):
+/// ```python
+/// class Cat(Animal):
+///     def greet(self, happy: bool = True):
+///         """Print a greeting from the cat.
+///
+///         Args:
+///             happy: Whether the cat is happy, is True by default.
+///
+///         Raises:
+///             ValueError: If the cat is not happy.
+///         """
+///         if happy:
+///             print("Meow!")
+///         else:
+///             raise ValueError("Tried to greet an unhappy cat.")
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedPublicMethod;
 
@@ -42,6 +234,83 @@ impl Violation for UndocumentedPublicMethod {
     }
 }
 
+/// ## What it does
+/// Checks for undocumented public function definitions.
+///
+/// ## Why is this bad?
+/// Public functions should be documented via docstrings to outline their
+/// purpose and behavior.
+///
+/// Generally, a function docstring should describe the function's behavior,
+/// arguments, side effects, exceptions, return values, and any other
+/// information that may be relevant to the user.
+///
+/// If the codebase adheres to a standard format for function docstrings, follow
+/// that format for consistency.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead (using the NumPy docstring format):
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Or, using the Google docstring format:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedPublicFunction;
 
@@ -52,6 +321,39 @@ impl Violation for UndocumentedPublicFunction {
     }
 }
 
+/// ## What it does
+/// Checks for undocumented public package definitions.
+///
+/// ## Why is this bad?
+/// Public packages should be documented via docstrings to outline their
+/// purpose and contents.
+///
+/// Generally, package docstrings should list the modules and subpackages that
+/// are exported by the package.
+///
+/// If the codebase adheres to a standard format for package docstrings, follow
+/// that format for consistency.
+///
+/// ## Example
+/// ```python
+/// __all__ = ["Player", "Game"]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// """Game and player management package.
+///
+/// This package provides classes for managing players and games.
+/// """
+///
+/// __all__ = ["player", "game"]
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedPublicPackage;
 
@@ -62,6 +364,50 @@ impl Violation for UndocumentedPublicPackage {
     }
 }
 
+/// ## What it does
+/// Checks for undocumented magic method definitions.
+///
+/// ## Why is this bad?
+/// Magic methods (methods with names that start and end with double
+/// underscores) are used to implement operator overloading and other special
+/// behavior. Such methods should should be documented via docstrings to
+/// outline their behavior.
+///
+/// Generally, magic method docstrings should describe the method's behavior,
+/// arguments, side effects, exceptions, return values, and any other
+/// information that may be relevant to the user.
+///
+/// If the codebase adheres to a standard format for method docstrings, follow
+/// that format for consistency.
+///
+/// ## Example
+/// ```python
+/// class Cat(Animal):
+///     def __str__(self) -> str:
+///         return f"Cat: {self.name}"
+///
+///
+/// cat = Cat("Dusty")
+/// print(cat)  # "Cat: Dusty"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Cat(Animal):
+///     def __str__(self) -> str:
+///         """Return a string representation of the cat."""
+///         return f"Cat: {self.name}"
+///
+///
+/// cat = Cat("Dusty")
+/// print(cat)  # "Cat: Dusty"
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedMagicMethod;
 
@@ -72,6 +418,50 @@ impl Violation for UndocumentedMagicMethod {
     }
 }
 
+/// ## What it does
+/// Checks for undocumented public class definitions, for nested classes.
+///
+/// ## Why is this bad?
+/// Public classes should be documented via docstrings to outline their
+/// purpose and behavior.
+///
+/// Nested classes do not inherit the docstring of their enclosing class, so
+/// they should have their own docstrings.
+///
+/// If the codebase adheres to a standard format for class docstrings, follow
+/// that format for consistency.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     """Class Foo."""
+///
+///     class Bar:
+///         ...
+///
+///
+/// bar = Foo.Bar()
+/// bar.__doc__  # None
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     """Class Foo."""
+///
+///     class Bar:
+///         """Class Bar."""
+///
+///
+/// bar = Foo.Bar()
+/// bar.__doc__  # "Class Bar."
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedPublicNestedClass;
 
@@ -82,6 +472,41 @@ impl Violation for UndocumentedPublicNestedClass {
     }
 }
 
+/// ## What it does
+/// Checks for public `__init__` method definitions that are missing
+/// docstrings.
+///
+/// ## Why is this bad?
+/// Public `__init__` methods are used to initialize objects. `__init__`
+/// methods should be documented via docstrings to describe the method's
+/// behavior, arguments, side effects, exceptions, and any other information
+/// that may be relevant to the user.
+///
+/// If the codebase adheres to a standard format for `__init__` method docstrings,
+/// follow that format for consistency.
+///
+/// ## Example
+/// ```python
+/// class City:
+///     def __init__(self, name: str, population: int) -> None:
+///         self.name: str = name
+///         self.population: int = population
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class City:
+///     def __init__(self, name: str, population: int) -> None:
+///         """Initialize a city with a name and population."""
+///         self.name: str = name
+///         self.population: int = population
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedPublicInit;
 

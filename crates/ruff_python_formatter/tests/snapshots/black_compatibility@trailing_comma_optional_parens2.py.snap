@@ -1,0 +1,52 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/trailing_comma_optional_parens2.py
+---
+## Input
+
+```py
+if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
+    (8, 5, 8) <= get_tk_patchlevel() < (8, 6)):
+    pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,6 +1,5 @@
+-if e123456.get_tk_patchlevel() >= (8, 6, 0, "final") or (
+-    8,
+-    5,
+-    8,
+-) <= get_tk_patchlevel() < (8, 6):
++if (
++    e123456.get_tk_patchlevel() >= (8, 6, 0, "final")
++    or (8, 5, 8) <= get_tk_patchlevel() < (8, 6)
++):
+     pass
+```
+
+## Ruff Output
+
+```py
+if (
+    e123456.get_tk_patchlevel() >= (8, 6, 0, "final")
+    or (8, 5, 8) <= get_tk_patchlevel() < (8, 6)
+):
+    pass
+```
+
+## Black Output
+
+```py
+if e123456.get_tk_patchlevel() >= (8, 6, 0, "final") or (
+    8,
+    5,
+    8,
+) <= get_tk_patchlevel() < (8, 6):
+    pass
+```
+
+
