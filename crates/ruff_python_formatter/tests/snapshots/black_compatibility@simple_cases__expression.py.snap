@@ -274,20 +274,11 @@ last_call()
  Name
  None
  True
-@@ -24,40 +24,46 @@
- 1 >> v2
- 1 % finished
- 1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
--((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
-+(1 + v2 - (v3 * 4)) ^ (5**v6 / 7 // 8)
- not great
- ~great
- +value
+@@ -31,33 +31,39 @@
  -1
  ~int and not v1 ^ 123 + v2 | True
--(~int) and (not ((v1 ^ (123 + v2)) | True))
+ (~int) and (not ((v1 ^ (123 + v2)) | True))
 -+(really ** -(confusing ** ~(operator**-precedence)))
-+(~int) and (not (v1 ^ (123 + v2) | True))
 ++really ** -confusing ** ~operator**-precedence
  flags & ~select.EPOLLIN and waiters.write_task is not None
 -lambda arg: None
@@ -650,13 +641,13 @@ v1 << 2
 1 >> v2
 1 % finished
 1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
-(1 + v2 - (v3 * 4)) ^ (5**v6 / 7 // 8)
+((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
 not great
 ~great
 +value
 -1
 ~int and not v1 ^ 123 + v2 | True
-(~int) and (not (v1 ^ (123 + v2) | True))
+(~int) and (not ((v1 ^ (123 + v2)) | True))
 +really ** -confusing ** ~operator**-precedence
 flags & ~select.EPOLLIN and waiters.write_task is not None
 lambda x: True
