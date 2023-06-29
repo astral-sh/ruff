@@ -301,7 +301,11 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 finalbody,
                 ..
             }) => {
+                let relation = self.enter_scope();
                 self.visit_body(body);
+                let relation = self.exit_scope(relation);
+                self.extend_requirements(relation.requirements);
+                self.extend_bindings(relation.bindings);
 
                 let mut except_handler_bindings = vec![];
                 for except_handler in handlers {
@@ -3155,6 +3159,343 @@ mod tests {
     }
 
     #[test]
+    fn try_with_del_in_body() {
+        let stmt = parse(
+            r#"
+                try:
+                    del a
+                except:
+                    b = c
+                else:
+                    d = e
+                finally:
+                    f = g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b", "d", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_with_del_binding_in_body() {
+        let stmt = parse(
+            r#"
+                try:
+                    del a
+                except:
+                    a = b
+                else:
+                    c = d
+                finally:
+                    e = f
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "e"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_with_del_in_except() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except:
+                    del c
+                else:
+                    d = e
+                finally:
+                    f = g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_with_del_binding_in_except() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except:
+                    del a
+                else:
+                    c = d
+                finally:
+                    e = f
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "e"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_with_del_in_orelse() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except:
+                    c = d
+                else:
+                    del e
+                finally:
+                    f = g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_with_del_binding_in_orelse() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except:
+                    c = d
+                else:
+                    del a
+                finally:
+                    e = f
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "e"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_with_del_in_finally() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except:
+                    c = d
+                else:
+                    e = f
+                finally:
+                    del g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c", "e"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["g"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_with_del_binding_in_finally() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except:
+                    c = d
+                else:
+                    e = f
+                finally:
+                    del a
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["c", "e"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn try_star() {
         let stmt = parse(
             r#"
@@ -3339,6 +3680,383 @@ mod tests {
                 },
                 Requirement {
                     name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_in_body() {
+        let stmt = parse(
+            r#"
+                try:
+                    del a
+                except* b:
+                    c = d
+                else:
+                    e = f
+                finally:
+                    g = h
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["c", "e", "g"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_binding_in_body() {
+        let stmt = parse(
+            r#"
+                try:
+                    del a
+                except* b:
+                    a = c
+                else:
+                    d = e
+                finally:
+                    f = g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_in_except() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* c:
+                    del d
+                else:
+                    e = f
+                finally:
+                    g = h
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "e", "g"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "d",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_binding_in_except() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* c:
+                    del a
+                else:
+                    d = e
+                finally:
+                    f = g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_in_orelse() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* c:
+                    d = e
+                else:
+                    del f
+                finally:
+                    g = h
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "g"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "f",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_binding_in_orelse() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* c:
+                    d = e
+                else:
+                    del a
+                finally:
+                    f = g
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_in_finally() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* c:
+                    d = e
+                else:
+                    f = g
+                finally:
+                    del h
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "d", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["h"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "h",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn try_star_with_del_binding_in_finally() {
+        let stmt = parse(
+            r#"
+                try:
+                    a = b
+                except* c:
+                    d = e
+                else:
+                    f = g
+                finally:
+                    del a
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["d", "f"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["a"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "g",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
