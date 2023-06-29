@@ -1,51 +1,135 @@
-#: E731
-f = lambda x: 2 * x
-#: E731
-f = lambda x: 2 * x
-#: E731
-while False:
-    this = lambda y, z: 2 * x
-#: E731
-f = lambda: (yield 1)
-#: E731
-f = lambda: (yield from g())
-#: E731
-class F:
+def scope():
+    # E731
     f = lambda x: 2 * x
 
 
-f = object()
-f.method = lambda: "Method"
-f = {}
-f["a"] = lambda x: x**2
-f = []
-f.append(lambda x: x**2)
-f = g = lambda x: x**2
-lambda: "no-op"
+def scope():
+    # E731
+    f = lambda x: 2 * x
 
-# Annotated
-from typing import Callable, ParamSpec
 
-P = ParamSpec("P")
+def scope():
+    # E731
+    while False:
+        this = lambda y, z: 2 * x
 
-# ParamSpec cannot be used in this context, so do not preserve the annotation.
-f: Callable[P, int] = lambda *args: len(args)
-f: Callable[[], None] = lambda: None
-f: Callable[..., None] = lambda a, b: None
-f: Callable[[int], int] = lambda x: 2 * x
+
+def scope():
+    # E731
+    f = lambda: (yield 1)
+
+
+def scope():
+    # E731
+    f = lambda: (yield from g())
+
+
+def scope():
+    # OK
+    f = object()
+    f.method = lambda: "Method"
+
+
+def scope():
+    # OK
+    f = {}
+    f["a"] = lambda x: x**2
+
+
+def scope():
+    # OK
+    f = []
+    f.append(lambda x: x**2)
+
+
+def scope():
+    # OK
+    f = g = lambda x: x**2
+
+
+def scope():
+    # OK
+    lambda: "no-op"
+
+
+class Scope:
+    # E731
+    f = lambda x: 2 * x
+
+
+class Scope:
+    from typing import Callable
+
+    # E731
+    f: Callable[[int], int] = lambda x: 2 * x
+
+
+def scope():
+    # E731
+    from typing import Callable
+
+    x: Callable[[int], int]
+    if True:
+        x = lambda: 1
+    else:
+        x = lambda: 2
+    return x
+
+
+def scope():
+    # E731
+
+    from typing import Callable, ParamSpec
+
+    # ParamSpec cannot be used in this context, so do not preserve the annotation.
+    P = ParamSpec("P")
+    f: Callable[P, int] = lambda *args: len(args)
+
+
+def scope():
+    # E731
+
+    from typing import Callable
+
+    f: Callable[[], None] = lambda: None
+
+
+def scope():
+    # E731
+
+    from typing import Callable
+
+    f: Callable[..., None] = lambda a, b: None
+
+
+def scope():
+    # E731
+
+    from typing import Callable
+
+    f: Callable[[int], int] = lambda x: 2 * x
+
 
 # Let's use the `Callable` type from `collections.abc` instead.
-from collections.abc import Callable
+def scope():
+    # E731
 
-f: Callable[[str, int], str] = lambda a, b: a * b
-f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
-f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
+    from collections.abc import Callable
 
-
-# Override `Callable`
-class Callable:
-    pass
+    f: Callable[[str, int], str] = lambda a, b: a * b
 
 
-# Do not copy the annotation from here on out.
-f: Callable[[str, int], str] = lambda a, b: a * b
+def scope():
+    # E731
+
+    from collections.abc import Callable
+
+    f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
+
+
+def scope():
+    # E731
+
+    from collections.abc import Callable
+
+    f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
