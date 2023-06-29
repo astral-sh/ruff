@@ -350,6 +350,7 @@ pub(crate) fn blank_lines(
         } else if token.kind() == TokenKind::Def
             && !tracked_vars.follows_decorator
             && !tracked_vars.is_in_class
+            && !tracked_vars.is_in_fn
             && line.line.preceding_blank_lines < 2
             && prev_line.is_some()
         {
