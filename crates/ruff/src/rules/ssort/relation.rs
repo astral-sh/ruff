@@ -183,6 +183,57 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                     cumulative_bindings.extend(bindings);
                 }
             }
+            Stmt::For(StmtFor {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            })
+            | Stmt::AsyncFor(StmtAsyncFor {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            }) => {
+                self.visit_expr(iter);
+                self.visit_expr(target);
+
+                let requirements = std::mem::take(&mut self.relation.requirements);
+                let bindings = std::mem::take(&mut self.relation.bindings);
+                let unbindings = std::mem::take(&mut self.relation.unbindings);
+
+                self.visit_body(body);
+
+                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
+                let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                self.relation.unbindings = unbindings;
+
+                for requirement in requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.insert_requirement(requirement);
+                    }
+                }
+                self.relation.bindings.extend(bindings);
+
+                let requirements = std::mem::take(&mut self.relation.requirements);
+                let bindings = std::mem::take(&mut self.relation.bindings);
+                let unbindings = std::mem::take(&mut self.relation.unbindings);
+
+                self.visit_body(orelse);
+
+                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
+                let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                self.relation.unbindings = unbindings;
+
+                for requirement in requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.insert_requirement(requirement);
+                    }
+                }
+                self.relation.bindings.extend(bindings);
+            }
             Stmt::AugAssign(StmtAugAssign {
                 target, op, value, ..
             }) => {
@@ -1832,8 +1883,8 @@ mod tests {
             "#,
         );
         let relation = stmt_relation(&stmt);
-        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
-        assert_eq!(Vec::from_iter(relation.unbindings), ["c"]);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
@@ -2020,8 +2071,8 @@ mod tests {
             "#,
         );
         let relation = stmt_relation(&stmt);
-        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
-        assert_eq!(Vec::from_iter(relation.unbindings), ["c"]);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a", "c"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
@@ -2208,8 +2259,8 @@ mod tests {
             "#,
         );
         let relation = stmt_relation(&stmt);
-        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
-        assert_eq!(Vec::from_iter(relation.unbindings), ["b"]);
+        assert_eq!(Vec::from_iter(relation.bindings), ["b"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
         assert_eq!(
             Vec::from_iter(relation.requirements),
             [
