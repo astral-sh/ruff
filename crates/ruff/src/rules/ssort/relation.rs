@@ -307,56 +307,45 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                                 self.visit_expr(expr);
                             }
 
-                            let requirements = std::mem::take(&mut self.relation.requirements);
-                            let bindings = std::mem::take(&mut self.relation.bindings);
-
+                            let relation = self.enter_scope();
                             self.visit_body(body);
-
-                            let requirements =
-                                std::mem::replace(&mut self.relation.requirements, requirements);
-                            let mut bindings =
-                                std::mem::replace(&mut self.relation.bindings, bindings);
+                            let mut relation = self.exit_scope(relation);
 
                             if let Some(name) = name {
-                                for requirement in requirements {
+                                for requirement in relation.requirements {
                                     if requirement.name != name.as_str()
                                         && !self.relation.bindings.contains(requirement.name)
                                     {
                                         self.insert_requirement(requirement);
                                     }
                                 }
-                                bindings.shift_remove(name.as_str());
+                                relation.bindings.shift_remove(name.as_str());
                             } else {
-                                for requirement in requirements {
+                                for requirement in relation.requirements {
                                     if !self.relation.bindings.contains(requirement.name) {
                                         self.insert_requirement(requirement);
                                     }
                                 }
                             }
 
-                            except_handler_bindings.push(bindings);
+                            except_handler_bindings.push(relation.bindings);
                         }
                     }
                 }
 
-                let requirements = std::mem::take(&mut self.relation.requirements);
-                let bindings = std::mem::take(&mut self.relation.bindings);
-
+                let relation = self.enter_scope();
                 self.visit_body(orelse);
-
-                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
-                let orelse_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
-
-                for requirement in requirements {
+                let orelse_relation = self.exit_scope(relation);
+                for requirement in orelse_relation.requirements {
                     if !self.relation.bindings.contains(requirement.name) {
                         self.insert_requirement(requirement);
                     }
                 }
 
                 for bindings in except_handler_bindings {
-                    self.relation.bindings.extend(bindings);
+                    self.extend_bindings(bindings);
                 }
-                self.relation.bindings.extend(orelse_bindings);
+                self.extend_bindings(orelse_relation.bindings);
 
                 self.visit_body(finalbody);
             }
@@ -402,36 +391,26 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
             }) => {
                 self.visit_expr(test);
 
-                let requirements = std::mem::take(&mut self.relation.requirements);
-                let bindings = std::mem::take(&mut self.relation.bindings);
-
+                let relation = self.enter_scope();
                 self.visit_expr(body);
-
-                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
-                let body_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
-
-                for requirement in requirements {
+                let body_relation = self.exit_scope(relation);
+                for requirement in body_relation.requirements {
                     if !self.relation.bindings.contains(requirement.name) {
                         self.insert_requirement(requirement);
                     }
                 }
 
-                let requirements = std::mem::take(&mut self.relation.requirements);
-                let bindings = std::mem::take(&mut self.relation.bindings);
-
+                let relation = self.enter_scope();
                 self.visit_expr(orelse);
-
-                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
-                let orelse_bindings = std::mem::replace(&mut self.relation.bindings, bindings);
-
-                for requirement in requirements {
+                let orelse_relation = self.exit_scope(relation);
+                for requirement in orelse_relation.requirements {
                     if !self.relation.bindings.contains(requirement.name) {
                         self.insert_requirement(requirement);
                     }
                 }
 
-                self.relation.bindings.extend(body_bindings);
-                self.relation.bindings.extend(orelse_bindings);
+                self.extend_bindings(body_relation.bindings);
+                self.extend_bindings(orelse_relation.bindings);
             }
             Expr::ListComp(ExprListComp {
                 elt, generators, ..
@@ -448,11 +427,14 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 let requirements = std::mem::take(&mut self.relation.requirements);
                 let mut bindings = IndexSet::new();
+                let mut unbindings = IndexSet::new();
 
                 for comprehension in generators {
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                    unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
                     self.visit_expr(&comprehension.target);
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                    unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
 
                     for expr in &comprehension.ifs {
                         self.visit_expr(expr);
@@ -466,6 +448,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 for requirement in requirements {
                     if !self.relation.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
+                        && !unbindings.contains(requirement.name)
                     {
                         self.insert_requirement(requirement);
                     }
@@ -483,11 +466,14 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 let requirements = std::mem::take(&mut self.relation.requirements);
                 let mut bindings = IndexSet::new();
+                let mut unbindings = IndexSet::new();
 
                 for comprehension in generators {
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                    unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
                     self.visit_expr(&comprehension.target);
                     bindings = std::mem::replace(&mut self.relation.bindings, bindings);
+                    unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
 
                     for expr in &comprehension.ifs {
                         self.visit_expr(expr);
@@ -502,6 +488,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 for requirement in requirements {
                     if !self.relation.bindings.contains(requirement.name)
                         && !bindings.contains(requirement.name)
+                        && !unbindings.contains(requirement.name)
                     {
                         self.insert_requirement(requirement);
                     }
