@@ -67,6 +67,14 @@ impl<'a> RelationVisitor<'a> {
         self.relation.requirements.insert(requirement);
     }
 
+    fn extend_requirements<I: IntoIterator<Item = Requirement<'a>>>(&mut self, requirements: I) {
+        for requirement in requirements {
+            if !self.relation.bindings.contains(requirement.name) {
+                self.insert_requirement(requirement);
+            }
+        }
+    }
+
     fn insert_binding(&mut self, binding: &'a str) {
         self.relation.bindings.insert(binding);
         self.relation.unbindings.shift_remove(binding);
@@ -219,21 +227,13 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 let relation = self.enter_scope();
                 self.visit_body(body);
                 let relation = self.exit_scope(relation);
-                for requirement in relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(relation.requirements);
                 self.extend_bindings(relation.bindings);
 
                 let relation = self.enter_scope();
                 self.visit_body(orelse);
                 let relation = self.exit_scope(relation);
-                for requirement in relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(relation.requirements);
                 self.extend_bindings(relation.bindings);
             }
             Stmt::While(StmtWhile {
@@ -244,21 +244,13 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 let relation = self.enter_scope();
                 self.visit_body(body);
                 let relation = self.exit_scope(relation);
-                for requirement in relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(relation.requirements);
                 self.extend_bindings(relation.bindings);
 
                 let relation = self.enter_scope();
                 self.visit_body(orelse);
                 let relation = self.exit_scope(relation);
-                for requirement in relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(relation.requirements);
                 self.extend_bindings(relation.bindings);
             }
             Stmt::AugAssign(StmtAugAssign {
@@ -279,20 +271,12 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 let relation = self.enter_scope();
                 self.visit_body(body);
                 let body_relation = self.exit_scope(relation);
-                for requirement in body_relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(body_relation.requirements);
 
                 let relation = self.enter_scope();
                 self.visit_body(orelse);
                 let orelse_relation = self.exit_scope(relation);
-                for requirement in orelse_relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(orelse_relation.requirements);
 
                 self.extend_bindings(body_relation.bindings);
                 self.extend_bindings(orelse_relation.bindings);
@@ -337,20 +321,15 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                             let mut relation = self.exit_scope(relation);
 
                             if let Some(name) = name {
-                                for requirement in relation.requirements {
-                                    if requirement.name != name.as_str()
-                                        && !self.relation.bindings.contains(requirement.name)
-                                    {
-                                        self.insert_requirement(requirement);
-                                    }
-                                }
+                                self.extend_requirements(
+                                    relation
+                                        .requirements
+                                        .into_iter()
+                                        .filter(|requirement| requirement.name != name.as_str()),
+                                );
                                 relation.bindings.shift_remove(name.as_str());
                             } else {
-                                for requirement in relation.requirements {
-                                    if !self.relation.bindings.contains(requirement.name) {
-                                        self.insert_requirement(requirement);
-                                    }
-                                }
+                                self.extend_requirements(relation.requirements);
                             }
 
                             except_handler_bindings.push(relation.bindings);
@@ -361,11 +340,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 let relation = self.enter_scope();
                 self.visit_body(orelse);
                 let orelse_relation = self.exit_scope(relation);
-                for requirement in orelse_relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(orelse_relation.requirements);
 
                 for bindings in except_handler_bindings {
                     self.extend_bindings(bindings);
@@ -419,20 +394,12 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 let relation = self.enter_scope();
                 self.visit_expr(body);
                 let body_relation = self.exit_scope(relation);
-                for requirement in body_relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(body_relation.requirements);
 
                 let relation = self.enter_scope();
                 self.visit_expr(orelse);
                 let orelse_relation = self.exit_scope(relation);
-                for requirement in orelse_relation.requirements {
-                    if !self.relation.bindings.contains(requirement.name) {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(orelse_relation.requirements);
 
                 self.extend_bindings(body_relation.bindings);
                 self.extend_bindings(orelse_relation.bindings);
@@ -469,15 +436,9 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 self.visit_expr(elt);
 
                 let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
-
-                for requirement in requirements {
-                    if !self.relation.bindings.contains(requirement.name)
-                        && !bindings.contains(requirement.name)
-                        && !unbindings.contains(requirement.name)
-                    {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(requirements.into_iter().filter(|requirement| {
+                    !bindings.contains(requirement.name) && !unbindings.contains(requirement.name)
+                }));
             }
             Expr::DictComp(ExprDictComp {
                 key,
@@ -509,15 +470,9 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 self.visit_expr(value);
 
                 let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
-
-                for requirement in requirements {
-                    if !self.relation.bindings.contains(requirement.name)
-                        && !bindings.contains(requirement.name)
-                        && !unbindings.contains(requirement.name)
-                    {
-                        self.insert_requirement(requirement);
-                    }
-                }
+                self.extend_requirements(requirements.into_iter().filter(|requirement| {
+                    !bindings.contains(requirement.name) && !unbindings.contains(requirement.name)
+                }));
             }
             Expr::Name(ExprName { id, ctx, .. }) => {
                 let ctx = if self.is_expr_context_inverted {
