@@ -2,24 +2,21 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
-/// Checks for `string.format()` in logging statements.
+/// Checks for uses of `str.format` to format logging messages.
 ///
 /// ## Why is this bad?
-/// Formatting strings in logging statements can produce inconsistent logging
-/// outputs that are difficult to read and error-prone (namely, regarding
-/// accidentally logging sensitive information).
+/// The `logging` module provides a mechanism for passing additional values to
+/// be logged using the `extra` keyword argument. This is more consistent, more
+/// efficient, and less error-prone than formatting the string directly.
 ///
-/// Additionally, formatting the string directly means formatting happens even
-/// if the logging statement is never executed (e.g., if the log level is above
-/// the level of the logging statement).
+/// Using `str.format` to format a logging message requires that Python eagerly
+/// format the string, even if the logging statement is never executed (e.g.,
+/// if the log level is above the level of the logging statement), whereas
+/// using the `extra` keyword argument defers formatting until required.
 ///
-/// Instead, use the `extra` keyword argument to `logging` methods and define
-/// an explicit format in the logger configuration. This is more consistent
-/// and efficient, and less error-prone.
-///
-/// Or, to avoid using the `extra` keyword argument, pass the values to be
-/// logged as arguments to the logging method so that string formatting is
-/// deferred until required.
+/// Additionally, the use of `extra` will ensure that the values are made
+/// available to all handlers, which can then be configured to log the values
+/// in a consistent manner.
 ///
 /// ## Example
 /// ```python
@@ -40,10 +37,10 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// user = "Maria"
 ///
-/// logging.info("Something happened", extra=dict(user_id=user))
+/// logging.info("Something happened", extra={"user_id": user})
 /// ```
 ///
-/// Or, to avoid using the `extra` keyword argument:
+/// Or:
 /// ```python
 /// import logging
 ///
@@ -57,36 +54,34 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-/// - [Python documentation: Logging variable data](https://docs.python.org/3/howto/logging.html#logging-variable-data)
 #[violation]
 pub struct LoggingStringFormat;
 
 impl Violation for LoggingStringFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `string.format()`")
+        format!("Logging statement uses `str.format`")
     }
 }
 
 /// ## What it does
-/// Checks for `printf`-style format strings in logging statements.
+/// Checks for uses of `printf`-style format strings to format logging
+/// messages.
 ///
 /// ## Why is this bad?
-/// Formatting strings in logging statements can produce inconsistent logging
-/// outputs that are difficult to read and error-prone (namely, regarding
-/// accidentally logging sensitive information).
+/// The `logging` module provides a mechanism for passing additional values to
+/// be logged using the `extra` keyword argument. This is more consistent, more
+/// efficient, and less error-prone than formatting the string directly.
 ///
-/// Additionally, formatting the string directly means formatting happens even
-/// if the logging statement is never executed (e.g., if the log level is above
-/// the level of the logging statement).
+/// Using `printf`-style format strings to format a logging message requires
+/// that Python eagerly format the string, even if the logging statement is
+/// never executed (e.g., if the log level is above the level of the logging
+/// statement), whereas using the `extra` keyword argument defers formatting
+/// until required.
 ///
-/// Instead, use the `extra` keyword argument to `logging` methods and define
-/// an explicit format in the logger configuration. This is more consistent
-/// and efficient, and less error-prone.
-///
-/// Or, to avoid using the `extra` keyword argument, pass the values to be
-/// logged as arguments to the logging method so that string formatting is
-/// deferred until required.
+/// Additionally, the use of `extra` will ensure that the values are made
+/// available to all handlers, which can then be configured to log the values
+/// in a consistent manner.
 ///
 /// ## Example
 /// ```python
@@ -110,7 +105,7 @@ impl Violation for LoggingStringFormat {
 /// logging.info("Something happened", extra=dict(user_id=user))
 /// ```
 ///
-/// Or, to avoid using the `extra` keyword argument:
+/// Or:
 /// ```python
 /// import logging
 ///
@@ -124,7 +119,6 @@ impl Violation for LoggingStringFormat {
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-/// - [Python documentation: Logging variable data](https://docs.python.org/3/howto/logging.html#logging-variable-data)
 #[violation]
 pub struct LoggingPercentFormat;
 
@@ -136,25 +130,22 @@ impl Violation for LoggingPercentFormat {
 }
 
 /// ## What it does
-/// Checks for string concatenation using the `+` operator in logging
-/// statements.
+/// Checks for uses string concatenation via the `+` operator to format logging
+/// messages.
 ///
 /// ## Why is this bad?
-/// Formatting strings in logging statements can produce inconsistent logging
-/// outputs that are difficult to read and error-prone (namely, regarding
-/// accidentally logging sensitive information).
+/// The `logging` module provides a mechanism for passing additional values to
+/// be logged using the `extra` keyword argument. This is more consistent, more
+/// efficient, and less error-prone than formatting the string directly.
 ///
-/// Additionally, formatting the string directly means formatting happens even
-/// if the logging statement is never executed (e.g., if the log level is above
-/// the level of the logging statement).
+/// Using concatenation to format a logging message requires that Python
+/// eagerly format the string, even if the logging statement is never executed
+/// (e.g., if the log level is above the level of the logging statement),
+/// whereas using the `extra` keyword argument defers formatting until required.
 ///
-/// Instead, use the `extra` keyword argument to `logging` methods and define
-/// an explicit format in the logger configuration. This is more consistent
-/// and efficient, and less error-prone.
-///
-/// Or, to avoid using the `extra` keyword argument, pass the values to be
-/// logged as arguments to the logging method so that string formatting is
-/// deferred until required.
+/// Additionally, the use of `extra` will ensure that the values are made
+/// available to all handlers, which can then be configured to log the values
+/// in a consistent manner.
 ///
 /// ## Example
 /// ```python
@@ -178,7 +169,7 @@ impl Violation for LoggingPercentFormat {
 /// logging.info("Something happened", extra=dict(user_id=user))
 /// ```
 ///
-/// Or, to avoid using the `extra` keyword argument:
+/// Or:
 /// ```python
 /// import logging
 ///
@@ -192,7 +183,6 @@ impl Violation for LoggingPercentFormat {
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-/// - [Python documentation: Logging variable data](https://docs.python.org/3/howto/logging.html#logging-variable-data)
 #[violation]
 pub struct LoggingStringConcat;
 
@@ -204,24 +194,21 @@ impl Violation for LoggingStringConcat {
 }
 
 /// ## What it does
-/// Checks for f-strings in logging statements.
+/// Checks for uses of f-strings to format logging messages.
 ///
 /// ## Why is this bad?
-/// Formatting strings in logging statements can produce inconsistent logging
-/// outputs that are difficult to read and error-prone (namely, regarding
-/// accidentally logging sensitive information).
+/// The `logging` module provides a mechanism for passing additional values to
+/// be logged using the `extra` keyword argument. This is more consistent, more
+/// efficient, and less error-prone than formatting the string directly.
 ///
-/// Additionally, formatting the string directly means formatting happens even
-/// if the logging statement is never executed (e.g., if the log level is above
-/// the level of the logging statement).
+/// Using f-strings to format a logging message requires that Python eagerly
+/// format the string, even if the logging statement is never executed (e.g.,
+/// if the log level is above the level of the logging statement), whereas
+/// using the `extra` keyword argument defers formatting until required.
 ///
-/// Instead, use the `extra` keyword argument to `logging` methods and define
-/// an explicit format in the logger configuration. This is more consistent
-/// and efficient, and less error-prone.
-///
-/// Or, to avoid using the `extra` keyword argument, pass the values to be
-/// logged as arguments to the logging method so that string formatting is
-/// deferred until required.
+/// Additionally, the use of `extra` will ensure that the values are made
+/// available to all handlers, which can then be configured to log the values
+/// in a consistent manner.
 ///
 /// ## Example
 /// ```python
@@ -245,7 +232,7 @@ impl Violation for LoggingStringConcat {
 /// logging.info("Something happened", extra=dict(user_id=user))
 /// ```
 ///
-/// Or, to avoid using the `extra` keyword argument:
+/// Or:
 /// ```python
 /// import logging
 ///
@@ -259,7 +246,6 @@ impl Violation for LoggingStringConcat {
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
-/// - [Python documentation: Logging variable data](https://docs.python.org/3/howto/logging.html#logging-variable-data)
 #[violation]
 pub struct LoggingFString;
 
@@ -294,7 +280,7 @@ impl Violation for LoggingFString {
 ///
 /// ## References
 /// - [Python documentation: `logging.warning`](https://docs.python.org/3/library/logging.html#logging.warning)
-/// - [Python documentation: `warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
+/// - [Python documentation: `logging.Logger.warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
 #[violation]
 pub struct LoggingWarn;
 
@@ -314,9 +300,13 @@ impl AlwaysAutofixableViolation for LoggingWarn {
 /// `LogRecord` attributes.
 ///
 /// ## Why is this bad?
-/// The `extra` argument to `logging` methods and the `LogRecord` attributes
-/// are both used to add additional information to logging statements. If any
-/// fields clash, a `KeyError` will be raised.
+/// The `logging` module provides a mechanism for passing additional values to
+/// be logged using the `extra` keyword argument. These values are then passed
+/// to the `LogRecord` constructor.
+///
+/// Providing a value via `extra` that clashes with one of the attributes of
+/// the `LogRecord` constructor will raise a `KeyError` when the `LogRecord` is
+/// constructed.
 ///
 /// ## Example
 /// ```python
@@ -350,17 +340,18 @@ impl Violation for LoggingExtraAttrClash {
     fn message(&self) -> String {
         let LoggingExtraAttrClash(key) = self;
         format!(
-            "Logging statement uses an extra field that clashes with a LogRecord field: `{key}`"
+            "Logging statement uses an `extra` field that clashes with a `LogRecord` field: `{key}`"
         )
     }
 }
 
 /// ## What it does
-/// Checks for `.error(..., exc_info=True)` in logging statements.
+/// Checks for uses of `logging.error` that pass `exc_info=True`.
 ///
 /// ## Why is this bad?
-/// `.exception` is equivalent to `.error(..., exc_info=True)`, and is more
-/// readable and conveys the intent of the logging statement more clearly.
+/// Calling `logging.error` with `exc_info=True` is equivalent to calling
+/// `logging.exception`. Using `logging.exception` is more concise, more
+/// readable, and conveys the intent of the logging statement more clearly.
 ///
 /// ## Example
 /// ```python
@@ -401,9 +392,11 @@ impl Violation for LoggingExcInfo {
 /// Checks for redundant `exc_info` keyword arguments in logging statements.
 ///
 /// ## Why is this bad?
-/// `exc_info` is `True` by default for `.exception`, and `False` by  default
-/// for `.error`. If `exc_info` is explicitly set to `True` for `.exception` or
-/// `False` for `.error`, it is redundant and should be removed.
+/// `exc_info` is `True` by default for `logging.exception`, and `False` by
+/// default for `logging.error`.
+///
+/// Passing `exc_info=True` to `logging.exception` calls is redundant, as is
+///passing `exc_info=False` to `logging.error` calls.
 ///
 /// ## Example
 /// ```python
