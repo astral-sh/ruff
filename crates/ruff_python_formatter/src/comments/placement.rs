@@ -604,7 +604,6 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { iter: expr, .. }) => {
             Some(AnyNodeRef::from(expr.as_ref()))
         }
-
         AnyNodeRef::StmtWith(ast::StmtWith { items, .. })
         | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { items, .. }) => {
             items.last().map(AnyNodeRef::from)
