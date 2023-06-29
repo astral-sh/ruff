@@ -69,7 +69,10 @@ class Repository(NamedTuple):
             ],
         )
 
-        process = await create_subprocess_exec(*git_command)
+        process = await create_subprocess_exec(
+            *git_command,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+        )
 
         status_code = await process.wait()
 
