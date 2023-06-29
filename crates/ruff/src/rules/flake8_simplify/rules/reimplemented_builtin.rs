@@ -237,7 +237,7 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
     let Stmt::If(ast::StmtIf {
         body: nested_body,
         test: nested_test,
-        orelse: nested_orelse,
+        elif_else_clauses: nested_elif_else_clauses,
         range: _,
     }) = &body[0]
     else {
@@ -246,7 +246,7 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
     if nested_body.len() != 1 {
         return None;
     }
-    if !nested_orelse.is_empty() {
+    if !nested_elif_else_clauses.is_empty() {
         return None;
     }
     let Stmt::Return(ast::StmtReturn { value, range: _ }) = &nested_body[0] else {
@@ -317,7 +317,7 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
     let Stmt::If(ast::StmtIf {
         body: nested_body,
         test: nested_test,
-        orelse: nested_orelse,
+        elif_else_clauses: nested_elif_else_clauses,
         range: _,
     }) = &body[0]
     else {
@@ -326,7 +326,7 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
     if nested_body.len() != 1 {
         return None;
     }
-    if !nested_orelse.is_empty() {
+    if !nested_elif_else_clauses.is_empty() {
         return None;
     }
     let Stmt::Return(ast::StmtReturn { value, range: _ }) = &nested_body[0] else {

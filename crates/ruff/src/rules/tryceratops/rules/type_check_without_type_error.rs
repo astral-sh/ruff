@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, ElifElseClause, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -164,22 +164,22 @@ fn check_body(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-/// Search the orelse of an if-condition for raises.
-fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
-    for item in body {
-        if has_control_flow(item) {
-            return;
+/// Search the `elif_else_clauses` of an if-condition for raises.
+fn check_elif_else_clauses(checker: &mut Checker, elif_else_clauses: &[ElifElseClause]) {
+    for clause in elif_else_clauses {
+        let Some(test) = &clause.test else {
+            continue;
+        };
+        if !check_type_check_test(checker, test) {
+            continue;
         }
-        match item {
-            Stmt::If(ast::StmtIf { test, .. }) => {
-                if !check_type_check_test(checker, test) {
-                    return;
-                }
+        for item in &clause.body {
+            if has_control_flow(item) {
+                return;
             }
-            Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
+            if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
                 check_raise(checker, exc, item);
             }
-            _ => {}
         }
     }
 }
@@ -189,7 +189,7 @@ pub(crate) fn type_check_without_type_error(
     checker: &mut Checker,
     body: &[Stmt],
     test: &Expr,
-    orelse: &[Stmt],
+    elif_else_clauses: &[ElifElseClause],
     parent: Option<&Stmt>,
 ) {
     if let Some(Stmt::If(ast::StmtIf { test, .. })) = parent {
@@ -201,6 +201,6 @@ pub(crate) fn type_check_without_type_error(
     // Only consider the body when the `if` condition is all type-related
     if check_type_check_test(checker, test) {
         check_body(checker, body);
-        check_orelse(checker, orelse);
+        check_elif_else_clauses(checker, elif_else_clauses);
     }
 }

@@ -190,9 +190,22 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
         }
         Stmt::For(ast::StmtFor { body, orelse, .. })
         | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. })
-        | Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+        | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             if is_only(body, child) || is_only(orelse, child) {
+                return true;
+            }
+        }
+
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            if is_only(body, child)
+                || elif_else_clauses
+                    .iter()
+                    .any(|ast::ElifElseClause { body, .. }| is_only(body, child))
+            {
                 return true;
             }
         }

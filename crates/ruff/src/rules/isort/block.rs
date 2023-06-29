@@ -225,14 +225,20 @@ where
                 }
                 self.finalize(None);
             }
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
+                for clause in elif_else_clauses {
+                    for stmt in &clause.body {
+                        self.visit_stmt(stmt);
+                    }
                 }
                 self.finalize(None);
             }

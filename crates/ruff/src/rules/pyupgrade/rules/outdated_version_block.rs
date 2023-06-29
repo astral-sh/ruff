@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use num_bigint::{BigInt, Sign};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, ElifElseClause, Expr, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -211,7 +211,7 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
 fn fix_py2_block(
     checker: &Checker,
     stmt: &Stmt,
-    orelse: &[Stmt],
+    elif_else_clauses: &[ElifElseClause],
     block: &BlockMetadata,
 ) -> Option<Fix> {
     let leading_token = &block.leading_token;
@@ -237,8 +237,9 @@ fn fix_py2_block(
     match (&leading_token.tok, &trailing_token.tok) {
         // If we only have an `if` and an `else`, dedent the `else` block.
         (StartTok::If, EndTok::Else) => {
-            let start = orelse.first()?;
-            let end = orelse.last()?;
+            // TODO(konstin): Check that we actually only have an else here?
+            let start = elif_else_clauses.first()?.body.first()?;
+            let end = elif_else_clauses.first()?.body.last()?;
             if indentation(checker.locator, start).is_none() {
                 // Inline `else` block (e.g., `else: x = 1`).
                 Some(Fix::suggested(Edit::range_replacement(
@@ -345,7 +346,7 @@ pub(crate) fn outdated_version_block(
     stmt: &Stmt,
     test: &Expr,
     body: &[Stmt],
-    orelse: &[Stmt],
+    elif_else_clauses: &[ElifElseClause],
 ) {
     let Expr::Compare(ast::ExprCompare {
         left,
@@ -379,7 +380,9 @@ pub(crate) fn outdated_version_block(
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt, body) {
-                                if let Some(fix) = fix_py2_block(checker, stmt, orelse, &block) {
+                                if let Some(fix) =
+                                    fix_py2_block(checker, stmt, elif_else_clauses, &block)
+                                {
                                     diagnostic.set_fix(fix);
                                 }
                             }
@@ -410,7 +413,9 @@ pub(crate) fn outdated_version_block(
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt, body) {
-                            if let Some(fix) = fix_py2_block(checker, stmt, orelse, &block) {
+                            if let Some(fix) =
+                                fix_py2_block(checker, stmt, elif_else_clauses, &block)
+                            {
                                 diagnostic.set_fix(fix);
                             }
                         }
