@@ -109,7 +109,7 @@ pub(crate) fn lambda_assignment(
             // assignment might be carrying a type annotation that will be used by some package like
             // dataclasses, which wouldn't consider the rewritten function definition to be
             // equivalent. Similarly, if the lambda is shadowing a variable in the current scope,
-            // rewriting it as a function may break type-checking.
+            // rewriting it as a function declaration may break type-checking.
             // See: https://github.com/astral-sh/ruff/issues/3046
             // See: https://github.com/astral-sh/ruff/issues/5421
             if (annotation.is_some() && checker.semantic().scope().kind.is_class())
