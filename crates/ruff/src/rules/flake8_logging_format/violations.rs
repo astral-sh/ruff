@@ -18,6 +18,9 @@ use ruff_macros::{derive_message_formats, violation};
 /// available to all handlers, which can then be configured to log the values
 /// in a consistent manner.
 ///
+/// As an alternative to `extra`, passing values as arguments to the logging
+/// method can also be used to defer string formatting until required.
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -83,6 +86,9 @@ impl Violation for LoggingStringFormat {
 /// available to all handlers, which can then be configured to log the values
 /// in a consistent manner.
 ///
+/// As an alternative to `extra`, passing values as arguments to the logging
+/// method can also be used to defer string formatting until required.
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -147,6 +153,9 @@ impl Violation for LoggingPercentFormat {
 /// available to all handlers, which can then be configured to log the values
 /// in a consistent manner.
 ///
+/// As an alternative to `extra`, passing values as arguments to the logging
+/// method can also be used to defer string formatting until required.
+///
 /// ## Example
 /// ```python
 /// import logging
@@ -209,6 +218,9 @@ impl Violation for LoggingStringConcat {
 /// Additionally, the use of `extra` will ensure that the values are made
 /// available to all handlers, which can then be configured to log the values
 /// in a consistent manner.
+///
+/// As an alternative to `extra`, passing values as arguments to the logging
+/// method can also be used to defer string formatting until required.
 ///
 /// ## Example
 /// ```python
@@ -396,7 +408,7 @@ impl Violation for LoggingExcInfo {
 /// default for `logging.error`.
 ///
 /// Passing `exc_info=True` to `logging.exception` calls is redundant, as is
-///passing `exc_info=False` to `logging.error` calls.
+/// passing `exc_info=False` to `logging.error` calls.
 ///
 /// ## Example
 /// ```python
