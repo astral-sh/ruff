@@ -4,7 +4,7 @@
 //! checking entire repositories.
 #![allow(clippy::print_stdout)]
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use clap::Parser;
 use log::debug;
 use ruff::resolver::python_files_in_path;
@@ -107,7 +107,10 @@ pub(crate) fn check_repo(args: &Args) -> anyhow::Result<bool> {
     ])
     .unwrap();
     let (paths, _resolver) = python_files_in_path(&cli.files, &pyproject_config, &overrides)?;
-    assert!(!paths.is_empty(), "no python files in {:?}", cli.files);
+
+    if paths.is_empty() {
+        bail!("no python files in {:?}", cli.files)
+    }
 
     let mut formatted_counter = 0;
     let errors = paths

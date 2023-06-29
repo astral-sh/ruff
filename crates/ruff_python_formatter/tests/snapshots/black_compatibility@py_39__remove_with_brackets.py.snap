@@ -1,0 +1,216 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_39/remove_with_brackets.py
+---
+## Input
+
+```py
+with (open("bla.txt")):
+    pass
+
+with (open("bla.txt")), (open("bla.txt")):
+    pass
+
+with (open("bla.txt") as f):
+    pass
+
+# Remove brackets within alias expression
+with (open("bla.txt")) as f:
+    pass
+
+# Remove brackets around one-line context managers
+with (open("bla.txt") as f, (open("x"))):
+    pass
+
+with ((open("bla.txt")) as f, open("x")):
+    pass
+
+with (CtxManager1() as example1, CtxManager2() as example2):
+    ...
+
+# Brackets remain when using magic comma
+with (CtxManager1() as example1, CtxManager2() as example2,):
+    ...
+
+# Brackets remain for multi-line context managers
+with (CtxManager1() as example1, CtxManager2() as example2, CtxManager2() as example2, CtxManager2() as example2, CtxManager2() as example2):
+    ...
+
+# Don't touch assignment expressions
+with (y := open("./test.py")) as f:
+    pass
+
+# Deeply nested examples
+# N.B. Multiple brackets are only possible
+# around the context manager itself.
+# Only one brackets is allowed around the
+# alias expression or comma-delimited context managers.
+with (((open("bla.txt")))):
+    pass
+
+with (((open("bla.txt")))), (((open("bla.txt")))):
+    pass
+
+with (((open("bla.txt")))) as f:
+    pass
+
+with ((((open("bla.txt")))) as f):
+    pass
+
+with ((((CtxManager1()))) as example1, (((CtxManager2()))) as example2):
+    ...
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -39,7 +39,7 @@
+     ...
+ 
+ # Don't touch assignment expressions
+-with (y := open("./test.py")) as f:
++with NOT_YET_IMPLEMENTED_ExprNamedExpr as f:
+     pass
+ 
+ # Deeply nested examples
+```
+
+## Ruff Output
+
+```py
+with open("bla.txt"):
+    pass
+
+with open("bla.txt"), open("bla.txt"):
+    pass
+
+with open("bla.txt") as f:
+    pass
+
+# Remove brackets within alias expression
+with open("bla.txt") as f:
+    pass
+
+# Remove brackets around one-line context managers
+with open("bla.txt") as f, open("x"):
+    pass
+
+with open("bla.txt") as f, open("x"):
+    pass
+
+with CtxManager1() as example1, CtxManager2() as example2:
+    ...
+
+# Brackets remain when using magic comma
+with (
+    CtxManager1() as example1,
+    CtxManager2() as example2,
+):
+    ...
+
+# Brackets remain for multi-line context managers
+with (
+    CtxManager1() as example1,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+):
+    ...
+
+# Don't touch assignment expressions
+with NOT_YET_IMPLEMENTED_ExprNamedExpr as f:
+    pass
+
+# Deeply nested examples
+# N.B. Multiple brackets are only possible
+# around the context manager itself.
+# Only one brackets is allowed around the
+# alias expression or comma-delimited context managers.
+with open("bla.txt"):
+    pass
+
+with open("bla.txt"), open("bla.txt"):
+    pass
+
+with open("bla.txt") as f:
+    pass
+
+with open("bla.txt") as f:
+    pass
+
+with CtxManager1() as example1, CtxManager2() as example2:
+    ...
+```
+
+## Black Output
+
+```py
+with open("bla.txt"):
+    pass
+
+with open("bla.txt"), open("bla.txt"):
+    pass
+
+with open("bla.txt") as f:
+    pass
+
+# Remove brackets within alias expression
+with open("bla.txt") as f:
+    pass
+
+# Remove brackets around one-line context managers
+with open("bla.txt") as f, open("x"):
+    pass
+
+with open("bla.txt") as f, open("x"):
+    pass
+
+with CtxManager1() as example1, CtxManager2() as example2:
+    ...
+
+# Brackets remain when using magic comma
+with (
+    CtxManager1() as example1,
+    CtxManager2() as example2,
+):
+    ...
+
+# Brackets remain for multi-line context managers
+with (
+    CtxManager1() as example1,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+):
+    ...
+
+# Don't touch assignment expressions
+with (y := open("./test.py")) as f:
+    pass
+
+# Deeply nested examples
+# N.B. Multiple brackets are only possible
+# around the context manager itself.
+# Only one brackets is allowed around the
+# alias expression or comma-delimited context managers.
+with open("bla.txt"):
+    pass
+
+with open("bla.txt"), open("bla.txt"):
+    pass
+
+with open("bla.txt") as f:
+    pass
+
+with open("bla.txt") as f:
+    pass
+
+with CtxManager1() as example1, CtxManager2() as example2:
+    ...
+```
+
+

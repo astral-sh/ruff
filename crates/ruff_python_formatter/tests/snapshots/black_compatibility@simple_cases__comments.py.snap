@@ -140,13 +140,6 @@ async def wat():
  
      if inner_imports.are_evil():
          # Explains why we have this if.
-@@ -93,4 +93,4 @@
- 
- # Some closing comments.
- # Maybe Vim or Emacs directives for formatting.
--# Who knows.
-\ No newline at end of file
-+# Who knows.
 ```
 
 ## Ruff Output
@@ -348,6 +341,7 @@ async def wat():
 
 # Some closing comments.
 # Maybe Vim or Emacs directives for formatting.
-# Who knows.```
+# Who knows.
+```
 
 
