@@ -283,3 +283,17 @@ jobs:
       - name: "Build docs"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: mkdocs build --strict -f mkdocs.generated.yml
+
+  check-formatter-stability:
+    name: "Check formatter stability"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Cache rust"
+        uses: Swatinem/rust-cache@v2
+      - name: "Clone CPython 3.10"
+        run: git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
+      - name: "Check stability"
+        run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
