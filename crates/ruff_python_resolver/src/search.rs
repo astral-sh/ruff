@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use log::debug;
 
@@ -94,9 +94,9 @@ fn find_site_packages_path(
     Some(default_dir.join(SITE_PACKAGES))
 }
 
-fn find_paths_from_pth_files(parent_dir: &Path) -> Vec<PathBuf> {
-    fs::read_dir(parent_dir)
-        .unwrap()
+fn find_paths_from_pth_files(parent_dir: &Path) -> io::Result<impl Iterator<Item = PathBuf> + '_> {
+    Ok(parent_dir
+        .read_dir()?
         .flatten()
         .filter(|entry| {
             // Collect all *.pth files.
@@ -130,8 +130,7 @@ fn find_paths_from_pth_files(parent_dir: &Path) -> Vec<PathBuf> {
                 }
             }
             None
-        })
-        .collect()
+        }))
 }
 
 /// Find the Python search paths for the given virtual environment.
@@ -144,7 +143,9 @@ fn find_python_search_paths<Host: host::Host>(config: &Config, host: &Host) -> V
                 let lib_path = venv_path.join(venv).join(lib_name);
                 if let Some(site_packages_path) = find_site_packages_path(&lib_path, None) {
                     // Add paths from any `.pth` files in each of the `site-packages` directories.
-                    found_paths.extend(find_paths_from_pth_files(&site_packages_path));
+                    if let Ok(pth_paths) = find_paths_from_pth_files(&site_packages_path) {
+                        found_paths.extend(pth_paths);
+                    }
 
                     // Add the `site-packages` directory to the search path.
                     found_paths.push(site_packages_path);
@@ -212,45 +213,48 @@ fn typeshed_subdirectory<Host: host::Host>(
 
 /// Generate a map from PyPI-registered package name to a list of paths
 /// containing the package's stubs.
-fn build_typeshed_third_party_package_map(third_party_dir: &Path) -> HashMap<String, Vec<PathBuf>> {
+fn build_typeshed_third_party_package_map(
+    third_party_dir: &Path,
+) -> io::Result<HashMap<String, Vec<PathBuf>>> {
     let mut package_map = HashMap::new();
 
     // Iterate over every directory.
-    for outer_entry in fs::read_dir(third_party_dir).unwrap() {
-        let outer_entry = outer_entry.unwrap();
-        if outer_entry.file_type().unwrap().is_dir() {
+    for outer_entry in fs::read_dir(third_party_dir)? {
+        let outer_entry = outer_entry?;
+        if outer_entry.file_type()?.is_dir() {
             // Iterate over any subdirectory children.
-            for inner_entry in fs::read_dir(outer_entry.path()).unwrap() {
-                let inner_entry = inner_entry.unwrap();
+            for inner_entry in fs::read_dir(outer_entry.path())? {
+                let inner_entry = inner_entry?;
 
-                if inner_entry.file_type().unwrap().is_dir() {
+                if inner_entry.file_type()?.is_dir() {
                     package_map
                         .entry(inner_entry.file_name().to_string_lossy().to_string())
                         .or_insert_with(Vec::new)
                         .push(outer_entry.path());
-                } else if inner_entry.file_type().unwrap().is_file() {
+                } else if inner_entry.file_type()?.is_file() {
                     if inner_entry
                         .path()
                         .extension()
                         .map_or(false, |extension| extension == "pyi")
                     {
-                        let stripped_file_name = inner_entry
+                        if let Some(stripped_file_name) = inner_entry
                             .path()
                             .file_stem()
-                            .unwrap()
-                            .to_string_lossy()
-                            .to_string();
-                        package_map
-                            .entry(stripped_file_name)
-                            .or_insert_with(Vec::new)
-                            .push(outer_entry.path());
+                            .and_then(std::ffi::OsStr::to_str)
+                            .map(std::string::ToString::to_string)
+                        {
+                            package_map
+                                .entry(stripped_file_name)
+                                .or_insert_with(Vec::new)
+                                .push(outer_entry.path());
+                        }
                     }
                 }
             }
         }
     }
 
-    package_map
+    Ok(package_map)
 }
 
 /// Determine the current `typeshed` subdirectory for a third-party package.
@@ -260,7 +264,7 @@ pub(crate) fn third_party_typeshed_package_paths<Host: host::Host>(
     host: &Host,
 ) -> Option<Vec<PathBuf>> {
     let typeshed_path = typeshed_subdirectory(false, config, host)?;
-    let package_paths = build_typeshed_third_party_package_map(&typeshed_path);
+    let package_paths = build_typeshed_third_party_package_map(&typeshed_path).ok()?;
     let first_name_part = module_descriptor.name_parts.first().map(String::as_str)?;
     package_paths.get(first_name_part).cloned()
 }

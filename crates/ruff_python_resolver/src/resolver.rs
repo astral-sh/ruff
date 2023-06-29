@@ -1,6 +1,5 @@
 //! Resolves Python imports to their corresponding files on disk.
 
-use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -8,10 +7,10 @@ use log::debug;
 
 use crate::config::Config;
 use crate::execution_environment::ExecutionEnvironment;
-use crate::implicit_imports::ImplicitImport;
+use crate::implicit_imports::ImplicitImports;
 use crate::import_result::{ImportResult, ImportType};
 use crate::module_descriptor::ImportModuleDescriptor;
-use crate::{host, implicit_imports, native_module, py_typed, search};
+use crate::{host, native_module, py_typed, search};
 
 #[allow(clippy::fn_params_excessive_bools)]
 fn resolve_module_descriptor(
@@ -37,7 +36,7 @@ fn resolve_module_descriptor(
     let mut is_stub_package = false;
     let mut is_stub_file = false;
     let mut is_native_lib = false;
-    let mut implicit_imports = BTreeMap::new();
+    let mut implicit_imports = None;
     let mut package_directory = None;
     let mut py_typed_info = None;
 
@@ -60,29 +59,29 @@ fn resolve_module_descriptor(
             is_namespace_package = true;
         }
 
-        implicit_imports = implicit_imports::find(&dir_path, &[&py_file_path, &pyi_file_path]);
+        implicit_imports = ImplicitImports::find(&dir_path, &[&py_file_path, &pyi_file_path]).ok();
     } else {
         for (i, part) in module_descriptor.name_parts.iter().enumerate() {
             let is_first_part = i == 0;
             let is_last_part = i == module_descriptor.name_parts.len() - 1;
 
             // Extend the directory path with the next segment.
-            if use_stub_package && is_first_part {
-                dir_path = dir_path.join(format!("{part}-stubs"));
+            let module_dir_path = if use_stub_package && is_first_part {
                 is_stub_package = true;
+                dir_path.join(format!("{part}-stubs"))
             } else {
-                dir_path = dir_path.join(part);
-            }
+                dir_path.join(part)
+            };
 
-            let found_directory = dir_path.is_dir();
+            let found_directory = module_dir_path.is_dir();
             if found_directory {
                 if is_first_part {
-                    package_directory = Some(dir_path.clone());
+                    package_directory = Some(module_dir_path.clone());
                 }
 
                 // Look for an `__init__.py[i]` in the directory.
-                let py_file_path = dir_path.join("__init__.py");
-                let pyi_file_path = dir_path.join("__init__.pyi");
+                let py_file_path = module_dir_path.join("__init__.py");
+                let pyi_file_path = module_dir_path.join("__init__.pyi");
                 is_init_file_present = false;
 
                 if allow_pyi && pyi_file_path.is_file() {
@@ -100,7 +99,7 @@ fn resolve_module_descriptor(
 
                 if look_for_py_typed {
                     py_typed_info =
-                        py_typed_info.or_else(|| py_typed::get_py_typed_info(&dir_path));
+                        py_typed_info.or_else(|| py_typed::get_py_typed_info(&module_dir_path));
                 }
 
                 // We haven't reached the end of the import, and we found a matching directory.
@@ -111,12 +110,15 @@ fn resolve_module_descriptor(
                         is_namespace_package = true;
                         py_typed_info = None;
                     }
+
+                    dir_path = module_dir_path;
                     continue;
                 }
 
                 if is_init_file_present {
                     implicit_imports =
-                        implicit_imports::find(&dir_path, &[&py_file_path, &pyi_file_path]);
+                        ImplicitImports::find(&module_dir_path, &[&py_file_path, &pyi_file_path])
+                            .ok();
                     break;
                 }
             }
@@ -124,8 +126,8 @@ fn resolve_module_descriptor(
             // We couldn't find a matching directory, or the directory didn't contain an
             // `__init__.py[i]` file. Look for an `.py[i]` file with the same name as the
             // segment, in lieu of a directory.
-            let py_file_path = dir_path.with_extension("py");
-            let pyi_file_path = dir_path.with_extension("pyi");
+            let py_file_path = module_dir_path.with_extension("py");
+            let pyi_file_path = module_dir_path.with_extension("pyi");
 
             if allow_pyi && pyi_file_path.is_file() {
                 debug!("Resolved import with file: {pyi_file_path:?}");
@@ -139,16 +141,9 @@ fn resolve_module_descriptor(
             } else {
                 if allow_native_lib && dir_path.is_dir() {
                     // We couldn't find a `.py[i]` file; search for a native library.
-                    if let Some(module_name) = dir_path.file_name().and_then(OsStr::to_str) {
-                        if let Some(native_lib_path) = dir_path
-                            .read_dir()
-                            .unwrap()
-                            .flatten()
-                            .filter(|entry| entry.file_type().map_or(false, |ft| ft.is_file()))
-                            .map(|entry| entry.path())
-                            .find(|path| {
-                                native_module::is_native_module_file_name(module_name, path)
-                            })
+                    if let Some(module_name) = module_dir_path.file_name().and_then(OsStr::to_str) {
+                        if let Ok(Some(native_lib_path)) =
+                            native_module::find_native_module(module_name, &dir_path)
                         {
                             debug!("Resolved import with file: {native_lib_path:?}");
                             is_native_lib = true;
@@ -162,13 +157,12 @@ fn resolve_module_descriptor(
                     resolved_paths.push(PathBuf::new());
                     if is_last_part {
                         implicit_imports =
-                            implicit_imports::find(&dir_path, &[&py_file_path, &pyi_file_path]);
+                            ImplicitImports::find(&dir_path, &[&py_file_path, &pyi_file_path]).ok();
                         is_namespace_package = true;
                     }
-                } else if is_native_lib {
-                    debug!("Did not find file {py_file_path:?} or {pyi_file_path:?}");
                 }
             }
+
             break;
         }
     }
@@ -179,8 +173,11 @@ fn resolve_module_descriptor(
         resolved_paths.len() == module_descriptor.name_parts.len()
     };
 
-    let is_partly_resolved =
-        !resolved_paths.is_empty() && resolved_paths.len() < module_descriptor.name_parts.len();
+    let is_partly_resolved = if resolved_paths.is_empty() {
+        false
+    } else {
+        resolved_paths.len() < module_descriptor.name_parts.len()
+    };
 
     ImportResult {
         is_relative: false,
@@ -197,8 +194,8 @@ fn resolve_module_descriptor(
         is_stdlib_typeshed_file: false,
         is_third_party_typeshed_file: false,
         is_local_typings_file: false,
-        implicit_imports,
-        filtered_implicit_imports: BTreeMap::default(),
+        implicit_imports: implicit_imports.unwrap_or_default(),
+        filtered_implicit_imports: ImplicitImports::default(),
         non_stub_import_result: None,
         py_typed_info,
         package_directory,
@@ -292,14 +289,15 @@ fn resolve_best_absolute_import<Host: host::Host>(
                 // If we resolved to a namespace package, ensure that all imported symbols are
                 // present in the namespace package's "implicit" imports.
                 if typings_import.is_namespace_package
-                    && typings_import.resolved_paths[typings_import.resolved_paths.len() - 1]
-                        .as_os_str()
-                        .is_empty()
+                    && typings_import
+                        .resolved_paths
+                        .last()
+                        .map_or(false, |path| path.as_os_str().is_empty())
                 {
-                    if is_namespace_package_resolved(
-                        module_descriptor,
-                        &typings_import.implicit_imports,
-                    ) {
+                    if typings_import
+                        .implicit_imports
+                        .resolves_namespace_package(&module_descriptor.imported_symbols)
+                    {
                         return Some(typings_import);
                     }
                 } else {
@@ -421,34 +419,6 @@ fn resolve_best_absolute_import<Host: host::Host>(
     best_result_so_far
 }
 
-/// Determines whether a namespace package resolves all of the symbols
-/// requested in the module descriptor. Namespace packages have no "__init__.py"
-/// file, so the only way that symbols can be resolved is if submodules
-/// are present. If specific symbols were requested, make sure they
-/// are all satisfied by submodules (as listed in the implicit imports).
-fn is_namespace_package_resolved(
-    module_descriptor: &ImportModuleDescriptor,
-    implicit_imports: &BTreeMap<String, ImplicitImport>,
-) -> bool {
-    if !module_descriptor.imported_symbols.is_empty() {
-        // TODO(charlie): Pyright uses:
-        //
-        // ```typescript
-        // !Array.from(moduleDescriptor.importedSymbols.keys()).some((symbol) => implicitImports.has(symbol))`
-        // ```
-        //
-        // However, that only checks if _any_ of the symbols are in the implicit imports.
-        for symbol in &module_descriptor.imported_symbols {
-            if !implicit_imports.contains_key(symbol) {
-                return false;
-            }
-        }
-    } else if implicit_imports.is_empty() {
-        return false;
-    }
-    true
-}
-
 /// Finds the `typeshed` path for the given module descriptor.
 ///
 /// Supports both standard library and third-party `typeshed` lookups.
@@ -549,14 +519,14 @@ fn pick_best_import(
         // imported symbols.
         if best_import_so_far.is_namespace_package && new_import.is_namespace_package {
             if !module_descriptor.imported_symbols.is_empty() {
-                if !is_namespace_package_resolved(
-                    module_descriptor,
-                    &best_import_so_far.implicit_imports,
-                ) {
-                    if is_namespace_package_resolved(
-                        module_descriptor,
-                        &new_import.implicit_imports,
-                    ) {
+                if !best_import_so_far
+                    .implicit_imports
+                    .resolves_namespace_package(&module_descriptor.imported_symbols)
+                {
+                    if new_import
+                        .implicit_imports
+                        .resolves_namespace_package(&module_descriptor.imported_symbols)
+                    {
                         return new_import;
                     }
 
@@ -723,7 +693,7 @@ fn resolve_import_strict<Host: host::Host>(
 /// 3. If a stub file was found, find the "best" match for the import, disallowing stub files.
 /// 4. If the import wasn't resolved, try to resolve it in the parent directory, then the parent's
 ///    parent, and so on, until the import root is reached.
-fn resolve_import<Host: host::Host>(
+pub(crate) fn resolve_import<Host: host::Host>(
     source_file: &Path,
     execution_environment: &ExecutionEnvironment,
     module_descriptor: &ImportModuleDescriptor,
@@ -765,10 +735,10 @@ fn resolve_import<Host: host::Host>(
             );
 
             if result.is_import_found {
-                if let Some(implicit_imports) = implicit_imports::filter(
-                    &result.implicit_imports,
-                    &module_descriptor.imported_symbols,
-                ) {
+                if let Some(implicit_imports) = result
+                    .implicit_imports
+                    .filter(&module_descriptor.imported_symbols)
+                {
                     result.implicit_imports = implicit_imports;
                 }
                 return result;
@@ -779,889 +749,4 @@ fn resolve_import<Host: host::Host>(
     }
 
     ImportResult::not_found()
-}
-
-#[cfg(test)]
-mod tests {
-    use insta::assert_debug_snapshot;
-    use std::fs::{create_dir_all, File};
-    use std::io::{self, Write};
-    use std::path::{Path, PathBuf};
-
-    use log::debug;
-    use tempfile::TempDir;
-
-    use crate::config::Config;
-    use crate::execution_environment::ExecutionEnvironment;
-    use crate::host;
-    use crate::import_result::{ImportResult, ImportType};
-    use crate::module_descriptor::ImportModuleDescriptor;
-    use crate::python_platform::PythonPlatform;
-    use crate::python_version::PythonVersion;
-    use crate::resolver::resolve_import;
-
-    /// Create a file at the given path with the given content.
-    fn create(path: PathBuf, content: &str) -> io::Result<PathBuf> {
-        if let Some(parent) = path.parent() {
-            create_dir_all(parent)?;
-        }
-        let mut f = File::create(&path)?;
-        f.write_all(content.as_bytes())?;
-        f.sync_all()?;
-
-        Ok(path)
-    }
-
-    /// Create an empty file at the given path.
-    fn empty(path: PathBuf) -> io::Result<PathBuf> {
-        create(path, "")
-    }
-
-    /// Create a partial `py.typed` file at the given path.
-    fn partial(path: PathBuf) -> io::Result<PathBuf> {
-        create(path, "partial\n")
-    }
-
-    /// Create a `py.typed` file at the given path.
-    fn typed(path: PathBuf) -> io::Result<PathBuf> {
-        create(path, "# typed")
-    }
-
-    #[derive(Debug, Default)]
-    struct ResolverOptions {
-        extra_paths: Vec<PathBuf>,
-        library: Option<PathBuf>,
-        stub_path: Option<PathBuf>,
-        typeshed_path: Option<PathBuf>,
-        venv_path: Option<PathBuf>,
-        venv: Option<PathBuf>,
-    }
-
-    fn resolve_options(
-        source_file: impl AsRef<Path>,
-        name: &str,
-        root: impl Into<PathBuf>,
-        options: ResolverOptions,
-    ) -> ImportResult {
-        let ResolverOptions {
-            extra_paths,
-            library,
-            stub_path,
-            typeshed_path,
-            venv_path,
-            venv,
-        } = options;
-
-        let execution_environment = ExecutionEnvironment {
-            root: root.into(),
-            python_version: PythonVersion::Py37,
-            python_platform: PythonPlatform::Darwin,
-            extra_paths,
-        };
-
-        let module_descriptor = ImportModuleDescriptor {
-            leading_dots: name.chars().take_while(|c| *c == '.').count(),
-            name_parts: name
-                .chars()
-                .skip_while(|c| *c == '.')
-                .collect::<String>()
-                .split('.')
-                .map(std::string::ToString::to_string)
-                .collect(),
-            imported_symbols: Vec::new(),
-        };
-
-        let config = Config {
-            typeshed_path,
-            stub_path,
-            venv_path,
-            venv,
-        };
-
-        let host = host::StaticHost::new(if let Some(library) = library {
-            vec![library]
-        } else {
-            Vec::new()
-        });
-
-        resolve_import(
-            source_file.as_ref(),
-            &execution_environment,
-            &module_descriptor,
-            &config,
-            &host,
-        )
-    }
-
-    fn setup() {
-        env_logger::builder().is_test(true).try_init().ok();
-    }
-
-    #[test]
-    fn partial_stub_file_exists() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        partial(library.join("myLib-stubs/py.typed"))?;
-        let partial_stub_pyi = empty(library.join("myLib-stubs").join("partialStub.pyi"))?;
-        let partial_stub_py = empty(library.join("myLib/partialStub.py"))?;
-
-        let result = resolve_options(
-            partial_stub_py,
-            "myLib.partialStub",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                ..Default::default()
-            },
-        );
-
-        assert!(result.is_import_found);
-        assert!(result.is_stub_file);
-        assert_eq!(result.import_type, ImportType::ThirdParty);
-        assert_eq!(
-            result.resolved_paths,
-            // TODO(charlie): Pyright matches on `libraryRoot, 'myLib', 'partialStub.pyi'` here.
-            // But that file doesn't exist. There's some kind of transform.
-            vec![PathBuf::new(), partial_stub_pyi]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn partial_stub_init_exists() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        partial(library.join("myLib-stubs/py.typed"))?;
-        let partial_stub_init_pyi = empty(library.join("myLib-stubs/__init__.pyi"))?;
-        let partial_stub_init_py = empty(library.join("myLib/__init__.py"))?;
-
-        let result = resolve_options(
-            partial_stub_init_py,
-            "myLib",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                ..Default::default()
-            },
-        );
-
-        assert!(result.is_import_found);
-        assert!(result.is_stub_file);
-        assert_eq!(result.import_type, ImportType::ThirdParty);
-        assert_eq!(
-            result.resolved_paths,
-            // TODO(charlie): Pyright matches on `libraryRoot, 'myLib', '__init__.pyi'` here.
-            // But that file doesn't exist. There's some kind of transform.
-            vec![partial_stub_init_pyi]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn side_by_side_files() -> io::Result<()> {
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        partial(library.join("myLib-stubs/py.typed"))?;
-        empty(library.join("myLib/partialStub.pyi"))?;
-        empty(library.join("myLib/partialStub.py"))?;
-        empty(library.join("myLib/partialStub2.py"))?;
-        let my_file = empty(root.join("myFile.py"))?;
-        let side_by_side_stub_file = empty(library.join("myLib-stubs/partialStub.pyi"))?;
-        let partial_stub_file = empty(library.join("myLib-stubs/partialStub2.pyi"))?;
-
-        // Stub package wins over original package (per PEP 561 rules).
-        let side_by_side_result = resolve_options(
-            &my_file,
-            "myLib.partialStub",
-            root,
-            ResolverOptions {
-                library: Some(library.clone()),
-                ..Default::default()
-            },
-        );
-        assert!(side_by_side_result.is_import_found);
-        assert!(side_by_side_result.is_stub_file);
-        assert_eq!(
-            side_by_side_result.resolved_paths,
-            vec![PathBuf::new(), side_by_side_stub_file]
-        );
-
-        // Side by side stub doesn't completely disable partial stub.
-        let partial_stub_result = resolve_options(
-            &my_file,
-            "myLib.partialStub2",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                ..Default::default()
-            },
-        );
-        assert!(partial_stub_result.is_import_found);
-        assert!(partial_stub_result.is_stub_file);
-        assert_eq!(
-            partial_stub_result.resolved_paths,
-            vec![PathBuf::new(), partial_stub_file]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn stub_package() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        empty(library.join("myLib-stubs/stub.pyi"))?;
-        empty(library.join("myLib-stubs/__init__.pyi"))?;
-        let partial_stub_py = empty(library.join("myLib/partialStub.py"))?;
-
-        let result = resolve_options(
-            partial_stub_py,
-            "myLib.partialStub",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                ..Default::default()
-            },
-        );
-
-        // If fully typed stub package exists, that wins over the real package.
-        assert!(!result.is_import_found);
-
-        Ok(())
-    }
-
-    #[test]
-    fn stub_namespace_package() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        empty(library.join("myLib-stubs/stub.pyi"))?;
-        let partial_stub_py = empty(library.join("myLib/partialStub.py"))?;
-
-        let result = resolve_options(
-            partial_stub_py.clone(),
-            "myLib.partialStub",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                ..Default::default()
-            },
-        );
-
-        // If fully typed stub package exists, that wins over the real package.
-        assert!(result.is_import_found);
-        assert!(!result.is_stub_file);
-        assert_eq!(result.resolved_paths, vec![PathBuf::new(), partial_stub_py]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn stub_in_typing_folder_over_partial_stub_package() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-        let typing_folder = root.join("typing");
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        partial(library.join("myLib-stubs/py.typed"))?;
-        empty(library.join("myLib-stubs/__init__.pyi"))?;
-        let my_lib_pyi = empty(typing_folder.join("myLib.pyi"))?;
-        let my_lib_init_py = empty(library.join("myLib/__init__.py"))?;
-
-        let result = resolve_options(
-            my_lib_init_py,
-            "myLib",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                stub_path: Some(typing_folder),
-                ..Default::default()
-            },
-        );
-
-        // If the package exists in typing folder, that gets picked up first (so we resolve to
-        // `myLib.pyi`).
-        assert!(result.is_import_found);
-        assert!(result.is_stub_file);
-        assert_eq!(result.resolved_paths, vec![my_lib_pyi]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn partial_stub_package_in_typing_folder() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-        let typing_folder = root.join("typing");
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        partial(typing_folder.join("myLib-stubs/py.typed"))?;
-        let my_lib_stubs_init_pyi = empty(typing_folder.join("myLib-stubs/__init__.pyi"))?;
-        let my_lib_init_py = empty(library.join("myLib/__init__.py"))?;
-
-        let result = resolve_options(
-            my_lib_init_py,
-            "myLib",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                stub_path: Some(typing_folder),
-                ..Default::default()
-            },
-        );
-
-        // If the package exists in typing folder, that gets picked up first (so we resolve to
-        // `myLib.pyi`).
-        assert!(result.is_import_found);
-        assert!(result.is_stub_file);
-        assert_eq!(result.resolved_paths, vec![my_lib_stubs_init_pyi]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn typeshed_folder() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-        let typeshed_folder = root.join("ts");
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        empty(typeshed_folder.join("stubs/myLibPackage/myLib.pyi"))?;
-        partial(library.join("myLib-stubs/py.typed"))?;
-        let my_lib_stubs_init_pyi = empty(library.join("myLib-stubs/__init__.pyi"))?;
-        let my_lib_init_py = empty(library.join("myLib/__init__.py"))?;
-
-        let result = resolve_options(
-            my_lib_init_py,
-            "myLib",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                typeshed_path: Some(typeshed_folder),
-                ..Default::default()
-            },
-        );
-
-        // Stub packages win over typeshed.
-        assert!(result.is_import_found);
-        assert!(result.is_stub_file);
-        assert_eq!(result.resolved_paths, vec![my_lib_stubs_init_pyi]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn py_typed_file() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        empty(library.join("myLib/__init__.py"))?;
-        partial(library.join("myLib-stubs/py.typed"))?;
-        let partial_stub_init_pyi = empty(library.join("myLib-stubs/__init__.pyi"))?;
-        let package_py_typed = typed(library.join("myLib/py.typed"))?;
-
-        let result = resolve_options(
-            package_py_typed,
-            "myLib",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                ..Default::default()
-            },
-        );
-
-        // Partial stub package always overrides original package.
-        assert!(result.is_import_found);
-        assert!(result.is_stub_file);
-        assert_eq!(result.resolved_paths, vec![partial_stub_init_pyi]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn py_typed_library() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-        let typeshed_folder = root.join("ts");
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        typed(library.join("os/py.typed"))?;
-        let init_py = empty(library.join("os/__init__.py"))?;
-        let typeshed_init_pyi = empty(typeshed_folder.join("stubs/os/os/__init__.pyi"))?;
-
-        let result = resolve_options(
-            typeshed_init_pyi,
-            "os",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                typeshed_path: Some(typeshed_folder),
-                ..Default::default()
-            },
-        );
-
-        assert!(result.is_import_found);
-        assert_eq!(result.resolved_paths, vec![init_py]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn non_py_typed_library() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-        let typeshed_folder = root.join("ts");
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        empty(library.join("os/__init__.py"))?;
-        let typeshed_init_pyi = empty(typeshed_folder.join("stubs/os/os/__init__.pyi"))?;
-
-        let result = resolve_options(
-            typeshed_init_pyi.clone(),
-            "os",
-            root,
-            ResolverOptions {
-                library: Some(library),
-                typeshed_path: Some(typeshed_folder),
-                ..Default::default()
-            },
-        );
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::ThirdParty);
-        assert_eq!(result.resolved_paths, vec![typeshed_init_pyi]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn import_side_by_side_file_root() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let file1 = empty(root.join("file1.py"))?;
-        let file2 = empty(root.join("file2.py"))?;
-
-        let result = resolve_options(file2, "file1", root, ResolverOptions::default());
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::Local);
-        assert_eq!(result.resolved_paths, vec![file1]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn import_side_by_side_file_sub_folder() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let test_init = empty(root.join("test/__init__.py"))?;
-        let test_file1 = empty(root.join("test/file1.py"))?;
-        let test_file2 = empty(root.join("test/file2.py"))?;
-
-        let result = resolve_options(test_file2, "test.file1", root, ResolverOptions::default());
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::Local);
-        assert_eq!(result.resolved_paths, vec![test_init, test_file1]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn import_side_by_side_file_sub_under_src_folder() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let nested_init = empty(root.join("src/nested/__init__.py"))?;
-        let nested_file1 = empty(root.join("src/nested/file1.py"))?;
-        let nested_file2 = empty(root.join("src/nested/file2.py"))?;
-
-        let result = resolve_options(
-            nested_file2,
-            "nested.file1",
-            root,
-            ResolverOptions::default(),
-        );
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::Local);
-        assert_eq!(result.resolved_paths, vec![nested_init, nested_file1]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn import_file_sub_under_containing_folder() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let nested_file1 = empty(root.join("src/nested/file1.py"))?;
-        let nested_file2 = empty(root.join("src/nested/nested2/file2.py"))?;
-
-        let result = resolve_options(nested_file2, "file1", root, ResolverOptions::default());
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::Local);
-        assert_eq!(result.resolved_paths, vec![nested_file1]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn import_side_by_side_file_sub_under_lib_folder() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let temp_dir = TempDir::new()?;
-        let library = temp_dir.path().join("lib").join("site-packages");
-
-        empty(library.join("myLib/file1.py"))?;
-        let file2 = empty(library.join("myLib/file2.py"))?;
-
-        let result = resolve_options(file2, "file1", root, ResolverOptions::default());
-
-        debug!("result: {:?}", result);
-
-        assert!(!result.is_import_found);
-
-        Ok(())
-    }
-
-    #[test]
-    fn nested_namespace_package_1() -> io::Result<()> {
-        // See: https://github.com/microsoft/pyright/issues/5089.
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let file = empty(root.join("package1/a/b/c/d.py"))?;
-        let package1_init = empty(root.join("package1/a/__init__.py"))?;
-        let package2_init = empty(root.join("package2/a/__init__.py"))?;
-
-        let package1 = root.join("package1");
-        let package2 = root.join("package2");
-
-        let result = resolve_options(
-            package2_init,
-            "a.b.c.d",
-            root,
-            ResolverOptions {
-                extra_paths: vec![package1, package2],
-                ..Default::default()
-            },
-        );
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::Local);
-        assert_eq!(
-            result.resolved_paths,
-            vec![package1_init, PathBuf::new(), PathBuf::new(), file]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn nested_namespace_package_2() -> io::Result<()> {
-        // See: https://github.com/microsoft/pyright/issues/5089.
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let file = empty(root.join("package1/a/b/c/d.py"))?;
-        let package1_init = empty(root.join("package1/a/b/c/__init__.py"))?;
-        let package2_init = empty(root.join("package2/a/b/c/__init__.py"))?;
-
-        let package1 = root.join("package1");
-        let package2 = root.join("package2");
-
-        let result = resolve_options(
-            package2_init,
-            "a.b.c.d",
-            root,
-            ResolverOptions {
-                extra_paths: vec![package1, package2],
-                ..Default::default()
-            },
-        );
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::Local);
-        assert_eq!(
-            result.resolved_paths,
-            vec![PathBuf::new(), PathBuf::new(), package1_init, file]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn nested_namespace_package_3() -> io::Result<()> {
-        // See: https://github.com/microsoft/pyright/issues/5089.
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        empty(root.join("package1/a/b/c/d.py"))?;
-        let package2_init = empty(root.join("package2/a/__init__.py"))?;
-
-        let package1 = root.join("package1");
-        let package2 = root.join("package2");
-
-        let result = resolve_options(
-            package2_init,
-            "a.b.c.d",
-            root,
-            ResolverOptions {
-                extra_paths: vec![package1, package2],
-                ..Default::default()
-            },
-        );
-
-        assert!(!result.is_import_found);
-
-        Ok(())
-    }
-
-    #[test]
-    fn nested_namespace_package_4() -> io::Result<()> {
-        // See: https://github.com/microsoft/pyright/issues/5089.
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        empty(root.join("package1/a/b/__init__.py"))?;
-        empty(root.join("package1/a/b/c.py"))?;
-        empty(root.join("package2/a/__init__.py"))?;
-        let package2_a_b_init = empty(root.join("package2/a/b/__init__.py"))?;
-
-        let package1 = root.join("package1");
-        let package2 = root.join("package2");
-
-        let result = resolve_options(
-            package2_a_b_init,
-            "a.b.c",
-            root,
-            ResolverOptions {
-                extra_paths: vec![package1, package2],
-                ..Default::default()
-            },
-        );
-
-        assert!(!result.is_import_found);
-
-        Ok(())
-    }
-
-    // New tests, don't exist upstream.
-    #[test]
-    fn relative_import_side_by_side_file_root() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        let file1 = empty(root.join("file1.py"))?;
-        let file2 = empty(root.join("file2.py"))?;
-
-        let result = resolve_options(file2, ".file1", root, ResolverOptions::default());
-
-        assert!(result.is_import_found);
-        assert_eq!(result.import_type, ImportType::Local);
-        assert_eq!(result.resolved_paths, vec![file1]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn invalid_relative_import_side_by_side_file_root() -> io::Result<()> {
-        setup();
-
-        let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
-
-        empty(root.join("file1.py"))?;
-        let file2 = empty(root.join("file2.py"))?;
-
-        let result = resolve_options(file2, "..file1", root, ResolverOptions::default());
-
-        assert!(!result.is_import_found);
-
-        Ok(())
-    }
-
-    #[test]
-    fn airflow_standard_library() {
-        setup();
-
-        let root = PathBuf::from("./resources/test/airflow");
-        let source_file = root.join("airflow/api/common/mark_tasks.py");
-
-        let result = resolve_options(
-            source_file,
-            "os",
-            root.clone(),
-            ResolverOptions {
-                venv_path: Some(root),
-                venv: Some(PathBuf::from("venv")),
-                ..Default::default()
-            },
-        );
-
-        assert_debug_snapshot!(result);
-    }
-
-    #[test]
-    fn airflow_first_party() {
-        setup();
-
-        let root = PathBuf::from("./resources/test/airflow");
-        let source_file = root.join("airflow/api/common/mark_tasks.py");
-
-        let result = resolve_options(
-            source_file,
-            "airflow.jobs.scheduler_job_runner",
-            root.clone(),
-            ResolverOptions {
-                venv_path: Some(root),
-                venv: Some(PathBuf::from("venv")),
-                ..Default::default()
-            },
-        );
-
-        assert_debug_snapshot!(result);
-    }
-
-    #[test]
-    fn airflow_stub_file() {
-        setup();
-
-        let root = PathBuf::from("./resources/test/airflow");
-        let source_file = root.join("airflow/api/common/mark_tasks.py");
-
-        let result = resolve_options(
-            source_file,
-            "airflow.compat.functools",
-            root.clone(),
-            ResolverOptions {
-                venv_path: Some(root),
-                venv: Some(PathBuf::from("venv")),
-                ..Default::default()
-            },
-        );
-
-        assert_debug_snapshot!(result);
-    }
-
-    #[test]
-    fn airflow_namespace_package() {
-        setup();
-
-        let root = PathBuf::from("./resources/test/airflow");
-        let source_file = root.join("airflow/api/common/mark_tasks.py");
-
-        let result = resolve_options(
-            source_file,
-            "airflow.providers.google.cloud.hooks.gcs",
-            root.clone(),
-            ResolverOptions {
-                venv_path: Some(root),
-                venv: Some(PathBuf::from("venv")),
-                ..Default::default()
-            },
-        );
-
-        assert_debug_snapshot!(result);
-    }
-
-    #[test]
-    fn airflow_third_party() {
-        setup();
-
-        let root = PathBuf::from("./resources/test/airflow");
-        let source_file = root.join("airflow/api/common/mark_tasks.py");
-
-        let result = resolve_options(
-            source_file,
-            "sqlalchemy.orm",
-            root.clone(),
-            ResolverOptions {
-                venv_path: Some(root),
-                venv: Some(PathBuf::from("venv")),
-                ..Default::default()
-            },
-        );
-
-        assert_debug_snapshot!(result);
-    }
 }
