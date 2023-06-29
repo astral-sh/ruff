@@ -139,30 +139,13 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
 
         output.extend(quote! {
-            impl IntoIterator for &#linter {
-                type Item = Rule;
-                type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-                fn into_iter(self) -> Self::IntoIter {
+            impl #linter {
+                pub fn rules(self) -> ::std::vec::IntoIter<Rule> {
                     match self { #prefix_into_iter_match_arms }
                 }
             }
         });
     }
-
-    output.extend(quote! {
-        impl IntoIterator for &RuleCodePrefix {
-            type Item = Rule;
-            type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                match self {
-                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.into_iter(),)*
-                }
-            }
-        }
-    });
-
     output.extend(quote! {
         impl RuleCodePrefix {
             pub fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeError> {
@@ -171,6 +154,12 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 Ok(match linter {
                     #(Linter::#linter_idents => RuleCodePrefix::#linter_idents(#linter_idents::from_str(code).map_err(|_| crate::registry::FromCodeError::Unknown)?),)*
                 })
+            }
+
+            pub fn rules(self) -> ::std::vec::IntoIter<Rule> {
+                match self {
+                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
+                }
             }
         }
     });

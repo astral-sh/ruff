@@ -167,7 +167,7 @@ impl IntoIterator for &RuleSelector {
                     .chain(Linter::Flake8Print.rules()),
             ),
             RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.into_iter()),
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.clone().rules()),
         }
     }
 }
@@ -346,7 +346,7 @@ mod clap_completion {
                             let prefix = p.linter().common_prefix();
                             let code = p.short_code();
 
-                            let mut rules_iter = p.into_iter();
+                            let mut rules_iter = p.rules();
                             let rule1 = rules_iter.next();
                             let rule2 = rules_iter.next();
 
