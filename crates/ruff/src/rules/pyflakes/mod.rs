@@ -282,7 +282,7 @@ mod tests {
             import os
 
             # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
-            # import. (This is a false negative.)
+            # import.
             del os
     "#,
         "del_shadowed_global_import_in_local_scope"
@@ -323,7 +323,7 @@ mod tests {
             del os
 
             def g():
-                # `import os` should still be flagged as shadowing an import.
+                # `import os` doesn't need to be flagged as shadowing an import.
                 os = 1
                 print(os)
         "#,
@@ -2114,7 +2114,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
+            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
         );
     }
 
