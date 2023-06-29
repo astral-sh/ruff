@@ -1851,6 +1851,36 @@ mod tests {
     }
 
     #[test]
+    fn for_with_del_in_body_and_orelse() {
+        let stmt = parse(
+            r#"
+                for a in b:
+                    del c
+                else:
+                    del c
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn async_for_() {
         let stmt = parse(
             r#"
@@ -2039,6 +2069,36 @@ mod tests {
     }
 
     #[test]
+    fn async_for_with_del_in_body_and_orelse() {
+        let stmt = parse(
+            r#"
+                async for a in b:
+                    del c
+                else:
+                    del c
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), ["a"]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn while_() {
         let stmt = parse(
             r#"
@@ -2219,6 +2279,36 @@ mod tests {
                 },
                 Requirement {
                     name: "c",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn while_with_del_in_body_and_orelse() {
+        let stmt = parse(
+            r#"
+                while a:
+                    del b
+                else:
+                    del b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
+        assert_eq!(Vec::from_iter(relation.unbindings), [] as [&str; 0]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
