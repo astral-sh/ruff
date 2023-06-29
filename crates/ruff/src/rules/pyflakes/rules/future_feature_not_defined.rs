@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Alias, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
+use ruff_python_stdlib::future::is_feature_name;
 
 use crate::checkers::ast::Checker;
 
@@ -30,12 +30,14 @@ impl Violation for FutureFeatureNotDefined {
 }
 
 pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
-    if !ALL_FEATURE_NAMES.contains(&alias.name.as_str()) {
-        checker.diagnostics.push(Diagnostic::new(
-            FutureFeatureNotDefined {
-                name: alias.name.to_string(),
-            },
-            alias.range(),
-        ));
+    if is_feature_name(&alias.name) {
+        return;
     }
+
+    checker.diagnostics.push(Diagnostic::new(
+        FutureFeatureNotDefined {
+            name: alias.name.to_string(),
+        },
+        alias.range(),
+    ));
 }

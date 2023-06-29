@@ -1,14 +1,11 @@
 use rustpython_parser::ast::{ArgWithDefault, Arguments, Decorator};
 
 use ruff_diagnostics::Violation;
-
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_boolean_trap::helpers::add_if_boolean;
-
-use super::super::helpers::FUNC_DEF_NAME_ALLOWLIST;
+use crate::rules::flake8_boolean_trap::helpers::{add_if_boolean, is_allowed_func_def};
 
 /// ## What it does
 /// Checks for the use of booleans as default values in function definitions.
@@ -64,7 +61,7 @@ pub(crate) fn check_boolean_default_value_in_function_definition(
     decorator_list: &[Decorator],
     arguments: &Arguments,
 ) {
-    if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
+    if is_allowed_func_def(name) {
         return;
     }
 

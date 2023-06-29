@@ -52,37 +52,6 @@ impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
     }
 }
 
-const BUILTINS: &[&str] = &[
-    "*",
-    "ascii",
-    "bytes",
-    "chr",
-    "dict",
-    "filter",
-    "hex",
-    "input",
-    "int",
-    "isinstance",
-    "list",
-    "map",
-    "max",
-    "min",
-    "next",
-    "object",
-    "oct",
-    "open",
-    "pow",
-    "range",
-    "round",
-    "str",
-    "super",
-    "zip",
-];
-const IO: &[&str] = &["open"];
-const SIX_MOVES_BUILTINS: &[&str] = BUILTINS;
-const SIX: &[&str] = &["callable", "next"];
-const SIX_MOVES: &[&str] = &["filter", "input", "map", "range", "zip"];
-
 /// UP029
 pub(crate) fn unnecessary_builtin_import(
     checker: &mut Checker,
@@ -90,25 +59,52 @@ pub(crate) fn unnecessary_builtin_import(
     module: &str,
     names: &[Alias],
 ) {
-    let deprecated_names = match module {
-        "builtins" => BUILTINS,
-        "io" => IO,
-        "six" => SIX,
-        "six.moves" => SIX_MOVES,
-        "six.moves.builtins" => SIX_MOVES_BUILTINS,
-        _ => return,
-    };
-
-    // Do this with a filter?
-    let mut unused_imports: Vec<&Alias> = vec![];
-    for alias in names {
-        if alias.asname.is_some() {
-            continue;
-        }
-        if deprecated_names.contains(&alias.name.as_str()) {
-            unused_imports.push(alias);
-        }
+    // Ignore irrelevant modules.
+    if !matches!(
+        module,
+        "builtins" | "io" | "six" | "six.moves" | "six.moves.builtins"
+    ) {
+        return;
     }
+
+    // Identify unaliased, builtin imports.
+    let unused_imports: Vec<&Alias> = names
+        .iter()
+        .filter(|alias| alias.asname.is_none())
+        .filter(|alias| {
+            matches!(
+                (module, alias.name.as_str()),
+                (
+                    "builtins" | "six.moves.builtins",
+                    "*" | "ascii"
+                        | "bytes"
+                        | "chr"
+                        | "dict"
+                        | "filter"
+                        | "hex"
+                        | "input"
+                        | "int"
+                        | "isinstance"
+                        | "list"
+                        | "map"
+                        | "max"
+                        | "min"
+                        | "next"
+                        | "object"
+                        | "oct"
+                        | "open"
+                        | "pow"
+                        | "range"
+                        | "round"
+                        | "str"
+                        | "super"
+                        | "zip"
+                ) | ("io", "open")
+                    | ("six", "callable" | "next")
+                    | ("six.moves", "filter" | "input" | "map" | "range" | "zip")
+            )
+        })
+        .collect();
 
     if unused_imports.is_empty() {
         return;
