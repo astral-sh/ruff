@@ -243,7 +243,10 @@ The Rome repository can be a helpful reference when implementing something in th
 
 ### Checking formatter stability and panics
 
-There are tree common problems with the formatter: The second formatting pass looks different than the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing parentheses around multiline expressions) and panics (mostly explicitly in debug assertions). We test for all of these using the `check-formatter-stability` subcommand in `ruff_dev`
+There are tree common problems with the formatter: The second formatting pass looks different than
+the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
+parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
+of these using the `check-formatter-stability` subcommand in `ruff_dev`
 
 The easiest is to check CPython:
 
@@ -252,9 +255,8 @@ git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resour
 cargo run --bin ruff_dev -- check-formatter-stability crates/ruff/resources/test/cpython
 ```
 
-TODO(konstin): The CPython checks needs to be integrated into the CI.
-
-It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we only do this occasionally:
+It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we
+only do this occasionally:
 
 ```shell
 curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
