@@ -105,7 +105,7 @@ pub(crate) fn generate() -> String {
                 generate_table(&mut table_out, prefix, &linter);
             }
         } else {
-            generate_table(&mut table_out, &linter, &linter);
+            generate_table(&mut table_out, linter.rules(), &linter);
         }
     }
 

@@ -158,15 +158,15 @@ impl IntoIterator for &RuleSelector {
             }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
-                    .into_iter()
-                    .chain(Linter::McCabe.into_iter()),
+                    .rules()
+                    .chain(Linter::McCabe.rules()),
             ),
             RuleSelector::T => RuleSelectorIter::Chain(
                 Linter::Flake8Debugger
-                    .into_iter()
-                    .chain(Linter::Flake8Print.into_iter()),
+                    .rules()
+                    .chain(Linter::Flake8Print.rules()),
             ),
-            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.into_iter()),
+            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
             RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.into_iter()),
         }
     }

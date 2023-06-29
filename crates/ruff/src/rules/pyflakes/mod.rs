@@ -490,7 +490,7 @@ mod tests {
         "load_after_unbind_from_class_scope"
     )]
     fn contents(contents: &str, snapshot: &str) {
-        let diagnostics = test_snippet(contents, &Settings::for_rules(&Linter::Pyflakes));
+        let diagnostics = test_snippet(contents, &Settings::for_rules(Linter::Pyflakes.rules()));
         assert_messages!(snapshot, diagnostics);
     }
 
@@ -498,7 +498,7 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
-        let settings = Settings::for_rules(&Linter::Pyflakes);
+        let settings = Settings::for_rules(Linter::Pyflakes.rules());
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);

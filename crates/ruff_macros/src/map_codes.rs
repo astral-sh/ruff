@@ -328,32 +328,39 @@ fn generate_iter_impl(
     linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
     linter_idents: &[&Ident],
 ) -> TokenStream {
-    let mut linter_into_iter_match_arms = quote!();
+    let mut linter_rules_match_arms = quote!();
+    let mut linter_all_rules_match_arms = quote!();
     for (linter, map) in linter_to_rules {
-        let rule_paths = map
-            .values()
-            .filter(|rule| {
-                // Nursery rules have to be explicitly selected, so we ignore them when looking at
-                // linter-level selectors (e.g., `--select SIM`).
-                !is_nursery(&rule.group)
-            })
-            .map(|Rule { attrs, path, .. }| {
+        let rule_paths = map.values().filter(|rule| !is_nursery(&rule.group)).map(
+            |Rule { attrs, path, .. }| {
                 let rule_name = path.segments.last().unwrap();
                 quote!(#(#attrs)* Rule::#rule_name)
-            });
-        linter_into_iter_match_arms.extend(quote! {
+            },
+        );
+        linter_rules_match_arms.extend(quote! {
+            Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
+        });
+        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
+            let rule_name = path.segments.last().unwrap();
+            quote!(#(#attrs)* Rule::#rule_name)
+        });
+        linter_all_rules_match_arms.extend(quote! {
             Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
         });
     }
 
     quote! {
-        impl IntoIterator for &Linter {
-            type Item = Rule;
-            type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-            fn into_iter(self) -> Self::IntoIter {
+        impl Linter {
+            /// Rules not in the nursery.
+            pub fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
                 match self {
-                    #linter_into_iter_match_arms
+                    #linter_rules_match_arms
+                }
+            }
+            /// All rules, including those in the nursery.
+            pub fn all_rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
+                match self {
+                    #linter_all_rules_match_arms
                 }
             }
         }
