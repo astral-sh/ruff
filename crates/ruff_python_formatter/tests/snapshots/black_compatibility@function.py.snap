@@ -111,14 +111,14 @@ def __await__(): return (yield)
  #!/usr/bin/env python3
 -import asyncio
 -import sys
--
--from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImport
 +NOT_YET_IMPLEMENTED_StmtImport
  
--from library import some_connection, some_decorator
+-from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
+-from library import some_connection, some_decorator
+-
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
@@ -215,17 +215,7 @@ def __await__(): return (yield)
          )
      _type_comment_re = re.compile(
          r"""
-@@ -118,7 +124,8 @@
-         )
-         $
-         """,
--        re.MULTILINE | re.VERBOSE,
-+        re.MULTILINE
-+        | re.VERBOSE,
-     )
- 
- 
-@@ -135,14 +142,8 @@
+@@ -135,14 +141,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -373,8 +363,7 @@ def long_lines():
         )
         $
         """,
-        re.MULTILINE
-        | re.VERBOSE,
+        re.MULTILINE | re.VERBOSE,
     )
 
 

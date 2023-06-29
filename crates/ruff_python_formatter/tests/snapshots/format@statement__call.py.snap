@@ -125,8 +125,7 @@ f(
 f(
     this_is_a_very_long_argument_asökdhflakjslaslhfdlaffahflahsöfdhasägporejfäalkdsjäfalisjäfdlkasjd,
     these_arguments_have_values_that_need_to_break_because_they_are_too_long1=(
-        100000
-        - 100000000000
+        100000 - 100000000000
     ),
     these_arguments_have_values_that_need_to_break_because_they_are_too_long2="akshfdlakjsdfad"
     + "asdfasdfa",

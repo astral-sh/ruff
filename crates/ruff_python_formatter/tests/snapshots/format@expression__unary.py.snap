@@ -142,6 +142,10 @@ if (
 if not \
     a:
     pass
+
+# Regression: https://github.com/astral-sh/ruff/issues/5338
+if a and not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
 ```
 
 ## Output
@@ -253,10 +257,8 @@ if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & (
     pass
 
 if (
-    not (
-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    )
+    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ):
     pass
@@ -295,6 +297,14 @@ if (
 
 if not a:
     pass
+
+# Regression: https://github.com/astral-sh/ruff/issues/5338
+if (
+    a
+    and not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+):
+    ...
 ```
 
 
