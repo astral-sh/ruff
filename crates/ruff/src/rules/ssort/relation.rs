@@ -236,6 +236,31 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 }
                 self.extend_bindings(relation.bindings);
             }
+            Stmt::While(StmtWhile {
+                test, body, orelse, ..
+            }) => {
+                self.visit_expr(test);
+
+                let relation = self.enter_scope();
+                self.visit_body(body);
+                let relation = self.exit_scope(relation);
+                for requirement in relation.requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.insert_requirement(requirement);
+                    }
+                }
+                self.extend_bindings(relation.bindings);
+
+                let relation = self.enter_scope();
+                self.visit_body(orelse);
+                let relation = self.exit_scope(relation);
+                for requirement in relation.requirements {
+                    if !self.relation.bindings.contains(requirement.name) {
+                        self.insert_requirement(requirement);
+                    }
+                }
+                self.extend_bindings(relation.bindings);
+            }
             Stmt::AugAssign(StmtAugAssign {
                 target, op, value, ..
             }) => {
