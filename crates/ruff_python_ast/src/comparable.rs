@@ -468,6 +468,26 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableElifElseClause<'a> {
+    test: Option<ComparableExpr<'a>>,
+    body: Vec<ComparableStmt<'a>>,
+}
+
+impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
+    fn from(elif_else_clause: &'a ast::ElifElseClause) -> Self {
+        let ast::ElifElseClause {
+            range: _,
+            test,
+            body,
+        } = elif_else_clause;
+        Self {
+            test: test.as_ref().map(Into::into),
+            body: body.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprBoolOp<'a> {
     op: ComparableBoolOp,
     values: Vec<ComparableExpr<'a>>,
@@ -1000,7 +1020,7 @@ pub struct StmtWhile<'a> {
 pub struct StmtIf<'a> {
     test: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
+    elif_else_clauses: Vec<ComparableElifElseClause<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1243,12 +1263,12 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::If(ast::StmtIf {
                 test,
                 body,
-                orelse,
+                elif_else_clauses,
                 range: _range,
             }) => Self::If(StmtIf {
                 test: test.into(),
                 body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
+                elif_else_clauses: elif_else_clauses.iter().map(Into::into).collect(),
             }),
             ast::Stmt::With(ast::StmtWith {
                 items,

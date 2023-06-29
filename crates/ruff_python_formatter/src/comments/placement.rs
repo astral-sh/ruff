@@ -288,12 +288,26 @@ fn handle_in_between_bodies_own_line_comment<'a>(
                 // if x == y:
                 //     pass
                 // # I'm a leading comment of the `elif` statement.
-                // elif:
+                // elif True:
                 //     print("nooop")
                 // ```
-                if following.is_stmt_if() || following.is_except_handler() {
-                    // The `elif` or except handlers have their own body to which we can attach the leading comment
+                if following.is_except_handler() {
+                    // The except handlers have their own body to which we can attach the leading comment
                     CommentPlacement::leading(following, comment)
+                } else if let AnyNodeRef::StmtIf(stmt_if) = comment.enclosing_node() {
+                    if let Some(clause) = stmt_if
+                        .elif_else_clauses
+                        .iter()
+                        .find(|clause| are_same_optional(following, clause.test.as_ref()))
+                    {
+                        CommentPlacement::leading(clause.into(), comment)
+                    } else {
+                        // Since we know we're between bodies and we know that the following node is
+                        // not the condition of any `elif`, we know the next node must be the `else`
+                        let else_clause = stmt_if.elif_else_clauses.last().unwrap();
+                        debug_assert!(else_clause.test.is_none());
+                        CommentPlacement::leading(else_clause.into(), comment)
+                    }
                 } else {
                     // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
                     // This means, there's no good place to attach the comments to.
@@ -335,89 +349,88 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     }
 
     // The comment must be between two statements...
-    if let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
-    {
-        // ...and the following statement must be the first statement in an alternate body of the parent...
-        if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
-            // ```python
-            // if test:
-            //     a
-            //     # comment
-            //     b
-            // ```
-            return CommentPlacement::Default(comment);
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // ...and the following statement must be the first statement in an alternate body of the parent...
+    if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
+        // ```python
+        // if test:
+        //     a
+        //     # comment
+        //     b
+        // ```
+        return CommentPlacement::Default(comment);
+    }
+
+    if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
+        // The  except handlers have their own body to which we can attach the trailing comment
+        // ```python
+        // try:
+        //     f()  # comment
+        // except RuntimeError:
+        //     raise
+        // ```
+        if following.is_except_handler() {
+            return CommentPlacement::trailing(following, comment);
         }
 
-        if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
-            // The `elif` or except handlers have their own body to which we can attach the trailing comment
-            // ```python
-            // if test:
-            //     a
-            // elif c: # comment
-            //     b
-            // ```
-            if following.is_except_handler() {
-                return CommentPlacement::trailing(following, comment);
-            } else if following.is_stmt_if() {
-                // We have to exclude for following if statements that are not elif by checking the
-                // indentation
-                // ```python
-                // if True:
-                //     pass
-                // else:  # Comment
-                //     if False:
-                //         pass
-                //     pass
-                // ```
-                let base_if_indent =
-                    whitespace::indentation_at_offset(locator, following.range().start());
-                let maybe_elif_indent = whitespace::indentation_at_offset(
-                    locator,
-                    comment.enclosing_node().range().start(),
-                );
-                if base_if_indent == maybe_elif_indent {
-                    return CommentPlacement::trailing(following, comment);
+        // Handle the `else` of an `if`. It is special because we don't have a test but unlike other
+        // `else` (e.g. for `while`), we have a dedicated node.
+        // ```python
+        // if x == y:
+        //     pass
+        // elif x < y:
+        //     pass
+        // else:  # 12 trailing else condition
+        //     pass
+        // ```
+        if let AnyNodeRef::StmtIf(stmt_if) = comment.enclosing_node() {
+            if let Some(else_clause) = stmt_if.elif_else_clauses.last() {
+                if else_clause.test.is_none()
+                    && following.ptr_eq(else_clause.body.first().unwrap().into())
+                {
+                    return CommentPlacement::dangling(else_clause.into(), comment);
                 }
             }
-            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
-            // This means, there's no good place to attach the comments to.
-            // Make this a dangling comments and manually format the comment in
-            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
-            // to correctly identify the comments for the `finally` and `orelse` block by looking
-            // at the comment's range.
-            //
-            // ```python
-            // while x == y:
-            //     pass
-            // else: # trailing
-            //     print("nooop")
-            // ```
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
-        } else {
-            // Trailing comment of the preceding statement
-            // ```python
-            // while test:
-            //     a # comment
-            // else:
-            //     b
-            // ```
-            if preceding.is_node_with_body() {
-                // We can't set this as a trailing comment of the function declaration because it
-                // will then move behind the function block instead of sticking with the pass
-                // ```python
-                // if True:
-                //     def f():
-                //         pass  # a
-                // else:
-                //     pass
-                // ```
-                CommentPlacement::Default(comment)
-            } else {
-                CommentPlacement::trailing(preceding, comment)
-            }
         }
+
+        // There are no bodies for the "else" branch (only `Vec<Stmt>`) expect for StmtIf, so
+        // we make this a dangling comments of the node containing the alternate branch and
+        // manually format the comment in that node's formatting logic. For `try`, it's the
+        // formatters responsibility to correctly identify the comments for the `finally` and
+        // `orelse` block by looking at the comment's range.
+        //
+        // ```python
+        // while x == y:
+        //     pass
+        // else: # trailing
+        //     print("nooop")
+        // ```
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::Default(comment)
+        // Trailing comment of the preceding statement
+        // ```python
+        // while test:
+        //     a # comment
+        // else:
+        //     b
+        // ```
+        if preceding.is_node_with_body() {
+            // We can't set this as a trailing comment of the function declaration because it
+            // will then move behind the function block instead of sticking with the pass
+            // ```python
+            // if True:
+            //     def f():
+            //         pass  # a
+            // else:
+            //     pass
+            // ```
+            CommentPlacement::Default(comment)
+        } else {
+            CommentPlacement::trailing(preceding, comment)
+        }
     }
 }
 
@@ -602,14 +615,37 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    let expression_before_colon = match comment.enclosing_node() {
-        AnyNodeRef::StmtIf(ast::StmtIf { test: expr, .. })
-        | AnyNodeRef::StmtWhile(ast::StmtWhile { test: expr, .. })
+    // Mutable for the `StmtIf` special case where we might want to set this to the elif or else node
+    let mut enclosing_node = comment.enclosing_node();
+    let expression_before_colon = match enclosing_node {
+        AnyNodeRef::StmtIf(ast::StmtIf {
+            test,
+            elif_else_clauses,
+            ..
+        }) => {
+            // The default enclosing node is always the entire if statement, but comments can also
+            // be after an `elif`, in which case we update the enclosing node. This is special for
+            // if statements because normally alternate branches don't have their own nodes
+            let (node, inner_test) = elif_else_clauses
+                .iter()
+                .find_map(|clause| {
+                    if clause.range().contains(comment.slice().start()) {
+                        if let Some(test) = &clause.test {
+                            return Some((clause.into(), test));
+                        }
+                    }
+                    None
+                })
+                // If there's no matching elif or else, use the original if
+                .unwrap_or((enclosing_node, test.as_ref()));
+            enclosing_node = node;
+            Some(AnyNodeRef::from(inner_test))
+        }
+        AnyNodeRef::StmtWhile(ast::StmtWhile { test: expr, .. })
         | AnyNodeRef::StmtFor(ast::StmtFor { iter: expr, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { iter: expr, .. }) => {
             Some(AnyNodeRef::from(expr.as_ref()))
         }
-
         AnyNodeRef::StmtWith(ast::StmtWith { items, .. })
         | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { items, .. }) => {
             items.last().map(AnyNodeRef::from)
@@ -652,7 +688,7 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
                         // while a: # comment
                         //      ...
                         // ```
-                        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+                        return CommentPlacement::dangling(enclosing_node, comment);
                     }
 
                     // Comment comes before the colon
@@ -1174,8 +1210,19 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
             body, ..
         }) => body,
 
-        AnyNodeRef::StmtIf(ast::StmtIf { body, orelse, .. })
-        | AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+        AnyNodeRef::StmtIf(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            if let Some(last) = elif_else_clauses.last() {
+                &last.body
+            } else {
+                body
+            }
+        }
+
+        AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
             if orelse.is_empty() {
@@ -1231,8 +1278,26 @@ fn is_first_statement_in_enclosing_alternate_body(
     enclosing: AnyNodeRef,
 ) -> bool {
     match enclosing {
-        AnyNodeRef::StmtIf(ast::StmtIf { orelse, .. })
-        | AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
+        AnyNodeRef::StmtIf(ast::StmtIf {
+            elif_else_clauses, ..
+        }) => {
+            for clause in elif_else_clauses {
+                if let Some(test) = &clause.test {
+                    // `elif`, the following node is the test
+                    if following.ptr_eq(test.into()) {
+                        return true;
+                    }
+                } else {
+                    // `else`, there is no test and the following node is the first entry in the
+                    // body
+                    if following.ptr_eq(clause.body.first().unwrap().into()) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
             are_same_optional(following, orelse.first())

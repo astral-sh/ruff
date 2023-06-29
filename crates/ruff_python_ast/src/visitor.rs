@@ -219,12 +219,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         Stmt::If(ast::StmtIf {
             test,
             body,
-            orelse,
+            elif_else_clauses,
             range: _range,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            for clause in elif_else_clauses {
+                visitor.visit_body(&clause.body);
+            }
         }
         Stmt::With(ast::StmtWith { items, body, .. }) => {
             for with_item in items {

@@ -24,8 +24,8 @@ expression: comments.debug(test_case.source_code)
         ],
     },
     Node {
-        kind: StmtIf,
-        range: 104..192,
+        kind: ElifElseClause,
+        range: 104..124,
         source: `elif x < y:⏎`,
     }: {
         "leading": [
@@ -35,13 +35,7 @@ expression: comments.debug(test_case.source_code)
                 formatted: false,
             },
         ],
-        "dangling": [
-            SourceComment {
-                text: "# Leading else comment",
-                position: OwnLine,
-                formatted: false,
-            },
-        ],
+        "dangling": [],
         "trailing": [],
     },
     Node {
@@ -58,6 +52,21 @@ expression: comments.debug(test_case.source_code)
                 formatted: false,
             },
         ],
+    },
+    Node {
+        kind: ElifElseClause,
+        range: 188..192,
+        source: `pass`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# Leading else comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
     },
     Node {
         kind: StmtPass,
