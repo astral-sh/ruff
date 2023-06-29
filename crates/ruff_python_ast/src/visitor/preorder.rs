@@ -286,12 +286,17 @@ where
         Stmt::If(ast::StmtIf {
             test,
             body,
-            orelse,
+            elif_else_clauses,
             range: _range,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            for clause in elif_else_clauses {
+                if let Some(test) = &clause.test {
+                    visitor.visit_expr(test);
+                }
+                visitor.visit_body(&clause.body);
+            }
         }
 
         Stmt::With(ast::StmtWith {

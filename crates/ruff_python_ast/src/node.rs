@@ -98,6 +98,7 @@ pub enum AnyNode {
     WithItem(WithItem),
     MatchCase(MatchCase),
     Decorator(Decorator),
+    ElifElseClause(ast::ElifElseClause),
 }
 
 impl AnyNode {
@@ -180,7 +181,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -263,7 +265,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -346,7 +349,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -429,7 +433,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -512,7 +517,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -595,7 +601,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -702,6 +709,7 @@ impl AnyNode {
             Self::WithItem(node) => AnyNodeRef::WithItem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
             Self::Decorator(node) => AnyNodeRef::Decorator(node),
+            Self::ElifElseClause(node) => AnyNodeRef::ElifElseClause(node),
         }
     }
 
@@ -1145,6 +1153,34 @@ impl AstNode for ast::StmtIf {
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
         if let AnyNodeRef::StmtIf(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+impl AstNode for ast::ElifElseClause {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ElifElseClause(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ElifElseClause(node) = kind {
             Some(node)
         } else {
             None
@@ -3076,6 +3112,12 @@ impl From<ast::StmtIf> for AnyNode {
     }
 }
 
+impl From<ast::ElifElseClause> for AnyNode {
+    fn from(node: ast::ElifElseClause) -> Self {
+        AnyNode::ElifElseClause(node)
+    }
+}
+
 impl From<ast::StmtWith> for AnyNode {
     fn from(node: ast::StmtWith) -> Self {
         AnyNode::StmtWith(node)
@@ -3514,6 +3556,7 @@ impl Ranged for AnyNode {
             AnyNode::WithItem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
             AnyNode::Decorator(node) => node.range(),
+            AnyNode::ElifElseClause(node) => node.range(),
         }
     }
 }
@@ -3597,6 +3640,7 @@ pub enum AnyNodeRef<'a> {
     WithItem(&'a WithItem),
     MatchCase(&'a MatchCase),
     Decorator(&'a Decorator),
+    ElifElseClause(&'a ast::ElifElseClause),
 }
 
 impl AnyNodeRef<'_> {
@@ -3679,6 +3723,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
         }
     }
 
@@ -3767,6 +3812,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
             AnyNodeRef::Decorator(_) => NodeKind::Decorator,
+            AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
         }
     }
 
@@ -3849,7 +3895,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -3932,7 +3979,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4015,7 +4063,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4098,7 +4147,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4181,7 +4231,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4264,7 +4315,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4380,6 +4432,12 @@ impl<'a> From<&'a ast::StmtWhile> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtIf> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtIf) -> Self {
         AnyNodeRef::StmtIf(node)
+    }
+}
+
+impl<'a> From<&'a ast::ElifElseClause> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ElifElseClause) -> Self {
+        AnyNodeRef::ElifElseClause(node)
     }
 }
 
@@ -4934,6 +4992,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::WithItem(node) => node.range(),
             AnyNodeRef::MatchCase(node) => node.range(),
             AnyNodeRef::Decorator(node) => node.range(),
+            AnyNodeRef::ElifElseClause(node) => node.range(),
         }
     }
 }
@@ -5017,4 +5076,5 @@ pub enum NodeKind {
     WithItem,
     MatchCase,
     Decorator,
+    ElifElseClause,
 }

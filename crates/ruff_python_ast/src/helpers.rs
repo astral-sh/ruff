@@ -437,9 +437,15 @@ where
         Stmt::If(ast::StmtIf {
             test,
             body,
-            orelse,
+            elif_else_clauses,
             range: _range,
-        }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
+        }) => {
+            any_over_expr(test, func)
+                || any_over_body(body, func)
+                || elif_else_clauses
+                    .iter()
+                    .any(|clause| any_over_body(&clause.body, func))
+        }
         Stmt::With(ast::StmtWith { items, body, .. })
         | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
             items.iter().any(|with_item| {
@@ -944,9 +950,15 @@ where
             | Stmt::AsyncFunctionDef(_)
             | Stmt::Try(_)
             | Stmt::TryStar(_) => {}
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 walk_body(self, body);
-                walk_body(self, orelse);
+                for clause in elif_else_clauses {
+                    walk_body(self, &clause.body);
+                }
             }
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
@@ -1064,22 +1076,16 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
 }
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(stmt: &ast::StmtIf, locator: &Locator) -> Option<TextRange> {
-    let ast::StmtIf { body, orelse, .. } = stmt;
-
-    let start = body.last().expect("Expected body to be non-empty").end();
-
-    let end = match &orelse[..] {
-        [Stmt::If(ast::StmtIf { test, .. })] => test.start(),
-        [stmt, ..] => stmt.start(),
-        _ => return None,
-    };
-
-    let contents = &locator.contents()[TextRange::new(start, end)];
-    lexer::lex_starts_at(contents, Mode::Module, start)
+pub fn elif_else_range(stmt: &ast::ElifElseClause, locator: &Locator) -> Option<TextRange> {
+    let contents = &locator.contents()[stmt.range];
+    let token = lexer::lex_starts_at(contents, Mode::Module, stmt.range.start())
         .flatten()
-        .find(|(kind, _)| matches!(kind, Tok::Elif | Tok::Else))
-        .map(|(_, range)| range)
+        .next()?;
+    if matches!(token.0, Tok::Elif | Tok::Else) {
+        Some(token.1)
+    } else {
+        None
+    }
 }
 
 /// Given an offset at the end of a line (including newlines), return the offset of the
