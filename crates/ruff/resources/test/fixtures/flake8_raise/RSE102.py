@@ -32,3 +32,9 @@ raise TypeError(
 raise AssertionError
 
 raise AttributeError("test message")
+
+
+def return_error():
+    return ValueError("Something")
+
+raise return_error()

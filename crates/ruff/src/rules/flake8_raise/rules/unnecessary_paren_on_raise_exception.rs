@@ -52,6 +52,18 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
         range: _,
     }) = expr
     {
+        let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+            return;
+        };
+
+        let scope = checker.semantic().scope();
+        if let Some(binding_id) = scope.get(id) {
+            let binding = checker.semantic().binding(binding_id);
+            if binding.kind.is_function_definition() {
+                return;
+            }
+        }
+
         if args.is_empty() && keywords.is_empty() {
             let range = match_parens(func.end(), checker.locator)
                 .expect("Expected call to include parentheses");
