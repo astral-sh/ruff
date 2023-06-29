@@ -39,6 +39,30 @@ struct RelationVisitor<'a> {
 }
 
 impl<'a> RelationVisitor<'a> {
+    fn enter_scope(&mut self) -> Relation<'a> {
+        std::mem::take(&mut self.relation)
+    }
+
+    fn exit_scope(&mut self, relation: Relation<'a>) -> Relation<'a> {
+        std::mem::replace(&mut self.relation, relation)
+    }
+
+    fn enter_deferred(&mut self) -> bool {
+        std::mem::replace(&mut self.is_deferred, true)
+    }
+
+    fn exit_deferred(&mut self, is_deferred: bool) -> bool {
+        std::mem::replace(&mut self.is_deferred, is_deferred)
+    }
+
+    fn enter_expr_context_inverted(&mut self) -> bool {
+        std::mem::replace(&mut self.is_expr_context_inverted, true)
+    }
+
+    fn exit_expr_context_inverted(&mut self, is_expr_context_inverted: bool) -> bool {
+        std::mem::replace(&mut self.is_expr_context_inverted, is_expr_context_inverted)
+    }
+
     fn insert_requirement(&mut self, requirement: Requirement<'a>) {
         self.relation.requirements.insert(requirement);
     }
@@ -53,13 +77,8 @@ impl<'a> RelationVisitor<'a> {
         self.relation.unbindings.insert(binding);
     }
 
-    fn insert_deferred_requirements(
-        &mut self,
-        requirements: IndexSet<Requirement<'a>>,
-        bindings: IndexSet<&'a str>,
-        unbindings: IndexSet<&'a str>,
-    ) {
-        for mut requirement in requirements {
+    fn insert_deferred_relation(&mut self, relation: Relation<'a>) {
+        for mut requirement in relation.requirements {
             match requirement.context {
                 RequirementContext::Global => {
                     self.insert_requirement(requirement);
@@ -70,8 +89,8 @@ impl<'a> RelationVisitor<'a> {
                 }
                 RequirementContext::Local => {
                     if !self.relation.bindings.contains(requirement.name)
-                        && !bindings.contains(requirement.name)
-                        && !unbindings.contains(requirement.name)
+                        && !relation.bindings.contains(requirement.name)
+                        && !relation.unbindings.contains(requirement.name)
                     {
                         self.insert_requirement(requirement);
                     }
@@ -112,21 +131,17 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
 
                 self.insert_binding(name);
 
-                let requirements = std::mem::take(&mut self.relation.requirements);
-                let bindings = std::mem::take(&mut self.relation.bindings);
-                let unbindings = std::mem::take(&mut self.relation.unbindings);
-                let is_deferred = std::mem::replace(&mut self.is_deferred, true);
+                let relation = self.enter_scope();
+                let is_deferred = self.enter_deferred();
 
                 add_arguments_to_bindings(&mut self.relation.bindings, args);
 
                 self.visit_body(body);
 
-                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
-                let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
-                let unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
-                self.is_deferred = is_deferred;
+                let relation = self.exit_scope(relation);
+                self.exit_deferred(is_deferred);
 
-                self.insert_deferred_requirements(requirements, bindings, unbindings);
+                self.insert_deferred_relation(relation);
             }
             Stmt::ClassDef(StmtClassDef {
                 name,
@@ -153,24 +168,17 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                 let mut cumulative_bindings = HashSet::new();
 
                 for stmt in body {
-                    let requirements = std::mem::take(&mut self.relation.requirements);
-                    let bindings = std::mem::take(&mut self.relation.bindings);
-                    let unbindings = std::mem::take(&mut self.relation.unbindings);
+                    let relation = self.enter_scope();
 
                     self.visit_stmt(stmt);
 
-                    let requirements =
-                        std::mem::replace(&mut self.relation.requirements, requirements);
-                    let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
-                    let unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
+                    let relation = self.exit_scope(relation);
 
-                    if !unbindings.is_empty() {
-                        for unbinding in unbindings {
-                            cumulative_bindings.remove(unbinding);
-                        }
+                    for unbinding in relation.unbindings {
+                        cumulative_bindings.remove(unbinding);
                     }
 
-                    for requirement in requirements {
+                    for requirement in relation.requirements {
                         if requirement.is_deferred
                             || (!self.relation.bindings.contains(requirement.name)
                                 && !cumulative_bindings.contains(requirement.name)
@@ -180,7 +188,7 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
                         }
                     }
 
-                    cumulative_bindings.extend(bindings);
+                    cumulative_bindings.extend(relation.bindings);
                 }
             }
             Stmt::For(StmtFor {
@@ -392,21 +400,17 @@ impl<'a> Visitor<'a> for RelationVisitor<'a> {
             Expr::Lambda(ExprLambda { args, body, .. }) => {
                 self.visit_arguments(args);
 
-                let requirements = std::mem::take(&mut self.relation.requirements);
-                let bindings = std::mem::take(&mut self.relation.bindings);
-                let unbindings = std::mem::take(&mut self.relation.unbindings);
-                let is_deferred = std::mem::replace(&mut self.is_deferred, true);
+                let relation = self.enter_scope();
+                let is_deferred = self.enter_deferred();
 
                 add_arguments_to_bindings(&mut self.relation.bindings, args);
 
                 self.visit_expr(body);
 
-                let requirements = std::mem::replace(&mut self.relation.requirements, requirements);
-                let bindings = std::mem::replace(&mut self.relation.bindings, bindings);
-                let unbindings = std::mem::replace(&mut self.relation.unbindings, unbindings);
-                self.is_deferred = is_deferred;
+                let relation = self.exit_scope(relation);
+                self.exit_deferred(is_deferred);
 
-                self.insert_deferred_requirements(requirements, bindings, unbindings);
+                self.insert_deferred_relation(relation);
             }
             Expr::IfExp(ExprIfExp {
                 test, body, orelse, ..
