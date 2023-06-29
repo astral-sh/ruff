@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::{collect_arg_names, SimpleCallArgs};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -17,26 +17,6 @@ impl Violation for PytestPatchWithLambda {
         format!("Use `return_value=` instead of patching with `lambda`")
     }
 }
-
-const PATCH_NAMES: &[&str] = &[
-    "mocker.patch",
-    "class_mocker.patch",
-    "module_mocker.patch",
-    "package_mocker.patch",
-    "session_mocker.patch",
-    "mock.patch",
-    "unittest.mock.patch",
-];
-
-const PATCH_OBJECT_NAMES: &[&str] = &[
-    "mocker.patch.object",
-    "class_mocker.patch.object",
-    "module_mocker.patch.object",
-    "package_mocker.patch.object",
-    "session_mocker.patch.object",
-    "mock.patch.object",
-    "unittest.mock.patch.object",
-];
 
 #[derive(Default)]
 /// Visitor that checks references the argument names in the lambda body.
@@ -98,14 +78,35 @@ pub(crate) fn patch_with_lambda(
     args: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Diagnostic> {
-    if let Some(call_path) = compose_call_path(call) {
-        if PATCH_NAMES.contains(&call_path.as_str()) {
-            check_patch_call(call, args, keywords, 1)
-        } else if PATCH_OBJECT_NAMES.contains(&call_path.as_str()) {
-            check_patch_call(call, args, keywords, 2)
-        } else {
-            None
-        }
+    let call_path = collect_call_path(call)?;
+
+    if matches!(
+        call_path.as_slice(),
+        [
+            "mocker"
+                | "class_mocker"
+                | "module_mocker"
+                | "package_mocker"
+                | "session_mocker"
+                | "mock",
+            "patch"
+        ] | ["unittest", "mock", "patch"]
+    ) {
+        check_patch_call(call, args, keywords, 1)
+    } else if matches!(
+        call_path.as_slice(),
+        [
+            "mocker"
+                | "class_mocker"
+                | "module_mocker"
+                | "package_mocker"
+                | "session_mocker"
+                | "mock",
+            "patch",
+            "object"
+        ] | ["unittest", "mock", "patch", "object"]
+    ) {
+        check_patch_call(call, args, keywords, 2)
     } else {
         None
     }

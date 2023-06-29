@@ -119,7 +119,12 @@ impl AlwaysAutofixableViolation for DoubleNegation {
     }
 }
 
-const DUNDER_METHODS: &[&str] = &["__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"];
+fn is_dunder_method(name: &str) -> bool {
+    matches!(
+        name,
+        "__eq__" | "__ne__" | "__lt__" | "__le__" | "__gt__" | "__ge__"
+    )
+}
 
 fn is_exception_check(stmt: &Stmt) -> bool {
     let Stmt::If(ast::StmtIf {test: _, body, orelse: _, range: _ })= stmt else {
@@ -159,7 +164,7 @@ pub(crate) fn negation_with_equal_op(
     | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
         &checker.semantic().scope().kind
     {
-        if DUNDER_METHODS.contains(&name.as_str()) {
+        if is_dunder_method(name) {
             return;
         }
     }
@@ -211,7 +216,7 @@ pub(crate) fn negation_with_not_equal_op(
     | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
         &checker.semantic().scope().kind
     {
-        if DUNDER_METHODS.contains(&name.as_str()) {
+        if is_dunder_method(name) {
             return;
         }
     }

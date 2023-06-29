@@ -94,15 +94,13 @@ impl Violation for DeprecatedImport {
     }
 }
 
-// A list of modules that may involve import rewrites.
-const RELEVANT_MODULES: &[&str] = &[
-    "collections",
-    "pipes",
-    "mypy_extensions",
-    "typing_extensions",
-    "typing",
-    "typing.re",
-];
+/// Returns `true` if the module may contain deprecated imports.
+fn is_relevant_module(module: &str) -> bool {
+    matches!(
+        module,
+        "collections" | "pipes" | "mypy_extensions" | "typing_extensions" | "typing" | "typing.re"
+    )
+}
 
 // Members of `collections` that were moved to `collections.abc`.
 const COLLECTIONS_TO_ABC: &[&str] = &[
@@ -560,7 +558,7 @@ pub(crate) fn deprecated_import(
         return;
     };
 
-    if !RELEVANT_MODULES.contains(&module) {
+    if !is_relevant_module(module) {
         return;
     }
 
