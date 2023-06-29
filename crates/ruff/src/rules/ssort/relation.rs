@@ -2738,6 +2738,34 @@ mod tests {
     }
 
     #[test]
+    fn with_with_del_in_body() {
+        let stmt = parse(
+            r#"
+                with a:
+                    del b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["b"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn async_with() {
         let stmt = parse(
             r#"
@@ -2830,6 +2858,34 @@ mod tests {
                 },
                 Requirement {
                     name: "e",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn async_with_with_del_in_body() {
+        let stmt = parse(
+            r#"
+                async with a:
+                    del b
+            "#,
+        );
+        let relation = stmt_relation(&stmt);
+        assert_eq!(Vec::from_iter(relation.bindings), [] as [&str; 0]);
+        assert_eq!(Vec::from_iter(relation.unbindings), ["b"]);
+        assert_eq!(
+            Vec::from_iter(relation.requirements),
+            [
+                Requirement {
+                    name: "a",
+                    is_deferred: false,
+                    context: RequirementContext::Local
+                },
+                Requirement {
+                    name: "b",
                     is_deferred: false,
                     context: RequirementContext::Local
                 },
