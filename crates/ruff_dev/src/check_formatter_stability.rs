@@ -2,17 +2,7 @@
 //! known as formatter stability or formatter idempotency, and that the formatter prints
 //! syntactically valid code. As our test cases cover only a limited amount of code, this allows
 //! checking entire repositories.
-#![allow(clippy::print_stdout)]
 
-use anyhow::{bail, Context};
-use clap::Parser;
-use log::debug;
-use ruff::resolver::python_files_in_path;
-use ruff::settings::types::{FilePattern, FilePatternSet};
-use ruff_cli::args::CheckArgs;
-use ruff_cli::resolve::resolve;
-use ruff_python_formatter::{format_module, PyFormatOptions};
-use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::io::stdout;
 use std::io::Write;
@@ -22,6 +12,17 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use std::{fmt, fs, iter};
+
+use anyhow::{bail, Context};
+use clap::Parser;
+use log::debug;
+use similar::{ChangeTag, TextDiff};
+
+use ruff::resolver::python_files_in_path;
+use ruff::settings::types::{FilePattern, FilePatternSet};
+use ruff_cli::args::CheckArgs;
+use ruff_cli::resolve::resolve;
+use ruff_python_formatter::{format_module, PyFormatOptions};
 
 /// Control the verbosity of the output
 #[derive(Copy, Clone, PartialEq, Eq, clap::ValueEnum, Default)]
@@ -65,7 +66,10 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     } else {
         let result = check_repo(args)?;
 
-        print!("{}", result.display(args.format));
+        #[allow(clippy::print_stdout)]
+        {
+            print!("{}", result.display(args.format));
+        }
 
         result.is_success()
     };
@@ -102,11 +106,12 @@ fn check_multi_project(args: &Args) -> bool {
         for base_dir in &args.files {
             for dir in base_dir.read_dir().unwrap() {
                 let path = dir.unwrap().path().clone();
-                sender.send(Message::Start { path: path.clone() }).unwrap();
 
                 let sender = sender.clone();
 
                 scope.spawn(move |_| {
+                    sender.send(Message::Start { path: path.clone() }).unwrap();
+
                     match check_repo(&Args {
                         files: vec![path.clone()],
                         ..*args
@@ -150,8 +155,11 @@ fn check_multi_project(args: &Args) -> bool {
 
     let duration = start.elapsed();
 
-    println!("{total_errors} stability errors in {total_files} files");
-    println!("Finished in {}s", duration.as_secs_f32());
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{total_errors} stability errors in {total_files} files");
+        println!("Finished in {}s", duration.as_secs_f32());
+    }
 
     all_success
 }
@@ -202,8 +210,14 @@ fn check_repo(args: &Args) -> anyhow::Result<CheckRepoResult> {
             let result = match catch_unwind(|| check_file(&file)) {
                 Ok(result) => result,
                 Err(panic) => {
-                    if let Ok(message) = panic.downcast::<String>() {
-                        Err(FormatterStabilityError::Panic { message: *message })
+                    if let Some(message) = panic.downcast_ref::<String>() {
+                        Err(FormatterStabilityError::Panic {
+                            message: message.clone(),
+                        })
+                    } else if let Some(&message) = panic.downcast_ref::<&str>() {
+                        Err(FormatterStabilityError::Panic {
+                            message: message.to_string(),
+                        })
                     } else {
                         Err(FormatterStabilityError::Panic {
                             // This should not happen, but it can
