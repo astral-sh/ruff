@@ -1,0 +1,23 @@
+import sys
+
+if sys.version_info == "1": # OK
+  ...
+
+if sys.platform <= "2": # OK
+  ...
+
+if sys.prefix == "1": # OK
+  ...
+
+import some_module
+if some_module.platform == "3": # OK
+  ...
+
+if sys.version == "1" or sys.version_info == "2": # OK
+  ...
+
+if sum([2,3]) > 4: # OK
+  ...
+
+if bool(True): # OK
+  ...

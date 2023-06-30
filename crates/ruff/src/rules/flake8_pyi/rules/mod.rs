@@ -1,6 +1,7 @@
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_version_info_comparison::*;
 pub(crate) use collections_named_tuple::*;
+pub(crate) use complex_if_test_in_stubs::*;
 pub(crate) use docstring_in_stubs::*;
 pub(crate) use duplicate_union_member::*;
 pub(crate) use ellipsis_in_non_empty_class_body::*;
@@ -26,6 +27,7 @@ pub(crate) use unrecognized_platform::*;
 mod any_eq_ne_annotation;
 mod bad_version_info_comparison;
 mod collections_named_tuple;
+mod complex_if_test_in_stubs;
 mod docstring_in_stubs;
 mod duplicate_union_member;
 mod ellipsis_in_non_empty_class_body;

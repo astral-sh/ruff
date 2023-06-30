@@ -1370,6 +1370,11 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.is_stub {
+                    if self.enabled(Rule::ComplexIfTestInStubs) {
+                        flake8_pyi::rules::complex_if_test_in_stubs(self, test);
+                    }
+                }
             }
             Stmt::Assert(ast::StmtAssert {
                 test,
