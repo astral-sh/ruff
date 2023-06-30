@@ -164,26 +164,6 @@ fn check_body(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-/// Search the `elif_else_clauses` of an if-condition for raises.
-fn check_elif_else_clauses(checker: &mut Checker, elif_else_clauses: &[ElifElseClause]) {
-    for clause in elif_else_clauses {
-        let Some(test) = &clause.test else {
-            continue;
-        };
-        if !check_type_check_test(checker, test) {
-            continue;
-        }
-        for item in &clause.body {
-            if has_control_flow(item) {
-                return;
-            }
-            if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
-                check_raise(checker, exc, item);
-            }
-        }
-    }
-}
-
 /// TRY004
 pub(crate) fn type_check_without_type_error(
     checker: &mut Checker,
@@ -199,8 +179,27 @@ pub(crate) fn type_check_without_type_error(
     }
 
     // Only consider the body when the `if` condition is all type-related
-    if check_type_check_test(checker, test) {
-        check_body(checker, body);
-        check_elif_else_clauses(checker, elif_else_clauses);
+    if !check_type_check_test(checker, test) {
+        return;
+    }
+    check_body(checker, body);
+
+    for clause in elif_else_clauses {
+        if let Some(test) = &clause.test {
+            // If there are any `elif`, they must all also be type-related
+            if !check_type_check_test(checker, test) {
+                return;
+            }
+        }
+
+        // The `elif` or `else` body must raise the wrong exception
+        for item in &clause.body {
+            if has_control_flow(item) {
+                return;
+            }
+            if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
+                check_raise(checker, exc, item);
+            }
+        }
     }
 }

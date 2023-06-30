@@ -230,6 +230,15 @@ def incorrect_multi_conditional(arg1, arg2):
         raise Exception("...")  # should be typeerror
 
 
+def multiple_is_instance_checks(some_arg):
+    if isinstance(some_arg, str):
+        pass
+    elif isinstance(some_arg, int):
+        pass
+    else:
+        raise Exception("...")   # should be typeerror
+
+
 class MyCustomTypeValidation(Exception):
     pass
 
