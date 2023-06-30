@@ -127,12 +127,11 @@ SIM114.py:38:1: SIM114 Combine `if` branches using logical `or` operator
 58 |   if result.eofs == "O":
    |
 
-SIM114.py:62:6: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:62:1: SIM114 Combine `if` branches using logical `or` operator
    |
 60 |   elif result.eofs == "S":
 61 |       skipped = 1
-62 |   elif result.eofs == "F":
-   |  ______^
+62 | / elif result.eofs == "F":
 63 | |     errors = 1
 64 | | elif result.eofs == "E":
 65 | |     errors = 1

@@ -94,3 +94,10 @@ if result.eofs == "F":
     errors = 1
 else:
     errors = 1
+
+if a:
+    # Ignore branches with diverging comments because it means we're repeating
+    # the bodies because we have different reasons for each branch
+    x = 1
+elif c:
+    x = 1

@@ -12,6 +12,7 @@ use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, Comparable
 use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
+use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
@@ -26,16 +27,6 @@ fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
 
 fn compare_stmt(stmt1: &ComparableStmt, stmt2: &ComparableStmt) -> bool {
     stmt1.eq(stmt2)
-}
-
-fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
-    if body1.len() != body2.len() {
-        return false;
-    }
-    body1
-        .iter()
-        .zip(body2.iter())
-        .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
 }
 
 /// ## What it does
@@ -685,36 +676,63 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     checker.diagnostics.push(diagnostic);
 }
 
-/// Ignore else
-fn elif_iter(clauses: &[ElifElseClause]) -> impl Iterator<Item = (&Expr, &[Stmt])> {
-    clauses
-        .iter()
-        .filter_map(|clause| Some((clause.test.as_ref()?, clause.body.as_slice())))
-}
-
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        range: _,
-    }) = stmt
-    else {
+pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt: &Stmt) {
+    let Stmt::If(ast::StmtIf { body, elif_else_clauses, .. }) = stmt else {
         return;
     };
 
-    // Check adjacent if or elif branches, ignoring else
-    let first_iter =
-        iter::once((test.as_ref(), body.as_slice())).chain(elif_iter(elif_else_clauses));
-    let second_iter = elif_iter(elif_else_clauses);
-    for ((first_test, first_body), (_second_test, second_body)) in first_iter.zip(second_iter) {
-        if compare_body(first_body, second_body) {
-            checker.diagnostics.push(Diagnostic::new(
-                IfWithSameArms,
-                TextRange::new(first_test.start(), second_body.last().unwrap().end()),
-            ));
+    // Check adjacent `if` or `elif` branches, ignore `else`
+    let mut branches_iter = iter::once((stmt.start(), body.as_slice()))
+        .chain(
+            elif_else_clauses
+                .iter()
+                .filter(|clause| clause.test.is_some())
+                .map(|clause| (clause.start(), clause.body.as_slice())),
+        )
+        .peekable();
+
+    while let Some((first_start, first_body)) = branches_iter.next() {
+        let Some((second_start, second_body)) = branches_iter.peek() else {
+            continue
+        };
+
+        // The bodies must have the same code ...
+        if first_body.len() != second_body.len() {
+            continue;
         }
+        if !first_body
+            .iter()
+            .zip(second_body.iter())
+            .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
+        {
+            continue;
+        }
+
+        // ...and the same statements
+        // TODO(konstin): Don't we have any helper to extract the comments in a specific range?
+        let comments_in_range = |range: TextRange| {
+            checker
+                .indexer
+                .comment_ranges()
+                .iter()
+                .filter(|comment_range| range.contains(comment_range.start()))
+                .map(|comment_range| locator.slice(*comment_range))
+                .collect()
+        };
+
+        let first_range = TextRange::new(first_start, first_body.last().unwrap().end());
+        let first_comments: Vec<_> = comments_in_range(first_range);
+        let second_range = TextRange::new(*second_start, second_body.last().unwrap().end());
+        let second_comments: Vec<_> = comments_in_range(second_range);
+        if first_comments != second_comments {
+            continue;
+        }
+
+        checker.diagnostics.push(Diagnostic::new(
+            IfWithSameArms,
+            TextRange::new(first_start, second_body.last().unwrap().end()),
+        ));
     }
 }
 

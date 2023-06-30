@@ -1309,7 +1309,7 @@ where
                     );
                 }
                 if self.enabled(Rule::IfWithSameArms) {
-                    flake8_simplify::rules::if_with_same_arms(self, stmt);
+                    flake8_simplify::rules::if_with_same_arms(self, self.locator, stmt);
                 }
                 if self.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
