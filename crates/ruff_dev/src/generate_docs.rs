@@ -25,7 +25,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
     for rule in Rule::iter() {
         if let Some(explanation) = rule.explanation() {
             let mut output = String::new();
-            output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
+            output.push_str(&format!("# (`{}`) {}", rule.noqa_code(), rule.as_ref()));
             output.push('\n');
             output.push('\n');
 
