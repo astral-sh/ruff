@@ -456,12 +456,13 @@ fn normalize_string(input: &str, quotes: StringQuotes) -> (Cow<str>, ContainsNew
             }
 
             last_index = index + '\r'.len_utf8();
-            newlines = ContainsNewlines::Yes
+            newlines = ContainsNewlines::Yes;
         } else if c == '\n' {
-            newlines = ContainsNewlines::Yes
+            newlines = ContainsNewlines::Yes;
         } else if !quotes.triple {
             if c == '\\' {
                 if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
+                    #[allow(clippy::if_same_then_else)]
                     if next == opposite_quote {
                         // Remove the escape by ending before the backslash and starting again with the quote
                         chars.next();
@@ -471,6 +472,7 @@ fn normalize_string(input: &str, quotes: StringQuotes) -> (Cow<str>, ContainsNew
                         // Quote is already escaped, skip over it.
                         chars.next();
                     } else if next == '\\' {
+                        // Skip over escaped backslashes
                         chars.next();
                     }
                 }
