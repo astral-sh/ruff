@@ -1,25 +1,31 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-F634.py:1:1: F634 If test is a tuple, which is always `True`
+F634.py:1:4: F634 If test is a tuple, which is always `True`
   |
-1 | / if (1, 2):
-2 | |     pass
-  | |________^ F634
-3 |   
-4 |   for _ in range(5):
+1 | if (1, 2):
+  |    ^^^^^^ F634
+2 |     pass
   |
 
-F634.py:7:5: F634 If test is a tuple, which is always `True`
+F634.py:4:4: F634 If test is a tuple, which is always `True`
+  |
+2 |     pass
+3 | 
+4 | if (3, 4):
+  |    ^^^^^^ F634
+5 |     pass
+6 | elif foo:
+  |
+
+F634.py:12:10: F634 If test is a tuple, which is always `True`
    |
- 5 |       if True:
- 6 |           pass
- 7 |       elif (3, 4):
-   |  _____^
- 8 | |         pass
- 9 | |     elif ():
-10 | |         pass
-   | |____________^ F634
+10 |     if True:
+11 |         pass
+12 |     elif (3, 4):
+   |          ^^^^^^ F634
+13 |         pass
+14 |     elif ():
    |
 
 

@@ -1,4 +1,5 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, ElifElseClause, Expr, Ranged};
+use std::iter;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,12 +38,26 @@ impl Violation for IfTuple {
 }
 
 /// F634
-pub(crate) fn if_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &test {
-        if !elts.is_empty() {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(IfTuple, stmt.range()));
+pub(crate) fn if_tuple(
+    checker: &mut Checker,
+    if_test: &Expr,
+    elif_else_clauses: &[ElifElseClause],
+) {
+    // Check the `if` and all `elif` tests
+    let if_elif_tests = iter::once(if_test).chain(
+        elif_else_clauses
+            .iter()
+            .filter_map(|clause| clause.test.as_ref()),
+    );
+    for test in if_elif_tests {
+        let Expr::Tuple(ast::ExprTuple { elts, .. }) = &test else {
+            continue
+        };
+        if elts.is_empty() {
+            continue;
         }
+        checker
+            .diagnostics
+            .push(Diagnostic::new(IfTuple, test.range()));
     }
 }
