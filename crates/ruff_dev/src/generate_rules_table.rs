@@ -52,7 +52,7 @@ pub(crate) fn generate() -> String {
                 .join(", "),
             prefix => prefix.to_string(),
         };
-        table_out.push_str(&format!("### {} ({codes_csv})", linter.name()));
+        table_out.push_str(&format!("### (`{codes_csv}`) {}", linter.name()));
         table_out.push('\n');
         table_out.push('\n');
 
@@ -96,7 +96,7 @@ pub(crate) fn generate() -> String {
         if let Some(categories) = linter.upstream_categories() {
             for UpstreamCategory(prefix, name) in categories {
                 table_out.push_str(&format!(
-                    "#### {name} ({}{})",
+                    "#### (`{}{}`) {name}",
                     linter.common_prefix(),
                     prefix.short_code()
                 ));
