@@ -25,7 +25,7 @@ pub(crate) fn complex_if_test_in_stubs(checker: &mut Checker, test: &Expr) {
             {
                 if matches!(
                     attribute_call_path.as_slice(),
-                    ["sys", "platform"] | ["sys", "version_info"]
+                    ["sys", "platform" | "version_info"]
                 ) {
                     return;
                 }
