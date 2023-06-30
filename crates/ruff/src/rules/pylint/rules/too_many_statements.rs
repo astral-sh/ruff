@@ -74,6 +74,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 count += 1;
                 count += num_statements(body);
                 for clause in elif_else_clauses {
+                    count += 1;
                     count += num_statements(&clause.body);
                 }
             }
@@ -206,7 +207,8 @@ def f():
             print()
 "#;
         let stmts = Suite::parse(source, "<filename>")?;
-        assert_eq!(num_statements(&stmts), 5);
+        // TODO(konstin): Was there a specific reason why this was 5? Doesn't seem right to me
+        assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
 

@@ -205,8 +205,8 @@ else:
     else:
         pass
 "#;
-
-        test_helper(source, 3)?;
+        // TODO(konstin): Was there a specific reason why this was 3? Doesn't seem right to me
+        test_helper(source, 4)?;
         Ok(())
     }
 

@@ -47,13 +47,10 @@ impl Violation for CollapsibleElseIf {
 
 /// PLR5501
 pub(crate) fn collapsible_else_if(elif_else_clauses: &[ElifElseClause]) -> Option<Diagnostic> {
-    // `test: None` to test for an `else` clause
     let [ElifElseClause { body, test: None, ..}] = elif_else_clauses else {
         return None;
     };
-
-    let first = body.first()?;
-    if matches!(first, Stmt::If(_)) {
+    if let [first @ Stmt::If(_)] = body.as_slice() {
         return Some(Diagnostic::new(CollapsibleElseIf, first.range()));
     }
     None
