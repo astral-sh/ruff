@@ -462,19 +462,42 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 /// SIM103
 pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let Stmt::If(ast::StmtIf {
-        test,
-        body,
+        test: if_test,
+        body: if_body,
         elif_else_clauses,
         range: _,
     }) = stmt
     else {
         return;
     };
-    let [ElifElseClause { test: None, body: else_body, .. }] = elif_else_clauses.as_slice() else {
-        return;
+    // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
+    let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
+        // if-else case
+        [ElifElseClause {
+            body: else_body,
+            test: None,
+            ..
+        }] => (if_test.as_ref(), if_body, else_body, stmt.range()),
+        // elif-else case
+        [.., ElifElseClause {
+            body: elif_body,
+            test: Some(elif_test),
+            range: elif_range,
+        }, ElifElseClause {
+            body: else_body,
+            test: None,
+            range: else_range,
+        }] => (
+            elif_test,
+            elif_body,
+            else_body,
+            TextRange::new(elif_range.start(), else_range.end()),
+        ),
+        _ => return,
     };
+
     let (Some(if_return), Some(else_return)) = (
-        is_one_line_return_bool(body),
+        is_one_line_return_bool(if_body),
         is_one_line_return_bool(else_body),
     ) else {
         return;
@@ -486,23 +509,23 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    let condition = checker.generator().expr(test);
-    let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
+    let condition = checker.generator().expr(if_test);
+    let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, range);
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
-            && !has_comments(stmt, checker.locator)
-            && (test.is_compare_expr() || checker.semantic().is_builtin("bool"))
+            && !has_comments(&range, checker.locator)
+            && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
-            if test.is_compare_expr() {
+            if if_test.is_compare_expr() {
                 // If the condition is a comparison, we can replace it with the condition.
                 let node = ast::StmtReturn {
-                    value: Some(test.clone()),
+                    value: Some(Box::new(if_test.clone())),
                     range: TextRange::default(),
                 };
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node.into()),
-                    stmt.range(),
+                    range,
                 )));
             } else {
                 // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
@@ -514,7 +537,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    args: vec![(**test).clone()],
+                    args: vec![if_test.clone()],
                     keywords: vec![],
                     range: TextRange::default(),
                 };
@@ -524,7 +547,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 };
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node2.into()),
-                    stmt.range(),
+                    range,
                 )));
             };
         }
