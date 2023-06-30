@@ -601,7 +601,8 @@ impl<'a> SemanticModel<'a> {
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
                     BindingKind::FromImport(FromImport { qualified_name }) => {
-                        if let Some((target_module, target_member)) = qualified_name.split_once('.')
+                        if let Some((target_module, target_member)) =
+                            qualified_name.rsplit_once('.')
                         {
                             if target_module == module && target_member == member {
                                 if let Some(source) = binding.source {
