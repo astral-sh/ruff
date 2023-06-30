@@ -1,13 +1,12 @@
 use std::cmp::Ordering;
+use std::iter;
 
 use num_bigint::{BigInt, Sign};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{self, CmpOp, Constant, ElifElseClause, Expr, Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::autofix::edits::delete_stmt;
@@ -61,96 +60,11 @@ impl AlwaysAutofixableViolation for OutdatedVersionBlock {
     }
 }
 
-/// The metadata for a version-comparison block.
-#[derive(Debug)]
-struct BlockMetadata {
-    /// The first `if` or `elif` token in the block, used to signal the start of the
-    /// version-comparison block.
-    leading_token: StartToken,
-    /// The first `elif` or `else` token following the start token, if any, used to signal the end
-    /// of the version-comparison block.
-    trailing_token: Option<EndToken>,
-}
-
 /// The set of tokens that can start a block, i.e., the first token in an `if` statement.
-#[derive(Debug)]
-enum StartTok {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum BranchKind {
     If,
     Elif,
-}
-
-impl StartTok {
-    fn from_tok(tok: &Tok) -> Option<Self> {
-        match tok {
-            Tok::If => Some(Self::If),
-            Tok::Elif => Some(Self::Elif),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct StartToken {
-    tok: StartTok,
-    range: TextRange,
-}
-
-/// The set of tokens that can end a block, i.e., the first token in the subsequent `elif` or `else`
-/// branch that follows an `if` or `elif` statement.
-#[derive(Debug)]
-enum EndTok {
-    Elif,
-    Else,
-}
-
-impl EndTok {
-    fn from_tok(tok: &Tok) -> Option<Self> {
-        match tok {
-            Tok::Elif => Some(Self::Elif),
-            Tok::Else => Some(Self::Else),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct EndToken {
-    tok: EndTok,
-    range: TextRange,
-}
-
-fn metadata<T>(locator: &Locator, located: &T, body: &[Stmt]) -> Option<BlockMetadata>
-where
-    T: Ranged,
-{
-    indentation(locator, located)?;
-
-    let mut iter = lexer::lex_starts_at(
-        locator.slice(located.range()),
-        Mode::Module,
-        located.start(),
-    )
-    .flatten();
-
-    // First the leading `if` or `elif` token.
-    let (tok, range) = iter.next()?;
-    let leading_token = StartToken {
-        tok: StartTok::from_tok(&tok)?,
-        range,
-    };
-
-    // Skip any tokens until we reach the end of the `if` body.
-    let body_end = body.last()?.range().end();
-
-    // Find the trailing `elif` or `else` token, if any.
-    let trailing_token = iter
-        .skip_while(|(_, range)| range.start() < body_end)
-        .find_map(|(tok, range)| EndTok::from_tok(&tok).map(|tok| EndToken { tok, range }));
-
-    Some(BlockMetadata {
-        leading_token,
-        trailing_token,
-    })
 }
 
 /// Converts a `BigInt` to a `u32`. If the number is negative, it will return 0.
@@ -207,79 +121,98 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
     }
 }
 
-/// Convert a [`Stmt::If`], retaining the `else`.
+/// For fixing, we have 4 cases:
+/// * Just an if: delete as statement (insert pass in parent if required)
+/// * If with an elif: delete, turn elif into if
+/// * If with an else: delete, dedent else
+/// * Just an elif: delete, `elif False` can always be removed
 fn fix_py2_block(
     checker: &Checker,
     stmt: &Stmt,
     elif_else_clauses: &[ElifElseClause],
-    block: &BlockMetadata,
+    branch_kind: BranchKind,
+    range: TextRange,
 ) -> Option<Fix> {
-    let leading_token = &block.leading_token;
-    let Some(trailing_token) = &block.trailing_token else {
-        // Delete the entire statement. If this is an `elif`, know it's the only child
-        // of its parent, so avoid passing in the parent at all. Otherwise,
-        // `delete_stmt` will erroneously include a `pass`.
-        let stmt = checker.semantic().stmt();
-        let parent = checker.semantic().stmt_parent();
-        let edit = delete_stmt(
-            stmt,
-            if matches!(block.leading_token.tok, StartTok::If) {
-                parent
-            } else {
-                None
-            },
-            checker.locator,
-            checker.indexer,
-        );
-        return Some(Fix::suggested(edit));
-    };
-
-    match (&leading_token.tok, &trailing_token.tok) {
-        // If we only have an `if` and an `else`, dedent the `else` block.
-        (StartTok::If, EndTok::Else) => {
-            // TODO(konstin): Check that we actually only have an else here?
-            let start = elif_else_clauses.first()?.body.first()?;
-            let end = elif_else_clauses.first()?.body.last()?;
-            if indentation(checker.locator, start).is_none() {
-                // Inline `else` block (e.g., `else: x = 1`).
-                Some(Fix::suggested(Edit::range_replacement(
-                    checker
-                        .locator
-                        .slice(TextRange::new(start.start(), end.end()))
-                        .to_string(),
-                    stmt.range(),
-                )))
-            } else {
-                indentation(checker.locator, stmt)
-                    .and_then(|indentation| {
-                        adjust_indentation(
-                            TextRange::new(checker.locator.line_start(start.start()), end.end()),
-                            indentation,
-                            checker.locator,
-                            checker.stylist,
-                        )
-                        .ok()
-                    })
-                    .map(|contents| {
-                        Fix::suggested(Edit::replacement(
-                            contents,
-                            checker.locator.line_start(stmt.start()),
-                            stmt.end(),
-                        ))
-                    })
+    match branch_kind {
+        BranchKind::If => match elif_else_clauses.first() {
+            // If we have a lone `if`, delete as statement (insert pass in parent if required)
+            None => {
+                let stmt = checker.semantic().stmt();
+                let parent = checker.semantic().stmt_parent();
+                let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
+                Some(Fix::suggested(edit))
             }
-        }
-        (StartTok::If, EndTok::Elif) => {
-            // If we have an `if` and an `elif`, turn the `elif` into an `if`.
-            let start_location = leading_token.range.start();
-            let end_location = trailing_token.range.start() + TextSize::from(2);
-            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
-        }
-        (StartTok::Elif, _) => {
-            // If we have an `elif`, delete up to the `else` or the end of the statement.
-            let start_location = leading_token.range.start();
-            let end_location = trailing_token.range.start();
-            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
+            // If we have an `if` and an `elif`, turn the `elif` into an `if`
+            Some(ElifElseClause {
+                test: Some(_),
+                range,
+                ..
+            }) => {
+                debug_assert!(
+                    &checker.locator.contents()[TextRange::at(range.start(), "elif".text_len())]
+                        == "elif"
+                );
+                let end_location = range.start() + ("elif".text_len() - "if".text_len());
+                Some(Fix::suggested(Edit::deletion(stmt.start(), end_location)))
+            }
+            // If we only have an `if` and an `else`, dedent the `else` block
+            Some(ElifElseClause { body, test: None.. }) => {
+                let start = body.first()?;
+                let end = body.last()?;
+                if indentation(checker.locator, start).is_none() {
+                    // Inline `else` block (e.g., `else: x = 1`).
+                    Some(Fix::suggested(Edit::range_replacement(
+                        checker
+                            .locator
+                            .slice(TextRange::new(start.start(), end.end()))
+                            .to_string(),
+                        stmt.range(),
+                    )))
+                } else {
+                    indentation(checker.locator, stmt)
+                        .and_then(|indentation| {
+                            adjust_indentation(
+                                TextRange::new(
+                                    checker.locator.line_start(start.start()),
+                                    end.end(),
+                                ),
+                                indentation,
+                                checker.locator,
+                                checker.stylist,
+                            )
+                            .ok()
+                        })
+                        .map(|contents| {
+                            Fix::suggested(Edit::replacement(
+                                contents,
+                                checker.locator.line_start(stmt.start()),
+                                stmt.end(),
+                            ))
+                        })
+                }
+            }
+        },
+        BranchKind::Elif => {
+            // The range of the `ElifElseClause` ends in the line of the last statement. To avoid
+            // inserting an empty line between the end of `if` branch and the beginning `elif` or
+            // `else` branch after the deleted branch we find the next branch after the current, if
+            // any, and delete to its start.
+            // ```python
+            //                         if cond:
+            //                             x = 1
+            //                         elif sys.version < (3.0):
+            //    delete from here ... ^   x = 2
+            //                         else:
+            // ... to here (exclusive) ^    x = 3
+            // ```
+            let next_start = elif_else_clauses
+                .iter()
+                .map(Ranged::start)
+                .find(|start| *start > range.start());
+            Some(Fix::suggested(Edit::deletion(
+                range.start(),
+                next_start.unwrap_or(range.end()),
+            )))
         }
     }
 }
@@ -290,10 +223,11 @@ fn fix_py3_block(
     stmt: &Stmt,
     test: &Expr,
     body: &[Stmt],
-    block: &BlockMetadata,
+    branch_kind: BranchKind,
+    range: TextRange,
 ) -> Option<Fix> {
-    match block.leading_token.tok {
-        StartTok::If => {
+    match branch_kind {
+        BranchKind::If => {
             // If the first statement is an if, use the body of this statement, and ignore
             // the rest.
             let start = body.first()?;
@@ -305,10 +239,10 @@ fn fix_py3_block(
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
-                    stmt.range(),
+                    range,
                 )))
             } else {
-                indentation(checker.locator, stmt)
+                indentation(checker.locator, &stmt)
                     .and_then(|indentation| {
                         adjust_indentation(
                             TextRange::new(checker.locator.line_start(start.start()), end.end()),
@@ -321,20 +255,20 @@ fn fix_py3_block(
                     .map(|contents| {
                         Fix::suggested(Edit::replacement(
                             contents,
-                            checker.locator.line_start(stmt.start()),
-                            stmt.end(),
+                            checker.locator.line_start(range.start()),
+                            range.end(),
                         ))
                     })
             }
         }
-        StartTok::Elif => {
+        BranchKind::Elif => {
             // Replace the `elif` with an `else, preserve the body of the elif, and remove
             // the rest.
             let end = body.last()?;
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
             Some(Fix::suggested(Edit::range_replacement(
                 format!("else{text}"),
-                stmt.range(),
+                TextRange::new(range.start(), stmt.end()),
             )))
         }
     }
@@ -344,60 +278,70 @@ fn fix_py3_block(
 pub(crate) fn outdated_version_block(
     checker: &mut Checker,
     stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
+    if_test: &Expr,
+    if_body: &[Stmt],
     elif_else_clauses: &[ElifElseClause],
 ) {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        range: _,
-    }) = &test
+    // Check the `if` and all `elif` tests
+    let elif_iter = elif_else_clauses.iter().filter_map(|clause| {
+        Some((
+            clause.test.as_ref()?,
+            clause.body.as_slice(),
+            BranchKind::Elif,
+            clause.range(),
+        ))
+    });
+    let if_elif_tests =
+        iter::once((if_test, if_body, BranchKind::If, stmt.range())).chain(elif_iter);
+    for (test, body, branch_kind, range) in if_elif_tests {
+        let Expr::Compare(ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            range: _,
+        }) = &test
     else {
-        return;
-    };
+            continue;
+        };
 
-    if !checker
-        .semantic()
-        .resolve_call_path(left)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["sys", "version_info"])
-        })
-    {
-        return;
-    }
+        let ([op], [comparison]) = (ops.as_slice(), comparators.as_slice()) else {
+            continue
+        };
 
-    if ops.len() == 1 && comparators.len() == 1 {
-        let comparison = &comparators[0];
-        let op = &ops[0];
+        if !checker
+            .semantic()
+            .resolve_call_path(left)
+            .map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["sys", "version_info"])
+            })
+        {
+            continue;
+        }
+
         match comparison {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let version = extract_version(elts);
                 let target = checker.settings.target_version;
                 if op == &CmpOp::Lt || op == &CmpOp::LtE {
                     if compare_version(&version, target, op == &CmpOp::LtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
+                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(block) = metadata(checker.locator, stmt, body) {
-                                if let Some(fix) =
-                                    fix_py2_block(checker, stmt, elif_else_clauses, &block)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) =
+                                fix_py2_block(checker, stmt, elif_else_clauses, branch_kind, range)
+                            {
+                                diagnostic.set_fix(fix);
                             }
                         }
                         checker.diagnostics.push(diagnostic);
                     }
                 } else if op == &CmpOp::Gt || op == &CmpOp::GtE {
                     if compare_version(&version, target, op == &CmpOp::GtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
+                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(block) = metadata(checker.locator, stmt, body) {
-                                if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) =
+                                fix_py3_block(checker, stmt, test, body, branch_kind, range)
+                            {
+                                diagnostic.set_fix(fix);
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -410,24 +354,22 @@ pub(crate) fn outdated_version_block(
             }) => {
                 let version_number = bigint_to_u32(number);
                 if version_number == 2 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
                     if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(block) = metadata(checker.locator, stmt, body) {
-                            if let Some(fix) =
-                                fix_py2_block(checker, stmt, elif_else_clauses, &block)
-                            {
-                                diagnostic.set_fix(fix);
-                            }
+                        if let Some(fix) =
+                            fix_py2_block(checker, stmt, elif_else_clauses, branch_kind, range)
+                        {
+                            diagnostic.set_fix(fix);
                         }
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if version_number == 3 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
                     if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(block) = metadata(checker.locator, stmt, body) {
-                            if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block) {
-                                diagnostic.set_fix(fix);
-                            }
+                        if let Some(fix) =
+                            fix_py3_block(checker, stmt, test, body, branch_kind, range)
+                        {
+                            diagnostic.set_fix(fix);
                         }
                     }
                     checker.diagnostics.push(diagnostic);
