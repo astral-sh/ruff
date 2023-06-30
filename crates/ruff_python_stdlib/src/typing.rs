@@ -322,18 +322,59 @@ type ModuleMember = (&'static str, &'static str);
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
 pub fn as_pep_585_generic(module: &str, member: &str) -> Option<ModuleMember> {
-    match (module, member) {
-        ("typing", "Dict") => Some(("", "dict")),
-        ("typing", "FrozenSet") => Some(("", "frozenset")),
-        ("typing", "List") => Some(("", "list")),
-        ("typing", "Set") => Some(("", "set")),
-        ("typing", "Tuple") => Some(("", "tuple")),
-        ("typing", "Type") => Some(("", "type")),
-        ("typing_extensions", "Type") => Some(("", "type")),
-        ("typing", "Deque") => Some(("collections", "deque")),
-        ("typing_extensions", "Deque") => Some(("collections", "deque")),
-        ("typing", "DefaultDict") => Some(("collections", "defaultdict")),
-        ("typing_extensions", "DefaultDict") => Some(("collections", "defaultdict")),
+    // typing_extensions mirrors all the relevant types defined in typing.
+    if module != "typing" && module != "typing_extensions" {
+        return None;
+    };
+
+    match member {
+        // Builtins
+        "Tuple" => Some(("", "tuple")),
+        "List" => Some(("", "list")),
+        "Dict" => Some(("", "dict")),
+        "Set" => Some(("", "set")),
+        "FrozenSet" => Some(("", "frozenset")),
+        "Type" => Some(("", "type")),
+
+        // collections
+        "Deque" => Some(("collections", "deque")),
+        "DefaultDict" => Some(("collections", "defaultdict")),
+        "OrderedDict" => Some(("collections", "OrderedDict")),
+        "Counter" => Some(("collections", "Counter")),
+        "ChainMap" => Some(("collections", "ChainMap")),
+
+        // collections.abc
+        "Awaitable" => Some(("collections.abc", "Awaitable")),
+        "Coroutine" => Some(("collections.abc", "Coroutine")),
+        "AsyncIterable" => Some(("collections.abc", "AsyncIterable")),
+        "AsyncGenerator" => Some(("collections.abc", "AsyncGenerator")),
+        "Iterable" => Some(("collections.abc", "Iterable")),
+        "Iterator" => Some(("collections.abc", "Iterator")),
+        "Generator" => Some(("collections.abc", "Generator")),
+        "Reversible" => Some(("collections.abc", "Reversible")),
+        "Container" => Some(("collections.abc", "Container")),
+        "Collection" => Some(("collections.abc", "Collection")),
+        "Callable" => Some(("collections.abc", "Callable")),
+        "AbstractSet" => Some(("collections.abc", "Set")),
+        "MutableSet" => Some(("collections.abc", "MutableSet")),
+        "Mapping" => Some(("collections.abc", "Mapping")),
+        "MutableMapping" => Some(("collections.abc", "MutableMapping")),
+        "Sequence" => Some(("collections.abc", "Sequence")),
+        "MutableSequence" => Some(("collections.abc", "MutableSequence")),
+        "ByteString" => Some(("collections.abc", "ByteString")),
+        "MappingView" => Some(("collections.abc", "MappingView")),
+        "KeysView" => Some(("collections.abc", "KeysView")),
+        "ItemsView" => Some(("collections.abc", "ItemsView")),
+        "ValuesView" => Some(("collections.abc", "ValuesView")),
+
+        // contextlib
+        "ContextManager" => Some(("contextlib", "AbstractContextManager")),
+        "AsyncContextManager" => Some(("contextlib", "AbstractAsyncContextManager")),
+
+        // re
+        "Pattern" => Some(("re", "Pattern")),
+        "Match" => Some(("re", "Match")),
+
         _ => None,
     }
 }
