@@ -57,3 +57,11 @@ def fine():
         a = process()  # This throws the exception now
     finally:
         print("finally")
+
+
+def fine():
+    try:
+        raise ValueError("a doesn't exist")
+
+    except TypeError: # A different exception is caught
+        print("A different exception is caught")
