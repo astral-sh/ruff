@@ -848,12 +848,9 @@ pub(crate) fn use_dict_get_with_default(
     let [body_stmt] = body else {
         return;
     };
-    let [ElifElseClause { body: else_body, test: else_test, .. }] = elif_else_clauses else {
+    let [ElifElseClause { body: else_body, test: None, .. }] = elif_else_clauses else {
         return;
     };
-    if else_test.is_some() {
-        return;
-    }
     let [else_body_stmt] = else_body.as_slice() else {
         return;
     };
