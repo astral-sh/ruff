@@ -1,12 +1,14 @@
 use crate::comments::{trailing_comments, trailing_node_comments, Comments};
 use crate::expression::binary_like::{BinaryLayout, FormatBinaryLike};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parenthesize,
+    default_expression_needs_parentheses, is_expression_parenthesized, NeedsParentheses,
+    Parenthesize,
 };
 use crate::expression::Parentheses;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_python_ast::node::AstNode;
 use rustpython_parser::ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
 };
@@ -44,9 +46,18 @@ impl<'ast> FormatBinaryLike<'ast> for ExprBinOp {
     fn fmt_default(&self, f: &mut PyFormatter<'ast, '_>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
-        let format_inner = format_with(|f| {
-            let binary_chain: SmallVec<[&ExprBinOp; 4]> =
-                iter::successors(Some(self), |parent| parent.left.as_bin_op_expr()).collect();
+        let format_inner = format_with(|f: &mut PyFormatter| {
+            let source = f.context().contents();
+            let binary_chain: SmallVec<[&ExprBinOp; 4]> = iter::successors(Some(self), |parent| {
+                parent.left.as_bin_op_expr().and_then(|bin_expression| {
+                    if is_expression_parenthesized(bin_expression.as_any_node_ref(), source) {
+                        None
+                    } else {
+                        Some(bin_expression)
+                    }
+                })
+            })
+            .collect();
 
             // SAFETY: `binary_chain` is guaranteed not to be empty because it always contains the current expression.
             let left_most = binary_chain.last().unwrap();

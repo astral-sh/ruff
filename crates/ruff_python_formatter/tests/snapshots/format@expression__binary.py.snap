@@ -211,6 +211,12 @@ if (
 # Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
 for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     updates.append(UserPresenceState.default(user_id))
+
+# Keeps parenthesized left hand sides
+(
+    log(self.price / self.strike)
+    + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
+) / self.sigmaT
 ```
 
 ## Output
@@ -468,6 +474,12 @@ for user_id in set(
     target_user_ids
 ) - {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}:
     updates.append(UserPresenceState.default(user_id))
+
+# Keeps parenthesized left hand sides
+(
+    log(self.price / self.strike)
+    + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
+) / self.sigmaT
 ```
 
 
