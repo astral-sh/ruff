@@ -562,12 +562,12 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
     node1.into()
 }
 
-/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-fn contains_call_path(expr: &Expr, target: &[&str], semantic: &SemanticModel) -> bool {
+/// Return `true` if the `Expr` contains a reference to any of the given `${module}.${target}`.
+fn contains_call_path(expr: &Expr, semantic: &SemanticModel, targets: &[&[&str]]) -> bool {
     any_over_expr(expr, &|expr| {
-        semantic
-            .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path.as_slice() == target)
+        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+            targets.iter().any(|target| &call_path.as_slice() == target)
+        })
     })
 }
 
@@ -582,51 +582,37 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     else {
         return;
     };
-
-    let [ElifElseClause { body: else_body, test: else_test, ..}] = elif_else_clauses.as_slice() else {
+    // `test: None` to only match an `else` clause
+    let [ElifElseClause { body: else_body, test: None, ..}] = elif_else_clauses.as_slice() else {
         return
     };
-
-    if else_test.is_some() || body.len() != 1 || else_body.len() != 1 {
-        return;
-    }
-    let Stmt::Assign(ast::StmtAssign {
-        targets: body_targets,
-        value: body_value,
-        ..
-    }) = &body[0]
+    let [Stmt::Assign(ast::StmtAssign { targets: body_targets, value: body_value, .. })] = body.as_slice()
     else {
         return;
     };
-    let Stmt::Assign(ast::StmtAssign {
-        targets: orelse_targets,
-        value: orelse_value,
-        ..
-    }) = &else_body[0]
+    let [Stmt::Assign(ast::StmtAssign {
+        targets: else_targets,
+        value: else_value, .. })] = else_body.as_slice()
     else {
         return;
     };
-    if body_targets.len() != 1 || orelse_targets.len() != 1 {
-        return;
-    }
-    let Expr::Name(ast::ExprName { id: body_id, .. }) = &body_targets[0] else {
+    let ([body_target], [else_target]) = (body_targets.as_slice(), else_targets.as_slice()) else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: orelse_id, .. }) = &orelse_targets[0] else {
+    let Expr::Name(ast::ExprName { id: body_id, .. }) = body_target else {
         return;
     };
-    if body_id != orelse_id {
+    let Expr::Name(ast::ExprName { id: else_id, .. } ) = else_target else {
+        return;
+    };
+    if body_id != else_id {
         return;
     }
 
-    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(test, &["sys", "version_info"], checker.semantic()) {
-        return;
-    }
-
-    // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
-    // checks.
-    if contains_call_path(test, &["sys", "platform"], checker.semantic()) {
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style and
+    // `if sys.platform.startswith("...")`-style checks.
+    let ignored_call_paths: &[&[&str]] = &[&["sys", "version_info"], &["sys", "platform"]];
+    if contains_call_path(test, checker.semantic(), ignored_call_paths) {
         return;
     }
 
@@ -639,14 +625,14 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
     if matches!(
-        orelse_value.as_ref(),
+        else_value.as_ref(),
         Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
     ) {
         return;
     }
 
-    let target_var = &body_targets[0];
-    let ternary = ternary(target_var, body_value, test, orelse_value);
+    let target_var = &body_target;
+    let ternary = ternary(target_var, body_value, test, else_value);
     let contents = checker.generator().stmt(&ternary);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
