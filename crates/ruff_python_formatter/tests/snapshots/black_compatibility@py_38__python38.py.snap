@@ -1,0 +1,113 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_38/python38.py
+---
+## Input
+
+```py
+#!/usr/bin/env python3.8
+
+
+def starred_return():
+    my_list = ["value2", "value3"]
+    return "value1", *my_list
+
+
+def starred_yield():
+    my_list = ["value2", "value3"]
+    yield "value1", *my_list
+
+
+# all right hand side expressions allowed in regular assignments are now also allowed in
+# annotated assignments
+a : Tuple[ str, int] = "1", 2
+a: Tuple[int , ... ] = b,  *c, d
+def t():
+    a : str =  yield "a"
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,19 +3,19 @@
+ 
+ def starred_return():
+     my_list = ["value2", "value3"]
+-    return "value1", *my_list
++    return "value1", *NOT_YET_IMPLEMENTED_ExprStarred
+ 
+ 
+ def starred_yield():
+     my_list = ["value2", "value3"]
+-    yield "value1", *my_list
++    NOT_YET_IMPLEMENTED_ExprYield
+ 
+ 
+ # all right hand side expressions allowed in regular assignments are now also allowed in
+ # annotated assignments
+-a: Tuple[str, int] = "1", 2
+-a: Tuple[int, ...] = b, *c, d
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAnnAssign
+ 
+ 
+ def t():
+-    a: str = yield "a"
++    NOT_YET_IMPLEMENTED_StmtAnnAssign
+```
+
+## Ruff Output
+
+```py
+#!/usr/bin/env python3.8
+
+
+def starred_return():
+    my_list = ["value2", "value3"]
+    return "value1", *NOT_YET_IMPLEMENTED_ExprStarred
+
+
+def starred_yield():
+    my_list = ["value2", "value3"]
+    NOT_YET_IMPLEMENTED_ExprYield
+
+
+# all right hand side expressions allowed in regular assignments are now also allowed in
+# annotated assignments
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+
+
+def t():
+    NOT_YET_IMPLEMENTED_StmtAnnAssign
+```
+
+## Black Output
+
+```py
+#!/usr/bin/env python3.8
+
+
+def starred_return():
+    my_list = ["value2", "value3"]
+    return "value1", *my_list
+
+
+def starred_yield():
+    my_list = ["value2", "value3"]
+    yield "value1", *my_list
+
+
+# all right hand side expressions allowed in regular assignments are now also allowed in
+# annotated assignments
+a: Tuple[str, int] = "1", 2
+a: Tuple[int, ...] = b, *c, d
+
+
+def t():
+    a: str = yield "a"
+```
+
+

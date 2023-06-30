@@ -1,0 +1,136 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_310/starred_for_target.py
+---
+## Input
+
+```py
+for x in *a, *b:
+    print(x)
+
+for x in a, b, *c:
+    print(x)
+
+for x in *a, b, c:
+    print(x)
+
+for x in *a, b, *c:
+    print(x)
+
+async for x in *a, *b:
+    print(x)
+
+async for x in *a, b, *c:
+    print(x)
+
+async for x in a, b, *c:
+    print(x)
+
+async for x in (
+    *loooooooooooooooooooooong,
+    very,
+    *loooooooooooooooooooooooooooooooooooooooooooooooong,
+):
+    print(x)
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,27 +1,19 @@
+-for x in *a, *b:
++for x in *NOT_YET_IMPLEMENTED_ExprStarred, *NOT_YET_IMPLEMENTED_ExprStarred:
+     print(x)
+ 
+-for x in a, b, *c:
++for x in a, b, *NOT_YET_IMPLEMENTED_ExprStarred:
+     print(x)
+ 
+-for x in *a, b, c:
++for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, c:
+     print(x)
+ 
+-for x in *a, b, *c:
++for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, *NOT_YET_IMPLEMENTED_ExprStarred:
+     print(x)
+ 
+-async for x in *a, *b:
+-    print(x)
++NOT_YET_IMPLEMENTED_StmtAsyncFor
+ 
+-async for x in *a, b, *c:
+-    print(x)
++NOT_YET_IMPLEMENTED_StmtAsyncFor
+ 
+-async for x in a, b, *c:
+-    print(x)
++NOT_YET_IMPLEMENTED_StmtAsyncFor
+ 
+-async for x in (
+-    *loooooooooooooooooooooong,
+-    very,
+-    *loooooooooooooooooooooooooooooooooooooooooooooooong,
+-):
+-    print(x)
++NOT_YET_IMPLEMENTED_StmtAsyncFor
+```
+
+## Ruff Output
+
+```py
+for x in *NOT_YET_IMPLEMENTED_ExprStarred, *NOT_YET_IMPLEMENTED_ExprStarred:
+    print(x)
+
+for x in a, b, *NOT_YET_IMPLEMENTED_ExprStarred:
+    print(x)
+
+for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, c:
+    print(x)
+
+for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, *NOT_YET_IMPLEMENTED_ExprStarred:
+    print(x)
+
+NOT_YET_IMPLEMENTED_StmtAsyncFor
+
+NOT_YET_IMPLEMENTED_StmtAsyncFor
+
+NOT_YET_IMPLEMENTED_StmtAsyncFor
+
+NOT_YET_IMPLEMENTED_StmtAsyncFor
+```
+
+## Black Output
+
+```py
+for x in *a, *b:
+    print(x)
+
+for x in a, b, *c:
+    print(x)
+
+for x in *a, b, c:
+    print(x)
+
+for x in *a, b, *c:
+    print(x)
+
+async for x in *a, *b:
+    print(x)
+
+async for x in *a, b, *c:
+    print(x)
+
+async for x in a, b, *c:
+    print(x)
+
+async for x in (
+    *loooooooooooooooooooooong,
+    very,
+    *loooooooooooooooooooooooooooooooooooooooooooooooong,
+):
+    print(x)
+```
+
+

@@ -1,0 +1,114 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtpass_imports.py
+---
+## Input
+
+```py
+# Regression test for https://github.com/psf/black/issues/3438
+
+import ast
+import collections  # fmt: skip
+import dataclasses
+# fmt: off
+import os
+# fmt: on
+import pathlib
+
+import re  # fmt: skip
+import secrets
+
+# fmt: off
+import sys
+# fmt: on
+
+import tempfile
+import zoneinfo
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,19 +1,19 @@
+ # Regression test for https://github.com/psf/black/issues/3438
+ 
+-import ast
+-import collections  # fmt: skip
+-import dataclasses
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport  # fmt: skip
++NOT_YET_IMPLEMENTED_StmtImport
+ # fmt: off
+-import os
++NOT_YET_IMPLEMENTED_StmtImport
+ # fmt: on
+-import pathlib
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+-import re  # fmt: skip
+-import secrets
++NOT_YET_IMPLEMENTED_StmtImport  # fmt: skip
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+ # fmt: off
+-import sys
++NOT_YET_IMPLEMENTED_StmtImport
+ # fmt: on
+ 
+-import tempfile
+-import zoneinfo
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
+```
+
+## Ruff Output
+
+```py
+# Regression test for https://github.com/psf/black/issues/3438
+
+NOT_YET_IMPLEMENTED_StmtImport
+NOT_YET_IMPLEMENTED_StmtImport  # fmt: skip
+NOT_YET_IMPLEMENTED_StmtImport
+# fmt: off
+NOT_YET_IMPLEMENTED_StmtImport
+# fmt: on
+NOT_YET_IMPLEMENTED_StmtImport
+
+NOT_YET_IMPLEMENTED_StmtImport  # fmt: skip
+NOT_YET_IMPLEMENTED_StmtImport
+
+# fmt: off
+NOT_YET_IMPLEMENTED_StmtImport
+# fmt: on
+
+NOT_YET_IMPLEMENTED_StmtImport
+NOT_YET_IMPLEMENTED_StmtImport
+```
+
+## Black Output
+
+```py
+# Regression test for https://github.com/psf/black/issues/3438
+
+import ast
+import collections  # fmt: skip
+import dataclasses
+# fmt: off
+import os
+# fmt: on
+import pathlib
+
+import re  # fmt: skip
+import secrets
+
+# fmt: off
+import sys
+# fmt: on
+
+import tempfile
+import zoneinfo
+```
+
+

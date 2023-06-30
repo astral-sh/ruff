@@ -266,15 +266,15 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -1,5 +1,6 @@
-+...
+@@ -1,6 +1,6 @@
+ ...
  "some_string"
 -b"\\xa3"
 +b"NOT_YET_IMPLEMENTED_BYTE_STRING"
  Name
  None
  True
-@@ -23,40 +24,46 @@
+@@ -24,40 +24,46 @@
  1 >> v2
  1 % finished
  1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
@@ -346,7 +346,7 @@ last_call()
  ()
  (1,)
  (1, 2)
-@@ -68,40 +75,37 @@
+@@ -69,40 +75,37 @@
      2,
      3,
  ]
@@ -405,9 +405,12 @@ last_call()
  Python3 > Python2 > COBOL
  Life is Life
  call()
-@@ -116,8 +120,8 @@
+@@ -115,10 +118,10 @@
+     arg,
+     another,
      kwarg="hey",
-     **kwargs,
+-    **kwargs
++    **kwargs,
  )  # note: no trailing comma pre-3.6
 -call(*gidgets[:2])
 -call(a, *gidgets[:2])
@@ -416,7 +419,7 @@ last_call()
  call(**self.screen_kwargs)
  call(b, **self.screen_kwargs)
  lukasz.langa.pl
-@@ -130,34 +134,28 @@
+@@ -131,34 +134,28 @@
  tuple[str, ...]
  tuple[str, int, float, dict[str, int]]
  tuple[
@@ -424,9 +427,6 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
--]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
 +    (
 +        str,
 +        int,
@@ -434,6 +434,9 @@ last_call()
 +        dict[str, int],
 +    )
  ]
+-very_long_variable_name_filters: t.List[
+-    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
+-]
 -xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)
@@ -464,7 +467,7 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -171,20 +169,27 @@
+@@ -172,20 +169,27 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
@@ -500,7 +503,7 @@ last_call()
  {
      "id": "1",
      "type": "type",
-@@ -199,32 +204,22 @@
+@@ -200,32 +204,22 @@
  c = 1
  d = (1,) + a + (2,)
  e = (1,).count(1)
@@ -513,7 +516,7 @@ last_call()
  )
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -521,7 +524,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -543,7 +546,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -236,29 +231,27 @@
+@@ -237,29 +231,27 @@
  
  
  def gen():
@@ -584,7 +587,7 @@ last_call()
      ...
  for i in call():
      ...
-@@ -327,13 +320,18 @@
+@@ -328,13 +320,18 @@
  ):
      return True
  if (
@@ -606,7 +609,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -341,7 +339,8 @@
+@@ -342,7 +339,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -995,6 +998,7 @@ last_call()
 ## Black Output
 
 ```py
+...
 "some_string"
 b"\\xa3"
 Name
@@ -1111,7 +1115,7 @@ call(
     arg,
     another,
     kwarg="hey",
-    **kwargs,
+    **kwargs
 )  # note: no trailing comma pre-3.6
 call(*gidgets[:2])
 call(a, *gidgets[:2])

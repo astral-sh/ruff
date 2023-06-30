@@ -41,7 +41,7 @@ def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r''
 def spaces_types(a: int = 1, b: tuple = (), c: list = [], d: dict = {}, e: bool = True, f: int = -1, g: int = 1 if False else 2, h: str = "", i: str = r''): ...
 def spaces2(result= _core.Value(None)):
  assert fut is self._read_fut, (fut, self._read_fut)
-    
+    # EMPTY LINE WITH WHITESPACE (this comment will be removed)
 def example(session):
     result = session.query(models.Customer.id).filter(
         models.Customer.account_id == account_id,
@@ -111,14 +111,14 @@ def __await__(): return (yield)
  #!/usr/bin/env python3
 -import asyncio
 -import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
- 
+-
 -from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
  
 -from library import some_connection, some_decorator
--
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
@@ -170,12 +170,13 @@ def __await__(): return (yield)
      h: str = "",
      i: str = r"",
  ):
-@@ -64,19 +73,16 @@
+@@ -64,19 +73,17 @@
  
  
  def spaces2(result=_core.Value(None)):
 -    assert fut is self._read_fut, (fut, self._read_fut)
 +    NOT_YET_IMPLEMENTED_StmtAssert
++    # EMPTY LINE WITH WHITESPACE (this comment will be removed)
  
  
  def example(session):
@@ -197,7 +198,7 @@ def __await__(): return (yield)
  
  
  def long_lines():
-@@ -87,7 +93,7 @@
+@@ -87,7 +94,7 @@
                  ast_args.kw_defaults,
                  parameters,
                  implicit_default=True,
@@ -206,7 +207,7 @@ def __await__(): return (yield)
          )
          typedargslist.extend(
              gen_annotated_params(
-@@ -96,7 +102,7 @@
+@@ -96,7 +103,7 @@
                  parameters,
                  implicit_default=True,
                  # trailing standalone comment
@@ -215,7 +216,7 @@ def __await__(): return (yield)
          )
      _type_comment_re = re.compile(
          r"""
-@@ -135,14 +141,8 @@
+@@ -135,14 +142,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -313,6 +314,7 @@ def spaces_types(
 
 def spaces2(result=_core.Value(None)):
     NOT_YET_IMPLEMENTED_StmtAssert
+    # EMPTY LINE WITH WHITESPACE (this comment will be removed)
 
 
 def example(session):
