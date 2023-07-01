@@ -22,6 +22,7 @@ pub(crate) use type_alias_naming::*;
 pub(crate) use type_comment_in_stub::*;
 pub(crate) use unaliased_collections_abc_set_import::*;
 pub(crate) use unrecognized_platform::*;
+pub(crate) use version_info_checks::*;
 
 mod any_eq_ne_annotation;
 mod bad_version_info_comparison;
@@ -47,3 +48,4 @@ mod type_alias_naming;
 mod type_comment_in_stub;
 mod unaliased_collections_abc_set_import;
 mod unrecognized_platform;
+mod version_info_checks;
