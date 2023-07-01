@@ -22,6 +22,8 @@ mod tests {
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.py"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.pyi"))]
+    #[test_case(Rule::ComplexIfTestInStubs, Path::new("PYI002.pyi"))]
+    #[test_case(Rule::ComplexIfTestInStubs, Path::new("PYI002.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]

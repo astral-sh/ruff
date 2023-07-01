@@ -1,0 +1,48 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI002.pyi:9:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+   |
+ 7 |   ...
+ 8 | 
+ 9 | if sys.prefix == "1": # Must be one of "sys.version_info" or "sys.platform"
+   |    ^^^^^^^^^^^^^^^^^ PYI002
+10 |   ...
+   |
+
+PYI002.pyi:13:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+   |
+12 | import some_module
+13 | if some_module.platform == "3": # Must be one of "sys.version_info" or "sys.platform"
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI002
+14 |   ...
+   |
+
+PYI002.pyi:16:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+   |
+14 |   ...
+15 | 
+16 | if sys.version == "1" or sys.version_info == "2": # Number of comparitors must be 1
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI002
+17 |   ...
+   |
+
+PYI002.pyi:19:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+   |
+17 |   ...
+18 | 
+19 | if sum([2,3]) > 4: # Comparison must be against an attribute
+   |    ^^^^^^^^^^^^^^ PYI002
+20 |   ...
+   |
+
+PYI002.pyi:22:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+   |
+20 |   ...
+21 | 
+22 | if bool(True): # If statement must contain a compare expression
+   |    ^^^^^^^^^^ PYI002
+23 |   ...
+   |
+
+
