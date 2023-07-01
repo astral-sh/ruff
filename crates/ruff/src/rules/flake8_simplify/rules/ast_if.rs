@@ -2,7 +2,7 @@ use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
-    self, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt,
+    self, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt, StmtIf,
 };
 use std::iter;
 
@@ -314,50 +314,36 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     })
 }
 
-/// SIM102
-pub(crate) fn nested_if_statements(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    elif_else_clauses: &[ElifElseClause],
-    parent: Option<&Stmt>,
-) {
-    // If the parent could contain a nested if-statement, abort.
-    // TODO(konstin): fix this
-    if let Some(Stmt::If(ast::StmtIf {
+fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
+    let StmtIf {
+        test,
         body,
         elif_else_clauses,
         ..
-    })) = parent
-    {
-        if elif_else_clauses.is_empty() && body.len() == 1 {
-            return;
-        }
-    }
+    } = stmt_if;
 
-    // If must be last condition, otherwise there could be another `elif` or `else` that only
+    // It must be the last condition, otherwise there could be another `elif` or `else` that only
     // depends on the outer of the two conditions
-    let (test, body, range, is_elif) = if let Some(clause) = elif_else_clauses.last() {
+    let (test, body, range) = if let Some(clause) = elif_else_clauses.last() {
         if let Some(test) = &clause.test {
-            (test, clause.body.as_slice(), clause.range(), true)
+            (test, &clause.body, clause.range())
         } else {
-            // There is an `else`
-            return;
+            // The last condition is an `else` (different rule)
+            return None;
         }
     } else {
-        (test, body, stmt.range(), false)
+        (test.as_ref(), body, stmt_if.range())
     };
 
     // The nested if must be the only child, otherwise there is at least one more statement that
     // only depends on the outer condition
     if body.len() > 1 {
-        return;
+        return None;
     }
 
     // Allow `if __name__ == "__main__":` statements.
     if is_main_check(test) {
-        return;
+        return None;
     }
 
     // Allow `if True:` and `if False:` statements.
@@ -368,8 +354,24 @@ pub(crate) fn nested_if_statements(
             ..
         })
     ) {
-        return;
+        return None;
     }
+
+    Some((body, range))
+}
+
+/// SIM102
+pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, parent: Option<&Stmt>) {
+    // If the parent could contain a nested if-statement, abort.
+    if let Some(Stmt::If(stmt_if)) = parent {
+        if nested_if_body(stmt_if).is_some() {
+            return;
+        }
+    }
+
+    let Some((body, range)) = nested_if_body(stmt_if) else {
+        return;
+    };
 
     // Find the deepest nested if-statement, to inform the range.
     let Some((test, first_stmt)) = find_last_nested_if(body) else {
@@ -383,10 +385,7 @@ pub(crate) fn nested_if_statements(
 
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
-        colon.map_or_else(
-            || range.range(),
-            |colon| TextRange::new(range.start(), colon.end()),
-        ),
+        colon.map_or(range, |colon| TextRange::new(range.start(), colon.end())),
     );
     if checker.patch(diagnostic.kind.rule()) {
         // The fixer preserves comments in the nested body, but removes comments between
@@ -396,8 +395,7 @@ pub(crate) fn nested_if_statements(
             TextRange::new(range.start(), nested_if.start()),
             checker.locator,
         ) {
-            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, range, is_elif)
-            {
+            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, range) {
                 Ok(edit) => {
                     if edit
                         .content()
@@ -563,7 +561,7 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
 }
 
 /// Return `true` if the `Expr` contains a reference to any of the given `${module}.${target}`.
-fn contains_call_path(expr: &Expr, semantic: &SemanticModel, targets: &[&[&str]]) -> bool {
+fn contains_call_path(expr: &Expr, targets: &[&[&str]], semantic: &SemanticModel) -> bool {
     any_over_expr(expr, &|expr| {
         semantic.resolve_call_path(expr).map_or(false, |call_path| {
             targets.iter().any(|target| &call_path.as_slice() == target)
@@ -612,7 +610,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style and
     // `if sys.platform.startswith("...")`-style checks.
     let ignored_call_paths: &[&[&str]] = &[&["sys", "version_info"], &["sys", "platform"]];
-    if contains_call_path(test, checker.semantic(), ignored_call_paths) {
+    if contains_call_path(test, ignored_call_paths, checker.semantic()) {
         return;
     }
 

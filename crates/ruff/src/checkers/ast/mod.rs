@@ -1289,22 +1289,21 @@ where
                     }
                 }
             }
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                range: _,
-            }) => {
+            Stmt::If(
+                if_stmt @ ast::StmtIf {
+                    test,
+                    body,
+                    elif_else_clauses,
+                    range: _,
+                },
+            ) => {
                 if self.enabled(Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
                 if self.enabled(Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
                         self,
-                        stmt,
-                        test,
-                        body,
-                        elif_else_clauses,
+                        if_stmt,
                         self.semantic.stmt_parent(),
                     );
                 }
