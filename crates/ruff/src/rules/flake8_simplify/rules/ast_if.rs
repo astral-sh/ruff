@@ -745,22 +745,13 @@ pub(crate) fn manual_dict_lookup(
     let Expr::Name(ast::ExprName { id: target, .. }) = left.as_ref() else {
         return;
     };
-    if body.len() != 1 {
+    if ops != &[CmpOp::Eq] {
         return;
     }
-    if !(ops.len() == 1 && ops[0] == CmpOp::Eq) {
-        return;
-    }
-    if comparators.len() != 1 {
-        return;
-    }
-    let Expr::Constant(ast::ExprConstant {
-        value: constant, ..
-    }) = &comparators[0]
-    else {
+    let [Expr::Constant(ast::ExprConstant { value: constant, .. })] = comparators.as_slice() else {
         return;
     };
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
+    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body else {
         return;
     };
     if value.as_ref().map_or(false, |value| {
@@ -773,42 +764,37 @@ pub(crate) fn manual_dict_lookup(
     constants.insert(constant.into());
 
     for clause in elif_else_clauses {
-        let ast::ElifElseClause { test, body, .. } = clause;
-        if body.len() != 1 {
-            return;
-        }
-        let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
-                return;
-            };
+        let ElifElseClause { test, body, .. } = clause;
+        let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+            continue;
+        };
         if value.as_ref().map_or(false, |value| {
             contains_effect(value, |id| checker.semantic().is_builtin(id))
         }) {
-            return;
+            continue;
         };
 
         // `elif`
-        if let Some(Expr::Compare(ast::ExprCompare {
+        let Some(Expr::Compare(ast::ExprCompare {
             left,
             ops,
             comparators,
             range: _,
-        })) = test.as_ref()
-        {
-            let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
-                return;
-            };
-            if !(id == target && ops.len() == 1 && ops[0] == CmpOp::Eq) {
-                return;
-            }
-            if comparators.len() != 1 {
-                return;
-            }
-            let Expr::Constant(ast::ExprConstant { value: constant, .. }) = &comparators[0] else {
-                return;
-            };
+        })) = test.as_ref() else {
+            continue;
+        };
 
-            constants.insert(constant.into());
+        let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
+            continue;
+        };
+        if id != target || ops != &[CmpOp::Eq] {
+            continue;
         }
+        let [Expr::Constant(ast::ExprConstant { value: constant, .. })] = comparators.as_slice() else {
+            continue;
+        };
+
+        constants.insert(constant.into());
     }
 
     if constants.len() < 3 {
