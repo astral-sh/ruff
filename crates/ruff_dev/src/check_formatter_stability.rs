@@ -135,13 +135,16 @@ fn check_multi_project(args: &Args) -> bool {
                     Message::Finished { path, result } => {
                         total_errors += result.diagnostics.len();
                         total_files += result.file_count;
+
                         writeln!(
                             stdout,
-                            "Finished {}\n{}\n",
+                            "Finished {} with {} files in {:.2}s",
                             path.display(),
-                            result.display(args.format)
+                            result.file_count,
+                            result.duration.as_secs_f32(),
                         )
                         .unwrap();
+                        write!(stdout, "{}", result.display(args.format)).unwrap();
                         all_success = all_success && result.is_success();
                     }
                     Message::Failed { path, error } => {
@@ -295,23 +298,11 @@ struct DisplayCheckRepoResult<'a> {
 }
 
 impl Display for DisplayCheckRepoResult<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let CheckRepoResult {
-            duration,
-            file_count,
-            diagnostics,
-        } = self.result;
-
-        for diagnostic in diagnostics {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for diagnostic in &self.result.diagnostics {
             write!(f, "{}", diagnostic.display(self.format))?;
         }
-
-        writeln!(
-            f,
-            "Formatting {} files twice took {:.2}s",
-            file_count,
-            duration.as_secs_f32()
-        )
+        Ok(())
     }
 }
 
