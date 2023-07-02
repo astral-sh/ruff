@@ -22,7 +22,7 @@ use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, wemake_python_styleguide,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
@@ -897,7 +897,9 @@ pub struct LintCommonOptions {
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
 
-    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
+    /// Options for the `wemake-python-styleguide` plugin.
+    #[option_group]
+    pub wemake_python_styleguide: Option<WemakePythonStyleguideOptions>,
 
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
@@ -2887,6 +2889,32 @@ impl PyUpgradeOptions {
     pub fn into_settings(self) -> pyupgrade::settings::Settings {
         pyupgrade::settings::Settings {
             keep_runtime_typing: self.keep_runtime_typing.unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct WemakePythonStyleguideOptions {
+    #[option(
+        default = r#"2"#,
+        value_type = "int",
+        example = r#"
+            # Minimum number of chars to define a valid variable and module name.
+            min-name-length = 3
+        "#
+    )]
+    /// Minimum number of chars to define a valid variable and module name.
+    pub min_name_length: Option<usize>,
+}
+
+impl WemakePythonStyleguideOptions {
+    pub fn into_settings(self) -> wemake_python_styleguide::settings::Settings {
+        wemake_python_styleguide::settings::Settings {
+            min_name_length: self.min_name_length.unwrap_or_default(),
         }
     }
 }

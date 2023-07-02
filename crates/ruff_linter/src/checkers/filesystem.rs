@@ -7,6 +7,7 @@ use ruff_source_file::Locator;
 use crate::registry::Rule;
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
 use crate::rules::pep8_naming::rules::invalid_module_name;
+use crate::rules::wemake_python_styleguide::rules::too_short_module_name;
 use crate::settings::LinterSettings;
 
 pub(crate) fn check_file_path(
@@ -37,6 +38,13 @@ pub(crate) fn check_file_path(
         if let Some(diagnostic) =
             invalid_module_name(path, package, &settings.pep8_naming.ignore_names)
         {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    // wemake-python-styleguide
+    if settings.rules.enabled(Rule::TooShortName) {
+        if let Some(diagnostic) = too_short_module_name(path, package, settings) {
             diagnostics.push(diagnostic);
         }
     }

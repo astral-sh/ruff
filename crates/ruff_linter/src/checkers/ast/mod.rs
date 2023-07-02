@@ -1532,6 +1532,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 2: Traversal
         walk_pattern(self, pattern);
+
+        // Step 3: Analysis
+        analyze::pattern(pattern, self);
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {

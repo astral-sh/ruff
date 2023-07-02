@@ -1,4 +1,5 @@
 """Generate the confusables.rs file from the VS Code ambiguous.json file."""
+# flake8: noqa: WPS111
 from __future__ import annotations
 
 import json

@@ -46,7 +46,7 @@ use crate::options::{
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions,
+    PydocstyleOptions, PyflakesOptions, PylintOptions, WemakePythonStyleguideOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -388,6 +388,10 @@ impl Configuration {
                     .pyupgrade
                     .map(PyUpgradeOptions::into_settings)
                     .unwrap_or_default(),
+                wemake_python_styleguide: lint
+                    .wemake_python_styleguide
+                    .map(WemakePythonStyleguideOptions::into_settings)
+                    .unwrap_or_default(),
             },
 
             formatter,
@@ -631,6 +635,7 @@ pub struct LintConfiguration {
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
     pub pyupgrade: Option<PyUpgradeOptions>,
+    pub wemake_python_styleguide: Option<WemakePythonStyleguideOptions>,
 }
 
 impl LintConfiguration {
@@ -735,6 +740,7 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
+            wemake_python_styleguide: options.common.wemake_python_styleguide,
         })
     }
 
@@ -1159,6 +1165,9 @@ impl LintConfiguration {
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
+            wemake_python_styleguide: self
+                .wemake_python_styleguide
+                .combine(config.wemake_python_styleguide),
         }
     }
 }

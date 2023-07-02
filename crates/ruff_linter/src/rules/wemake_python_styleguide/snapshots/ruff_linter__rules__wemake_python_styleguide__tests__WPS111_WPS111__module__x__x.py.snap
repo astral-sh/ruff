@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/rules/wemake_python_styleguide/mod.rs
+---
+x.py:1:1: WPS111 Found too short module name: `x`
+ |
+ |
+
+

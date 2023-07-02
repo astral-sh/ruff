@@ -1,4 +1,5 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
+# flake8: noqa: WPS111
 from __future__ import annotations
 
 import argparse

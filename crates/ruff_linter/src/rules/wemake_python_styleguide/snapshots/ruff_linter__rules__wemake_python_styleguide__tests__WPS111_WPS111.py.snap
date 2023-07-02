@@ -1,0 +1,195 @@
+---
+source: crates/ruff_linter/src/rules/wemake_python_styleguide/mod.rs
+---
+WPS111.py:1:34: WPS111 Found too short name: `p`
+  |
+1 | from matplotlib import pyplot as p  # bad
+  |                                  ^ WPS111
+2 | from matplotlib import pyplot as plt  # good
+  |
+
+WPS111.py:4:17: WPS111 Found too short name: `n`
+  |
+2 | from matplotlib import pyplot as plt  # good
+3 | 
+4 | import numpy as n  # bad
+  |                 ^ WPS111
+5 | import numpy as np  # good
+  |
+
+WPS111.py:7:1: WPS111 Found too short name: `x`
+  |
+5 | import numpy as np  # good
+6 | 
+7 | x = 1  # bad
+  | ^ WPS111
+8 | x_coordinate = 1  # good
+  |
+
+WPS111.py:10:1: WPS111 Found too short name: `y`
+   |
+ 8 | x_coordinate = 1  # good
+ 9 | 
+10 | y = 2  # bad
+   | ^ WPS111
+11 | abscissa = 2  # good
+   |
+
+WPS111.py:13:1: WPS111 Found too short name: `z`
+   |
+11 | abscissa = 2  # good
+12 | 
+13 | z: int = 1  # bad
+   | ^ WPS111
+14 | z_coordinate: int = 1  # good
+   |
+
+WPS111.py:16:1: WPS111 Found too short name: `c`
+   |
+14 | z_coordinate: int = 1  # good
+15 | 
+16 | c: str | bytes = "drop foo bar"  # bad
+   | ^ WPS111
+17 | command: str | bytes = "drop foo bar"  # good
+   |
+
+WPS111.py:22:5: WPS111 Found too short name: `f`
+   |
+22 | def f(a: int, b):  # bad
+   |     ^ WPS111
+23 |     pass
+   |
+
+WPS111.py:22:7: WPS111 Found too short name: `a`
+   |
+22 | def f(a: int, b):  # bad
+   |       ^ WPS111
+23 |     pass
+   |
+
+WPS111.py:22:15: WPS111 Found too short name: `b`
+   |
+22 | def f(a: int, b):  # bad
+   |               ^ WPS111
+23 |     pass
+   |
+
+WPS111.py:30:7: WPS111 Found too short name: `C`
+   |
+30 | class C:  # bad
+   |       ^ WPS111
+31 |     a: int  # bad
+32 |     b = 2  # bad
+   |
+
+WPS111.py:31:5: WPS111 Found too short name: `a`
+   |
+30 | class C:  # bad
+31 |     a: int  # bad
+   |     ^ WPS111
+32 |     b = 2  # bad
+   |
+
+WPS111.py:32:5: WPS111 Found too short name: `b`
+   |
+30 | class C:  # bad
+31 |     a: int  # bad
+32 |     b = 2  # bad
+   |     ^ WPS111
+33 | 
+34 |     def __init__(self, i: str, j):  # bad
+   |
+
+WPS111.py:34:24: WPS111 Found too short name: `i`
+   |
+32 |     b = 2  # bad
+33 | 
+34 |     def __init__(self, i: str, j):  # bad
+   |                        ^ WPS111
+35 |         self.i = i  # bad
+36 |         self.j = j  # bad
+   |
+
+WPS111.py:34:32: WPS111 Found too short name: `j`
+   |
+32 |     b = 2  # bad
+33 | 
+34 |     def __init__(self, i: str, j):  # bad
+   |                                ^ WPS111
+35 |         self.i = i  # bad
+36 |         self.j = j  # bad
+   |
+
+WPS111.py:35:14: WPS111 Found too short name: `i`
+   |
+34 |     def __init__(self, i: str, j):  # bad
+35 |         self.i = i  # bad
+   |              ^ WPS111
+36 |         self.j = j  # bad
+   |
+
+WPS111.py:36:14: WPS111 Found too short name: `j`
+   |
+34 |     def __init__(self, i: str, j):  # bad
+35 |         self.i = i  # bad
+36 |         self.j = j  # bad
+   |              ^ WPS111
+   |
+
+WPS111.py:49:21: WPS111 Found too short name: `c`
+   |
+48 | match command.split():
+49 |     case ["quit" as c]:  # bad
+   |                     ^ WPS111
+50 |         pass
+51 |     case ["go", d]:  # bad
+   |
+
+WPS111.py:51:17: WPS111 Found too short name: `d`
+   |
+49 |     case ["quit" as c]:  # bad
+50 |         pass
+51 |     case ["go", d]:  # bad
+   |                 ^ WPS111
+52 |         pass
+53 |     case ["drop", *o]:  # bad
+   |
+
+WPS111.py:53:20: WPS111 Found too short name: `o`
+   |
+51 |     case ["go", d]:  # bad
+52 |         pass
+53 |     case ["drop", *o]:  # bad
+   |                    ^ WPS111
+54 |         pass
+   |
+
+WPS111.py:67:22: WPS111 Found too short name: `e`
+   |
+65 | try:
+66 |     int("-")
+67 | except ValueError as e:  # bad
+   |                      ^ WPS111
+68 |     print(e)
+   |
+
+WPS111.py:77:6: WPS111 Found too short name: `P`
+   |
+75 | type Point = tuple[int, int]  # good
+76 | 
+77 | type P = tuple[int, int]  # bad
+   |      ^ WPS111
+78 | 
+79 | for i in range(3):  # bad
+   |
+
+WPS111.py:79:5: WPS111 Found too short name: `i`
+   |
+77 | type P = tuple[int, int]  # bad
+78 | 
+79 | for i in range(3):  # bad
+   |     ^ WPS111
+80 |     pass
+   |
+
+

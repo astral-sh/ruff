@@ -17,6 +17,7 @@ use crate::rules::{
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
     flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
+    wemake_python_styleguide,
 };
 use crate::settings::types::PythonVersion;
 
@@ -248,6 +249,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             checker.diagnostics.push(diagnostic);
                         }
                     }
+                    if checker.enabled(Rule::TooShortName) {
+                        wemake_python_styleguide::rules::too_short_name(checker, expr);
+                    }
                     if !checker.semantic.current_scope().kind.is_class() {
                         if checker.enabled(Rule::BuiltinVariableShadowing) {
                             flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
@@ -330,6 +334,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::PrivateMemberAccess) {
                 flake8_self::rules::private_member_access(checker, expr);
+            }
+            if checker.enabled(Rule::TooShortName) {
+                wemake_python_styleguide::rules::too_short_name(checker, expr);
             }
             if checker.enabled(Rule::CollectionsNamedTuple) {
                 flake8_pyi::rules::collections_named_tuple(checker, expr);

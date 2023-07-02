@@ -1,3 +1,4 @@
+use ast::ExceptHandlerExceptHandler;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Node;
@@ -14,6 +15,7 @@ use crate::rules::{
     flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots,
     flake8_tidy_imports, flake8_trio, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
     perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    wemake_python_styleguide,
 };
 use crate::settings::types::PythonVersion;
 
@@ -334,6 +336,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
+            if checker.enabled(Rule::TooShortName) {
+                wemake_python_styleguide::rules::too_short_name(checker, name);
+            }
             if !checker.semantic.current_scope().kind.is_class() {
                 if checker.enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
@@ -503,6 +508,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::MetaClassABCMeta) {
                 refurb::rules::metaclass_abcmeta(checker, class_def);
             }
+            if checker.enabled(Rule::TooShortName) {
+                wemake_python_styleguide::rules::too_short_name(checker, name);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
@@ -560,6 +568,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname.range(),
                         );
                     }
+                }
+                if checker.enabled(Rule::TooShortName) {
+                    wemake_python_styleguide::rules::too_short_name(checker, alias);
                 }
                 if checker.enabled(Rule::Debugger) {
                     if let Some(diagnostic) =
@@ -974,6 +985,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             checker.diagnostics.push(diagnostic);
                         }
                     }
+                    if checker.enabled(Rule::TooShortName) {
+                        wemake_python_styleguide::rules::too_short_name(checker, asname);
+                    }
                     if !checker.source_type.is_stub() {
                         if checker.enabled(Rule::UselessImportAlias) {
                             pylint::rules::useless_import_alias(checker, alias);
@@ -1371,6 +1385,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_simplify::rules::return_in_try_except_finally(
                     checker, body, handlers, finalbody,
                 );
+            }
+            if checker.enabled(Rule::TooShortName) {
+                for handler in handlers {
+                    if let ast::ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler {
+                        name: Some(name),
+                        ..
+                    }) = handler
+                    {
+                        wemake_python_styleguide::rules::too_short_name(checker, name);
+                    }
+                }
             }
             if checker.enabled(Rule::TryConsiderElse) {
                 tryceratops::rules::try_consider_else(checker, body, orelse, handlers);

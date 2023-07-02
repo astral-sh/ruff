@@ -20,7 +20,7 @@ use crate::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, wemake_python_styleguide,
 };
 use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnores, PythonVersion};
 use crate::{codes, RuleSelector};
@@ -259,6 +259,7 @@ pub struct LinterSettings {
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
+    pub wemake_python_styleguide: wemake_python_styleguide::settings::Settings,
 }
 
 impl Display for LinterSettings {
@@ -421,6 +422,7 @@ impl LinterSettings {
             pyflakes: pyflakes::settings::Settings::default(),
             pylint: pylint::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
+            wemake_python_styleguide: wemake_python_styleguide::settings::Settings::default(),
             preview: PreviewMode::default(),
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),

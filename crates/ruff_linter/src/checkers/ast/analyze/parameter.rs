@@ -3,7 +3,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_builtins, pep8_naming, pycodestyle};
+use crate::rules::{flake8_builtins, pep8_naming, pycodestyle, wemake_python_styleguide};
 
 /// Run lint rules over a [`Parameter`] syntax node.
 pub(crate) fn parameter(parameter: &Parameter, checker: &mut Checker) {
@@ -25,5 +25,8 @@ pub(crate) fn parameter(parameter: &Parameter, checker: &mut Checker) {
     }
     if checker.enabled(Rule::BuiltinArgumentShadowing) {
         flake8_builtins::rules::builtin_argument_shadowing(checker, parameter);
+    }
+    if checker.enabled(Rule::TooShortName) {
+        wemake_python_styleguide::rules::too_short_name(checker, parameter);
     }
 }

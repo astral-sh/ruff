@@ -120,7 +120,7 @@ pub fn check_path(
     if settings
         .rules
         .iter_enabled()
-        .any(|rule_code| rule_code.lint_source().is_filesystem())
+        .any(|rule_code| rule_code.lint_source().is_filesystem() || rule_code == Rule::TooShortName)
     {
         diagnostics.extend(check_file_path(path, package, locator, indexer, settings));
     }
