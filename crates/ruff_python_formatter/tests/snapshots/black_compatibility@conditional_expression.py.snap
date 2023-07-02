@@ -79,7 +79,7 @@ def something():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,90 +1,48 @@
+@@ -1,90 +1,50 @@
  long_kwargs_single_line = my_function(
      foo="test, this is a sample value",
 -    bar=(
@@ -157,21 +157,21 @@ def something():
 -    )
 -    for some_boolean_variable in some_iterable
 -)
-+generator_expression = (i for i in [])
++generator_expression = (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
  
  
  def limit_offset_sql(self, low_mark, high_mark):
      """Return LIMIT/OFFSET SQL clause."""
      limit, offset = self._get_limit_offset_params(low_mark, high_mark)
--    return " ".join(
+     return " ".join(
 -        sql
 -        for sql in (
 -            "LIMIT %d" % limit if limit else None,
 -            ("OFFSET %d" % offset) if offset else None,
 -        )
 -        if sql
--    )
-+    return " ".join((i for i in []))
++        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+     )
  
  
  def something():
@@ -221,13 +221,15 @@ def weird_default_argument(
 
 nested = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 
-generator_expression = (i for i in [])
+generator_expression = (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 
 
 def limit_offset_sql(self, low_mark, high_mark):
     """Return LIMIT/OFFSET SQL clause."""
     limit, offset = self._get_limit_offset_params(low_mark, high_mark)
-    return " ".join((i for i in []))
+    return " ".join(
+        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+    )
 
 
 def something():

@@ -248,9 +248,9 @@ instruction()#comment with bad spacing
 -        # right
 -        if element is not None
 -    ]
-+    lcomp = [i for i in []]
-+    lcomp2 = [i for i in []]
-+    lcomp3 = [i for i in []]
++    lcomp = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
++    lcomp2 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
++    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
      while True:
          if False:
              continue
@@ -404,9 +404,9 @@ short
         # yup
         arg3=True,
     )
-    lcomp = [i for i in []]
-    lcomp2 = [i for i in []]
-    lcomp3 = [i for i in []]
+    lcomp = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+    lcomp2 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
     while True:
         if False:
             continue
