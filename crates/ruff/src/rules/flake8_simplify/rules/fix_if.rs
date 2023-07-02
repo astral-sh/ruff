@@ -90,7 +90,8 @@ pub(crate) fn fix_nested_if_statements(
         body: Suite::IndentedBlock(ref mut outer_body),
         orelse: None,
         ..
-    } = outer_if else {
+    } = outer_if
+    else {
         bail!("Expected outer if to have indented body and no else")
     };
 

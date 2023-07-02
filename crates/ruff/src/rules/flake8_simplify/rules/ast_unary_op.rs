@@ -127,7 +127,13 @@ fn is_dunder_method(name: &str) -> bool {
 }
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let Stmt::If(ast::StmtIf {test: _, body, orelse: _, range: _ })= stmt else {
+    let Stmt::If(ast::StmtIf {
+        test: _,
+        body,
+        orelse: _,
+        range: _,
+    }) = stmt
+    else {
         return false;
     };
     if body.len() != 1 {
@@ -149,7 +155,13 @@ pub(crate) fn negation_with_equal_op(
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _}) = operand else {
+    let Expr::Compare(ast::ExprCompare {
+        left,
+        ops,
+        comparators,
+        range: _,
+    }) = operand
+    else {
         return;
     };
     if !matches!(&ops[..], [CmpOp::Eq]) {
@@ -201,7 +213,13 @@ pub(crate) fn negation_with_not_equal_op(
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _}) = operand else {
+    let Expr::Compare(ast::ExprCompare {
+        left,
+        ops,
+        comparators,
+        range: _,
+    }) = operand
+    else {
         return;
     };
     if !matches!(&ops[..], [CmpOp::NotEq]) {
@@ -248,7 +266,12 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::UnaryOp(ast::ExprUnaryOp { op: operand_op, operand, range: _ }) = operand else {
+    let Expr::UnaryOp(ast::ExprUnaryOp {
+        op: operand_op,
+        operand,
+        range: _,
+    }) = operand
+    else {
         return;
     };
     if !matches!(operand_op, UnaryOp::Not) {

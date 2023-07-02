@@ -106,7 +106,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if i >= tokens.len() {
             return None;
         }
-        let Ok(( tok, _)) = &tokens[i] else {
+        let Ok((tok, _)) = &tokens[i] else {
             return None;
         };
         match tok {
@@ -122,7 +122,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     if i >= tokens.len() {
         return None;
     }
-    let Ok(( tok, _)) = &tokens[i] else {
+    let Ok((tok, _)) = &tokens[i] else {
         return None;
     };
     if matches!(tok, Tok::Rpar) {

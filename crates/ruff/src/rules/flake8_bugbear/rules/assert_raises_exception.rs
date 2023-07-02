@@ -55,7 +55,13 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
         return;
     };
     let item_context = &item.context_expr;
-    let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = &item_context else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        keywords,
+        range: _,
+    }) = &item_context
+    else {
         return;
     };
     if args.len() != 1 {

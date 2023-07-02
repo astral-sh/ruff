@@ -46,18 +46,24 @@ pub(crate) fn generate() -> String {
 
     // Generate all the top-level fields.
     for (name, entry) in &sorted_options {
-        let OptionEntry::Field(field) = entry else { continue; };
+        let OptionEntry::Field(field) = entry else {
+            continue;
+        };
         emit_field(&mut output, name, field, None);
         output.push_str("---\n\n");
     }
 
     // Generate all the sub-groups.
     for (group_name, entry) in &sorted_options {
-        let OptionEntry::Group(fields) = entry else { continue; };
+        let OptionEntry::Group(fields) = entry else {
+            continue;
+        };
         output.push_str(&format!("### `{group_name}`\n"));
         output.push('\n');
         for (name, entry) in fields.iter().sorted_by_key(|(name, _)| name) {
-            let OptionEntry::Field(field) = entry else { continue; };
+            let OptionEntry::Field(field) = entry else {
+                continue;
+            };
             emit_field(&mut output, name, field, Some(group_name));
             output.push_str("---\n\n");
         }

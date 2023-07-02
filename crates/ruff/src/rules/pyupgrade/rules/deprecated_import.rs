@@ -471,7 +471,7 @@ impl<'a> ImportReplacer<'a> {
             // line, we can't add a statement after it. For example, if we have
             // `if True: import foo`, we can't add a statement to the next line.
             let Some(indentation) = indentation else {
-                 let operation = WithoutRename {
+                let operation = WithoutRename {
                     target: target.to_string(),
                     members: matched_names
                         .iter()

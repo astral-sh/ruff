@@ -82,7 +82,8 @@ pub(crate) fn explicit_f_string_type_conversion(
             args,
             keywords,
             ..
-        }) = value.as_ref() else {
+        }) = value.as_ref()
+        else {
             continue;
         };
 

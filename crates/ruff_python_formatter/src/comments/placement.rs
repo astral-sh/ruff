@@ -67,14 +67,12 @@ fn handle_match_comment<'a>(
 
     // Get the enclosing match case
     let Some(match_case) = comment.enclosing_node().match_case() else {
-        return CommentPlacement::Default(comment)
+        return CommentPlacement::Default(comment);
     };
 
     // And its parent match statement.
-    let Some(match_stmt) = comment
-        .enclosing_parent()
-        .and_then(AnyNodeRef::stmt_match) else {
-        return CommentPlacement::Default(comment)
+    let Some(match_stmt) = comment.enclosing_parent().and_then(AnyNodeRef::stmt_match) else {
+        return CommentPlacement::Default(comment);
     };
 
     // Get the next sibling (sibling traversal would be really nice)
@@ -163,7 +161,9 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
         return CommentPlacement::Default(comment);
     }
 
-    let (Some(AnyNodeRef::ExceptHandlerExceptHandler(preceding_except_handler)), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+    let (Some(AnyNodeRef::ExceptHandlerExceptHandler(preceding_except_handler)), Some(following)) =
+        (comment.preceding_node(), comment.following_node())
+    else {
         return CommentPlacement::Default(comment);
     };
 
@@ -175,10 +175,10 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
             .unwrap_or_default();
 
     let Some(except_indentation) =
-            whitespace::indentation(locator, preceding_except_handler).map(str::len) else
-        {
-            return CommentPlacement::Default(comment);
-        };
+        whitespace::indentation(locator, preceding_except_handler).map(str::len)
+    else {
+        return CommentPlacement::Default(comment);
+    };
 
     if comment_indentation > except_indentation {
         // Delegate to `handle_trailing_body_comment`
@@ -447,7 +447,9 @@ fn handle_trailing_body_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    let Some(comment_indentation) = whitespace::indentation_at_offset(locator, comment.slice().range().start()) else {
+    let Some(comment_indentation) =
+        whitespace::indentation_at_offset(locator, comment.slice().range().start())
+    else {
         // The comment can't be a comment for the previous block if it isn't indented..
         return CommentPlacement::Default(comment);
     };
@@ -465,7 +467,9 @@ fn handle_trailing_body_comment<'a>(
     // # Trailing if comment
     // ```
     // Here we keep the comment a trailing comment of the `if`
-    let Some(preceding_node_indentation) = whitespace::indentation_at_offset(locator, preceding_node.start()) else {
+    let Some(preceding_node_indentation) =
+        whitespace::indentation_at_offset(locator, preceding_node.start())
+    else {
         return CommentPlacement::Default(comment);
     };
     if comment_indentation_len == preceding_node_indentation.len() {
@@ -593,7 +597,8 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     }
 
     // Must be between the condition expression and the first body element
-    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
         return CommentPlacement::Default(comment);
     };
 
@@ -881,8 +886,9 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     }
 
     // ... for comments with a preceding and following node,
-    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
-        return CommentPlacement::Default(comment)
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
     };
 
     // ... where the following is a function or class statement.

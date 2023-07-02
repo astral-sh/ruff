@@ -10,18 +10,17 @@ use crate::settings::Settings;
 
 pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &Settings) -> bool {
     let scope = semantic.scope();
-    let (
-        ScopeKind::Function(ast::StmtFunctionDef {
-            name,
-            decorator_list,
+    let (ScopeKind::Function(ast::StmtFunctionDef {
+        name,
+        decorator_list,
         ..
-        }) |
-        ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
-            name,
-            decorator_list,
-            ..
-        })
-    ) = scope.kind else {
+    })
+    | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
+        name,
+        decorator_list,
+        ..
+    })) = scope.kind
+    else {
         return false;
     };
     if name != "__init__" {

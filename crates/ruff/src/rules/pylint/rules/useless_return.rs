@@ -85,7 +85,7 @@ pub(crate) fn useless_return<'a>(
     }
 
     // Verify that the last statement is a return statement.
-    let Stmt::Return(ast::StmtReturn { value, range: _}) = &last_stmt else {
+    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &last_stmt else {
         return;
     };
 

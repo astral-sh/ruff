@@ -1411,11 +1411,18 @@ impl Truthiness {
                 Constant::Ellipsis => Some(true),
                 Constant::Tuple(elts) => Some(!elts.is_empty()),
             },
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _range }) => {
+            Expr::JoinedStr(ast::ExprJoinedStr {
+                values,
+                range: _range,
+            }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {
-                    let Expr::Constant(ast::ExprConstant { value: Constant::Str(string), .. } )= &value else {
+                    let Expr::Constant(ast::ExprConstant {
+                        value: Constant::Str(string),
+                        ..
+                    }) = &value
+                    else {
                         return false;
                     };
                     !string.is_empty()
@@ -1425,14 +1432,30 @@ impl Truthiness {
                     None
                 }
             }
-            Expr::List(ast::ExprList { elts, range: _range, .. })
-            | Expr::Set(ast::ExprSet { elts, range: _range })
-            | Expr::Tuple(ast::ExprTuple { elts,  range: _range,.. }) => Some(!elts.is_empty()),
-            Expr::Dict(ast::ExprDict { keys, range: _range, .. }) => Some(!keys.is_empty()),
+            Expr::List(ast::ExprList {
+                elts,
+                range: _range,
+                ..
+            })
+            | Expr::Set(ast::ExprSet {
+                elts,
+                range: _range,
+            })
+            | Expr::Tuple(ast::ExprTuple {
+                elts,
+                range: _range,
+                ..
+            }) => Some(!elts.is_empty()),
+            Expr::Dict(ast::ExprDict {
+                keys,
+                range: _range,
+                ..
+            }) => Some(!keys.is_empty()),
             Expr::Call(ast::ExprCall {
                 func,
                 args,
-                keywords, range: _range,
+                keywords,
+                range: _range,
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {

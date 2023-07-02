@@ -141,13 +141,13 @@ pub(crate) fn explicit_true_false_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let Expr::Constant(ast::ExprConstant { value, .. } )= &body else {
+    let Expr::Constant(ast::ExprConstant { value, .. }) = &body else {
         return;
     };
     if !matches!(value, Constant::Bool(true)) {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value, .. } )= &orelse else {
+    let Expr::Constant(ast::ExprConstant { value, .. }) = &orelse else {
         return;
     };
     if !matches!(value, Constant::Bool(false)) {
@@ -237,7 +237,12 @@ pub(crate) fn twisted_arms_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let Expr::UnaryOp(ast::ExprUnaryOp { op, operand: test_operand, range: _ } )= &test else {
+    let Expr::UnaryOp(ast::ExprUnaryOp {
+        op,
+        operand: test_operand,
+        range: _,
+    }) = &test
+    else {
         return;
     };
     if !op.is_not() {
@@ -245,10 +250,10 @@ pub(crate) fn twisted_arms_in_ifexpr(
     }
 
     // Check if the test operand and else branch use the same variable.
-    let Expr::Name(ast::ExprName { id: test_id, .. } )= test_operand.as_ref() else {
+    let Expr::Name(ast::ExprName { id: test_id, .. }) = test_operand.as_ref() else {
         return;
     };
-    let Expr::Name(ast::ExprName {id: orelse_id, ..}) = orelse else {
+    let Expr::Name(ast::ExprName { id: orelse_id, .. }) = orelse else {
         return;
     };
     if !test_id.eq(orelse_id) {

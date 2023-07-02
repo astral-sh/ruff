@@ -156,9 +156,10 @@ pub(crate) fn unordered_body_content_in_model(
         };
         let Some(&element_type) = elements_type_found
             .iter()
-            .find(|&&element_type| element_type > current_element_type) else {
-                elements_type_found.push(current_element_type);
-                continue;
+            .find(|&&element_type| element_type > current_element_type)
+        else {
+            elements_type_found.push(current_element_type);
+            continue;
         };
         let diagnostic = Diagnostic::new(
             DjangoUnorderedBodyContentInModel {

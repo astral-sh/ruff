@@ -4422,7 +4422,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
 
