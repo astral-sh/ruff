@@ -1,6 +1,8 @@
 //! Settings for the `isort` plugin.
 
 use std::collections::BTreeSet;
+use std::error::Error;
+use std::fmt;
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -346,8 +348,10 @@ impl Default for Settings {
     }
 }
 
-impl From<Options> for Settings {
-    fn from(options: Options) -> Self {
+impl TryFrom<Options> for Settings {
+    type Error = SettingsError;
+
+    fn try_from(options: Options) -> Result<Self, Self::Error> {
         // Extract any configuration options that deal with user-defined sections.
         let mut section_order: Vec<_> = options
             .section_order
@@ -424,7 +428,7 @@ impl From<Options> for Settings {
             }
         }
 
-        Self {
+        Ok(Self {
             required_imports: BTreeSet::from_iter(options.required_imports.unwrap_or_default()),
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
             force_single_line: options.force_single_line.unwrap_or(false),
@@ -452,6 +456,35 @@ impl From<Options> for Settings {
             lines_between_types: options.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(options.forced_separate.unwrap_or_default()),
             section_order,
+        })
+    }
+}
+
+/// Error returned by the [`TryFrom`] implementation of [`Settings`].
+#[derive(Debug)]
+pub enum SettingsError {
+    InvalidKnownFirstParty(glob::PatternError),
+    InvalidKnownThirdParty(glob::PatternError),
+}
+
+impl fmt::Display for SettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingsError::InvalidKnownThirdParty(err) => {
+                write!(f, "invalid known third-party pattern: {err}")
+            }
+            SettingsError::InvalidKnownFirstParty(err) => {
+                write!(f, "invalid known first-party pattern: {err}")
+            }
+        }
+    }
+}
+
+impl Error for SettingsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SettingsError::InvalidKnownThirdParty(err) => Some(err),
+            SettingsError::InvalidKnownFirstParty(err) => Some(err),
         }
     }
 }
