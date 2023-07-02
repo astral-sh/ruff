@@ -8,7 +8,7 @@ use ruff::logging::{set_up_logging, LogLevel};
 use ruff_cli::check;
 use std::process::ExitCode;
 
-mod check_formatter_stability;
+mod format_dev;
 mod generate_all;
 mod generate_cli_help;
 mod generate_docs;
@@ -63,9 +63,15 @@ enum Command {
         #[clap(long)]
         repeat: usize,
     },
-    /// Format a repository twice and ensure that it looks that the first and second formatting
-    /// look the same. Same arguments as `ruff check`
-    CheckFormatterStability(check_formatter_stability::Args),
+    /// Several utils related to the formatter which can be run on one or more repositories. The
+    /// selected set of files in a repository is the same as for `ruff check`.
+    ///
+    /// * Check formatter stability: Format a repository twice and ensure that it looks that the
+    ///   first and second formatting look the same.
+    /// * Format: Format the files in a repository to be able to check them with `git diff`
+    /// * Statistics: This computes the Jaccard index between the (assumed to be black formatted)
+    ///   input and the ruff formatted output
+    FormatDev(format_dev::Args),
 }
 
 fn main() -> Result<ExitCode> {
@@ -93,8 +99,8 @@ fn main() -> Result<ExitCode> {
                 check(args.clone(), log_level)?;
             }
         }
-        Command::CheckFormatterStability(args) => {
-            let exit_code = check_formatter_stability::main(&args)?;
+        Command::FormatDev(args) => {
+            let exit_code = format_dev::main(&args)?;
             return Ok(exit_code);
         }
     }

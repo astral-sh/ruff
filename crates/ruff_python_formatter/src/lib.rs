@@ -3,17 +3,24 @@ use crate::comments::{
 };
 use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
-use anyhow::{anyhow, Context, Result};
-use ruff_formatter::prelude::*;
-use ruff_formatter::{format, write};
+use ruff_formatter::format_element::tag;
+use ruff_formatter::prelude::{
+    dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
+};
+// `write!` aliased for https://github.com/dtolnay/thiserror/issues/239
+use ruff_formatter::{
+    format, normalize_newlines, write as ruff_write, Buffer, Format, FormatElement, FormatError,
+    FormatResult, PrintError,
+};
 use ruff_formatter::{Formatted, Printed, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
 use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{Mod, Ranged};
-use rustpython_parser::lexer::lex;
-use rustpython_parser::{parse_tokens, Mode};
+use rustpython_parser::lexer::{lex, LexicalError};
+use rustpython_parser::{parse_tokens, Mode, ParseError};
 use std::borrow::Cow;
+use thiserror::Error;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -48,9 +55,9 @@ where
 
     /// Formats the node without comments. Ignores any suppression comments.
     fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [source_position(node.start())])?;
+        ruff_write!(f, [source_position(node.start())])?;
         self.fmt_fields(node, f)?;
-        write!(f, [source_position(node.end())])
+        ruff_write!(f, [source_position(node.end())])
     }
 
     /// Formats the node's fields.
@@ -84,16 +91,40 @@ where
     }
 }
 
-pub fn format_module(contents: &str, options: PyFormatOptions) -> Result<Printed> {
+#[derive(Error, Debug)]
+pub enum FormatModuleError {
+    #[error("source contains syntax errors (lexer error): {0:?}")]
+    LexError(LexicalError),
+    #[error("source contains syntax errors (parser error): {0:?}")]
+    ParseError(ParseError),
+    #[error(transparent)]
+    FormatError(#[from] FormatError),
+    #[error(transparent)]
+    PrintError(#[from] PrintError),
+}
+
+impl From<LexicalError> for FormatModuleError {
+    fn from(value: LexicalError) -> Self {
+        Self::LexError(value)
+    }
+}
+
+impl From<ParseError> for FormatModuleError {
+    fn from(value: ParseError) -> Self {
+        Self::ParseError(value)
+    }
+}
+
+pub fn format_module(
+    contents: &str,
+    options: PyFormatOptions,
+) -> Result<Printed, FormatModuleError> {
     // Tokenize once
     let mut tokens = Vec::new();
     let mut comment_ranges = CommentRangesBuilder::default();
 
     for result in lex(contents, Mode::Module) {
-        let (token, range) = match result {
-            Ok((token, range)) => (token, range),
-            Err(err) => return Err(anyhow!("Source contains syntax errors {err:?}")),
-        };
+        let (token, range) = result?;
 
         comment_ranges.visit_token(&token, range);
         tokens.push(Ok((token, range)));
@@ -102,14 +133,11 @@ pub fn format_module(contents: &str, options: PyFormatOptions) -> Result<Printed
     let comment_ranges = comment_ranges.finish();
 
     // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
-        .with_context(|| "Syntax error in input")?;
+    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")?;
 
     let formatted = format_node(&python_ast, &comment_ranges, contents, options)?;
 
-    formatted
-        .print()
-        .with_context(|| "Failed to print the formatter IR")
+    Ok(formatted.print()?)
 }
 
 pub fn format_node<'a>(
@@ -200,10 +228,10 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
         match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
             Cow::Borrowed(_) => {
-                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
+                ruff_write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
             }
             Cow::Owned(cleaned) => {
-                write!(
+                ruff_write!(
                     f,
                     [
                         dynamic_text(&cleaned, Some(self.0.start())),

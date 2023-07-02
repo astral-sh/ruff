@@ -45,6 +45,7 @@ strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 syn = { version = "2.0.15" }
 test-case = { version = "3.0.0" }
+thiserror = { version = "1.0.41" }
 toml = { version = "0.7.2" }
 
 # v0.0.1

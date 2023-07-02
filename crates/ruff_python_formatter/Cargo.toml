@@ -27,6 +27,7 @@ rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 ruff_formatter = { path = "../ruff_formatter", features = ["serde"]}

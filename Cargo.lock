@@ -404,6 +404,7 @@ dependencies = [
  "encode_unicode",
  "lazy_static",
  "libc",
+ "unicode-width",
  "windows-sys 0.45.0",
 ]
 
@@ -950,6 +951,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "indicatif"
+version = "0.17.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ff8cc23a7393a397ed1d7f56e6365cba772aba9f9912ab968b03043c395d057"
+dependencies = [
+ "console",
+ "instant",
+ "number_prefix",
+ "portable-atomic",
+ "unicode-width",
+]
+
+[[package]]
 name = "inotify"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1334,6 +1348,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "number_prefix"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
 name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1556,6 +1576,12 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
+
+[[package]]
+name = "portable-atomic"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "767eb9f07d4a5ebcb39bbf2d452058a93c011373abf6832e24194a1c3f004794"
 
 [[package]]
 name = "predicates"
@@ -1959,6 +1985,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
+ "ignore",
+ "indicatif",
  "itertools",
  "libcst",
  "log",
@@ -1969,6 +1997,7 @@ dependencies = [
  "ruff",
  "ruff_cli",
  "ruff_diagnostics",
+ "ruff_formatter",
  "ruff_python_formatter",
  "ruff_python_stdlib",
  "ruff_textwrap",
@@ -1979,6 +2008,7 @@ dependencies = [
  "similar",
  "strum",
  "strum_macros",
+ "tempfile",
 ]
 
 [[package]]
@@ -2071,6 +2101,7 @@ dependencies = [
  "serde_json",
  "similar",
  "smallvec",
+ "thiserror",
 ]
 
 [[package]]
