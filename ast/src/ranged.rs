@@ -14,6 +14,12 @@ pub trait Ranged {
     }
 }
 
+impl Ranged for TextRange {
+    fn range(&self) -> TextRange {
+        *self
+    }
+}
+
 impl<T> Ranged for &T
 where
     T: Ranged,

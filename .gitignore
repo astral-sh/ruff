@@ -9,6 +9,7 @@ __pycache__
 .*sw*
 .vscode
 .idea/
+.venv/
 
 flame-graph.html
 flame.txt
