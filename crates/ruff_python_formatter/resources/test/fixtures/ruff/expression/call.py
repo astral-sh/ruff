@@ -81,3 +81,8 @@ f(
     dict()
 )
 
+# Don't add a magic trailing comma when there is only one entry
+# Minimized from https://github.com/django/django/blob/7eeadc82c2f7d7a778e3bb43c34d642e6275dacf/django/contrib/admin/checks.py#L674-L681
+f(
+    a.very_long_function_function_that_is_so_long_that_it_expands_the_parent_but_its_only_a_single_argument()
+)

@@ -111,14 +111,14 @@ def __await__(): return (yield)
  #!/usr/bin/env python3
 -import asyncio
 -import sys
--
--from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImport
 +NOT_YET_IMPLEMENTED_StmtImport
  
--from library import some_connection, some_decorator
+-from third_party import X, Y, Z
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
+-from library import some_connection, some_decorator
+-
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
@@ -198,24 +198,6 @@ def __await__(): return (yield)
  
  
  def long_lines():
-@@ -87,7 +94,7 @@
-                 ast_args.kw_defaults,
-                 parameters,
-                 implicit_default=True,
--            )
-+            ),
-         )
-         typedargslist.extend(
-             gen_annotated_params(
-@@ -96,7 +103,7 @@
-                 parameters,
-                 implicit_default=True,
-                 # trailing standalone comment
--            )
-+            ),
-         )
-     _type_comment_re = re.compile(
-         r"""
 @@ -135,14 +142,8 @@
      a,
      **kwargs,
@@ -334,7 +316,7 @@ def long_lines():
                 ast_args.kw_defaults,
                 parameters,
                 implicit_default=True,
-            ),
+            )
         )
         typedargslist.extend(
             gen_annotated_params(
@@ -343,7 +325,7 @@ def long_lines():
                 parameters,
                 implicit_default=True,
                 # trailing standalone comment
-            ),
+            )
         )
     _type_comment_re = re.compile(
         r"""

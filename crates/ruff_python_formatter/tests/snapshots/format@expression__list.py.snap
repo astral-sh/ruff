@@ -14,6 +14,19 @@ a2 = [  # a
 a3 = [
     # b
 ]
+
+# Add magic trailing comma only if there is more than one entry, but respect it if it's
+# already there
+b1 = [
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
+]
+b2 = [
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
+]
+b3 = [
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
+]
 ```
 
 ## Output
@@ -27,6 +40,19 @@ a2 = [  # a
 ]
 a3 = [
     # b
+]
+
+# Add magic trailing comma only if there is more than one entry, but respect it if it's
+# already there
+b1 = [
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
+]
+b2 = [
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
+]
+b3 = [
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
+    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
 ]
 ```
 

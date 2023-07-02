@@ -76,15 +76,6 @@ def func():
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
      if isinstance(exc_value, MultiError):
          embedded = []
-@@ -29,7 +22,7 @@
-                         # copy the set of _seen exceptions so that duplicates
-                         # shared between sub-exceptions are not omitted
-                         _seen=set(_seen),
--                    )
-+                    ),
-                     # This should be left alone (after)
-                 )
- 
 ```
 
 ## Ruff Output
@@ -114,7 +105,7 @@ def func():
                         # copy the set of _seen exceptions so that duplicates
                         # shared between sub-exceptions are not omitted
                         _seen=set(_seen),
-                    ),
+                    )
                     # This should be left alone (after)
                 )
 
