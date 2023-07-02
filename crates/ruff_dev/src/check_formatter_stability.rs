@@ -4,8 +4,9 @@
 //! checking entire repositories.
 
 use std::fmt::{Display, Formatter};
-use std::io::stdout;
+use std::fs::File;
 use std::io::Write;
+use std::io::{stdout, BufWriter};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -49,6 +50,9 @@ pub(crate) struct Args {
     /// Checks each project inside a directory
     #[arg(long)]
     pub(crate) multi_project: bool,
+    /// Write all errors to this file in addition to stdout
+    #[arg(long)]
+    pub(crate) error_file: Option<PathBuf>,
 }
 
 /// Generate ourself a `try_parse_from` impl for `CheckArgs`. This is a strange way to use clap but
@@ -114,6 +118,7 @@ fn check_multi_project(args: &Args) -> bool {
 
                     match check_repo(&Args {
                         files: vec![path.clone()],
+                        error_file: args.error_file.clone(),
                         ..*args
                     }) {
                         Ok(result) => sender.send(Message::Finished { result, path }),
@@ -126,6 +131,9 @@ fn check_multi_project(args: &Args) -> bool {
 
         scope.spawn(|_| {
             let mut stdout = stdout().lock();
+            let mut error_file = args.error_file.as_ref().map(|error_file| {
+                BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
+            });
 
             for message in receiver {
                 match message {
@@ -145,6 +153,9 @@ fn check_multi_project(args: &Args) -> bool {
                         )
                         .unwrap();
                         write!(stdout, "{}", result.display(args.format)).unwrap();
+                        if let Some(error_file) = &mut error_file {
+                            write!(error_file, "{}", result.display(args.format)).unwrap();
+                        }
                         all_success = all_success && result.is_success();
                     }
                     Message::Failed { path, error } => {
