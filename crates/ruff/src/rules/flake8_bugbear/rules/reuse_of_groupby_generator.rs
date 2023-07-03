@@ -147,19 +147,17 @@ where
                 range: _,
             }) => {
                 // base if plus branches
-                self.counter_stack
-                    .push(Vec::with_capacity(1 + elif_else_clauses.len()));
+                let mut if_stack = Vec::with_capacity(1 + elif_else_clauses.len());
                 // Initialize the vector with the count for the if branch.
-                self.counter_stack.last_mut().unwrap().push(0);
+                if_stack.push(0);
+                self.counter_stack.push(if_stack);
+
                 self.visit_expr(test);
                 self.visit_body(body);
 
                 for clause in elif_else_clauses {
                     self.counter_stack.last_mut().unwrap().push(0);
-                    if let Some(test) = &clause.test {
-                        self.visit_expr(test);
-                    }
-                    self.visit_body(&clause.body);
+                    self.visit_elif_else_clause(clause);
                 }
 
                 if let Some(last) = self.counter_stack.pop() {
