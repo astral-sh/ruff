@@ -644,10 +644,7 @@ where
                 },
             ) => {
                 if self.enabled(Rule::DjangoNullableModelStringField) {
-                    self.diagnostics
-                        .extend(flake8_django::rules::nullable_model_string_field(
-                            self, body,
-                        ));
+                    flake8_django::rules::nullable_model_string_field(self, body);
                 }
                 if self.enabled(Rule::DjangoExcludeWithModelForm) {
                     if let Some(diagnostic) =
