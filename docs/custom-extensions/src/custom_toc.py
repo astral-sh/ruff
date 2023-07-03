@@ -5,7 +5,7 @@ Table of Contents Extension for Python-Markdown
 See <https://Python-Markdown.github.io/extensions/toc>
 for documentation.
 
-Oringinal code Copyright 2008 [Jack Miller](https://codezen.org/)
+Original code Copyright 2008 [Jack Miller](https://codezen.org/)
 
 All changes Copyright 2008-2014 The Python Markdown Project
 
