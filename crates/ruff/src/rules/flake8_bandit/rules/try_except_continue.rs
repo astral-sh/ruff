@@ -38,6 +38,7 @@ use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-703](https://cwe.mitre.org/data/definitions/703.html)
+/// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 #[violation]
 pub struct TryExceptContinue;
 

@@ -7,11 +7,11 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for hardcoded temporary file or directory paths.
 ///
 /// ## Why is this bad?
-/// Hardcoded temporary file or directory paths with permissive permissions
-/// are insecure as they can be easily discovered by attackers who can then use
-/// them to supply malicious or otherwise unexpected files to the application.
-/// Other applications may also unexpectedly read or write to these files,
-/// causing unexpected behavior.
+/// Hardcoded temporary file or directory paths with permissive read and write
+/// permissions are insecure as they can be easily discovered by attackers who
+/// can use them to supply malicious or otherwise unexpected files to the
+/// program. Other programs may also read or write to these files, causing
+/// unexpected behavior.
 ///
 /// ## Example
 /// ```python

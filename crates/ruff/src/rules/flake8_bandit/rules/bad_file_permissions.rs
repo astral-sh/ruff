@@ -14,8 +14,8 @@ use crate::checkers::ast::Checker;
 /// Checks for particularly permissive file permissions.
 ///
 /// ## Why is this bad?
-/// Overly permissive file permissions can result in unintended access to and
-/// code execution.
+/// Overly permissive file permissions may allow unintended access and
+/// arbitrary code execution.
 ///
 /// ## Example
 /// ```python

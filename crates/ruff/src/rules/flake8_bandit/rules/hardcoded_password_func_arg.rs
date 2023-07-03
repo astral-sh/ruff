@@ -9,10 +9,10 @@ use super::super::helpers::{matches_password_name, string_literal};
 /// Checks for hardcoded password arguments.
 ///
 /// ## Why is this bad?
-/// Hardcoded passwords are a security risk because they can be easily
-/// discovered by attackers and used to gain unauthorized access. As they are
-/// hardcoded, this vulnerability cannot be easily fixed without changing the
-/// source code.
+/// Hardcoded passwords are a security risk as they can be easily discovered
+/// by attackers and used to gain unauthorized access. As they are hardcoded,
+/// this vulnerability cannot be easily fixed by the end user without changing
+/// the source code.
 ///
 /// Instead of hardcoding passwords, consider storing them in configuration
 /// files or other stores that are not committed to version control.
