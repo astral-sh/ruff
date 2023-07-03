@@ -360,7 +360,7 @@ mod tests {
     }
 
     fn to_pattern(pattern: &str) -> glob::Pattern {
-        glob::Pattern::new(pattern).unwrap() // TODO(tjkuson): fine for now!
+        glob::Pattern::new(pattern).unwrap()
     }
 
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
@@ -372,6 +372,30 @@ mod tests {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
                         vec![to_pattern("foo.bar"), to_pattern("baz")],
+                        vec![to_pattern("foo"), to_pattern("__future__")],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules_glob(path: &Path) -> Result<()> {
+        let snapshot = format!("glob_1_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![to_pattern("foo.*"), to_pattern("baz")],
                         vec![to_pattern("foo"), to_pattern("__future__")],
                         vec![],
                         vec![],
