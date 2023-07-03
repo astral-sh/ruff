@@ -359,6 +359,10 @@ mod tests {
         Ok(())
     }
 
+    fn to_pattern(pattern: &str) -> glob::Pattern {
+        glob::Pattern::new(pattern).unwrap() // TODO(tjkuson): fine for now!
+    }
+
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
     fn separate_modules(path: &Path) -> Result<()> {
         let snapshot = format!("1_{}", path.to_string_lossy());
@@ -367,8 +371,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["foo.bar".to_string(), "baz".to_string()],
-                        vec!["foo".to_string(), "__future__".to_string()],
+                        vec![to_pattern("foo.bar"), to_pattern("baz")],
+                        vec![to_pattern("foo"), to_pattern("__future__")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -391,8 +395,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["foo".to_string()],
-                        vec!["foo.bar".to_string()],
+                        vec![to_pattern("foo")],
+                        vec![to_pattern("foo.bar")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -435,7 +439,7 @@ mod tests {
                     known_modules: KnownModules::new(
                         vec![],
                         vec![],
-                        vec!["ruff".to_string()],
+                        vec![to_pattern("ruff")],
                         vec![],
                         FxHashMap::default(),
                     ),
@@ -933,7 +937,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![to_pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
@@ -962,11 +966,11 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["library".to_string()],
+                        vec![to_pattern("library")],
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![to_pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),

@@ -10,7 +10,7 @@ use strum_macros::EnumIter;
 use ruff_macros::CacheKey;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
-use crate::settings::types::PythonVersion;
+use crate::settings::types::{IdentifierPattern, PythonVersion};
 use crate::warn_user_once;
 
 use super::types::{ImportBlock, Importable};
@@ -210,18 +210,18 @@ pub(crate) fn categorize_imports<'a>(
 #[derive(Debug, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
-    known: FxHashMap<String, ImportSection>,
+    known: FxHashMap<glob::Pattern, ImportSection>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
 
 impl KnownModules {
     pub(crate) fn new(
-        first_party: Vec<String>,
-        third_party: Vec<String>,
-        local_folder: Vec<String>,
-        standard_library: Vec<String>,
-        user_defined: FxHashMap<String, Vec<String>>,
+        first_party: Vec<glob::Pattern>,
+        third_party: Vec<glob::Pattern>,
+        local_folder: Vec<glob::Pattern>,
+        standard_library: Vec<glob::Pattern>,
+        user_defined: FxHashMap<String, Vec<glob::Pattern>>,
     ) -> Self {
         let modules = user_defined
             .into_iter()
@@ -261,7 +261,8 @@ impl KnownModules {
             }
         });
 
-        let has_submodules = known.keys().any(|module| module.contains('.'));
+        // Check if glob::Pattern contains '.'. If so, we need to check for submodules.
+        let has_submodules = known.keys().any(|module| module.as_str().contains('.'));
 
         Self {
             known,
@@ -296,7 +297,8 @@ impl KnownModules {
     }
 
     fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason)> {
-        if let Some(section) = self.known.get(submodule) {
+        let submodule_pattern = IdentifierPattern::new(submodule).ok()?;
+        if let Some(section) = self.known.get(&submodule_pattern) {
             let reason = match section {
                 ImportSection::UserDefined(_) => Reason::UserDefinedSection,
                 ImportSection::Known(ImportType::FirstParty) => Reason::KnownFirstParty,
@@ -314,7 +316,7 @@ impl KnownModules {
     }
 
     /// Return the list of modules that are known to be of a given type.
-    pub(crate) fn modules_for_known_type(&self, import_type: ImportType) -> Vec<String> {
+    pub(crate) fn modules_for_known_type(&self, import_type: ImportType) -> Vec<glob::Pattern> {
         self.known
             .iter()
             .filter_map(|(module, known_section)| {
@@ -332,8 +334,8 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub(crate) fn user_defined(&self) -> FxHashMap<String, Vec<String>> {
-        let mut user_defined: FxHashMap<String, Vec<String>> = FxHashMap::default();
+    pub(crate) fn user_defined(&self) -> FxHashMap<String, Vec<glob::Pattern>> {
+        let mut user_defined: FxHashMap<String, Vec<glob::Pattern>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined
