@@ -63,20 +63,23 @@ use super::helpers;
 /// [Django Style Guide]: https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#model-style
 #[violation]
 pub struct DjangoUnorderedBodyContentInModel {
-    elem_type: ContentType,
-    before: ContentType,
+    element_type: ContentType,
+    prev_element_type: ContentType,
 }
 
 impl Violation for DjangoUnorderedBodyContentInModel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DjangoUnorderedBodyContentInModel { elem_type, before } = self;
-        format!("Order of model's inner classes, methods, and fields does not follow the Django Style Guide: {elem_type} should come before {before}")
+        let DjangoUnorderedBodyContentInModel {
+            element_type,
+            prev_element_type,
+        } = self;
+        format!("Order of model's inner classes, methods, and fields does not follow the Django Style Guide: {element_type} should come before {prev_element_type}")
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-pub(crate) enum ContentType {
+enum ContentType {
     FieldDeclaration,
     ManagerDeclaration,
     MetaClass,
@@ -149,25 +152,38 @@ pub(crate) fn unordered_body_content_in_model(
     {
         return;
     }
-    let mut elements_type_found = Vec::new();
+
+    // Track all the element types we've seen so far.
+    let mut element_types = Vec::new();
+    let mut prev_element_type = None;
     for element in body.iter() {
-        let Some(current_element_type) = get_element_type(element, checker.semantic()) else {
+        let Some(element_type) = get_element_type(element, checker.semantic()) else {
             continue;
         };
-        let Some(&element_type) = elements_type_found
+
+        // Skip consecutive elements of the same type. It's less noisy to only report
+        // violations at type boundaries (e.g., avoid raising a violation for _every_
+        // field declaration that's out of order).
+        if prev_element_type == Some(element_type) {
+            continue;
+        }
+
+        prev_element_type = Some(element_type);
+
+        if let Some(&prev_element_type) = element_types
             .iter()
-            .find(|&&element_type| element_type > current_element_type)
-        else {
-            elements_type_found.push(current_element_type);
-            continue;
-        };
-        let diagnostic = Diagnostic::new(
-            DjangoUnorderedBodyContentInModel {
-                elem_type: current_element_type,
-                before: element_type,
-            },
-            element.range(),
-        );
-        checker.diagnostics.push(diagnostic);
+            .find(|&&prev_element_type| prev_element_type > element_type)
+        {
+            let diagnostic = Diagnostic::new(
+                DjangoUnorderedBodyContentInModel {
+                    element_type,
+                    prev_element_type,
+                },
+                element.range(),
+            );
+            checker.diagnostics.push(diagnostic);
+        } else {
+            element_types.push(element_type);
+        }
     }
 }
