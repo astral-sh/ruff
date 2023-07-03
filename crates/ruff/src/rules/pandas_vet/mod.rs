@@ -353,8 +353,10 @@ mod tests {
         "PD901_fail_df_var"
     )]
     fn contents(contents: &str, snapshot: &str) {
-        let diagnostics =
-            test_snippet(contents, &settings::Settings::for_rules(&Linter::PandasVet));
+        let diagnostics = test_snippet(
+            contents,
+            &settings::Settings::for_rules(Linter::PandasVet.rules()),
+        );
         assert_messages!(snapshot, diagnostics);
     }
 
