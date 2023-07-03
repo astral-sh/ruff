@@ -72,7 +72,7 @@ pub(crate) struct Checker<'a> {
     deferred: Deferred<'a>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Check-specific state.
-    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
+    pub(crate) flake8_bugbear_seen: Vec<&'a ast::ExprName>,
 }
 
 impl<'a> Checker<'a> {
