@@ -21,7 +21,7 @@ use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 /// while predicate:
 ///     try:
 ///         ...
-///     except Exception as exc:
+///     except Exception:
 ///         continue
 /// ```
 ///
