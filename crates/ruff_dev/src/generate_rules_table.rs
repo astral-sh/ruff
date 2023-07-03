@@ -96,7 +96,7 @@ pub(crate) fn generate() -> String {
         if let Some(categories) = linter.upstream_categories() {
             for UpstreamCategory(prefix, name) in categories {
                 table_out.push_str(&format!(
-                    "####  {name} <code>({}{})</code>",
+                    "#### {name} <code>({}{})</code>",
                     linter.common_prefix(),
                     prefix.short_code()
                 ));
