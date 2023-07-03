@@ -72,8 +72,11 @@ def get_name(el):
     return "".join(text).strip()
 
 
-def stashedHTML2text(text, md, strip_entities=True):
+def stashedHTML2text(text, md, strip_entities=True, keep_tags=None):
     """Extract raw HTML from stash, reduce to plain text and swap with placeholder."""
+
+    def _tag_keeper(m):
+        return m.group(0) if keep_tags and m.group(1) in keep_tags else ""
 
     def _html_sub(m):
         """Substitute raw html with plain text."""
@@ -82,7 +85,7 @@ def stashedHTML2text(text, md, strip_entities=True):
         except (IndexError, TypeError):  # pragma: no cover
             return m.group(0)
         # Strip out tags and/or entities - leaving text
-        res = re.sub(r"(<[^>]+>)", "", raw)
+        res = re.sub(r"<\/?\s*([^\s>]+)(\s[^>]*)?>", _tag_keeper, raw)
         if strip_entities:
             res = re.sub(r"(&[\#a-zA-Z0-9]+;)", "", res)
         return res
@@ -182,6 +185,7 @@ class TocTreeprocessor(Treeprocessor):
         else:
             self.toc_top = 1
             self.toc_bottom = int(config["toc_depth"])
+        self.keep_tags = config["keep_tags"]
 
     def iterparent(self, node):
         """Iterator wrapper to get allowed parent and child all at once."""
@@ -313,6 +317,7 @@ class TocTreeprocessor(Treeprocessor):
                                     code_escape(el.attrib.get("data-toc-label", text)),
                                     self.md,
                                     strip_entities=False,
+                                    keep_tags=self.keep_tags,
                                 )
                             ),
                         }
@@ -391,6 +396,7 @@ class TocExtension(Extension):
                 'in between ("2-5"), define the top (t) and the'
                 "bottom (b) (<ht>..<hb>). Defaults to `6` (bottom).",
             ],
+            "keep_tags": [[], "HTML tags to keep in the TOC."],
         }
 
         super().__init__(**kwargs)
