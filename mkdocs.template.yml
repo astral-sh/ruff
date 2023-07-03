@@ -32,6 +32,7 @@ site_dir: site/docs
 markdown_extensions:
   - custom-toc:
       permalink: "#"
+      keep_tags: ["code"]
   - pymdownx.snippets:
   - pymdownx.magiclink:
   - attr_list:
