@@ -96,7 +96,7 @@ f(
 
 ## Output
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from unittest.mock import MagicMock
 
 
 def f(*args, **kwargs):

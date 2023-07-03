@@ -65,22 +65,15 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -32,34 +32,28 @@
- 
- 
- if os.name == "posix":
--    import termios
-+    NOT_YET_IMPLEMENTED_StmtImport
+@@ -36,7 +36,6 @@
  
      def i_should_be_followed_by_only_one_newline():
          pass
 -
  elif os.name == "nt":
      try:
--        import msvcrt
-+        NOT_YET_IMPLEMENTED_StmtImport
- 
-         def i_should_be_followed_by_only_one_newline():
+         import msvcrt
+@@ -45,21 +44,16 @@
              pass
  
      except ImportError:
@@ -141,13 +134,13 @@ def h():
 
 
 if os.name == "posix":
-    NOT_YET_IMPLEMENTED_StmtImport
+    import termios
 
     def i_should_be_followed_by_only_one_newline():
         pass
 elif os.name == "nt":
     try:
-        NOT_YET_IMPLEMENTED_StmtImport
+        import msvcrt
 
         def i_should_be_followed_by_only_one_newline():
             pass
