@@ -300,12 +300,12 @@ pub(crate) fn outdated_version_block(
             comparators,
             range: _,
         }) = &test
-    else {
+        else {
             continue;
         };
 
         let ([op], [comparison]) = (ops.as_slice(), comparators.as_slice()) else {
-            continue
+            continue;
         };
 
         if !checker

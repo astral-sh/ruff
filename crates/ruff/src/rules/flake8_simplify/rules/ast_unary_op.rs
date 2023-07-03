@@ -127,7 +127,7 @@ fn is_dunder_method(name: &str) -> bool {
 }
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let Stmt::If(ast::StmtIf { body, .. })= stmt else {
+    let Stmt::If(ast::StmtIf { body, .. }) = stmt else {
         return false;
     };
     if body.len() != 1 {

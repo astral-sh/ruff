@@ -349,7 +349,8 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     }
 
     // The comment must be between two statements...
-    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
         return CommentPlacement::Default(comment);
     };
 

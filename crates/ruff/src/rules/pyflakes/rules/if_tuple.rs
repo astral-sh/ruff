@@ -51,7 +51,7 @@ pub(crate) fn if_tuple(
     );
     for test in if_elif_tests {
         let Expr::Tuple(ast::ExprTuple { elts, .. }) = &test else {
-            continue
+            continue;
         };
         if elts.is_empty() {
             continue;

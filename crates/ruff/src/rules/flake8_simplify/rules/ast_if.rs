@@ -581,16 +581,27 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         return;
     };
     // `test: None` to only match an `else` clause
-    let [ElifElseClause { body: else_body, test: None, ..}] = elif_else_clauses.as_slice() else {
-        return
+    let [ElifElseClause {
+        body: else_body,
+        test: None,
+        ..
+    }] = elif_else_clauses.as_slice()
+    else {
+        return;
     };
-    let [Stmt::Assign(ast::StmtAssign { targets: body_targets, value: body_value, .. })] = body.as_slice()
+    let [Stmt::Assign(ast::StmtAssign {
+        targets: body_targets,
+        value: body_value,
+        ..
+    })] = body.as_slice()
     else {
         return;
     };
     let [Stmt::Assign(ast::StmtAssign {
         targets: else_targets,
-        value: else_value, .. })] = else_body.as_slice()
+        value: else_value,
+        ..
+    })] = else_body.as_slice()
     else {
         return;
     };
@@ -600,7 +611,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     let Expr::Name(ast::ExprName { id: body_id, .. }) = body_target else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: else_id, .. } ) = else_target else {
+    let Expr::Name(ast::ExprName { id: else_id, .. }) = else_target else {
         return;
     };
     if body_id != else_id {
@@ -662,7 +673,12 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
 
 /// SIM114
 pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf { body, elif_else_clauses, .. }) = stmt else {
+    let Stmt::If(ast::StmtIf {
+        body,
+        elif_else_clauses,
+        ..
+    }) = stmt
+    else {
         return;
     };
 
@@ -678,7 +694,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt: 
 
     while let Some((first_start, first_body)) = branches_iter.next() {
         let Some((second_start, second_body)) = branches_iter.peek() else {
-            continue
+            continue;
         };
 
         // The bodies must have the same code ...
@@ -748,7 +764,10 @@ pub(crate) fn manual_dict_lookup(
     if ops != &[CmpOp::Eq] {
         return;
     }
-    let [Expr::Constant(ast::ExprConstant { value: constant, .. })] = comparators.as_slice() else {
+    let [Expr::Constant(ast::ExprConstant {
+        value: constant, ..
+    })] = comparators.as_slice()
+    else {
         return;
     };
     let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body else {
@@ -780,7 +799,8 @@ pub(crate) fn manual_dict_lookup(
             ops,
             comparators,
             range: _,
-        })) = test.as_ref() else {
+        })) = test.as_ref()
+        else {
             continue;
         };
 
@@ -790,7 +810,10 @@ pub(crate) fn manual_dict_lookup(
         if id != target || ops != &[CmpOp::Eq] {
             continue;
         }
-        let [Expr::Constant(ast::ExprConstant { value: constant, .. })] = comparators.as_slice() else {
+        let [Expr::Constant(ast::ExprConstant {
+            value: constant, ..
+        })] = comparators.as_slice()
+        else {
             continue;
         };
 
@@ -818,7 +841,12 @@ pub(crate) fn use_dict_get_with_default(
     let [body_stmt] = body else {
         return;
     };
-    let [ElifElseClause { body: else_body, test: None, .. }] = elif_else_clauses else {
+    let [ElifElseClause {
+        body: else_body,
+        test: None,
+        ..
+    }] = elif_else_clauses
+    else {
         return;
     };
     let [else_body_stmt] = else_body.as_slice() else {

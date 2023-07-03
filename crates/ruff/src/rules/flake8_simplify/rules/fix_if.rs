@@ -92,7 +92,9 @@ pub(crate) fn fix_nested_if_statements(
         bail!("Expected outer if to have indented body and no else")
     };
 
-    let [Statement::Compound(CompoundStatement::If(inner_if @ If { orelse: None, .. }))] = &mut *outer_body.body else {
+    let [Statement::Compound(CompoundStatement::If(inner_if @ If { orelse: None, .. }))] =
+        &mut *outer_body.body
+    else {
         bail!("Expected one inner if statement");
     };
 
