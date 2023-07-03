@@ -5,6 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "custom-extensions"
 version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = [
+  "Markdown",
+]
 
 [project.entry-points."markdown.extensions"]
-custom-toc = "custom_toc:TocExtension"
+custom-toc = "custom_extensions.toc:TocExtension"

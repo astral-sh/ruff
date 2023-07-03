@@ -1,5 +1,5 @@
-./docs/custom-extensions
 mkdocs~=1.4.2
 mkdocs-material~=9.0.6
 PyYAML~=6.0
 black==23.3.0
+./docs/custom-extensions

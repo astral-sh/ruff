@@ -10,4 +10,6 @@
 !custom-extensions/
 !custom-extensions/pyproject.toml
 !custom-extensions/src
-!custom-extensions/src/custom_toc.py
+!custom-extensions/src/custom_extensions
+!custom-extensions/src/custom_extensions/__init__.py
+!custom-extensions/src/custom_extensions/toc.py
