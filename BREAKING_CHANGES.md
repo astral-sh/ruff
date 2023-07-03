@@ -1,5 +1,31 @@
 # Breaking Changes
 
+## 0.0.276
+
+### The `keep-runtime-typing` setting has been reinstated ([#5470](https://github.com/astral-sh/ruff/pull/5470))
+
+The `keep-runtime-typing` setting has been reinstated with revised semantics. This setting was
+removed in [#4427](https://github.com/astral-sh/ruff/pull/4427), as it was equivalent to ignoring
+the `UP006` and `UP007` rules via Ruff's standard `ignore` mechanism.
+
+Taking `UP006` (rewrite `List[int]` to `list[int]`) as an example, the setting now behaves as
+follows:
+
+- On Python 3.7 and Python 3.8, setting `keep-runtime-typing = true` will cause Ruff to ignore
+  `UP006` violations, even if `from __future__ import annotations` is present in the file.
+  While such annotations are valid in Python 3.7 and Python 3.8 when combined with
+  `from __future__ import annotations`, they aren't supported by libraries like Pydantic and
+  FastAPI, which rely on runtime type checking.
+- On Python 3.9 and above, the setting has no effect, as `list[int]` is a valid type annotation,
+  and libraries like Pydantic and FastAPI support it without issue.
+
+In short: `keep-runtime-typing` can be used to ensure that Ruff doesn't introduce type annotations
+that are not supported at runtime by the current Python version, which are unsupported by libraries
+like Pydantic and FastAPI.
+
+Note that this is not a breaking change, but is included here to complement the previous removal
+of `keep-runtime-typing`.
+
 ## 0.0.268
 
 ### The `keep-runtime-typing` setting has been removed ([#4427](https://github.com/astral-sh/ruff/pull/4427))
