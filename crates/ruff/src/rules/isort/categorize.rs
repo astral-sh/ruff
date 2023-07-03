@@ -10,7 +10,7 @@ use strum_macros::EnumIter;
 use ruff_macros::CacheKey;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
-use crate::settings::types::{IdentifierPattern, PythonVersion};
+use crate::settings::types::PythonVersion;
 use crate::warn_user_once;
 
 use super::types::{ImportBlock, Importable};
@@ -261,7 +261,6 @@ impl KnownModules {
             }
         });
 
-        // Check if glob::Pattern contains '.'. If so, we need to check for submodules.
         let has_submodules = known.keys().any(|module| module.as_str().contains('.'));
 
         Self {
@@ -297,8 +296,11 @@ impl KnownModules {
     }
 
     fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason)> {
-        let submodule_pattern = IdentifierPattern::new(submodule).ok()?;
-        if let Some(section) = self.known.get(&submodule_pattern) {
+        let submodule_match = self
+            .known
+            .keys()
+            .find(|pattern| pattern.matches(submodule))?;
+        if let Some(section) = self.known.get(submodule_match) {
             let reason = match section {
                 ImportSection::UserDefined(_) => Reason::UserDefinedSection,
                 ImportSection::Known(ImportType::FirstParty) => Reason::KnownFirstParty,
