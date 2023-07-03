@@ -54,7 +54,9 @@ pub(crate) fn unnecessary_literal_dict(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
+    else {
         return;
     };
     if !checker.semantic().is_builtin("dict") {

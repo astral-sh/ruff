@@ -72,7 +72,7 @@ def func():
 -        # right
 -        if element is not None
 -    ]
-+    lcomp3 = [i for i in []]
++    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
      if isinstance(exc_value, MultiError):
          embedded = []
@@ -98,7 +98,7 @@ def func():
     x = """
     a really long string
     """
-    lcomp3 = [i for i in []]
+    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
     if isinstance(exc_value, MultiError):
         embedded = []

@@ -25,8 +25,8 @@ impl From<&CFormatString> for CFormatSummary {
                 ref min_field_width,
                 ref precision,
                 ..
-            }) = format_part.1 else
-            {
+            }) = format_part.1
+            else {
                 continue;
             };
             match mapping_key {

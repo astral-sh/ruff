@@ -109,7 +109,8 @@ pub(crate) fn fix_unnecessary_generator_dict(
     // Extract the (k, v) from `(k, v) for ...`.
     let generator_exp = match_generator_exp(&arg.value)?;
     let tuple = match_tuple(&generator_exp.elt)?;
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..] else {
+    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    else {
         bail!("Expected tuple to contain two elements");
     };
 
@@ -188,9 +189,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
 
     let tuple = match_tuple(&list_comp.elt)?;
 
-    let [Element::Simple {
-            value: key, ..
-        }, Element::Simple { value, .. }] = &tuple.elements[..] else { bail!("Expected tuple with two elements"); };
+    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    else {
+        bail!("Expected tuple with two elements");
+    };
 
     tree = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
@@ -982,14 +984,10 @@ pub(crate) fn fix_unnecessary_map(
                     }
 
                     let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
-                        bail!(
-                            "Expected tuple to contain a key as the first element"
-                        );
+                        bail!("Expected tuple to contain a key as the first element");
                     };
                     let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) else {
-                        bail!(
-                            "Expected tuple to contain a key as the second element"
-                        );
+                        bail!("Expected tuple to contain a key as the second element");
                     };
 
                     (key, value)
@@ -1063,9 +1061,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
     let call = match_call_mut(&mut tree)?;
 
     let Expression::ListComp(list_comp) = &call.args[0].value else {
-        bail!(
-            "Expected Expression::ListComp"
-        );
+        bail!("Expected Expression::ListComp");
     };
 
     let mut new_empty_lines = vec![];

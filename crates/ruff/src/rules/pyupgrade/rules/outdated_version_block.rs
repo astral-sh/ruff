@@ -223,7 +223,11 @@ fn fix_py2_block(
         let parent = checker.semantic().stmt_parent();
         let edit = delete_stmt(
             stmt,
-            if matches!(block.leading_token.tok, StartTok::If) { parent } else { None },
+            if matches!(block.leading_token.tok, StartTok::If) {
+                parent
+            } else {
+                None
+            },
             checker.locator,
             checker.indexer,
         );
@@ -348,7 +352,8 @@ pub(crate) fn outdated_version_block(
         ops,
         comparators,
         range: _,
-    }) = &test else {
+    }) = &test
+    else {
         return;
     };
 

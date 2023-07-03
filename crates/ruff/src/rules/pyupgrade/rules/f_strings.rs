@@ -197,7 +197,7 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
         return None;
     };
 
-    let Some(mut summary) = FormatSummaryValues::try_from_expr( expr, locator) else {
+    let Some(mut summary) = FormatSummaryValues::try_from_expr(expr, locator) else {
         return None;
     };
 
@@ -325,7 +325,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let Some(mut contents) = try_convert_to_f_string( expr, checker.locator) else {
+    let Some(mut contents) = try_convert_to_f_string(expr, checker.locator) else {
         return;
     };
 

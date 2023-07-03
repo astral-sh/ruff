@@ -69,7 +69,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
 
     let body = docstring.body();
     let Some(first_word) = body.split(' ').next() else {
-        return
+        return;
     };
 
     // Like pydocstyle, we only support ASCII for now.

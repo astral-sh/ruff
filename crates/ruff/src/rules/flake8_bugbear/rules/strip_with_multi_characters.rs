@@ -62,7 +62,8 @@ pub(crate) fn strip_with_multi_characters(
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } )= &args[0] else {
+    }) = &args[0]
+    else {
         return;
     };
 

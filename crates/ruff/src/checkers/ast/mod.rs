@@ -36,6 +36,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::flake8_builtins::helpers::AnyShadowing;
+
 use crate::rules::{
     airflow, flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -1370,6 +1371,51 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.is_stub {
+                    if self.any_enabled(&[
+                        Rule::UnrecognizedVersionInfoCheck,
+                        Rule::PatchVersionComparison,
+                        Rule::WrongTupleLengthVersionComparison,
+                    ]) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_version_info(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_version_info(self, test);
+                        }
+                    }
+                    if self.any_enabled(&[
+                        Rule::UnrecognizedPlatformCheck,
+                        Rule::UnrecognizedPlatformName,
+                    ]) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_platform(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_platform(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::BadVersionInfoComparison) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::bad_version_info_comparison(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::bad_version_info_comparison(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::ComplexIfStatementInStub) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::complex_if_statement_in_stub(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::complex_if_statement_in_stub(self, test);
+                        }
+                    }
+                }
             }
             Stmt::Assert(ast::StmtAssert {
                 test,
@@ -1409,7 +1455,7 @@ where
             Stmt::With(ast::StmtWith { items, body, .. })
             | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
-                    flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
+                    flake8_bugbear::rules::assert_raises_exception(self, items);
                 }
                 if self.enabled(Rule::PytestRaisesWithMultipleStatements) {
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
@@ -1489,6 +1535,12 @@ where
                 }
                 if self.enabled(Rule::IncorrectDictIterator) {
                     perflint::rules::incorrect_dict_iterator(self, target, iter);
+                }
+                if self.enabled(Rule::ManualListComprehension) {
+                    perflint::rules::manual_list_comprehension(self, body);
+                }
+                if self.enabled(Rule::ManualListCopy) {
+                    perflint::rules::manual_list_copy(self, body);
                 }
                 if self.enabled(Rule::UnnecessaryListCast) {
                     perflint::rules::unnecessary_list_cast(self, iter);
@@ -2107,6 +2159,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, value,
@@ -2117,7 +2170,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep604_annotation(
                                     self, expr, slice, operator,
@@ -2193,6 +2247,9 @@ where
                         if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
+                        if self.enabled(Rule::NumpyDeprecatedFunction) {
+                            numpy::rules::deprecated_function(self, expr);
+                        }
                         if self.is_stub {
                             if self.enabled(Rule::CollectionsNamedTuple) {
                                 flake8_pyi::rules::collections_named_tuple(self, expr);
@@ -2212,6 +2269,7 @@ where
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
+                                        && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
                                             self, expr,
@@ -2222,7 +2280,8 @@ where
                                     if self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
-                                            && self.semantic.in_annotation())
+                                            && self.semantic.in_annotation()
+                                            && !self.settings.pyupgrade.keep_runtime_typing)
                                     {
                                         pyupgrade::rules::use_pep585_annotation(
                                             self,
@@ -2287,6 +2346,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, expr,
@@ -2297,7 +2357,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep585_annotation(self, expr, &replacement);
                             }
@@ -2314,6 +2375,9 @@ where
                 }
                 if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
+                }
+                if self.enabled(Rule::NumpyDeprecatedFunction) {
+                    numpy::rules::deprecated_function(self, expr);
                 }
                 if self.enabled(Rule::DeprecatedMockImport) {
                     pyupgrade::rules::deprecated_mock_attribute(self, expr);
@@ -2869,7 +2933,7 @@ where
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
                 if self.enabled(Rule::NumpyLegacyRandom) {
-                    numpy::rules::numpy_legacy_random(self, func);
+                    numpy::rules::legacy_random(self, func);
                 }
                 if self.any_enabled(&[
                     Rule::LoggingStringFormat,
@@ -3193,29 +3257,6 @@ where
                 }
                 if self.enabled(Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
-                }
-                if self.is_stub {
-                    if self.any_enabled(&[
-                        Rule::UnrecognizedPlatformCheck,
-                        Rule::UnrecognizedPlatformName,
-                    ]) {
-                        flake8_pyi::rules::unrecognized_platform(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
-                    if self.enabled(Rule::BadVersionInfoComparison) {
-                        flake8_pyi::rules::bad_version_info_comparison(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
                 }
             }
             Expr::Constant(ast::ExprConstant {
@@ -4422,7 +4463,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
 

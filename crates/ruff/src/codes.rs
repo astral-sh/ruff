@@ -596,6 +596,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // flake8-pyi
         (Flake8Pyi, "001") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnprefixedTypeParam),
+        (Flake8Pyi, "002") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::ComplexIfStatementInStub),
+        (Flake8Pyi, "003") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedVersionInfoCheck),
+        (Flake8Pyi, "004") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::PatchVersionComparison),
+        (Flake8Pyi, "005") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::WrongTupleLengthVersionComparison),
         (Flake8Pyi, "006") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::BadVersionInfoComparison),
         (Flake8Pyi, "007") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedPlatformCheck),
         (Flake8Pyi, "008") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedPlatformName),
@@ -742,6 +746,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // numpy
         (Numpy, "001") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyDeprecatedTypeAlias),
         (Numpy, "002") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyLegacyRandom),
+        (Numpy, "003") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyDeprecatedFunction),
 
         // ruff
         (Ruff, "001") => (RuleGroup::Unspecified, rules::ruff::rules::AmbiguousUnicodeCharacterString),
@@ -788,6 +793,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Perflint, "101") => (RuleGroup::Unspecified, rules::perflint::rules::UnnecessaryListCast),
         (Perflint, "102") => (RuleGroup::Unspecified, rules::perflint::rules::IncorrectDictIterator),
         (Perflint, "203") => (RuleGroup::Unspecified, rules::perflint::rules::TryExceptInLoop),
+        (Perflint, "401") => (RuleGroup::Unspecified, rules::perflint::rules::ManualListComprehension),
+        (Perflint, "402") => (RuleGroup::Unspecified, rules::perflint::rules::ManualListCopy),
 
         // flake8-fixme
         (Flake8Fixme, "001") => (RuleGroup::Unspecified, rules::flake8_fixme::rules::LineContainsFixme),

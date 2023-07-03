@@ -62,7 +62,8 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
             args,
             keywords,
             range: _,
-        }) = &decorator.expression else {
+        }) = &decorator.expression
+        else {
             continue;
         };
 

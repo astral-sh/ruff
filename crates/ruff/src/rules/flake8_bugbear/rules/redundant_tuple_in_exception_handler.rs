@@ -59,7 +59,11 @@ pub(crate) fn redundant_tuple_in_exception_handler(
     handlers: &[ExceptHandler],
 ) {
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_: Some(type_), .. }) = handler else {
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            type_: Some(type_),
+            ..
+        }) = handler
+        else {
             continue;
         };
         let Expr::Tuple(ast::ExprTuple { elts, .. }) = type_.as_ref() else {

@@ -88,11 +88,16 @@ pub(crate) fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.semantic().is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
-                LiteralType::Str
-            } else {
-                LiteralType::Bytes
-            }}, expr.range());
+            let mut diagnostic = Diagnostic::new(
+                NativeLiterals {
+                    literal_type: if id == "str" {
+                        LiteralType::Str
+                    } else {
+                        LiteralType::Bytes
+                    },
+                },
+                expr.range(),
+            );
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = if id == "bytes" {
                     Constant::Bytes(vec![])

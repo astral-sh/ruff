@@ -121,7 +121,7 @@ with (
 
 
 # currently unparsable by black: https://github.com/psf/black/issues/3678
-with (i for i in []):
+with (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
     pass
 with (a, *NOT_YET_IMPLEMENTED_ExprStarred):
     pass

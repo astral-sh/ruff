@@ -19,6 +19,10 @@ use crate::registry::AsRule;
 /// Removing the `list()` call will not change the behavior of the code, but
 /// may improve performance.
 ///
+/// Note that, as with all `perflint` rules, this is only intended as a
+/// micro-optimization, and will have a negligible impact on performance in
+/// most cases.
+///
 /// ## Example
 /// ```python
 /// items = (1, 2, 3)
@@ -48,7 +52,13 @@ impl AlwaysAutofixableViolation for UnnecessaryListCast {
 
 /// PERF101
 pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
-    let Expr::Call(ast::ExprCall{ func, args, range: list_range, ..}) = iter else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        range: list_range,
+        ..
+    }) = iter
+    else {
         return;
     };
 
@@ -56,7 +66,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
         return;
     }
 
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else{
+    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
         return;
     };
 

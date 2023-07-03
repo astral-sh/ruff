@@ -61,7 +61,8 @@ fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
         value: variable,
         attr,
         ..
-    }) = func else {
+    }) = func
+    else {
         return None;
     };
     if attr != "encode" {
