@@ -43,16 +43,16 @@ pub(crate) fn slow_list_copy(checker: &mut Checker, body: &[Stmt]) {
 
     let stmt = &body[0];
 
-    let Stmt::Expr(ast::StmtExpr { value, .. })= stmt else {
-        return
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return;
     };
 
     let Expr::Call(ast::ExprCall { func, range, .. }) = value.as_ref() else {
-        return
+        return;
     };
 
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
-        return
+        return;
     };
 
     let attr = attr.as_str();

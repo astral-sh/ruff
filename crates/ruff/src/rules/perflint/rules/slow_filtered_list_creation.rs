@@ -45,20 +45,20 @@ pub(crate) fn slow_filtered_list_creation(checker: &mut Checker, body: &[Stmt]) 
     let stmt = &body[0];
 
     let Stmt::If(ast::StmtIf { body: if_body, .. }) = stmt else {
-        return
+        return;
     };
 
     for if_stmt in if_body {
-        let Stmt::Expr(ast::StmtExpr { value, .. })= if_stmt else {
-            continue
+        let Stmt::Expr(ast::StmtExpr { value, .. }) = if_stmt else {
+            continue;
         };
 
         let Expr::Call(ast::ExprCall { func, range, .. }) = value.as_ref() else {
-            continue
+            continue;
         };
 
         let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
-            continue
+            continue;
         };
 
         let attr = attr.as_str();
