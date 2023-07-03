@@ -50,7 +50,8 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
 }
 
 /// Note that this implementation misses the leading newlines before the leading comments because
-/// it does not have access to the last node of the previous branch
+/// it does not have access to the last node of the previous branch. The `StmtIf` therefore doesn't
+/// call this but `format_elif_else_clause` directly.
 #[derive(Default)]
 pub struct FormatElifElseClause;
 
