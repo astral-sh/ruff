@@ -981,7 +981,7 @@ where
             }) => {
                 walk_body(self, body);
                 for clause in elif_else_clauses {
-                    self.visit_elif_else_clause(&clause);
+                    self.visit_elif_else_clause(clause);
                 }
             }
             Stmt::While(ast::StmtWhile { body, .. })

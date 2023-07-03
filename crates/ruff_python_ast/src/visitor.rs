@@ -94,9 +94,10 @@ pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     elif_else_clause: &'a ElifElseClause,
 ) {
-    for stmt in &elif_else_clause.body {
-        visitor.visit_stmt(stmt);
+    if let Some(test) = &elif_else_clause.test {
+        visitor.visit_expr(test);
     }
+    visitor.visit_body(&elif_else_clause.body);
 }
 
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
