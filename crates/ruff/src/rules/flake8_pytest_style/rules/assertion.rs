@@ -226,10 +226,10 @@ pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Diagnostic> {
-    handlers
-        .iter()
-        .flat_map(|handler| match handler {
+pub(crate) fn assert_in_exception_handler(checker: &mut Checker, handlers: &[ExceptHandler]) {
+    checker
+        .diagnostics
+        .extend(handlers.iter().flat_map(|handler| match handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 name, body, ..
             }) => {
@@ -239,8 +239,7 @@ pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Dia
                     Vec::new()
                 }
             }
-        })
-        .collect()
+        }));
 }
 
 #[derive(Copy, Clone)]
