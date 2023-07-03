@@ -1409,7 +1409,7 @@ where
             Stmt::With(ast::StmtWith { items, body, .. })
             | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
-                    flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
+                    flake8_bugbear::rules::assert_raises_exception(self, items);
                 }
                 if self.enabled(Rule::PytestRaisesWithMultipleStatements) {
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
