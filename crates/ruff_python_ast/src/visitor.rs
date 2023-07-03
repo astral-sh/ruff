@@ -2,6 +2,7 @@
 
 pub mod preorder;
 
+use rustpython_ast::ElifElseClause;
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ExceptHandler, Expr,
     ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
@@ -75,10 +76,22 @@ pub trait Visitor<'a> {
     fn visit_body(&mut self, body: &'a [Stmt]) {
         walk_body(self, body);
     }
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+        walk_elif_else_clause(self, elif_else_clause);
+    }
 }
 
 pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt]) {
     for stmt in body {
+        visitor.visit_stmt(stmt);
+    }
+}
+
+pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    elif_else_clause: &'a ElifElseClause,
+) {
+    for stmt in &elif_else_clause.body {
         visitor.visit_stmt(stmt);
     }
 }

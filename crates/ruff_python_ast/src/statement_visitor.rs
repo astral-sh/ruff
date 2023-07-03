@@ -1,5 +1,6 @@
 //! Specialized AST visitor trait and walk functions that only visit statements.
 
+use rustpython_ast::ElifElseClause;
 use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Stmt};
 
 /// A trait for AST visitors that only need to visit statements.
@@ -12,6 +13,9 @@ pub trait StatementVisitor<'a> {
     }
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
         walk_except_handler(self, except_handler);
+    }
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+        walk_elif_else_clause(self, elif_else_clause);
     }
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
@@ -109,6 +113,13 @@ pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
             visitor.visit_body(body);
         }
     }
+}
+
+pub fn walk_elif_else_clause<'a, V: StatementVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    elif_else_clause: &'a ElifElseClause,
+) {
+    visitor.visit_body(&elif_else_clause.body);
 }
 
 pub fn walk_match_case<'a, V: StatementVisitor<'a> + ?Sized>(
