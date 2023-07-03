@@ -236,9 +236,7 @@ where
                 self.finalize(None);
 
                 for clause in elif_else_clauses {
-                    for stmt in &clause.body {
-                        self.visit_stmt(stmt);
-                    }
+                    self.visit_elif_else_clause(clause);
                 }
                 self.finalize(None);
             }
