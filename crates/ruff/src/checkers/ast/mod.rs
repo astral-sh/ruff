@@ -2068,7 +2068,9 @@ where
                     self.visit_body(body);
                 }
 
-                self.visit_body(orelse);
+                for clause in elif_else_clauses {
+                    self.visit_elif_else_clause(clause);
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         };
