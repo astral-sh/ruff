@@ -1418,8 +1418,8 @@ where
                 if self.enabled(Rule::UnnecessaryListCast) {
                     perflint::rules::unnecessary_list_cast(self, iter);
                 }
-                if self.enabled(Rule::SlowDictCreation) {
-                    perflint::rules::slow_dict_creation(self, target, body);
+                if self.enabled(Rule::ManualDictCreation) {
+                    perflint::rules::manual_dict_comprehension(self, target, body);
                 }
             }
             Stmt::Try(ast::StmtTry {
