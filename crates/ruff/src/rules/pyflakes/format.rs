@@ -44,7 +44,8 @@ impl TryFrom<&str> for FormatSummary {
                 field_name,
                 format_spec,
                 ..
-            } = format_part else {
+            } = format_part
+            else {
                 continue;
             };
             let parsed = FieldName::parse(field_name)?;

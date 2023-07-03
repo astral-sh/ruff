@@ -221,7 +221,8 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
         iter,
         orelse,
         ..
-    }) = stmt else {
+    }) = stmt
+    else {
         return None;
     };
 
@@ -236,8 +237,10 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
     let Stmt::If(ast::StmtIf {
         body: nested_body,
         test: nested_test,
-        orelse: nested_orelse, range: _,
-    }) = &body[0] else {
+        orelse: nested_orelse,
+        range: _,
+    }) = &body[0]
+    else {
         return None;
     };
     if nested_body.len() != 1 {
@@ -252,18 +255,30 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
     let Some(value) = value else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(value), .. }) = value.as_ref() else {
+    let Expr::Constant(ast::ExprConstant {
+        value: Constant::Bool(value),
+        ..
+    }) = value.as_ref()
+    else {
         return None;
     };
 
     // The `else` block has to contain a single `return True` or `return False`.
-    let Stmt::Return(ast::StmtReturn { value: next_value, range: _ }) = &orelse[0] else {
+    let Stmt::Return(ast::StmtReturn {
+        value: next_value,
+        range: _,
+    }) = &orelse[0]
+    else {
         return None;
     };
     let Some(next_value) = next_value else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(next_value), .. }) = next_value.as_ref() else {
+    let Expr::Constant(ast::ExprConstant {
+        value: Constant::Bool(next_value),
+        ..
+    }) = next_value.as_ref()
+    else {
         return None;
     };
 
@@ -286,7 +301,8 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
         iter,
         orelse,
         ..
-    }) = stmt else {
+    }) = stmt
+    else {
         return None;
     };
 
@@ -301,8 +317,10 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
     let Stmt::If(ast::StmtIf {
         body: nested_body,
         test: nested_test,
-        orelse: nested_orelse, range: _,
-    }) = &body[0] else {
+        orelse: nested_orelse,
+        range: _,
+    }) = &body[0]
+    else {
         return None;
     };
     if nested_body.len() != 1 {
@@ -317,18 +335,30 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
     let Some(value) = value else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(value), .. }) = value.as_ref() else {
+    let Expr::Constant(ast::ExprConstant {
+        value: Constant::Bool(value),
+        ..
+    }) = value.as_ref()
+    else {
         return None;
     };
 
     // The next statement has to be a `return True` or `return False`.
-    let Stmt::Return(ast::StmtReturn { value: next_value, range: _ }) = &sibling else {
+    let Stmt::Return(ast::StmtReturn {
+        value: next_value,
+        range: _,
+    }) = &sibling
+    else {
         return None;
     };
     let Some(next_value) = next_value else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(next_value), .. }) = next_value.as_ref() else {
+    let Expr::Constant(ast::ExprConstant {
+        value: Constant::Bool(next_value),
+        ..
+    }) = next_value.as_ref()
+    else {
         return None;
     };
 

@@ -2114,6 +2114,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, value,
@@ -2124,7 +2125,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep604_annotation(
                                     self, expr, slice, operator,
@@ -2222,6 +2224,7 @@ where
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
+                                        && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
                                             self, expr,
@@ -2232,7 +2235,8 @@ where
                                     if self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
-                                            && self.semantic.in_annotation())
+                                            && self.semantic.in_annotation()
+                                            && !self.settings.pyupgrade.keep_runtime_typing)
                                     {
                                         pyupgrade::rules::use_pep585_annotation(
                                             self,
@@ -2297,6 +2301,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, expr,
@@ -2307,7 +2312,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep585_annotation(self, expr, &replacement);
                             }
@@ -4435,7 +4441,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
 

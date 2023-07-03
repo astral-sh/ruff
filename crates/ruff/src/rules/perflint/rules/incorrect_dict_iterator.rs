@@ -56,12 +56,8 @@ impl AlwaysAutofixableViolation for IncorrectDictIterator {
 
 /// PERF102
 pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
-    let Expr::Tuple(ast::ExprTuple {
-        elts,
-        ..
-    }) = target
-    else {
-        return
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
+        return;
     };
     if elts.len() != 2 {
         return;
@@ -72,7 +68,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
     if !args.is_empty() {
         return;
     }
-    let Expr::Attribute(ast::ExprAttribute { attr, value, ..  }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
     if attr != "items" {

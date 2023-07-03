@@ -49,9 +49,9 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
     let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func,  .. }) = value.as_ref() else {
-         return false;
-     };
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+        return false;
+    };
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return false;
     };
@@ -80,9 +80,9 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.expr_parent() else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func,  .. }) = expr else {
-         return false;
-     };
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return false;
     };

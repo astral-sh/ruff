@@ -83,7 +83,7 @@ pub(crate) fn unnecessary_map(
         )
     }
 
-    let Some(id) = helpers::expr_name(func)  else {
+    let Some(id) = helpers::expr_name(func) else {
         return;
     };
     match id {
@@ -127,9 +127,11 @@ pub(crate) fn unnecessary_map(
                 if args.len() != 2 {
                     return;
                 }
-                let Some(argument) = helpers::first_argument_with_matching_function("map", func, args) else {
-                        return;
-                    };
+                let Some(argument) =
+                    helpers::first_argument_with_matching_function("map", func, args)
+                else {
+                    return;
+                };
                 if let Expr::Lambda(_) = argument {
                     let mut diagnostic = create_diagnostic(id, expr.range());
                     if checker.patch(diagnostic.kind.rule()) {
@@ -155,7 +157,9 @@ pub(crate) fn unnecessary_map(
 
             if args.len() == 1 {
                 if let Expr::Call(ast::ExprCall { func, args, .. }) = &args[0] {
-                    let Some(argument) = helpers::first_argument_with_matching_function("map", func, args) else {
+                    let Some(argument) =
+                        helpers::first_argument_with_matching_function("map", func, args)
+                    else {
                         return;
                     };
                     if let Expr::Lambda(ast::ExprLambda { body, .. }) = argument {

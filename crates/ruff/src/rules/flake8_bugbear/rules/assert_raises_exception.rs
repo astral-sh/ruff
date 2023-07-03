@@ -78,7 +78,13 @@ impl fmt::Display for ExceptionKind {
 /// B017
 pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem]) {
     for item in items {
-        let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = &item.context_expr else {
+        let Expr::Call(ast::ExprCall {
+            func,
+            args,
+            keywords,
+            range: _,
+        }) = &item.context_expr
+        else {
             return;
         };
         if args.len() != 1 {
@@ -91,13 +97,14 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
         let Some(exception) = checker
             .semantic()
             .resolve_call_path(args.first().unwrap())
-            .and_then(|call_path| {
-                match call_path.as_slice() {
-                    ["", "Exception"] => Some(ExceptionKind::Exception),
-                    ["", "BaseException"] => Some(ExceptionKind::BaseException),
-                    _ => None,
-                }
-            }) else { return; };
+            .and_then(|call_path| match call_path.as_slice() {
+                ["", "Exception"] => Some(ExceptionKind::Exception),
+                ["", "BaseException"] => Some(ExceptionKind::BaseException),
+                _ => None,
+            })
+        else {
+            return;
+        };
 
         let assertion = if matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
         {
