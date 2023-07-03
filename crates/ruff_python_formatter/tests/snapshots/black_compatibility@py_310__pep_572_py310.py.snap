@@ -27,7 +27,7 @@ f(x, (a := b + c for c in range(10)), y=z, **q)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,15 +1,15 @@
+@@ -1,15 +1,20 @@
  # Unparenthesized walruses are now allowed in indices since Python 3.10.
 -x[a:=0]
 -x[a:=0, b:=1]
@@ -38,7 +38,7 @@ f(x, (a := b + c for c in range(10)), y=z, **q)
  
  # Walruses are allowed inside generator expressions on function calls since 3.10.
 -if any(match := pattern_error.match(s) for s in buffer):
-+if any((i for i in [])):
++if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
      if match.group(2) == data_not_available:
          # Error OK to ignore.
          pass
@@ -47,10 +47,15 @@ f(x, (a := b + c for c in range(10)), y=z, **q)
 -f((a := b + c for c in range(10)), x)
 -f(y=(a := b + c for c in range(10)))
 -f(x, (a := b + c for c in range(10)), y=z, **q)
-+f((i for i in []))
-+f((i for i in []), x)
-+f(y=(i for i in []))
-+f(x, (i for i in []), y=z, **q)
++f((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []))
++f((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []), x)
++f(y=(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []))
++f(
++    x,
++    (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []),
++    y=z,
++    **q,
++)
 ```
 
 ## Ruff Output
@@ -62,15 +67,20 @@ x[NOT_YET_IMPLEMENTED_ExprNamedExpr, NOT_YET_IMPLEMENTED_ExprNamedExpr]
 x[5, NOT_YET_IMPLEMENTED_ExprNamedExpr]
 
 # Walruses are allowed inside generator expressions on function calls since 3.10.
-if any((i for i in [])):
+if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
     if match.group(2) == data_not_available:
         # Error OK to ignore.
         pass
 
-f((i for i in []))
-f((i for i in []), x)
-f(y=(i for i in []))
-f(x, (i for i in []), y=z, **q)
+f((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []))
+f((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []), x)
+f(y=(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []))
+f(
+    x,
+    (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []),
+    y=z,
+    **q,
+)
 ```
 
 ## Black Output

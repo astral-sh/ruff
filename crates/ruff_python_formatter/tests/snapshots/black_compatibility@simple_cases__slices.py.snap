@@ -43,7 +43,7 @@ ham[lower + offset : upper + offset]
 ```diff
 --- Black
 +++ Ruff
-@@ -4,28 +4,28 @@
+@@ -4,28 +4,34 @@
  slice[d::d]
  slice[0]
  slice[-1]
@@ -65,13 +65,19 @@ ham[lower + offset : upper + offset]
  slice[not so_simple : 1 < val <= 10]
 -slice[(1 for i in range(42)) : x]
 -slice[:: [i for i in range(42)]]
-+slice[(i for i in []) : x]
-+slice[ :: [i for i in []]]
++slice[
++    (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []) : x
++]
++slice[
++     :: [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
++]
  
  
  async def f():
 -    slice[await x : [i async for i in arange(42)] : 42]
-+    slice[await x : [i for i in []] : 42]
++    slice[
++        await x : [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []] : 42
++    ]
  
  
  # These are from PEP-8:
@@ -103,12 +109,18 @@ slice[lambda x: True : lambda x: True]
 slice[lambda x: True :, None::]
 slice[1 or 2 : True and False]
 slice[not so_simple : 1 < val <= 10]
-slice[(i for i in []) : x]
-slice[ :: [i for i in []]]
+slice[
+    (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []) : x
+]
+slice[
+     :: [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+]
 
 
 async def f():
-    slice[await x : [i for i in []] : 42]
+    slice[
+        await x : [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []] : 42
+    ]
 
 
 # These are from PEP-8:
