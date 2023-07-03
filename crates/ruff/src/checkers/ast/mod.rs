@@ -668,21 +668,17 @@ where
                 }
                 if !self.is_stub {
                     if self.enabled(Rule::DjangoModelWithoutDunderStr) {
-                        if let Some(diagnostic) =
-                            flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        flake8_django::rules::model_without_dunder_str(self, class_def);
                     }
                 }
                 if self.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }
                 if self.enabled(Rule::UselessObjectInheritance) {
-                    pyupgrade::rules::useless_object_inheritance(self, class_def, stmt);
+                    pyupgrade::rules::useless_object_inheritance(self, class_def);
                 }
                 if self.enabled(Rule::UnnecessaryClassParentheses) {
-                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def, stmt);
+                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def);
                 }
                 if self.enabled(Rule::AmbiguousClassName) {
                     if let Some(diagnostic) =
@@ -2756,17 +2752,12 @@ where
                     flake8_debugger::rules::debugger_call(self, expr, func);
                 }
                 if self.enabled(Rule::PandasUseOfInplaceArgument) {
-                    self.diagnostics.extend(
-                        pandas_vet::rules::inplace_argument(self, expr, func, args, keywords)
-                            .into_iter(),
-                    );
+                    pandas_vet::rules::inplace_argument(self, expr, func, args, keywords);
                 }
                 pandas_vet::rules::call(self, func);
 
                 if self.enabled(Rule::PandasUseOfPdMerge) {
-                    if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    pandas_vet::rules::use_of_pd_merge(self, func);
                 }
                 if self.enabled(Rule::CallDatetimeWithoutTzinfo) {
                     flake8_datetimez::rules::call_datetime_without_tzinfo(
