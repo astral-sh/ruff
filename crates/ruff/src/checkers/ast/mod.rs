@@ -36,6 +36,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::flake8_builtins::helpers::AnyShadowing;
+
 use crate::rules::{
     airflow, flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -1409,7 +1410,7 @@ where
             Stmt::With(ast::StmtWith { items, body, .. })
             | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
-                    flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
+                    flake8_bugbear::rules::assert_raises_exception(self, items);
                 }
                 if self.enabled(Rule::PytestRaisesWithMultipleStatements) {
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
@@ -2199,6 +2200,9 @@ where
                         if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
+                        if self.enabled(Rule::NumpyDeprecatedFunction) {
+                            numpy::rules::deprecated_function(self, expr);
+                        }
                         if self.is_stub {
                             if self.enabled(Rule::CollectionsNamedTuple) {
                                 flake8_pyi::rules::collections_named_tuple(self, expr);
@@ -2320,6 +2324,9 @@ where
                 }
                 if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
+                }
+                if self.enabled(Rule::NumpyDeprecatedFunction) {
+                    numpy::rules::deprecated_function(self, expr);
                 }
                 if self.enabled(Rule::DeprecatedMockImport) {
                     pyupgrade::rules::deprecated_mock_attribute(self, expr);
@@ -2875,7 +2882,7 @@ where
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
                 if self.enabled(Rule::NumpyLegacyRandom) {
-                    numpy::rules::numpy_legacy_random(self, func);
+                    numpy::rules::legacy_random(self, func);
                 }
                 if self.any_enabled(&[
                     Rule::LoggingStringFormat,

@@ -114,8 +114,7 @@ with a:  # should remove brackets
 # WithItem allow the `aa + bb` content expression to be wrapped
 with (
     (
-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ) as c,
 ):
     ...

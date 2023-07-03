@@ -1983,6 +1983,7 @@ dependencies = [
  "log",
  "once_cell",
  "pretty_assertions",
+ "rayon",
  "regex",
  "ruff",
  "ruff_cli",
@@ -2088,6 +2089,7 @@ dependencies = [
  "serde",
  "serde_json",
  "similar",
+ "smallvec",
 ]
 
 [[package]]

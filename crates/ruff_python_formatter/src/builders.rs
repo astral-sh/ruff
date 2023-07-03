@@ -242,23 +242,25 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     }
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
-        if let Some(last_end) = self.last_end.take() {
-            if_group_breaks(&text(",")).fmt(self.fmt)?;
+        self.result.and_then(|_| {
+            if let Some(last_end) = self.last_end.take() {
+                if_group_breaks(&text(",")).fmt(self.fmt)?;
 
-            if self.fmt.options().magic_trailing_comma().is_respect()
-                && matches!(
-                    first_non_trivia_token(last_end, self.fmt.context().contents()),
-                    Some(Token {
-                        kind: TokenKind::Comma,
-                        ..
-                    })
-                )
-            {
-                expand_parent().fmt(self.fmt)?;
+                if self.fmt.options().magic_trailing_comma().is_respect()
+                    && matches!(
+                        first_non_trivia_token(last_end, self.fmt.context().contents()),
+                        Some(Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        })
+                    )
+                {
+                    expand_parent().fmt(self.fmt)?;
+                }
             }
-        }
 
-        Ok(())
+            Ok(())
+        })
     }
 }
 

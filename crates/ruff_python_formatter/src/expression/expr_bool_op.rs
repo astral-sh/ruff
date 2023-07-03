@@ -31,9 +31,9 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
 impl<'ast> FormatBinaryLike<'ast> for ExprBoolOp {
     type FormatOperator = FormatOwnedWithRule<BoolOp, FormatBoolOp, PyFormatContext<'ast>>;
 
-    fn binary_layout(&self) -> BinaryLayout {
+    fn binary_layout(&self, source: &str) -> BinaryLayout {
         match self.values.as_slice() {
-            [left, right] => BinaryLayout::from_left_right(left, right),
+            [left, right] => BinaryLayout::from_left_right(left, right, source),
             [..] => BinaryLayout::Default,
         }
     }
@@ -93,7 +93,7 @@ impl NeedsParentheses for ExprBoolOp {
         comments: &Comments,
     ) -> Parentheses {
         match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => match self.binary_layout() {
+            Parentheses::Optional => match self.binary_layout(source) {
                 BinaryLayout::Default => Parentheses::Optional,
 
                 BinaryLayout::ExpandRight

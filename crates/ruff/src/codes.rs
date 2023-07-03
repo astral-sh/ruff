@@ -742,6 +742,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // numpy
         (Numpy, "001") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyDeprecatedTypeAlias),
         (Numpy, "002") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyLegacyRandom),
+        (Numpy, "003") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyDeprecatedFunction),
 
         // ruff
         (Ruff, "001") => (RuleGroup::Unspecified, rules::ruff::rules::AmbiguousUnicodeCharacterString),

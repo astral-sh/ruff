@@ -34,10 +34,10 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 impl<'ast> FormatBinaryLike<'ast> for ExprCompare {
     type FormatOperator = FormatOwnedWithRule<CmpOp, FormatCmpOp, PyFormatContext<'ast>>;
 
-    fn binary_layout(&self) -> BinaryLayout {
+    fn binary_layout(&self, source: &str) -> BinaryLayout {
         if self.ops.len() == 1 {
             match self.comparators.as_slice() {
-                [right] => BinaryLayout::from_left_right(&self.left, right),
+                [right] => BinaryLayout::from_left_right(&self.left, right, source),
                 [..] => BinaryLayout::Default,
             }
         } else {
@@ -102,7 +102,7 @@ impl NeedsParentheses for ExprCompare {
         comments: &Comments,
     ) -> Parentheses {
         match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            parentheses @ Parentheses::Optional => match self.binary_layout() {
+            parentheses @ Parentheses::Optional => match self.binary_layout(source) {
                 BinaryLayout::Default => parentheses,
 
                 BinaryLayout::ExpandRight

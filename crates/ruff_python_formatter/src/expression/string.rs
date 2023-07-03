@@ -8,7 +8,7 @@ use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{ExprConstant, Ranged};
-use rustpython_parser::lexer::lex_starts_at;
+use rustpython_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use rustpython_parser::{Mode, Tok};
 use std::borrow::Cow;
 
@@ -17,7 +17,7 @@ pub enum StringLayout {
     Default(Option<Parentheses>),
 
     /// Enforces that implicit continuation strings are printed on a single line even if they exceed
-    /// the configured line width.  
+    /// the configured line width.
     Flat,
 }
 
@@ -83,7 +83,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // Call into the lexer to extract the individual chunks and format each string on its own.
         // This code does not yet implement the automatic joining of strings that fit on the same line
         // because this is a black preview style.
-        let lexer = lex_starts_at(string_content, Mode::Module, string_range.start());
+        let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
 
         let separator = format_with(|f| match self.layout {
             StringLayout::Default(_) => soft_line_break_or_space().fmt(f),
@@ -93,7 +93,31 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let mut joiner = f.join_with(separator);
 
         for token in lexer {
-            let (token, token_range) = token.map_err(|_| FormatError::SyntaxError)?;
+            let (token, token_range) = match token {
+                Ok(spanned) => spanned,
+                Err(LexicalError {
+                    error: LexicalErrorType::IndentationError,
+                    ..
+                }) => {
+                    // This can happen if the string continuation appears anywhere inside of a parenthesized expression
+                    // because the lexer doesn't know about the parentheses. For example, the following snipped triggers an Indentation error
+                    // ```python
+                    // {
+                    //     "key": (
+                    //         [],
+                    //         'a'
+                    //             'b'
+                    //          'c'
+                    //     )
+                    // }
+                    // ```
+                    // Ignoring the error here is *safe* because we know that the program once parsed to a valid AST.
+                    continue;
+                }
+                Err(_) => {
+                    return Err(FormatError::SyntaxError);
+                }
+            };
 
             match token {
                 Tok::String { .. } => {
@@ -175,12 +199,11 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         let raw_content_range = relative_raw_content_range + self.part_range.start();
 
         let raw_content = &string_content[relative_raw_content_range];
-        let (preferred_quotes, contains_newlines) =
-            preferred_quotes(raw_content, quotes, f.options().quote_style());
+        let preferred_quotes = preferred_quotes(raw_content, quotes, f.options().quote_style());
 
         write!(f, [prefix, preferred_quotes])?;
 
-        let normalized = normalize_quotes(raw_content, preferred_quotes);
+        let (normalized, contains_newlines) = normalize_string(raw_content, preferred_quotes);
 
         match normalized {
             Cow::Borrowed(_) => {
@@ -270,9 +293,7 @@ fn preferred_quotes(
     input: &str,
     quotes: StringQuotes,
     configured_style: QuoteStyle,
-) -> (StringQuotes, ContainsNewlines) {
-    let mut contains_newlines = ContainsNewlines::No;
-
+) -> StringQuotes {
     let preferred_style = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
@@ -281,7 +302,6 @@ fn preferred_quotes(
         while let Some(c) = chars.next() {
             let configured_quote_char = configured_style.as_char();
             match c {
-                '\n' | '\r' => contains_newlines = ContainsNewlines::Yes,
                 '\\' => {
                     if matches!(chars.peek(), Some('"' | '\\')) {
                         chars.next();
@@ -334,10 +354,6 @@ fn preferred_quotes(
                     double_quotes += 1;
                 }
 
-                '\n' | '\r' => {
-                    contains_newlines = ContainsNewlines::Yes;
-                }
-
                 _ => continue,
             }
         }
@@ -360,13 +376,10 @@ fn preferred_quotes(
         }
     };
 
-    (
-        StringQuotes {
-            triple: quotes.triple,
-            style: preferred_style,
-        },
-        contains_newlines,
-    )
+    StringQuotes {
+        triple: quotes.triple,
+        style: preferred_style,
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -411,30 +424,56 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 
 /// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
 /// with the provided `style`.
-fn normalize_quotes(input: &str, quotes: StringQuotes) -> Cow<str> {
-    if quotes.triple {
-        Cow::Borrowed(input)
-    } else {
-        // The normalized string if `input` is not yet normalized.
-        // `output` must remain empty if `input` is already normalized.
-        let mut output = String::new();
-        // Tracks the last index of `input` that has been written to `output`.
-        // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
-        let mut last_index = 0;
+///
+/// Returns the normalized string and whether it contains new lines.
+fn normalize_string(input: &str, quotes: StringQuotes) -> (Cow<str>, ContainsNewlines) {
+    // The normalized string if `input` is not yet normalized.
+    // `output` must remain empty if `input` is already normalized.
+    let mut output = String::new();
+    // Tracks the last index of `input` that has been written to `output`.
+    // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
+    let mut last_index = 0;
 
-        let style = quotes.style;
-        let preferred_quote = style.as_char();
-        let opposite_quote = style.invert().as_char();
+    let mut newlines = ContainsNewlines::No;
 
-        let mut chars = input.char_indices();
+    let style = quotes.style;
+    let preferred_quote = style.as_char();
+    let opposite_quote = style.invert().as_char();
 
-        while let Some((index, c)) = chars.next() {
+    let mut chars = input.char_indices();
+
+    while let Some((index, c)) = chars.next() {
+        if c == '\r' {
+            output.push_str(&input[last_index..index]);
+
+            // Skip over the '\r' character, keep the `\n`
+            if input.as_bytes().get(index + 1).copied() == Some(b'\n') {
+                chars.next();
+            }
+            // Replace the `\r` with a `\n`
+            else {
+                output.push('\n');
+            }
+
+            last_index = index + '\r'.len_utf8();
+            newlines = ContainsNewlines::Yes;
+        } else if c == '\n' {
+            newlines = ContainsNewlines::Yes;
+        } else if !quotes.triple {
             if c == '\\' {
-                if let Some((_, next)) = chars.next() {
+                if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
+                    #[allow(clippy::if_same_then_else)]
                     if next == opposite_quote {
                         // Remove the escape by ending before the backslash and starting again with the quote
+                        chars.next();
                         output.push_str(&input[last_index..index]);
                         last_index = index + '\\'.len_utf8();
+                    } else if next == preferred_quote {
+                        // Quote is already escaped, skip over it.
+                        chars.next();
+                    } else if next == '\\' {
+                        // Skip over escaped backslashes
+                        chars.next();
                     }
                 }
             } else if c == preferred_quote {
@@ -445,12 +484,14 @@ fn normalize_quotes(input: &str, quotes: StringQuotes) -> Cow<str> {
                 last_index = index + preferred_quote.len_utf8();
             }
         }
-
-        if last_index == 0 {
-            Cow::Borrowed(input)
-        } else {
-            output.push_str(&input[last_index..]);
-            Cow::Owned(output)
-        }
     }
+
+    let normalized = if last_index == 0 {
+        Cow::Borrowed(input)
+    } else {
+        output.push_str(&input[last_index..]);
+        Cow::Owned(output)
+    };
+
+    (normalized, newlines)
 }

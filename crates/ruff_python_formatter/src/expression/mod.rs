@@ -10,7 +10,7 @@ use ruff_formatter::{
 };
 use rustpython_parser::ast::Expr;
 
-mod binary_like;
+pub(crate) mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
