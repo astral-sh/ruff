@@ -1371,6 +1371,16 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.is_stub {
+                    if self.any_enabled(&[
+                        Rule::ComplexIfStatementInStub,
+                        Rule::UnrecognizedVersionInfoCheck,
+                        Rule::PatchVersionComparison,
+                        Rule::WrongTupleLengthVersionComparison,
+                    ]) {
+                        flake8_pyi::rules::version_info(self, test);
+                    }
+                }
             }
             Stmt::Assert(ast::StmtAssert {
                 test,

@@ -52,7 +52,7 @@ pub struct BadVersionInfoComparison;
 impl Violation for BadVersionInfoComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `<` or `>=` for version info comparisons")
+        format!("Use `<` or `>=` for `sys.version_info` comparisons")
     }
 }
 
@@ -78,8 +78,10 @@ pub(crate) fn bad_version_info_comparison(
         return;
     }
 
-    if !matches!(op, CmpOp::Lt | CmpOp::GtE) {
-        let diagnostic = Diagnostic::new(BadVersionInfoComparison, expr.range());
-        checker.diagnostics.push(diagnostic);
+    if matches!(op, CmpOp::Lt | CmpOp::GtE) {
+        return;
     }
+
+    let diagnostic = Diagnostic::new(BadVersionInfoComparison, expr.range());
+    checker.diagnostics.push(diagnostic);
 }
