@@ -1290,7 +1290,7 @@ where
                 }
             }
             Stmt::If(
-                if_stmt @ ast::StmtIf {
+                stmt_if @ ast::StmtIf {
                     test,
                     body,
                     elif_else_clauses,
@@ -1303,7 +1303,7 @@ where
                 if self.enabled(Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
                         self,
-                        if_stmt,
+                        stmt_if,
                         self.semantic.stmt_parent(),
                     );
                 }
@@ -1314,13 +1314,7 @@ where
                     flake8_simplify::rules::needless_bool(self, stmt);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfDictLookup) {
-                    flake8_simplify::rules::manual_dict_lookup(
-                        self,
-                        stmt,
-                        test,
-                        body,
-                        elif_else_clauses,
-                    );
+                    flake8_simplify::rules::manual_dict_lookup(self, stmt_if);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfIfExp) {
                     flake8_simplify::rules::use_ternary_operator(self, stmt);
@@ -1337,7 +1331,7 @@ where
                 if self.enabled(Rule::TypeCheckWithoutTypeError) {
                     tryceratops::rules::type_check_without_type_error(
                         self,
-                        if_stmt,
+                        stmt_if,
                         self.semantic.stmt_parent(),
                     );
                 }

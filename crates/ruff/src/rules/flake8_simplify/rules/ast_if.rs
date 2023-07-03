@@ -737,24 +737,25 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt: 
 }
 
 /// SIM116
-pub(crate) fn manual_dict_lookup(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    elif_else_clauses: &[ElifElseClause],
-) {
+pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
     // Throughout this rule:
     // * Each if-statement's test must consist of a constant equality check with the same variable.
     // * Each if-statement's body must consist of a single `return`.
     // * Each if-statement's orelse must be either another if-statement or empty.
     // * The final if-statement's orelse must be empty, or a single `return`.
+    let StmtIf {
+        body,
+        test,
+        elif_else_clauses,
+        ..
+    } = stmt_if;
+
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
         comparators,
         range: _,
-    }) = &test
+    }) = test.as_ref()
     else {
         return;
     };
@@ -770,7 +771,7 @@ pub(crate) fn manual_dict_lookup(
     else {
         return;
     };
-    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body else {
+    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
         return;
     };
     if value.as_ref().map_or(false, |value| {
@@ -785,11 +786,6 @@ pub(crate) fn manual_dict_lookup(
     for clause in elif_else_clauses {
         let ElifElseClause { test, body, .. } = clause;
         let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
-            continue;
-        };
-        if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.semantic().is_builtin(id))
-        }) {
             continue;
         };
 
@@ -817,6 +813,12 @@ pub(crate) fn manual_dict_lookup(
             continue;
         };
 
+        if value.as_ref().map_or(false, |value| {
+            contains_effect(value, |id| checker.semantic().is_builtin(id))
+        }) {
+            continue;
+        };
+
         constants.insert(constant.into());
     }
 
@@ -826,7 +828,7 @@ pub(crate) fn manual_dict_lookup(
 
     checker.diagnostics.push(Diagnostic::new(
         IfElseBlockInsteadOfDictLookup,
-        stmt.range(),
+        stmt_if.range(),
     ));
 }
 
