@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ElifElseClause, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt, StmtIf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -167,11 +167,15 @@ fn check_body(checker: &mut Checker, body: &[Stmt]) {
 /// TRY004
 pub(crate) fn type_check_without_type_error(
     checker: &mut Checker,
-    body: &[Stmt],
-    test: &Expr,
-    elif_else_clauses: &[ElifElseClause],
+    stmt_if: &StmtIf,
     parent: Option<&Stmt>,
 ) {
+    let StmtIf {
+        body,
+        test,
+        elif_else_clauses,
+        ..
+    } = stmt_if;
     if let Some(Stmt::If(ast::StmtIf { test, .. })) = parent {
         if !check_type_check_test(checker, test) {
             return;

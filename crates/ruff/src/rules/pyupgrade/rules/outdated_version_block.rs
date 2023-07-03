@@ -156,7 +156,9 @@ fn fix_py2_block(
                 Some(Fix::suggested(Edit::deletion(stmt.start(), end_location)))
             }
             // If we only have an `if` and an `else`, dedent the `else` block
-            Some(ElifElseClause { body, test: None.. }) => {
+            Some(ElifElseClause {
+                body, test: None, ..
+            }) => {
                 let start = body.first()?;
                 let end = body.last()?;
                 if indentation(checker.locator, start).is_none() {

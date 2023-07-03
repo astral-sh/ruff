@@ -1337,9 +1337,7 @@ where
                 if self.enabled(Rule::TypeCheckWithoutTypeError) {
                     tryceratops::rules::type_check_without_type_error(
                         self,
-                        body,
-                        test,
-                        elif_else_clauses,
+                        if_stmt,
                         self.semantic.stmt_parent(),
                     );
                 }
