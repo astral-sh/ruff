@@ -1,5 +1,6 @@
 use rustpython_parser::ast::{Arg, ArgWithDefault, Arguments, Expr, Ranged};
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -36,9 +37,7 @@ fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
+pub(crate) fn hardcoded_password_default(checker: &mut Checker, arguments: &Arguments) {
     for ArgWithDefault {
         def,
         default,
@@ -53,9 +52,7 @@ pub(crate) fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnosti
             continue;
         };
         if let Some(diagnostic) = check_password_kwarg(def, default) {
-            diagnostics.push(diagnostic);
+            checker.diagnostics.push(diagnostic);
         }
     }
-
-    diagnostics
 }

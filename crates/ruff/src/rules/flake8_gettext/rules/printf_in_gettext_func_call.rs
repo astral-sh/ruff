@@ -1,5 +1,6 @@
 use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -14,7 +15,7 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
+pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::Mod { .. },
@@ -27,9 +28,10 @@ pub(crate) fn printf_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
                 ..
             }) = left.as_ref()
             {
-                return Some(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
             }
         }
     }
-    None
 }
