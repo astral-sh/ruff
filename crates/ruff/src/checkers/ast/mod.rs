@@ -2194,6 +2194,9 @@ where
                         if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
+                        if self.enabled(Rule::NumpyDeprecatedFunction) {
+                            numpy::rules::deprecated_function(self, expr);
+                        }
                         if self.is_stub {
                             if self.enabled(Rule::CollectionsNamedTuple) {
                                 flake8_pyi::rules::collections_named_tuple(self, expr);
@@ -2315,6 +2318,9 @@ where
                 }
                 if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
+                }
+                if self.enabled(Rule::NumpyDeprecatedFunction) {
+                    numpy::rules::deprecated_function(self, expr);
                 }
                 if self.enabled(Rule::DeprecatedMockImport) {
                     pyupgrade::rules::deprecated_mock_attribute(self, expr);
@@ -2870,7 +2876,7 @@ where
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
                 if self.enabled(Rule::NumpyLegacyRandom) {
-                    numpy::rules::numpy_legacy_random(self, func);
+                    numpy::rules::legacy_random(self, func);
                 }
                 if self.any_enabled(&[
                     Rule::LoggingStringFormat,
