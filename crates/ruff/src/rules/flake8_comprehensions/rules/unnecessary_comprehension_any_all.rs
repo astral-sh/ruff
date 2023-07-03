@@ -66,11 +66,13 @@ pub(crate) fn unnecessary_comprehension_any_all(
     if !keywords.is_empty() {
         return;
     }
-    let Expr::Name(ast::ExprName { id, .. } )= func  else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
     if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
-        let (Expr::ListComp(ast::ExprListComp { elt, .. } )| Expr::SetComp(ast::ExprSetComp { elt, .. })) = &args[0] else {
+        let (Expr::ListComp(ast::ExprListComp { elt, .. })
+        | Expr::SetComp(ast::ExprSetComp { elt, .. })) = &args[0]
+        else {
             return;
         };
         if contains_await(elt) {

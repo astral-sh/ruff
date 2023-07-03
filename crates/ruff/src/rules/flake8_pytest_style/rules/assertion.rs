@@ -392,7 +392,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     let statements = if outer_indent.is_empty() {
         &mut tree.body
     } else {
-        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
+        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body
+        else {
             bail!("Expected statement to be embedded in a function definition")
         };
 

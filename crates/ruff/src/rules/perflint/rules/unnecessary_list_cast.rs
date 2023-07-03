@@ -48,7 +48,13 @@ impl AlwaysAutofixableViolation for UnnecessaryListCast {
 
 /// PERF101
 pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
-    let Expr::Call(ast::ExprCall{ func, args, range: list_range, ..}) = iter else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        range: list_range,
+        ..
+    }) = iter
+    else {
         return;
     };
 
@@ -56,7 +62,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
         return;
     }
 
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else{
+    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
         return;
     };
 

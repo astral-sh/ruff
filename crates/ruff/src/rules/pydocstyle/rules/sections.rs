@@ -1715,18 +1715,18 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
-    }) = docstring.definition else {
+    }) = docstring.definition
+    else {
         return;
     };
 
-    let (
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            args: arguments, ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            args: arguments, ..
-        })
-    ) = stmt else {
+    let (Stmt::FunctionDef(ast::StmtFunctionDef {
+        args: arguments, ..
+    })
+    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+        args: arguments, ..
+    })) = stmt
+    else {
         return;
     };
 

@@ -52,7 +52,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
-            return Ok(())
+            return Ok(());
         };
 
         // First entry has never any separator, doesn't matter which one we take;

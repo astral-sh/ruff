@@ -64,7 +64,7 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         return;
     };
     for arg in args {
-        let Expr::Starred (_) = arg else {
+        let Expr::Starred(_) = arg else {
             continue;
         };
         if arg.start() <= keyword.start() {

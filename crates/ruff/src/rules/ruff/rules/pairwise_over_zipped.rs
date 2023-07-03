@@ -67,7 +67,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
         return None;
     };
 
-    let Expr::Slice(ast::ExprSlice { lower,  step, .. }) = slice.as_ref() else {
+    let Expr::Slice(ast::ExprSlice { lower, step, .. }) = slice.as_ref() else {
         return None;
     };
 

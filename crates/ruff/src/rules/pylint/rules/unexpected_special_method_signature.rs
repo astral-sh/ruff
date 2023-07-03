@@ -160,7 +160,9 @@ pub(crate) fn unexpected_special_method_signature(
     let actual_params = args.args.len();
     let mandatory_params = args.args.iter().filter(|arg| arg.default.is_none()).count();
 
-    let Some(expected_params) = ExpectedParams::from_method(name, is_staticmethod(decorator_list, checker.semantic())) else {
+    let Some(expected_params) =
+        ExpectedParams::from_method(name, is_staticmethod(decorator_list, checker.semantic()))
+    else {
         return;
     };
 

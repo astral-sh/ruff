@@ -69,7 +69,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Argume
         .chain(&arguments.args)
         .chain(&arguments.kwonlyargs)
     {
-        let Some(default)= default else {
+        let Some(default) = default else {
             continue;
         };
 

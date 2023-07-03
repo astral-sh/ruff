@@ -47,7 +47,7 @@ impl Violation for ExceptWithNonExceptionClasses {
 /// This should leave any unstarred iterables alone (subsequently raising a
 /// warning for B029).
 fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
-    let Expr::Tuple(ast::ExprTuple { elts, .. } )= expr else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr else {
         return vec![expr];
     };
     let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(elts.len());

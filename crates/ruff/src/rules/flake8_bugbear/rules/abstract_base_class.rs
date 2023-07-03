@@ -161,19 +161,19 @@ pub(crate) fn abstract_base_class(
             continue;
         }
 
-        let (
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                decorator_list,
-                body,
-                name: method_name,
-                ..
-            }) | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                decorator_list,
-                body,
-                name: method_name,
-                ..
-            })
-        ) = stmt else {
+        let (Stmt::FunctionDef(ast::StmtFunctionDef {
+            decorator_list,
+            body,
+            name: method_name,
+            ..
+        })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            decorator_list,
+            body,
+            name: method_name,
+            ..
+        })) = stmt
+        else {
             continue;
         };
 

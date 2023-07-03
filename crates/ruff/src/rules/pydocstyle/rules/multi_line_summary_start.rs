@@ -132,10 +132,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
     };
     let mut content_lines = UniversalNewlineIterator::with_offset(contents, docstring.start());
 
-    let Some(first_line) = content_lines
-        .next()
-         else
-    {
+    let Some(first_line) = content_lines.next() else {
         return;
     };
 
