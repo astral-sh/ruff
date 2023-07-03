@@ -19,6 +19,10 @@ use crate::registry::AsRule;
 /// Removing the `list()` call will not change the behavior of the code, but
 /// may improve performance.
 ///
+/// Note that, as with all `perflint` rules, this is only intended as a
+/// micro-optimization, and will have a negligible impact on performance in
+/// most cases.
+///
 /// ## Example
 /// ```python
 /// items = (1, 2, 3)

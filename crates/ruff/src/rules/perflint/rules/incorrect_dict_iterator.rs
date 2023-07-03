@@ -23,6 +23,10 @@ use crate::registry::AsRule;
 /// avoid allocating tuples for every item in the dictionary. They also
 /// communicate the intent of the code more clearly.
 ///
+/// Note that, as with all `perflint` rules, this is only intended as a
+/// micro-optimization, and will have a negligible impact on performance in
+/// most cases.
+///
 /// ## Example
 /// ```python
 /// some_dict = {"a": 1, "b": 2}
