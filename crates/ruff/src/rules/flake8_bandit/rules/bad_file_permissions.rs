@@ -10,6 +10,31 @@ use ruff_python_ast::helpers::SimpleCallArgs;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for particularly permissive file permissions.
+///
+/// ## Why is this bad?
+/// Overly permissive file permissions can result in unintended access to and
+/// code execution.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+/// os.chmod("/etc/secrets.txt", 0o666)  # rw-rw-rw-
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+/// os.chmod("/etc/secrets.txt", 0o600)  # rw-------
+/// ```
+///
+/// ## References
+/// - [Python documentation: `os.chmod`](https://docs.python.org/3/library/os.html#os.chmod)
+/// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
+/// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[violation]
 pub struct BadFilePermissions {
     mask: u16,

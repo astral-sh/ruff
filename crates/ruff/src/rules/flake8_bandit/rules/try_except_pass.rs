@@ -6,6 +6,34 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 
+/// ## What it does
+/// Checks for `try`-`except`-`pass` statements.
+///
+/// ## Why is this bad?
+/// Suppressing exception messages may hide errors that could otherwise reveal
+/// security vulnerabilities or malicious activity. Instead, consider logging
+/// the exception.
+///
+/// ## Example
+/// ```python
+/// try:
+///     ...
+/// except Exception:
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+/// try:
+///     ...
+/// except Exception as exc:
+///     logging.exception("Exception occurred")
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-703](https://cwe.mitre.org/data/definitions/703.html)
 #[violation]
 pub struct TryExceptPass;
 

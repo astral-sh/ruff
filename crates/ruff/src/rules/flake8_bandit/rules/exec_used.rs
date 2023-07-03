@@ -3,6 +3,20 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for uses of builtin `exec` function.
+///
+/// ## Why is this bad?
+/// The `exec()` function is insecure as it enables arbitrary code execution.
+///
+/// ## Example
+/// ```python
+/// exec("print('Hello World')")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `exec`](https://docs.python.org/3/library/functions.html#exec)
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct ExecBuiltin;
 

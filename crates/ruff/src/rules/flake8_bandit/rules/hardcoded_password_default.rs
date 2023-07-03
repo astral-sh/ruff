@@ -5,6 +5,35 @@ use ruff_macros::{derive_message_formats, violation};
 
 use super::super::helpers::{matches_password_name, string_literal};
 
+/// ## What it does
+/// Checks for hardcoded password argument defaults.
+///
+/// ## Why is this bad?
+/// Hardcoded passwords are a security risk because they can be easily
+/// discovered by attackers and used to gain unauthorized access. As they are
+/// hardcoded, this vulnerability cannot be easily fixed without changing the
+/// source code.
+///
+/// Instead of hardcoding passwords, consider storing them in configuration
+/// files or other stores that are not committed to version control.
+///
+/// ## Example
+/// ```python
+/// def connect_to_server(password="hunter2"):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+///
+/// def connect_to_server(password=os.environ["PASSWORD"]):
+///     ...
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[violation]
 pub struct HardcodedPasswordDefault {
     name: String,

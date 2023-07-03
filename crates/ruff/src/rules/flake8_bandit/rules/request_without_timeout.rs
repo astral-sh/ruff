@@ -6,6 +6,30 @@ use ruff_python_ast::helpers::SimpleCallArgs;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of the Python `requests` module without a timeout.
+///
+/// ## Why is this bad?
+/// The `timeout` parameter is used to set the maximum time to wait for a
+/// response from the server. Without a timeout, the program may hang
+/// indefinitely waiting for a response.
+///
+/// ## Example
+/// ```python
+/// import requests
+///
+/// requests.get("https://www.example.com/")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import requests
+///
+/// requests.get("https://www.example.com/", timeout=10)
+/// ```
+///
+/// ## References
+/// - [Requests documentation: Timeouts](https://requests.readthedocs.io/en/latest/user/advanced/#timeouts)
 #[violation]
 pub struct RequestWithoutTimeout {
     pub timeout: Option<String>,

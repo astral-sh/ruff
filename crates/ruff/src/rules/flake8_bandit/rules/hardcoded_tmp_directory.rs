@@ -3,6 +3,34 @@ use rustpython_parser::ast::{Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for hardcoded temporary file or directory paths.
+///
+/// ## Why is this bad?
+/// Hardcoded temporary file or directory paths with permissive permissions
+/// are insecure as they can be easily discovered by attackers who can then use
+/// them to supply malicious or otherwise unexpected files to the application.
+/// Other applications may also unexpectedly read or write to these files,
+/// causing unexpected behavior.
+///
+/// ## Example
+/// ```python
+/// with open("/tmp/foo.txt", "w") as file:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import tempfile
+///
+/// with tempfile.NamedTemporaryFile() as file:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-377](https://cwe.mitre.org/data/definitions/377.html)
+/// - [Common Weakness Enumeration: CWE-379](https://cwe.mitre.org/data/definitions/379.html)
+/// - [Python documentation: `tempfile`](https://docs.python.org/3/library/tempfile.html)
 #[violation]
 pub struct HardcodedTempFile {
     string: String,

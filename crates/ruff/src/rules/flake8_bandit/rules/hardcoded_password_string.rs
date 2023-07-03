@@ -5,6 +5,32 @@ use ruff_macros::{derive_message_formats, violation};
 
 use super::super::helpers::{matches_password_name, string_literal};
 
+/// ## What it does
+/// Checks for hardcoded password strings.
+///
+/// ## Why is this bad?
+/// Hardcoded passwords are a security risk because they can be easily
+/// discovered by attackers and used to gain unauthorized access. As they are
+/// hardcoded, this vulnerability cannot be easily fixed without changing the
+/// source code.
+///
+/// Instead of hardcoding passwords, consider storing them in configuration
+/// files or other stores that are not committed to version control.
+///
+/// ## Example
+/// ```python
+/// SECRET_KEY = "hunter2"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+/// SECRET_KEY = os.environ["SECRET_KEY"]
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[violation]
 pub struct HardcodedPasswordString {
     name: String,
