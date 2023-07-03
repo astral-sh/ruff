@@ -18,7 +18,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         } = item;
 
         let level_str = level
-            .map(|level| ".".repeat(level.to_usize()).collect())
+            .map(|level| ".".repeat(level.to_usize()))
             .unwrap_or(String::default());
 
         write!(
