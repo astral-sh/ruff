@@ -1320,13 +1320,7 @@ where
                     flake8_simplify::rules::use_ternary_operator(self, stmt);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfDictGet) {
-                    flake8_simplify::rules::use_dict_get_with_default(
-                        self,
-                        stmt,
-                        test,
-                        body,
-                        elif_else_clauses,
-                    );
+                    flake8_simplify::rules::use_dict_get_with_default(self, stmt_if);
                 }
                 if self.enabled(Rule::TypeCheckWithoutTypeError) {
                     tryceratops::rules::type_check_without_type_error(

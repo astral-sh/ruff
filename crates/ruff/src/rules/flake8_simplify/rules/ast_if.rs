@@ -833,21 +833,22 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
 }
 
 /// SIM401
-pub(crate) fn use_dict_get_with_default(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    elif_else_clauses: &[ElifElseClause],
-) {
-    let [body_stmt] = body else {
+pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf) {
+    let StmtIf {
+        test,
+        body,
+        elif_else_clauses,
+        ..
+    } = stmt_if;
+
+    let [body_stmt] = body.as_slice() else {
         return;
     };
     let [ElifElseClause {
         body: else_body,
         test: None,
         ..
-    }] = elif_else_clauses
+    }] = elif_else_clauses.as_slice()
     else {
         return;
     };
@@ -881,7 +882,7 @@ pub(crate) fn use_dict_get_with_default(
         ops,
         comparators: test_dict,
         range: _,
-    }) = &test
+    }) = test.as_ref()
     else {
         return;
     };
@@ -953,9 +954,9 @@ pub(crate) fn use_dict_get_with_default(
     let contents = checker.generator().stmt(&node5.into());
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    let line_start = checker.locator.line_start(stmt.start());
+    let line_start = checker.locator.line_start(stmt_if.start());
     if LineWidth::new(checker.settings.tab_size)
-        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt_if.start())])
         .add_str(&contents)
         > checker.settings.line_length
     {
@@ -966,13 +967,13 @@ pub(crate) fn use_dict_get_with_default(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
-        stmt.range(),
+        stmt_if.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator) {
+        if !has_comments(stmt_if, checker.locator) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
-                stmt.range(),
+                stmt_if.range(),
             )));
         }
     }
