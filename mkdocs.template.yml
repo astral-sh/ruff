@@ -30,7 +30,7 @@ site_author: charliermarsh
 site_url: https://beta.ruff.rs/docs/
 site_dir: site/docs
 markdown_extensions:
-  - toc:
+  - custom-toc:
       permalink: "#"
   - pymdownx.snippets:
   - pymdownx.magiclink:
