@@ -11,8 +11,8 @@ use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 ///
 /// ## Why is this bad?
 /// Suppressing exception messages may hide errors that could otherwise reveal
-/// security vulnerabilities or malicious activity. Instead, consider logging
-/// the exception.
+/// unexpected behavior, security vulnerabilities, or malicious activity.
+/// Instead, consider logging the exception.
 ///
 /// ## Example
 /// ```python
