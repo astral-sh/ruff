@@ -18,7 +18,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         } = item;
 
         let level_str = level
-            .map(|level| iter::repeat('.').take(level.to_usize()).collect())
+            .map(|level| ".".repeat(level.to_usize()).collect())
             .unwrap_or(String::default());
 
         write!(
@@ -27,7 +27,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                 text("from"),
                 space(),
                 dynamic_text(&level_str, None),
-                module.as_ref().map(|module| module.format()),
+                module.as_ref().map(AsFormat::format),
                 space(),
                 text("import"),
                 space(),
