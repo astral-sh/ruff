@@ -115,29 +115,14 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
 
                 self.stack.returns.push(stmt_return);
             }
-            stmt_if @ Stmt::If(ast::StmtIf {
+            Stmt::If(ast::StmtIf {
                 body,
                 elif_else_clauses,
                 ..
             }) => {
                 // TODO(konstin): What's the rational here/is the condition right? -> https://github.com/astral-sh/ruff/pull/2881
-                let is_elif_arm = self.parents.iter().any(|parent| {
-                    if let Stmt::If(ast::StmtIf {
-                        elif_else_clauses, ..
-                    }) = parent
-                    {
-                        elif_else_clauses
-                            .iter()
-                            .any(|clause| clause.body.contains(stmt_if))
-                    } else {
-                        false
-                    }
-                });
-
-                if !is_elif_arm {
-                    if let Some(first) = elif_else_clauses.first() {
-                        self.stack.elifs_elses.push((body, first));
-                    }
+                if let Some(first) = elif_else_clauses.first() {
+                    self.stack.elifs_elses.push((body, first));
                 }
             }
             _ => {}
