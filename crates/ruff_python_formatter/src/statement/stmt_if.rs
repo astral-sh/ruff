@@ -77,28 +77,27 @@ fn format_elif_else_clause(
     let trailing_colon_comment = comments.dangling_comments(item);
     let leading_comments = comments.leading_comments(item);
 
+    leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
+
     if let Some(test) = test {
         write!(
             f,
             [
-                leading_alternate_branch_comments(leading_comments, last_node),
                 text("elif"),
                 space(),
                 maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                text(":"),
-                trailing_comments(trailing_colon_comment),
-                block_indent(&body.format())
             ]
-        )
+        )?;
     } else {
-        write!(
-            f,
-            [
-                leading_alternate_branch_comments(leading_comments, last_node),
-                text("else:"),
-                trailing_comments(trailing_colon_comment),
-                block_indent(&body.format())
-            ]
-        )
+        text("else").fmt(f)?;
     }
+
+    write!(
+        f,
+        [
+            text(":"),
+            trailing_comments(trailing_colon_comment),
+            block_indent(&body.format())
+        ]
+    )
 }
