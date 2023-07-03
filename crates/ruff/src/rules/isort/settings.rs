@@ -410,7 +410,7 @@ impl TryFrom<Options> for Settings {
             .collect();
 
         let sections_pattern: FxHashMap<String, Vec<glob::Pattern>> = sections
-            .clone() // TODO(tjkuson): I don't like this.
+            .clone()
             .into_iter()
             .map(|(section, modules)| {
                 let modules_pattern = modules
