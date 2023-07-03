@@ -52,7 +52,7 @@ pub(crate) fn generate() -> String {
                 .join(", "),
             prefix => prefix.to_string(),
         };
-        table_out.push_str(&format!("###  {} <code>({codes_csv})</code>", linter.name()));
+        table_out.push_str(&format!("### {} <code>({codes_csv})</code>", linter.name()));
         table_out.push('\n');
         table_out.push('\n');
 
