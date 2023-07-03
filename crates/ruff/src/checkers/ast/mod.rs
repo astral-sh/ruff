@@ -1375,10 +1375,10 @@ where
                     if self.any_enabled(&[
                         Rule::ComplexIfStatementInStub,
                         Rule::UnrecognizedVersionInfoCheck,
-                        Rule::TooSpecificVersionComparison,
+                        Rule::PatchVersionComparison,
                         Rule::WrongTupleLengthVersionComparison,
                     ]) {
-                        flake8_pyi::rules::version_info_checks(self, test);
+                        flake8_pyi::rules::version_info(self, test);
                     }
                 }
             }

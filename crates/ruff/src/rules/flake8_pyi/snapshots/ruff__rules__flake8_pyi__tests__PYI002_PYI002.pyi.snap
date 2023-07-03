@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI002.pyi:4:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+PYI002.pyi:4:4: PYI002 `if`` test must be a simple comparison against `sys.platform` or `sys.version_info`
   |
 2 | from sys import platform, version_info
 3 | 
@@ -11,7 +11,7 @@ PYI002.pyi:4:4: PYI002 If test must be a simple comparison against sys.platform 
 6 | if hasattr(sys, 'maxint'): ...  # PYI002 
   |
 
-PYI002.pyi:5:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+PYI002.pyi:5:4: PYI002 `if`` test must be a simple comparison against `sys.platform` or `sys.version_info`
   |
 4 | if sys.version == 'Python 2.7.10': ...  # PYI002 
 5 | if 'linux' == sys.platform: ...  # PYI002 
@@ -20,7 +20,7 @@ PYI002.pyi:5:4: PYI002 If test must be a simple comparison against sys.platform 
 7 | if sys.maxsize == 42: ...  # PYI002 
   |
 
-PYI002.pyi:6:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+PYI002.pyi:6:4: PYI002 `if`` test must be a simple comparison against `sys.platform` or `sys.version_info`
   |
 4 | if sys.version == 'Python 2.7.10': ...  # PYI002 
 5 | if 'linux' == sys.platform: ...  # PYI002 
@@ -30,7 +30,7 @@ PYI002.pyi:6:4: PYI002 If test must be a simple comparison against sys.platform 
 8 | if (2, 7) < sys.version_info < (3, 5): ...  # PYI002 
   |
 
-PYI002.pyi:7:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+PYI002.pyi:7:4: PYI002 `if`` test must be a simple comparison against `sys.platform` or `sys.version_info`
   |
 5 | if 'linux' == sys.platform: ...  # PYI002 
 6 | if hasattr(sys, 'maxint'): ...  # PYI002 
@@ -40,7 +40,7 @@ PYI002.pyi:7:4: PYI002 If test must be a simple comparison against sys.platform 
 9 | if sys.version[0] == 'P': ...  # PYI002
   |
 
-PYI002.pyi:8:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+PYI002.pyi:8:4: PYI002 `if`` test must be a simple comparison against `sys.platform` or `sys.version_info`
    |
  6 | if hasattr(sys, 'maxint'): ...  # PYI002 
  7 | if sys.maxsize == 42: ...  # PYI002 
@@ -50,7 +50,7 @@ PYI002.pyi:8:4: PYI002 If test must be a simple comparison against sys.platform 
 10 | if False: ...  # PYI002
    |
 
-PYI002.pyi:9:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+PYI002.pyi:9:4: PYI002 `if`` test must be a simple comparison against `sys.platform` or `sys.version_info`
    |
  7 | if sys.maxsize == 42: ...  # PYI002 
  8 | if (2, 7) < sys.version_info < (3, 5): ...  # PYI002 
@@ -59,7 +59,7 @@ PYI002.pyi:9:4: PYI002 If test must be a simple comparison against sys.platform 
 10 | if False: ...  # PYI002
    |
 
-PYI002.pyi:10:4: PYI002 If test must be a simple comparison against sys.platform or sys.version_info
+PYI002.pyi:10:4: PYI002 `if`` test must be a simple comparison against `sys.platform` or `sys.version_info`
    |
  8 | if (2, 7) < sys.version_info < (3, 5): ...  # PYI002 
  9 | if sys.version[0] == 'P': ...  # PYI002

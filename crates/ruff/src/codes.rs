@@ -598,7 +598,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "001") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnprefixedTypeParam),
         (Flake8Pyi, "002") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::ComplexIfStatementInStub),
         (Flake8Pyi, "003") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedVersionInfoCheck),
-        (Flake8Pyi, "004") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::TooSpecificVersionComparison),
+        (Flake8Pyi, "004") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::PatchVersionComparison),
         (Flake8Pyi, "005") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::WrongTupleLengthVersionComparison),
         (Flake8Pyi, "006") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::BadVersionInfoComparison),
         (Flake8Pyi, "007") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedPlatformCheck),
