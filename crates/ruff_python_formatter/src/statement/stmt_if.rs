@@ -77,7 +77,7 @@ fn format_elif_else_clause(
     let leading_comments = comments.leading_comments(item);
 
     leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
-    
+
     if let Some(test) = test {
         write!(
             f,
@@ -87,13 +87,16 @@ fn format_elif_else_clause(
                 test.format().with_options(Parenthesize::IfBreaks),
                 text(":")
             ]
-        )
+        )?;
     } else {
-    	text("else").fmt(f)?;
+        write!(f, [text("else"), text(":")])?;
     }
-    
-    write!(f, [
-                trailing_comments(trailing_colon_comment),
-                block_indent(&body.format())
-  	])
+
+    write!(
+        f,
+        [
+            trailing_comments(trailing_colon_comment),
+            block_indent(&body.format())
+        ]
+    )
 }
