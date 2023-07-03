@@ -395,12 +395,8 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -150,12 +172,10 @@
-                 ast_args.kw_defaults,
-                 parameters,
-                 implicit_default=True,
--            )
-+            ),
+@@ -153,9 +175,7 @@
+             )
          )
          # fmt: off
 -        a = (
@@ -610,7 +606,7 @@ def long_lines():
                 ast_args.kw_defaults,
                 parameters,
                 implicit_default=True,
-            ),
+            )
         )
         # fmt: off
         a = unnecessary_bracket()
