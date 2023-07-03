@@ -442,9 +442,13 @@ where
         }) => {
             any_over_expr(test, func)
                 || any_over_body(body, func)
-                || elif_else_clauses
-                    .iter()
-                    .any(|clause| any_over_body(&clause.body, func))
+                || elif_else_clauses.iter().any(|clause| {
+                    clause
+                        .test
+                        .as_ref()
+                        .map_or(false, |test| any_over_expr(test, func))
+                        || any_over_body(&clause.body, func)
+                })
         }
         Stmt::With(ast::StmtWith { items, body, .. })
         | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
@@ -977,7 +981,7 @@ where
             }) => {
                 walk_body(self, body);
                 for clause in elif_else_clauses {
-                    walk_body(self, &clause.body);
+                    self.visit_elif_else_clause(&clause);
                 }
             }
             Stmt::While(ast::StmtWhile { body, .. })

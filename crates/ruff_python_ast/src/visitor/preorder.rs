@@ -1,4 +1,4 @@
-use rustpython_ast::{ArgWithDefault, Mod, TypeIgnore};
+use rustpython_ast::{ArgWithDefault, ElifElseClause, Mod, TypeIgnore};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
     Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
@@ -96,6 +96,10 @@ pub trait PreorderVisitor<'a> {
 
     fn visit_type_ignore(&mut self, type_ignore: &'a TypeIgnore) {
         walk_type_ignore(self, type_ignore);
+    }
+
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+        walk_elif_else_clause(self, elif_else_clause);
     }
 }
 
@@ -718,6 +722,16 @@ where
     for expr in &comprehension.ifs {
         visitor.visit_expr(expr);
     }
+}
+
+pub fn walk_elif_else_clause<'a, V>(visitor: &mut V, elif_else_clause: &'a ElifElseClause)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    if let Some(test) = &elif_else_clause.test {
+        visitor.visit_expr(test);
+    }
+    visitor.visit_body(&elif_else_clause.body);
 }
 
 pub fn walk_except_handler<'a, V>(visitor: &mut V, except_handler: &'a ExceptHandler)

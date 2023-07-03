@@ -55,8 +55,8 @@ expression: comments.debug(test_case.source_code)
     },
     Node {
         kind: ElifElseClause,
-        range: 188..192,
-        source: `pass`,
+        range: 178..192,
+        source: `else:⏎`,
     }: {
         "leading": [
             SourceComment {
