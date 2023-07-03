@@ -1373,12 +1373,47 @@ where
                 }
                 if self.is_stub {
                     if self.any_enabled(&[
-                        Rule::ComplexIfStatementInStub,
                         Rule::UnrecognizedVersionInfoCheck,
                         Rule::PatchVersionComparison,
                         Rule::WrongTupleLengthVersionComparison,
                     ]) {
-                        flake8_pyi::rules::version_info(self, test);
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_version_info(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_version_info(self, test);
+                        }
+                    }
+                    if self.any_enabled(&[
+                        Rule::UnrecognizedPlatformCheck,
+                        Rule::UnrecognizedPlatformName,
+                    ]) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_platform(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_platform(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::BadVersionInfoComparison) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::bad_version_info_comparison(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::bad_version_info_comparison(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::ComplexIfStatementInStub) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::complex_if_statement_in_stub(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::complex_if_statement_in_stub(self, test);
+                        }
                     }
                 }
             }
@@ -3222,29 +3257,6 @@ where
                 }
                 if self.enabled(Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
-                }
-                if self.is_stub {
-                    if self.any_enabled(&[
-                        Rule::UnrecognizedPlatformCheck,
-                        Rule::UnrecognizedPlatformName,
-                    ]) {
-                        flake8_pyi::rules::unrecognized_platform(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
-                    if self.enabled(Rule::BadVersionInfoComparison) {
-                        flake8_pyi::rules::bad_version_info_comparison(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
                 }
             }
             Expr::Constant(ast::ExprConstant {

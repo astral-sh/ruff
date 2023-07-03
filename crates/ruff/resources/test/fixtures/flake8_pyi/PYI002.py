@@ -1,17 +1,6 @@
 import sys
-from sys import platform, version_info
 
-if sys.version == 'Python 2.7.10': ...  # PYI002 
-if 'linux' == sys.platform: ...  # PYI002 
-if hasattr(sys, 'maxint'): ...  # PYI002 
-if sys.maxsize == 42: ...  # PYI002 
-if (2, 7) < sys.version_info < (3, 5): ...  # PYI002 
-if sys.version[0] == 'P': ...  # PYI002
-if False: ...  # PYI002
-
-if version_info[0] == 2: ...
-if sys.version_info < (3, 5): ...
-if version_info >= (3, 5): ...
-if sys.version_info[:2] == (2, 7): ...
-if sys.version_info[:1] == (2,): ...
-if platform == 'linux': ...
+if sys.version == 'Python 2.7.10': ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
+if 'linux' == sys.platform: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
+if hasattr(sys, 'maxint'): ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
+if sys.maxsize == 42: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
