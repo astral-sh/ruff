@@ -1525,10 +1525,10 @@ where
                     perflint::rules::incorrect_dict_iterator(self, target, iter);
                 }
                 if self.enabled(Rule::ManualListComprehension) {
-                    perflint::rules::manual_list_comprehension(self, body);
+                    perflint::rules::manual_list_comprehension(self, target, body);
                 }
                 if self.enabled(Rule::ManualListCopy) {
-                    perflint::rules::manual_list_copy(self, body);
+                    perflint::rules::manual_list_copy(self, target, body);
                 }
                 if self.enabled(Rule::UnnecessaryListCast) {
                     perflint::rules::unnecessary_list_cast(self, iter);

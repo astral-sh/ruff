@@ -44,7 +44,7 @@ impl Violation for ManualListCopy {
 }
 
 /// PERF402
-pub(crate) fn manual_list_copy(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
     let [stmt] = body else {
         return;
     };
@@ -53,9 +53,32 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, body: &[Stmt]) {
         return;
     };
 
-    let Expr::Call(ast::ExprCall { func, range, .. }) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        range,
+        args,
+        keywords,
+    }) = value.as_ref()
+    else {
         return;
     };
+
+    if !keywords.is_empty() {
+        return;
+    }
+
+    let [arg] = args.as_slice() else {
+        return;
+    };
+
+    // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
+    if !arg.as_name_expr().map_or(false, |arg| {
+        target
+            .as_name_expr()
+            .map_or(false, |target| arg.id == target.id)
+    }) {
+        return;
+    }
 
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return;
