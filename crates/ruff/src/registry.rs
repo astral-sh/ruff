@@ -19,7 +19,13 @@ impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
         let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
-        Ok(prefix.rules().next().unwrap())
+        let rule = prefix.rules().next().unwrap();
+        // TODO(charlie): Add a method to return an individual code, rather than matching on the
+        // prefix.
+        if rule.noqa_code().to_string() != format!("{}{}", linter.common_prefix(), code) {
+            return Err(FromCodeError::Prefix);
+        }
+        Ok(rule)
     }
 }
 
@@ -27,6 +33,8 @@ impl Rule {
 pub enum FromCodeError {
     #[error("unknown rule code")]
     Unknown,
+    #[error("expected a rule code (like `SIM101`), not a prefix (like `SIM` or `SIM1`)")]
+    Prefix,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
