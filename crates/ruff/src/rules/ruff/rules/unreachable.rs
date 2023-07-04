@@ -194,9 +194,10 @@ struct BasicBlocks<'stmt> {
     /// # Notes
     ///
     /// The order of these block is unspecified. However it's guaranteed that
-    /// the last block is the statement in the function and the first block is
-    /// the last statement. The block are more or less in reverse order, but it
-    /// gets fussy around control flow statements (e.g. `if` statements).
+    /// the last block is the first statement in the function and the first
+    /// block is the last statement. The block are more or less in reverse
+    /// order, but it gets fussy around control flow statements (e.g. `while`
+    /// statements).
     ///
     /// For loop blocks, and similar recurring control flows, the end of the
     /// body will point to the loop block again (to create the loop). However an
