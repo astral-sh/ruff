@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::any_over_expr;
 
 use crate::checkers::ast::Checker;
 
@@ -52,6 +53,10 @@ impl Violation for ManualListComprehension {
 
 /// PERF401
 pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return;
+    };
+
     let (stmt, conditional) = match body {
         // ```python
         // for x in y:
@@ -99,22 +104,27 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
 
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
     if !conditional {
-        if arg.as_name_expr().map_or(false, |arg| {
-            target
-                .as_name_expr()
-                .map_or(false, |target| arg.id == target.id)
-        }) {
+        if arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
             return;
         }
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
 
-    if attr.as_str() == "append" {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ManualListComprehension, *range));
+    if attr.as_str() != "append" {
+        return;
     }
+
+    // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
+    if any_over_expr(value, &|expr| {
+        expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+    }) {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(ManualListComprehension, *range));
 }
