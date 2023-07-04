@@ -11,4 +11,4 @@ dependencies = [
 ]
 
 [project.entry-points."markdown.extensions"]
-custom-toc = "custom_extensions.toc:TocExtension"
+custom_toc = "custom_extensions.toc:TocExtension"
