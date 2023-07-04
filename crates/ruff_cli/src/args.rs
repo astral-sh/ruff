@@ -37,12 +37,14 @@ pub enum Command {
     Check(CheckArgs),
     /// Explain a rule (or all rules).
     #[clap(alias = "--explain")]
+    #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
-        #[arg(value_parser=Rule::from_code)]
+        /// Rule to explain
+        #[arg(value_parser=Rule::from_code, group = "selector")]
         rule: Option<Rule>,
 
         /// Explain all rules
-        #[arg(long, conflicts_with = "rule")]
+        #[arg(long, conflicts_with = "rule", group = "selector")]
         all: bool,
 
         /// Output format

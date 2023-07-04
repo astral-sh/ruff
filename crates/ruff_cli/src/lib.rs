@@ -137,13 +137,9 @@ quoting the executed command, along with the relevant file contents and `pyproje
         Command::Rule { rule, all, format } => {
             if all {
                 commands::rule::rules(format)?;
-            } else {
-                match rule {
-                    Some(rule) => commands::rule::rule(rule, format)?,
-                    None => {
-                        return Err(anyhow::anyhow!("No rule or --all specified"));
-                    }
-                }
+            }
+            if let Some(rule) = rule {
+                commands::rule::rule(rule, format)?
             }
         }
         Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
