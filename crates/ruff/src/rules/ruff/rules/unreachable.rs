@@ -357,7 +357,6 @@ fn create_blocks<'stmt>(
             | Stmt::Assign(_)
             | Stmt::AugAssign(_)
             | Stmt::AnnAssign(_)
-            | Stmt::Expr(_)
             | Stmt::Break(_)
             | Stmt::Continue(_) // NOTE: the next branch gets fixed up in `change_next_block`.
             | Stmt::Pass(_) => unconditional_next_block(blocks, after),
@@ -437,6 +436,7 @@ fn create_blocks<'stmt>(
                 // TODO: currently we don't include the lines before the match
                 // statement in the block, unlike what we do for other
                 // statements.
+                after = Some(blocks.len() - 1);
                 continue;
             }
             Stmt::Raise(_) => {
@@ -461,6 +461,38 @@ fn create_blocks<'stmt>(
                     orelse,
                 }
             }
+            Stmt::Expr(stmt) => {
+                match &*stmt.value {
+                    Expr::BoolOp(_) |
+                    Expr::BinOp(_) |
+                    Expr::UnaryOp(_) |
+                    Expr::Dict(_) |
+                    Expr::Set(_) |
+                    Expr::Compare(_) |
+                    Expr::Call(_) |
+                    Expr::FormattedValue(_) |
+                    Expr::JoinedStr(_) |
+                    Expr::Constant(_) |
+                    Expr::Attribute(_) |
+                    Expr::Subscript(_) |
+                    Expr::Starred(_) |
+                    Expr::Name(_) |
+                    Expr::List(_) |
+                    Expr::Tuple(_) |
+                    Expr::Slice(_)  => unconditional_next_block(blocks, after),
+                    // TODO: handle these expressions.
+                    Expr::NamedExpr(_) |
+                    Expr::Lambda(_) |
+                    Expr::IfExp(_) |
+                    Expr::ListComp(_) |
+                    Expr::SetComp(_) |
+                    Expr::DictComp(_) |
+                    Expr::GeneratorExp(_) |
+                    Expr::Await(_) |
+                    Expr::Yield(_) |
+                    Expr::YieldFrom(_) => unconditional_next_block(blocks, after),
+                }
+            },
             // The tough branches are done, here is an easy one.
             Stmt::Return(_) => NextBlock::Terminate,
         };
