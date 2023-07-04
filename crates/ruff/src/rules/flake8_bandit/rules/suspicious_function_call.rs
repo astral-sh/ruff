@@ -9,6 +9,42 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for calls to `pickle` functions or modules that wrap them.
+///
+/// ## Why is this bad?
+/// Deserializing untrusted data with `pickle` and other deserialization
+/// modules is insecure as it can allow for the creation of arbitrary objects,
+/// which can then be used to achieve arbitrary code execution and otherwise
+/// unexpected behavior.
+///
+/// Avoid deserializing untrusted data with `pickle` and other deserialization
+/// modules. Instead, consider safer formats, such as JSON.
+///
+/// If you must deserialize untrusted data with `pickle`, consider signing the
+/// data with a secret key and verifying the signature before deserializing
+/// (such as with `hmac`). This will prevent an attacker from modifying the
+/// serialized data to inject arbitrary objects.
+///
+/// ## Example
+/// ```python
+/// import pickle
+///
+/// with open("foo.pickle", "rb") as file:
+///     foo = pickle.load(file)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import json
+///
+/// with open("foo.json", "rb") as file:
+///     foo = json.load(file)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
+/// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
 #[violation]
 pub struct SuspiciousPickleUsage;
 
@@ -19,6 +55,41 @@ impl Violation for SuspiciousPickleUsage {
     }
 }
 
+/// ## What it does
+/// Checks for calls to `marshal` functions.
+///
+/// ## Why is this bad?
+/// Deserializing untrusted data with `marshal` is insecure as it can allow for
+/// the creation of arbitrary objects, which can then be used to achieve
+/// arbitrary code execution and otherwise unexpected behavior.
+///
+/// Avoid deserializing untrusted data with `marshal`. Instead, consider safer
+/// formats, such as JSON.
+///
+/// If you must deserialize untrusted data with `marshal`, consider signing the
+/// data with a secret key and verifying the signature before deserializing
+/// (such as with `hmac`). This will prevent an attacker from modifying the
+/// serialized data to inject arbitrary objects.
+///
+/// ## Example
+/// ```python
+/// import marshal
+///
+/// with open("foo.marshal", "rb") as file:
+///     foo = pickle.load(file)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import json
+///
+/// with open("foo.json", "rb") as file:
+///     foo = json.load(file)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `marshal` — Internal Python object serialization](https://docs.python.org/3/library/marshal.html)
+/// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
 #[violation]
 pub struct SuspiciousMarshalUsage;
 
@@ -29,6 +100,44 @@ impl Violation for SuspiciousMarshalUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of weak or broken cryptographic hash functions.
+///
+/// ## Why is this bad?
+/// Weak or broken cryptographic hash functions may be susceptible to
+/// collision attacks (where two different inputs produce the same hash) or
+/// prei-image attacks (where an attacker can find an input that produces a
+/// given hash). This can lead to security vulnerabilities in applications
+/// that rely on these hash functions.
+///
+/// Avoid using weak or broken cryptographic hash functions in security
+/// contexts. Instead, use a known secure hash function such as SHA256.
+///
+/// ## Example
+/// ```python
+/// import hashlib
+///
+///
+/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
+///     hash = hashlib.md5(certificate).hexdigest()
+///     return hash == known_hash
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import hashlib
+///
+///
+/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
+///     hash = hashlib.sha256(certificate).hexdigest()
+///     return hash == known_hash
+/// ```
+///
+/// ## References
+/// - [Python documentation: `hashlib` — Secure hashes and message digests](https://docs.python.org/3/library/hashlib.html)
+/// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+/// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
+/// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
 #[violation]
 pub struct SuspiciousInsecureHashUsage;
 
@@ -39,6 +148,34 @@ impl Violation for SuspiciousInsecureHashUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of weak or broken cryptographic ciphers.
+///
+/// ## Why is this bad?
+/// Weak or broken cryptographic ciphers may be susceptible to attacks that
+/// allow an attacker to decrypt ciphertext without knowing the key or
+/// otherwise compromise the security of the cipher, such as forgeries.
+///
+/// Use strong, modern cryptographic ciphers instead of weak or broken ones.
+///
+/// ## Example
+/// ```python
+/// from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
+///
+/// algorithm = algorithms.ARC4(key)
+/// cipher = Cipher(algorithm, mode=None)
+/// encryptor = cipher.encryptor()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from cryptography.fernet import Fernet
+///
+/// fernet = Fernet(key)
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 #[violation]
 pub struct SuspiciousInsecureCipherUsage;
 
@@ -49,6 +186,36 @@ impl Violation for SuspiciousInsecureCipherUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of weak or broken cryptographic cipher modes.
+///
+/// ## Why is this bad?
+/// Weak or broken cryptographic ciphers may be susceptible to attacks that
+/// allow an attacker to decrypt ciphertext without knowing the key or
+/// otherwise compromise the security of the cipher, such as forgeries.
+///
+/// Use strong, modern cryptographic ciphers instead of weak or broken ones.
+///
+/// ## Example
+/// ```python
+/// from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+///
+/// algorithm = algorithms.ARC4(key)
+/// cipher = Cipher(algorithm, mode=modes.ECB(iv))
+/// encryptor = cipher.encryptor()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+///
+/// algorithm = algorithms.ARC4(key)
+/// cipher = Cipher(algorithm, mode=modes.CTR(iv))
+/// encryptor = cipher.encryptor()
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 #[violation]
 pub struct SuspiciousInsecureCipherModeUsage;
 
@@ -59,6 +226,41 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `tempfile.mktemp`.
+///
+/// ## Why is this bad?
+/// `tempfile.mktemp` returns a pathname of a file that does not exist at the
+/// time the call is made; then, the caller is responsible for creating the
+/// file and subsequently using it. This is insecure because another process
+/// could create a file with the same name between the time the function
+/// returns and the time the caller creates the file.
+///
+/// `tempfile.mktemp` is deprecated in favor of `tempfile.mkstemp` which
+/// creates the file when it is called. Consider using `tempfile.mkstemp`
+/// instead, either directly or via a context manager such as
+/// `tempfile.TemporaryFile`.
+///
+///
+/// ## Example
+/// ```python
+/// import tempfile
+///
+/// tmp_file = tempfile.mktemp()
+/// with open(tmp_file, "w") as file:
+///     file.write("Hello, world!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import tempfile
+///
+/// with tempfile.TemporaryFile() as file:
+///     file.write("Hello, world!")
+/// ```
+///
+/// ## References
+/// - [Python documentation:`mktemp`](https://docs.python.org/3/library/tempfile.html#tempfile.mktemp)
 #[violation]
 pub struct SuspiciousMktempUsage;
 
