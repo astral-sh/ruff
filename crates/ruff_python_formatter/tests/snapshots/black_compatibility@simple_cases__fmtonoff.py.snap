@@ -198,22 +198,13 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -1,15 +1,14 @@
- #!/usr/bin/env python3
--import asyncio
--import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
+@@ -6,10 +6,9 @@
  
--from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
--from library import some_connection, some_decorator
-+NOT_YET_IMPLEMENTED_StmtImportFrom
+ from library import some_connection, some_decorator
  # fmt: off
 -from third_party import (X,
 -                         Y, Z)
-+NOT_YET_IMPLEMENTED_StmtImportFrom
++from third_party import X, Y, Z
  # fmt: on
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
@@ -336,7 +327,7 @@ d={'a':1,
      # fmt: off
 -    from hello import a,        b
 -    'unformatted'
-+    NOT_YET_IMPLEMENTED_StmtImportFrom
++    from hello import a, b
 +    "unformatted"
      # fmt: on
  
@@ -433,14 +424,14 @@ d={'a':1,
 
 ```py
 #!/usr/bin/env python3
-NOT_YET_IMPLEMENTED_StmtImport
-NOT_YET_IMPLEMENTED_StmtImport
+import asyncio
+import sys
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from third_party import X, Y, Z
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from library import some_connection, some_decorator
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from third_party import X, Y, Z
 # fmt: on
 NOT_YET_IMPLEMENTED_ExprJoinedStr
 # Comment 1
@@ -539,7 +530,7 @@ def subscriptlist():
 
 def import_as_names():
     # fmt: off
-    NOT_YET_IMPLEMENTED_StmtImportFrom
+    from hello import a, b
     "unformatted"
     # fmt: on
 

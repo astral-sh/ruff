@@ -107,20 +107,12 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,12 +1,11 @@
- #!/usr/bin/env python3
--import asyncio
--import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
+@@ -5,8 +5,7 @@
+ from third_party import X, Y, Z
  
--from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
--from library import some_connection, some_decorator
+ from library import some_connection, some_decorator
 -
 -f"trigger 3.6 mode"
-+NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
  
  
@@ -221,12 +213,12 @@ def __await__(): return (yield)
 
 ```py
 #!/usr/bin/env python3
-NOT_YET_IMPLEMENTED_StmtImport
-NOT_YET_IMPLEMENTED_StmtImport
+import asyncio
+import sys
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from third_party import X, Y, Z
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from library import some_connection, some_decorator
 NOT_YET_IMPLEMENTED_ExprJoinedStr
 
 
