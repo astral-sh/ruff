@@ -139,7 +139,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
                 commands::rule::rules(format)?;
             }
             if let Some(rule) = rule {
-                commands::rule::rule(rule, format)?
+                commands::rule::rule(rule, format)?;
             }
         }
         Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
