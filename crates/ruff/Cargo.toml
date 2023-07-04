@@ -17,6 +17,7 @@ name = "ruff"
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
+ruff_index = { path = "../ruff_index" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_whitespace = { path = "../ruff_python_whitespace" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
@@ -88,3 +89,5 @@ colored = { workspace = true, features = ["no-color"] }
 [features]
 default = []
 schemars = ["dep:schemars"]
+# Enables the UnreachableCode rule
+unreachable-code = []
