@@ -73,6 +73,12 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         #[allow(clippy::print_stdout)]
         {
             print!("{}", result.display(args.format));
+            println!(
+                "Found {} stability errors in {} files in {:.2}s",
+                result.diagnostics.len(),
+                result.file_count,
+                result.duration.as_secs_f32(),
+            );
         }
 
         result.is_success()
@@ -171,8 +177,10 @@ fn check_multi_project(args: &Args) -> bool {
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{total_errors} stability errors in {total_files} files");
-        println!("Finished in {}s", duration.as_secs_f32());
+        println!(
+            "{total_errors} stability errors in {total_files} files in {}s",
+            duration.as_secs_f32()
+        );
     }
 
     all_success
