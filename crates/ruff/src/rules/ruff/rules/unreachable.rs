@@ -1,13 +1,15 @@
-use std::{fmt, iter};
+use std::{fmt, iter, usize};
 
 use log::error;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{
     Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtAsyncFor,
     StmtAsyncWith, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtTryStar, StmtWhile, StmtWith,
 };
 use rustpython_parser::text_size::{TextRange, TextSize};
+
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_index::{IndexSlice, IndexVec};
+use ruff_macros::{derive_message_formats, newtype_index, violation};
 
 /// ## What it does
 /// Checks for unreachable code.
@@ -47,12 +49,11 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
 
     // Basic on the code blocks we can (more) easily follow what statements are
     // and aren't reached, we'll mark them as such in `reached_map`.
-    let mut reached_map = Bitmap::with_capacity(basic_blocks.blocks.len());
-    mark_reached(
-        &mut reached_map,
-        &basic_blocks.blocks,
-        basic_blocks.blocks.len() - 1,
-    );
+    let mut reached_map = Bitmap::with_capacity(basic_blocks.len());
+
+    if let Some(start_index) = basic_blocks.start_index() {
+        mark_reached(&mut reached_map, &basic_blocks.blocks, start_index);
+    }
 
     // For each unreached code block create a diagnostic.
     reached_map
@@ -105,11 +106,11 @@ impl Bitmap {
     /// Set bit at index `idx` to true.
     ///
     /// Returns a boolean indicating if the bit was already set.
-    fn set(&mut self, idx: usize) -> bool {
-        let n = idx / usize::BITS as usize;
-        let s = idx % usize::BITS as usize;
-        if (self.bits[n] & (1 << s)) == 0 {
-            self.bits[n] |= 1 << s;
+    fn set(&mut self, idx: BlockIndex) -> bool {
+        let bits_index = (idx.as_u32() / usize::BITS) as usize;
+        let shift = idx.as_u32() % usize::BITS;
+        if (self.bits[bits_index] & (1 << shift)) == 0 {
+            self.bits[bits_index] |= 1 << shift;
             false
         } else {
             true
@@ -117,7 +118,7 @@ impl Bitmap {
     }
 
     /// Returns an iterator of all unset indices.
-    fn unset(&self) -> impl Iterator<Item = usize> + '_ {
+    fn unset(&self) -> impl Iterator<Item = BlockIndex> + '_ {
         let mut index = 0;
         let mut shift = 0;
         let last_max_shift = self.capacity % usize::BITS as usize;
@@ -134,7 +135,9 @@ impl Bitmap {
             let is_set = (self.bits[index] & (1 << shift)) != 0;
             shift += 1;
             if !is_set {
-                return Some((index * usize::BITS as usize) + shift - 1);
+                return Some(BlockIndex::from_usize(
+                    (index * usize::BITS as usize) + shift - 1,
+                ));
             }
         })
     }
@@ -142,7 +145,13 @@ impl Bitmap {
 
 /// Set bits in `reached_map` for all blocks that are reached in `blocks`
 /// starting with block at index `idx`.
-fn mark_reached(reached_map: &mut Bitmap, blocks: &[BasicBlock<'_>], mut idx: BlockIndex) {
+fn mark_reached(
+    reached_map: &mut Bitmap,
+    blocks: &IndexSlice<BlockIndex, BasicBlock<'_>>,
+    start_index: BlockIndex,
+) {
+    let mut idx = start_index;
+
     loop {
         let block = &blocks[idx];
         if reached_map.set(idx) {
@@ -188,6 +197,11 @@ fn taken(condition: &Condition) -> Option<bool> {
     }
 }
 
+/// Index into [`BasicBlocks::blocks`].
+#[newtype_index]
+#[derive(PartialOrd, Ord)]
+struct BlockIndex;
+
 /// Collection of basic block.
 #[derive(Debug, PartialEq)]
 struct BasicBlocks<'stmt> {
@@ -220,7 +234,17 @@ struct BasicBlocks<'stmt> {
     ///
     /// Finally `BasicBlock` can also be a sentinel node, see the associated
     /// constants of [`BasicBlock`].
-    blocks: Vec<BasicBlock<'stmt>>,
+    blocks: IndexVec<BlockIndex, BasicBlock<'stmt>>,
+}
+
+impl BasicBlocks<'_> {
+    fn len(&self) -> usize {
+        self.blocks.len()
+    }
+
+    fn start_index(&self) -> Option<BlockIndex> {
+        self.blocks.indices().last()
+    }
 }
 
 impl<'stmt> From<&'stmt [Stmt]> for BasicBlocks<'stmt> {
@@ -296,9 +320,6 @@ impl<'stmt> Ranged for Condition<'stmt> {
     }
 }
 
-/// Index into [`BasicBlocks::blocks`].
-type BlockIndex = usize;
-
 impl<'stmt> BasicBlock<'stmt> {
     /// A sentinel block indicating an empty termination block.
     const EMPTY: BasicBlock<'static> = BasicBlock {
@@ -342,25 +363,28 @@ fn loop_block<'stmt>(
     let after_block = blocks.maybe_next_block_index(after, || orelse.is_empty());
     // NOTE: a while loop's body must not be empty, so we can safely
     // create at least one block from it.
-    debug_assert!(!body.is_empty());
-    blocks.create_blocks(body, after);
-    let next = blocks.len() - 1;
-    let orelse = blocks.append_blocks_if_not_empty(orelse, after_block);
+    let last_statement_index = blocks.append_blocks(body, after);
+    let last_orelse_statement = blocks.append_blocks_if_not_empty(orelse, after_block);
     // `create_blocks` always continues to the next block by
     // default. However in a while loop we want to continue with the
     // while block (we're about to create) to create the loop.
     // NOTE: `blocks.len()` is an invalid index at time of creation
     // as it points to the block which we're about to create.
-    blocks.change_next_block(next, after_block, blocks.len(), |block| {
-        // For `break` statements we don't want to continue with the
-        // loop, but instead with the statement after the loop (i.e.
-        // not change anything).
-        !block.stmts.last().map_or(false, Stmt::is_break_stmt)
-    });
+    blocks.change_next_block(
+        last_statement_index,
+        after_block,
+        blocks.blocks.next_index(),
+        |block| {
+            // For `break` statements we don't want to continue with the
+            // loop, but instead with the statement after the loop (i.e.
+            // not change anything).
+            !block.stmts.last().map_or(false, Stmt::is_break_stmt)
+        },
+    );
     NextBlock::If {
         condition,
-        next,
-        orelse,
+        next: last_statement_index,
+        orelse: last_orelse_statement,
     }
 }
 
@@ -385,10 +409,12 @@ fn match_case<'stmt>(
     let next_block_index = if case.body.is_empty() {
         next_after_block
     } else {
-        let from = blocks.len().saturating_sub(1);
-        let next = blocks.append_blocks(&case.body, Some(next_after_block));
-        blocks.change_next_block(next, from, next_after_block, |_| true);
-        next
+        let from = blocks.last_index();
+        let last_statement_index = blocks.append_blocks(&case.body, Some(next_after_block));
+        if let Some(from) = from {
+            blocks.change_next_block(last_statement_index, from, next_after_block, |_| true);
+        }
+        last_statement_index
     };
     // TODO: handle named arguments, e.g.
     // ```python
@@ -418,18 +444,22 @@ fn is_wildcard(pattern: &MatchCase) -> bool {
 
 #[derive(Debug, Default)]
 struct BasicBlocksBuilder<'stmt> {
-    blocks: Vec<BasicBlock<'stmt>>,
+    blocks: IndexVec<BlockIndex, BasicBlock<'stmt>>,
 }
 
 impl<'stmt> BasicBlocksBuilder<'stmt> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
-            blocks: Vec::with_capacity(capacity),
+            blocks: IndexVec::with_capacity(capacity),
         }
     }
 
     /// Creates basic blocks from `stmts` and appends them to `blocks`.
-    fn create_blocks(&mut self, stmts: &'stmt [Stmt], mut after: Option<BlockIndex>) {
+    fn create_blocks(
+        &mut self,
+        stmts: &'stmt [Stmt],
+        mut after: Option<BlockIndex>,
+    ) -> Option<BlockIndex> {
         // We process the statements in reverse so that we can always point to the
         // next block (as that should always be processed).
         let mut stmts_iter = stmts.iter().enumerate().rev().peekable();
@@ -448,12 +478,17 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 | Stmt::AugAssign(_)
                 | Stmt::AnnAssign(_)
                 | Stmt::Break(_)
-                | Stmt::Continue(_) // NOTE: the next branch gets fixed up in `change_next_block`.
-                | Stmt::Pass(_) => self.unconditional_next_block( after),
+                | Stmt::Pass(_) => self.unconditional_next_block(after),
+                Stmt::Continue(_) => {
+                    // NOTE: the next branch gets fixed up in `change_next_block`.
+                    self.unconditional_next_block(after)
+                }
                 // Statements that (can) divert the control flow.
                 Stmt::If(stmt) => {
-                    let next_after_block = self.maybe_next_block_index( after, || needs_next_block(&stmt.body));
-                    let orelse_after_block = self.maybe_next_block_index( after, || needs_next_block(&stmt.orelse));
+                    let next_after_block =
+                        self.maybe_next_block_index(after, || needs_next_block(&stmt.body));
+                    let orelse_after_block =
+                        self.maybe_next_block_index(after, || needs_next_block(&stmt.orelse));
                     let next = self.append_blocks_if_not_empty(&stmt.body, next_after_block);
                     let orelse = self.append_blocks_if_not_empty(&stmt.orelse, orelse_after_block);
                     NextBlock::If {
@@ -463,25 +498,37 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     }
                 }
                 Stmt::While(StmtWhile {
-                                test: condition,
-                                body,
-                                orelse,
-                                ..
-                            }) => loop_block(self, Condition::Test(condition), body, orelse, after),
+                    test: condition,
+                    body,
+                    orelse,
+                    ..
+                }) => loop_block(self, Condition::Test(condition), body, orelse, after),
                 Stmt::For(StmtFor {
-                              iter: condition,
-                              body,
-                              orelse,
-                              ..
-                          })
+                    iter: condition,
+                    body,
+                    orelse,
+                    ..
+                })
                 | Stmt::AsyncFor(StmtAsyncFor {
-                                     iter: condition,
-                                     body,
-                                     orelse,
-                                     ..
-                                 }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
-                Stmt::Try(StmtTry { body, handlers, orelse, finalbody, .. })
-                | Stmt::TryStar(StmtTryStar { body, handlers, orelse, finalbody, .. }) => {
+                    iter: condition,
+                    body,
+                    orelse,
+                    ..
+                }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
+                Stmt::Try(StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                })
+                | Stmt::TryStar(StmtTryStar {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                }) => {
                     // TODO: handle `try` statements. The `try` control flow is very
                     // complex, what blocks are and aren't taken and from which
                     // block the control flow is actually returns is **very**
@@ -490,17 +537,27 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     // very carefully.
                     // For now we'll skip over it.
                     let _ = (body, handlers, orelse, finalbody); // Silence unused code warnings.
-                    self.unconditional_next_block( after)
+                    self.unconditional_next_block(after)
                 }
-                Stmt::With(StmtWith { items, body, type_comment, .. })
-                | Stmt::AsyncWith(StmtAsyncWith { items, body, type_comment, .. }) => {
+                Stmt::With(StmtWith {
+                    items,
+                    body,
+                    type_comment,
+                    ..
+                })
+                | Stmt::AsyncWith(StmtAsyncWith {
+                    items,
+                    body,
+                    type_comment,
+                    ..
+                }) => {
                     // TODO: handle `with` statements, see
                     // <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>.
                     // I recommend to `try` statements first as `with` can desugar
                     // to a `try` statement.
                     // For now we'll skip over it.
                     let _ = (items, body, type_comment); // Silence unused code warnings.
-                    self.unconditional_next_block( after)
+                    self.unconditional_next_block(after)
                 }
                 Stmt::Match(StmtMatch { subject, cases, .. }) => {
                     let next_after_block = self.maybe_next_block_index(after, || {
@@ -516,17 +573,23 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     });
                     let mut orelse_after_block = next_after_block;
                     for case in cases.iter().rev() {
-                        let block = match_case(self, stmt, subject, case, next_after_block, orelse_after_block);
-                        self.blocks.push(block);
+                        let block = match_case(
+                            self,
+                            stmt,
+                            subject,
+                            case,
+                            next_after_block,
+                            orelse_after_block,
+                        );
                         // For the case above this use the just added case as the
                         // `orelse` branch, this convert the match statement to
                         // (essentially) a bunch of if statements.
-                        orelse_after_block = self.blocks.len() - 1;
+                        orelse_after_block = self.blocks.push(block);
                     }
                     // TODO: currently we don't include the lines before the match
                     // statement in the block, unlike what we do for other
                     // statements.
-                    after = Some(self.blocks.len() - 1);
+                    after = Some(orelse_after_block);
                     continue;
                 }
                 Stmt::Raise(_) => {
@@ -553,36 +616,36 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 }
                 Stmt::Expr(stmt) => {
                     match &*stmt.value {
-                        Expr::BoolOp(_) |
-                        Expr::BinOp(_) |
-                        Expr::UnaryOp(_) |
-                        Expr::Dict(_) |
-                        Expr::Set(_) |
-                        Expr::Compare(_) |
-                        Expr::Call(_) |
-                        Expr::FormattedValue(_) |
-                        Expr::JoinedStr(_) |
-                        Expr::Constant(_) |
-                        Expr::Attribute(_) |
-                        Expr::Subscript(_) |
-                        Expr::Starred(_) |
-                        Expr::Name(_) |
-                        Expr::List(_) |
-                        Expr::Tuple(_) |
-                        Expr::Slice(_)  => self.unconditional_next_block(after),
+                        Expr::BoolOp(_)
+                        | Expr::BinOp(_)
+                        | Expr::UnaryOp(_)
+                        | Expr::Dict(_)
+                        | Expr::Set(_)
+                        | Expr::Compare(_)
+                        | Expr::Call(_)
+                        | Expr::FormattedValue(_)
+                        | Expr::JoinedStr(_)
+                        | Expr::Constant(_)
+                        | Expr::Attribute(_)
+                        | Expr::Subscript(_)
+                        | Expr::Starred(_)
+                        | Expr::Name(_)
+                        | Expr::List(_)
+                        | Expr::Tuple(_)
+                        | Expr::Slice(_) => self.unconditional_next_block(after),
                         // TODO: handle these expressions.
-                        Expr::NamedExpr(_) |
-                        Expr::Lambda(_) |
-                        Expr::IfExp(_) |
-                        Expr::ListComp(_) |
-                        Expr::SetComp(_) |
-                        Expr::DictComp(_) |
-                        Expr::GeneratorExp(_) |
-                        Expr::Await(_) |
-                        Expr::Yield(_) |
-                        Expr::YieldFrom(_) => self.unconditional_next_block(after),
+                        Expr::NamedExpr(_)
+                        | Expr::Lambda(_)
+                        | Expr::IfExp(_)
+                        | Expr::ListComp(_)
+                        | Expr::SetComp(_)
+                        | Expr::DictComp(_)
+                        | Expr::GeneratorExp(_)
+                        | Expr::Await(_)
+                        | Expr::Yield(_)
+                        | Expr::YieldFrom(_) => self.unconditional_next_block(after),
                     }
-                },
+                }
                 // The tough branches are done, here is an easy one.
                 Stmt::Return(_) => NextBlock::Terminate,
             };
@@ -601,16 +664,18 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 stmts: &stmts[start..end],
                 next,
             };
-            self.blocks.push(block);
-            after = Some(self.blocks.len() - 1);
+            after = Some(self.blocks.push(block));
         }
+
+        after
     }
 
     /// Calls [`create_blocks`] and returns this first block reached (i.e. the last
     /// block).
     fn append_blocks(&mut self, stmts: &'stmt [Stmt], after: Option<BlockIndex>) -> BlockIndex {
-        self.create_blocks(stmts, after);
-        self.blocks.len() - 1
+        assert!(!stmts.is_empty());
+        self.create_blocks(stmts, after)
+            .expect("Expect `create_blocks` to create a block if `stmts` is not empty")
     }
 
     /// If `stmts` is not empty this calls [`create_blocks`] and returns this first
@@ -637,8 +702,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         // Either we continue with the next block (that is the last block `blocks`).
         // Or it's the last statement, thus we terminate.
         self.blocks
-            .len()
-            .checked_sub(1)
+            .last_index()
             .map_or(NextBlock::Terminate, NextBlock::Always)
     }
 
@@ -659,32 +723,30 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         if let Some(after) = after {
             // Next block is already determined.
             after
-        } else if let Some(idx) = self.blocks.len().checked_sub(1) {
+        } else if let Some(idx) = self.blocks.last_index() {
             // Otherwise we either continue with the next block (that is the last
             // block in `blocks`).
             idx
         } else if condition() {
             // Or if there are no blocks, but need one based on `condition` than we
             // add a fake end block.
-            self.blocks.push(BasicBlock::EMPTY);
-            0
+            self.blocks.push(BasicBlock::EMPTY)
         } else {
             // NOTE: invalid, but because `condition` returned false this shouldn't
             // be used. This only used as an optimisation to avoid adding fake end
             // blocks.
-            usize::MAX
+            BlockIndex::MAX
         }
     }
 
     /// Returns a block index for a fake exception block in `blocks`.
     fn fake_exception_block_index(&mut self) -> BlockIndex {
-        for (i, block) in self.blocks.iter().enumerate() {
+        for (i, block) in self.blocks.iter_enumerated() {
             if block.is_exception() {
                 return i;
             }
         }
-        self.blocks.push(BasicBlock::EXCEPTION);
-        self.blocks.len() - 1
+        self.blocks.push(BasicBlock::EXCEPTION)
     }
 
     /// Change the next basic block for the block, or chain of blocks, in index
@@ -783,7 +845,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
 }
 
 impl<'stmt> std::ops::Deref for BasicBlocksBuilder<'stmt> {
-    type Target = [BasicBlock<'stmt>];
+    type Target = IndexSlice<BlockIndex, BasicBlock<'stmt>>;
 
     fn deref(&self) -> &Self::Target {
         &self.blocks
@@ -799,7 +861,9 @@ impl<'stmt> std::ops::DerefMut for BasicBlocksBuilder<'stmt> {
 /// Returns true if `stmts` need a next block, false otherwise.
 fn needs_next_block(stmts: &[Stmt]) -> bool {
     // No statements, we automatically continue with the next block.
-    let Some(last) = stmts.last() else { return true; };
+    let Some(last) = stmts.last() else {
+        return true;
+    };
 
     match last {
         Stmt::Return(_) | Stmt::Raise(_) => false,
@@ -919,17 +983,28 @@ impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
 
         // Then link all the blocks.
         writeln!(f, "  start --> block{}", self.graph.blocks.len() - 1)?;
-        for (i, block) in self.graph.blocks.iter().enumerate().rev() {
+        for (i, block) in self.graph.blocks.iter_enumerated().rev() {
+            let i = i.as_u32();
             match &block.next {
-                NextBlock::Always(target) => writeln!(f, "  block{i} --> block{target}")?,
+                NextBlock::Always(target) => {
+                    writeln!(f, "  block{i} --> block{target}", target = target.as_u32())?;
+                }
                 NextBlock::If {
                     condition,
                     next,
                     orelse,
                 } => {
                     let condition_code = &self.source[condition.range()].trim();
-                    writeln!(f, "  block{i} -- \"{condition_code}\" --> block{next}")?;
-                    writeln!(f, "  block{i} -- \"else\" --> block{orelse}")?;
+                    writeln!(
+                        f,
+                        "  block{i} -- \"{condition_code}\" --> block{next}",
+                        next = next.as_u32()
+                    )?;
+                    writeln!(
+                        f,
+                        "  block{i} -- \"else\" --> block{orelse}",
+                        orelse = orelse.as_u32()
+                    )?;
                 }
                 NextBlock::Terminate => writeln!(f, "  block{i} --> return")?,
             }
@@ -959,7 +1034,9 @@ mod tests {
     use rustpython_parser::{parse, Mode};
     use test_case::test_case;
 
-    use crate::rules::ruff::rules::unreachable::{BasicBlocks, MermaidGraph, NextBlock};
+    use crate::rules::ruff::rules::unreachable::{
+        BasicBlocks, BlockIndex, MermaidGraph, NextBlock,
+    };
 
     #[test_case("simple.py")]
     #[test_case("if.py")]
@@ -994,13 +1071,13 @@ mod tests {
                 "first block should always terminate"
             );
             // All block index should be valid.
-            let valid = got.blocks.len();
+            let valid = BlockIndex::from_usize(got.blocks.len());
             for block in &got.blocks {
                 match block.next {
-                    NextBlock::Always(index) => assert!(index <= valid, "invalid block index"),
+                    NextBlock::Always(index) => assert!(index < valid, "invalid block index"),
                     NextBlock::If { next, orelse, .. } => {
-                        assert!(next <= valid, "invalid next block index");
-                        assert!(orelse <= valid, "invalid orelse block index");
+                        assert!(next < valid, "invalid next block index");
+                        assert!(orelse < valid, "invalid orelse block index");
                     }
                     NextBlock::Terminate => {}
                 }
