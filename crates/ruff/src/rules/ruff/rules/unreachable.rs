@@ -937,22 +937,10 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
 struct MermaidGraph<'stmt, 'source> {
     graph: &'stmt BasicBlocks<'stmt>,
     source: &'source str,
-    /// The range of the `source` code which contains the function, used to
-    /// print the source code.
-    range: TextRange,
 }
 
 impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Include the entire source code for debugging purposes.
-        writeln!(f, "%% Source code:")?;
-        for line in self.source[self.range].lines() {
-            writeln!(f, "%% {line}")?;
-        }
-        if !self.source.is_empty() {
-            writeln!(f)?;
-        }
-
         // Flowchart type of graph, top down.
         writeln!(f, "flowchart TD")?;
 
@@ -1031,7 +1019,9 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
+    use rustpython_parser::ast::Ranged;
     use rustpython_parser::{parse, Mode};
+    use std::fmt::Write;
     use test_case::test_case;
 
     use crate::rules::ruff::rules::unreachable::{
@@ -1055,6 +1045,8 @@ mod tests {
             .expect_module()
             .body;
 
+        let mut output = String::new();
+
         for (i, stmts) in stmts.into_iter().enumerate() {
             let Some(func) = stmts.function_def_stmt() else {
                 use std::io::Write;
@@ -1070,6 +1062,7 @@ mod tests {
                 NextBlock::Terminate,
                 "first block should always terminate"
             );
+
             // All block index should be valid.
             let valid = BlockIndex::from_usize(got.blocks.len());
             for block in &got.blocks {
@@ -1086,13 +1079,23 @@ mod tests {
             let got_mermaid = MermaidGraph {
                 graph: &got,
                 source: &source,
-                range: func.range,
-            }
-            .to_string();
-            let snapshot = format!("{filename}_{i}");
-            insta::with_settings!({ omit_expression => true }, {
-                insta::assert_snapshot!(snapshot, got_mermaid);
-            });
+            };
+
+            writeln!(
+                output,
+                "## Function {i}\n### Source\n```python\n{}\n```\n\n### Control Flow Graph\n```mermaid\n{}```\n",
+                &source[func.range()],
+                got_mermaid
+            )
+            .unwrap();
         }
+
+        insta::with_settings!({
+            omit_expression => true,
+            input_file => filename,
+            description => "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+        }, {
+            insta::assert_snapshot!(format!("{filename}.md"), output);
+        });
     }
 }
