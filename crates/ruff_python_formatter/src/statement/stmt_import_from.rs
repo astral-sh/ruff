@@ -3,7 +3,6 @@ use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{dynamic_text, format_with, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
 use rustpython_parser::ast::StmtImportFrom;
-use std::iter;
 
 #[derive(Default)]
 pub struct FormatStmtImportFrom;
