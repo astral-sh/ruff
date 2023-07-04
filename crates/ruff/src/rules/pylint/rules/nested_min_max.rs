@@ -143,7 +143,7 @@ pub(crate) fn nested_min_max(
     }
 
     if args.iter().any(|arg| {
-        let Expr::Call(ast::ExprCall { func, keywords, ..} )= arg else {
+        let Expr::Call(ast::ExprCall { func, keywords, .. }) = arg else {
             return false;
         };
         MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)

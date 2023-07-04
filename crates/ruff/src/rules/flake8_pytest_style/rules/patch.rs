@@ -1,10 +1,9 @@
-use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::{collect_arg_names, SimpleCallArgs};
+use ruff_python_ast::helpers::{includes_arg_name, SimpleCallArgs};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -18,10 +17,10 @@ impl Violation for PytestPatchWithLambda {
     }
 }
 
-#[derive(Default)]
 /// Visitor that checks references the argument names in the lambda body.
+#[derive(Debug)]
 struct LambdaBodyVisitor<'a> {
-    names: FxHashSet<&'a str>,
+    arguments: &'a Arguments,
     uses_args: bool,
 }
 
@@ -32,11 +31,15 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if self.names.contains(&id.as_str()) {
+                if includes_arg_name(id, self.arguments) {
                     self.uses_args = true;
                 }
             }
-            _ => visitor::walk_expr(self, expr),
+            _ => {
+                if !self.uses_args {
+                    visitor::walk_expr(self, expr);
+                }
+            }
         }
     }
 }
@@ -60,7 +63,7 @@ fn check_patch_call(
     {
         // Walk the lambda body.
         let mut visitor = LambdaBodyVisitor {
-            names: collect_arg_names(args),
+            arguments: args,
             uses_args: false,
         };
         visitor.visit_expr(body);

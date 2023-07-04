@@ -49,7 +49,7 @@ impl<'ast> FormatBinaryLike<'ast> for ExprBoolOp {
         let comments = f.context().comments().clone();
 
         let Some(first) = values.next() else {
-            return Ok(())
+            return Ok(());
         };
 
         write!(f, [group(&first.format())])?;

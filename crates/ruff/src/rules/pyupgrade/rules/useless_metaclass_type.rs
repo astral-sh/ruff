@@ -52,13 +52,13 @@ pub(crate) fn useless_metaclass_type(
         return;
     }
     let Expr::Name(ast::ExprName { id, .. }) = targets.first().unwrap() else {
-        return ;
+        return;
     };
     if id != "__metaclass__" {
         return;
     }
     let Expr::Name(ast::ExprName { id, .. }) = value else {
-        return ;
+        return;
     };
     if id != "type" {
         return;

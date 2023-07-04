@@ -86,7 +86,13 @@ enum Type {
 
 /// Recursively merge all the tuples and lists in the expression.
 fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
-    let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
+    let Expr::BinOp(ast::ExprBinOp {
+        left,
+        op: Operator::Add,
+        right,
+        range: _,
+    }) = expr
+    else {
         return None;
     };
 
@@ -171,7 +177,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     }
 
     let Some((new_expr, type_)) = concatenate_expressions(expr) else {
-        return
+        return;
     };
 
     let contents = match type_ {

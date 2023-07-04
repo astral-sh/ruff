@@ -80,7 +80,7 @@ impl ImplicitImports {
                     continue;
                 };
 
-                let Some(name) = path.file_name().and_then(OsStr::to_str)  else {
+                let Some(name) = path.file_name().and_then(OsStr::to_str) else {
                     continue;
                 };
                 submodules.insert(

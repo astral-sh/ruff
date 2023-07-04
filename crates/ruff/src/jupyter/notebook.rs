@@ -268,11 +268,12 @@ impl Notebook {
                         .markers()
                         .iter()
                         .rev()
-                        .find(|m| m.source <= *offset) else {
-                            // There are no markers above the current offset, so we can
-                            // stop here.
-                            break;
-                        };
+                        .find(|m| m.source <= *offset)
+                    else {
+                        // There are no markers above the current offset, so we can
+                        // stop here.
+                        break;
+                    };
                     last_marker = Some(marker);
                     marker
                 }

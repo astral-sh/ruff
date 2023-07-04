@@ -66,7 +66,7 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value, .. } )= &args[0] else {
+    let Expr::Constant(ast::ExprConstant { value, .. }) = &args[0] else {
         return;
     };
     let Some(primitive) = Primitive::from_constant(value) else {

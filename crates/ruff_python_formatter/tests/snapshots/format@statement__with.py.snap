@@ -113,15 +113,13 @@ with a:  # should remove brackets
 # if we do want to wrap, do we prefer to wrap the entire WithItem or to let the
 # WithItem allow the `aa + bb` content expression to be wrapped
 with (
-    (
-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    ) as c,
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c
 ):
     ...
 
 
 # currently unparsable by black: https://github.com/psf/black/issues/3678
-with (i for i in []):
+with (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
     pass
 with (a, *NOT_YET_IMPLEMENTED_ExprStarred):
     pass

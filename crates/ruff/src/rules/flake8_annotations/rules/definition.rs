@@ -457,11 +457,7 @@ pub(crate) fn definition(
     // TODO(charlie): Consider using the AST directly here rather than `Definition`.
     // We could adhere more closely to `flake8-annotations` by defining public
     // vs. secret vs. protected.
-    let Definition::Member(Member {
-        kind,
-        stmt,
-        ..
-    }) = definition else {
+    let Definition::Member(Member { kind, stmt, .. }) = definition else {
         return vec![];
     };
 

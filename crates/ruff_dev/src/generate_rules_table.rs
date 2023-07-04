@@ -102,10 +102,10 @@ pub(crate) fn generate() -> String {
                 ));
                 table_out.push('\n');
                 table_out.push('\n');
-                generate_table(&mut table_out, prefix, &linter);
+                generate_table(&mut table_out, prefix.clone().rules(), &linter);
             }
         } else {
-            generate_table(&mut table_out, &linter, &linter);
+            generate_table(&mut table_out, linter.rules(), &linter);
         }
     }
 

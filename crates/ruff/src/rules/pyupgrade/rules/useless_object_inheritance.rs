@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
@@ -47,11 +46,7 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 }
 
 /// UP004
-pub(crate) fn useless_object_inheritance(
-    checker: &mut Checker,
-    class_def: &ast::StmtClassDef,
-    stmt: &Stmt,
-) {
+pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     for expr in &class_def.bases {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             continue;
@@ -73,7 +68,7 @@ pub(crate) fn useless_object_inheritance(
             diagnostic.try_set_fix(|| {
                 let edit = remove_argument(
                     checker.locator,
-                    stmt.identifier().start(),
+                    class_def.name.end(),
                     expr.range(),
                     &class_def.bases,
                     &class_def.keywords,

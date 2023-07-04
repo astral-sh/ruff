@@ -69,7 +69,7 @@ fn generate_fix(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
             locator,
-            func.start(),
+            func.end(),
             second.range(),
             args,
             keywords,

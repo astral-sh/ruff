@@ -70,15 +70,12 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
         kind: MemberKind::Method,
         stmt,
         ..
-    }) = definition else {
+    }) = definition
+    else {
         return;
     };
 
-    let Stmt::FunctionDef(ast::StmtFunctionDef {
-        name,
-        returns,
-        ..
-    }) = stmt else {
+    let Stmt::FunctionDef(ast::StmtFunctionDef { name, returns, .. }) = stmt else {
         return;
     };
 

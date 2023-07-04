@@ -36,6 +36,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::flake8_builtins::helpers::AnyShadowing;
+
 use crate::rules::{
     airflow, flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -71,7 +72,7 @@ pub(crate) struct Checker<'a> {
     deferred: Deferred<'a>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Check-specific state.
-    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
+    pub(crate) flake8_bugbear_seen: Vec<&'a ast::ExprName>,
 }
 
 impl<'a> Checker<'a> {
@@ -358,11 +359,7 @@ where
                 ..
             }) => {
                 if self.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
-                    self.diagnostics
-                        .extend(flake8_django::rules::non_leading_receiver_decorator(
-                            decorator_list,
-                            |expr| self.semantic.resolve_call_path(expr),
-                        ));
+                    flake8_django::rules::non_leading_receiver_decorator(self, decorator_list);
                 }
                 if self.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
@@ -504,8 +501,7 @@ where
                     }
                 }
                 if self.enabled(Rule::HardcodedPasswordDefault) {
-                    self.diagnostics
-                        .extend(flake8_bandit::rules::hardcoded_password_default(args));
+                    flake8_bandit::rules::hardcoded_password_default(self, args);
                 }
                 if self.enabled(Rule::PropertyWithParameters) {
                     pylint::rules::property_with_parameters(self, stmt, decorator_list, args);
@@ -623,6 +619,11 @@ where
                         );
                     }
                 }
+                #[cfg(feature = "unreachable-code")]
+                if self.enabled(Rule::UnreachableCode) {
+                    self.diagnostics
+                        .extend(ruff::rules::unreachable::in_function(name, body));
+                }
             }
             Stmt::Return(_) => {
                 if self.enabled(Rule::ReturnOutsideFunction) {
@@ -643,10 +644,7 @@ where
                 },
             ) => {
                 if self.enabled(Rule::DjangoNullableModelStringField) {
-                    self.diagnostics
-                        .extend(flake8_django::rules::nullable_model_string_field(
-                            self, body,
-                        ));
+                    flake8_django::rules::nullable_model_string_field(self, body);
                 }
                 if self.enabled(Rule::DjangoExcludeWithModelForm) {
                     if let Some(diagnostic) =
@@ -667,21 +665,17 @@ where
                 }
                 if !self.is_stub {
                     if self.enabled(Rule::DjangoModelWithoutDunderStr) {
-                        if let Some(diagnostic) =
-                            flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        flake8_django::rules::model_without_dunder_str(self, class_def);
                     }
                 }
                 if self.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }
                 if self.enabled(Rule::UselessObjectInheritance) {
-                    pyupgrade::rules::useless_object_inheritance(self, class_def, stmt);
+                    pyupgrade::rules::useless_object_inheritance(self, class_def);
                 }
                 if self.enabled(Rule::UnnecessaryClassParentheses) {
-                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def, stmt);
+                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def);
                 }
                 if self.enabled(Rule::AmbiguousClassName) {
                     if let Some(diagnostic) =
@@ -1370,6 +1364,51 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.is_stub {
+                    if self.any_enabled(&[
+                        Rule::UnrecognizedVersionInfoCheck,
+                        Rule::PatchVersionComparison,
+                        Rule::WrongTupleLengthVersionComparison,
+                    ]) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_version_info(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_version_info(self, test);
+                        }
+                    }
+                    if self.any_enabled(&[
+                        Rule::UnrecognizedPlatformCheck,
+                        Rule::UnrecognizedPlatformName,
+                    ]) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_platform(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_platform(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::BadVersionInfoComparison) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::bad_version_info_comparison(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::bad_version_info_comparison(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::ComplexIfStatementInStub) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::complex_if_statement_in_stub(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::complex_if_statement_in_stub(self, test);
+                        }
+                    }
+                }
             }
             Stmt::Assert(ast::StmtAssert {
                 test,
@@ -1409,7 +1448,7 @@ where
             Stmt::With(ast::StmtWith { items, body, .. })
             | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
-                    flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
+                    flake8_bugbear::rules::assert_raises_exception(self, items);
                 }
                 if self.enabled(Rule::PytestRaisesWithMultipleStatements) {
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
@@ -1490,6 +1529,12 @@ where
                 if self.enabled(Rule::IncorrectDictIterator) {
                     perflint::rules::incorrect_dict_iterator(self, target, iter);
                 }
+                if self.enabled(Rule::ManualListComprehension) {
+                    perflint::rules::manual_list_comprehension(self, target, body);
+                }
+                if self.enabled(Rule::ManualListCopy) {
+                    perflint::rules::manual_list_copy(self, target, body);
+                }
                 if self.enabled(Rule::UnnecessaryListCast) {
                     perflint::rules::unnecessary_list_cast(self, iter);
                 }
@@ -1528,9 +1573,7 @@ where
                     pyupgrade::rules::os_error_alias_handlers(self, handlers);
                 }
                 if self.enabled(Rule::PytestAssertInExcept) {
-                    self.diagnostics.extend(
-                        flake8_pytest_style::rules::assert_in_exception_handler(handlers),
-                    );
+                    flake8_pytest_style::rules::assert_in_exception_handler(self, handlers);
                 }
                 if self.enabled(Rule::SuppressibleException) {
                     flake8_simplify::rules::suppressible_exception(
@@ -1571,11 +1614,7 @@ where
                     flake8_bugbear::rules::assignment_to_os_environ(self, targets);
                 }
                 if self.enabled(Rule::HardcodedPasswordString) {
-                    if let Some(diagnostic) =
-                        flake8_bandit::rules::assign_hardcoded_password_string(value, targets)
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::assign_hardcoded_password_string(self, value, targets);
                 }
                 if self.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
@@ -1615,6 +1654,9 @@ where
                     {
                         self.diagnostics.push(diagnostic);
                     }
+                }
+                if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
+                    pylint::rules::type_param_name_mismatch(self, value, targets);
                 }
                 if self.is_stub {
                     if self.any_enabled(&[
@@ -2107,6 +2149,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, value,
@@ -2117,7 +2160,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep604_annotation(
                                     self, expr, slice, operator,
@@ -2193,6 +2237,9 @@ where
                         if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
+                        if self.enabled(Rule::NumpyDeprecatedFunction) {
+                            numpy::rules::deprecated_function(self, expr);
+                        }
                         if self.is_stub {
                             if self.enabled(Rule::CollectionsNamedTuple) {
                                 flake8_pyi::rules::collections_named_tuple(self, expr);
@@ -2212,6 +2259,7 @@ where
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
+                                        && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
                                             self, expr,
@@ -2222,7 +2270,8 @@ where
                                     if self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
-                                            && self.semantic.in_annotation())
+                                            && self.semantic.in_annotation()
+                                            && !self.settings.pyupgrade.keep_runtime_typing)
                                     {
                                         pyupgrade::rules::use_pep585_annotation(
                                             self,
@@ -2287,6 +2336,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, expr,
@@ -2297,7 +2347,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep585_annotation(self, expr, &replacement);
                             }
@@ -2314,6 +2365,9 @@ where
                 }
                 if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
+                }
+                if self.enabled(Rule::NumpyDeprecatedFunction) {
+                    numpy::rules::deprecated_function(self, expr);
                 }
                 if self.enabled(Rule::DeprecatedMockImport) {
                     pyupgrade::rules::deprecated_mock_attribute(self, expr);
@@ -2533,9 +2587,7 @@ where
                     flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
                 }
                 if self.enabled(Rule::ExecBuiltin) {
-                    if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::exec_used(self, func);
                 }
                 if self.enabled(Rule::BadFilePermissions) {
                     flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
@@ -2558,8 +2610,7 @@ where
                     flake8_bandit::rules::jinja2_autoescape_false(self, func, args, keywords);
                 }
                 if self.enabled(Rule::HardcodedPasswordFuncArg) {
-                    self.diagnostics
-                        .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
+                    flake8_bandit::rules::hardcoded_password_func_arg(self, keywords);
                 }
                 if self.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
@@ -2692,17 +2743,12 @@ where
                     flake8_debugger::rules::debugger_call(self, expr, func);
                 }
                 if self.enabled(Rule::PandasUseOfInplaceArgument) {
-                    self.diagnostics.extend(
-                        pandas_vet::rules::inplace_argument(self, expr, func, args, keywords)
-                            .into_iter(),
-                    );
+                    pandas_vet::rules::inplace_argument(self, expr, func, args, keywords);
                 }
                 pandas_vet::rules::call(self, func);
 
                 if self.enabled(Rule::PandasUseOfPdMerge) {
-                    if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    pandas_vet::rules::use_of_pd_merge(self, func);
                 }
                 if self.enabled(Rule::CallDatetimeWithoutTzinfo) {
                     flake8_datetimez::rules::call_datetime_without_tzinfo(
@@ -2819,16 +2865,13 @@ where
                     &self.settings.flake8_gettext.functions_names,
                 ) {
                     if self.enabled(Rule::FStringInGetTextFuncCall) {
-                        self.diagnostics
-                            .extend(flake8_gettext::rules::f_string_in_gettext_func_call(args));
+                        flake8_gettext::rules::f_string_in_gettext_func_call(self, args);
                     }
                     if self.enabled(Rule::FormatInGetTextFuncCall) {
-                        self.diagnostics
-                            .extend(flake8_gettext::rules::format_in_gettext_func_call(args));
+                        flake8_gettext::rules::format_in_gettext_func_call(self, args);
                     }
                     if self.enabled(Rule::PrintfInGetTextFuncCall) {
-                        self.diagnostics
-                            .extend(flake8_gettext::rules::printf_in_gettext_func_call(args));
+                        flake8_gettext::rules::printf_in_gettext_func_call(self, args);
                     }
                 }
                 if self.enabled(Rule::UncapitalizedEnvironmentVariables) {
@@ -2869,7 +2912,7 @@ where
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
                 if self.enabled(Rule::NumpyLegacyRandom) {
-                    numpy::rules::numpy_legacy_random(self, func);
+                    numpy::rules::legacy_random(self, func);
                 }
                 if self.any_enabled(&[
                     Rule::LoggingStringFormat,
@@ -3169,11 +3212,10 @@ where
                     flake8_2020::rules::compare(self, left, ops, comparators);
                 }
                 if self.enabled(Rule::HardcodedPasswordString) {
-                    self.diagnostics.extend(
-                        flake8_bandit::rules::compare_to_hardcoded_password_string(
-                            left,
-                            comparators,
-                        ),
+                    flake8_bandit::rules::compare_to_hardcoded_password_string(
+                        self,
+                        left,
+                        comparators,
                     );
                 }
                 if self.enabled(Rule::ComparisonWithItself) {
@@ -3193,29 +3235,6 @@ where
                 }
                 if self.enabled(Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
-                }
-                if self.is_stub {
-                    if self.any_enabled(&[
-                        Rule::UnrecognizedPlatformCheck,
-                        Rule::UnrecognizedPlatformName,
-                    ]) {
-                        flake8_pyi::rules::unrecognized_platform(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
-                    if self.enabled(Rule::BadVersionInfoComparison) {
-                        flake8_pyi::rules::bad_version_info_comparison(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
                 }
             }
             Expr::Constant(ast::ExprConstant {
@@ -4422,7 +4441,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
 

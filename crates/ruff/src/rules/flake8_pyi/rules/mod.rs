@@ -1,6 +1,7 @@
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_version_info_comparison::*;
 pub(crate) use collections_named_tuple::*;
+pub(crate) use complex_if_statement_in_stub::*;
 pub(crate) use docstring_in_stubs::*;
 pub(crate) use duplicate_union_member::*;
 pub(crate) use ellipsis_in_non_empty_class_body::*;
@@ -22,10 +23,12 @@ pub(crate) use type_alias_naming::*;
 pub(crate) use type_comment_in_stub::*;
 pub(crate) use unaliased_collections_abc_set_import::*;
 pub(crate) use unrecognized_platform::*;
+pub(crate) use unrecognized_version_info::*;
 
 mod any_eq_ne_annotation;
 mod bad_version_info_comparison;
 mod collections_named_tuple;
+mod complex_if_statement_in_stub;
 mod docstring_in_stubs;
 mod duplicate_union_member;
 mod ellipsis_in_non_empty_class_body;
@@ -47,3 +50,4 @@ mod type_alias_naming;
 mod type_comment_in_stub;
 mod unaliased_collections_abc_set_import;
 mod unrecognized_platform;
+mod unrecognized_version_info;
