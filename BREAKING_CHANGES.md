@@ -1,5 +1,41 @@
 # Breaking Changes
 
+## 0.0.277
+
+### `.ipynb_checkpoints`, `.pyenv`, `.pytest_cache`, and `.vscode` are now excluded by default ([#5513](https://github.com/astral-sh/ruff/pull/5513))
+
+Ruff maintains a list of default exclusions, which now consists of the following patterns:
+
+- `.bzr`
+- `.direnv`
+- `.eggs`
+- `.git`
+- `.git-rewrite`
+- `.hg`
+- `.ipynb_checkpoints`
+- `.mypy_cache`
+- `.nox`
+- `.pants.d`
+- `.pyenv`
+- `.pytest_cache`
+- `.pytype`
+- `.ruff_cache`
+- `.svn`
+- `.tox`
+- `.venv`
+- `.vscode`
+- `__pypackages__`
+- `_build`
+- `buck-out`
+- `build`
+- `dist`
+- `node_modules`
+- `venv`
+
+Previously, the `.ipynb_checkpoints`, `.pyenv`, `.pytest_cache`, and `.vscode` directories were not
+excluded by default. This change brings Ruff's default exclusions in line with other tools like
+Black.
+
 ## 0.0.276
 
 ### The `keep-runtime-typing` setting has been reinstated ([#5470](https://github.com/astral-sh/ruff/pull/5470))
