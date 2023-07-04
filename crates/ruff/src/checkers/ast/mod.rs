@@ -2579,9 +2579,7 @@ where
                     flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
                 }
                 if self.enabled(Rule::ExecBuiltin) {
-                    if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::exec_used(self, func);
                 }
                 if self.enabled(Rule::BadFilePermissions) {
                     flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
