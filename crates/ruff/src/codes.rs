@@ -14,6 +14,18 @@ use crate::rules;
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
 
+impl NoqaCode {
+    /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`.
+    pub fn prefix(&self) -> &str {
+        self.0
+    }
+
+    /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
+    pub fn suffix(&self) -> &str {
+        self.1
+    }
+}
+
 impl std::fmt::Debug for NoqaCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(self, f)
