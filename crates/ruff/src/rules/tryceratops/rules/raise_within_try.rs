@@ -1,4 +1,3 @@
-use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -82,10 +81,21 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
         return;
     }
 
+    let raises = {
+        let mut visitor = RaiseStatementVisitor::default();
+        visitor.visit_body(body);
+        visitor.raises
+    };
+
+    if raises.is_empty() {
+        return;
+    }
+
     // The names of exceptions handled by the `try` Stmt. We can't compare `Expr`'s since they have
     // different ranges, but by virtue of this function's call path we know that the `raise`
     // statements will always be within the surrounding `try`.
-    let handler_ids: FxHashSet<&str> = helpers::extract_handled_exceptions(handlers)
+
+    let handler_ids: Vec<&str> = helpers::extract_handled_exceptions(handlers)
         .into_iter()
         .filter_map(|handler| {
             if let Expr::Name(ast::ExprName { id, .. }) = handler {
@@ -96,25 +106,20 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
         })
         .collect();
 
-    let raises = {
-        let mut visitor = RaiseStatementVisitor::default();
-        visitor.visit_body(body);
-        visitor.raises
-    };
-
     for stmt in raises {
-        let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt else {
+        let Stmt::Raise(ast::StmtRaise { exc: Some(exception), .. }) = stmt else {
             continue;
         };
 
-        let Some(exception) = exc else {
+        let Some(exc_name) = get_function_name(exception.as_ref()) else {
             continue;
         };
 
-        let exc_name = get_function_name(exception.as_ref()).unwrap_or_default();
         // We can't check exception sub-classes without a type-checker implementation, so let's
         // just catch the blanket `Exception` for now.
-        if handler_ids.contains(exc_name) || handler_ids.contains("Exception") {
+        if (handler_ids.contains(&"Exception") && checker.semantic().is_builtin("Exception"))
+            || handler_ids.contains(&exc_name)
+        {
             checker
                 .diagnostics
                 .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
