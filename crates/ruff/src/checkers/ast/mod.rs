@@ -1650,6 +1650,9 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
+                    pylint::rules::type_param_name_mismatch(self, value, targets);
+                }
                 if self.is_stub {
                     if self.any_enabled(&[
                         Rule::UnprefixedTypeParam,
