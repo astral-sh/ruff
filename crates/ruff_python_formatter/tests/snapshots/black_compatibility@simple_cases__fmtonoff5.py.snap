@@ -103,7 +103,7 @@ elif   unformatted:
 -        # fmt: on
 -            ]  # Includes an formatted indentation.
 +            # fmt: on
-+        ],  # Includes an formatted indentation.
++        ]  # Includes an formatted indentation.
      },
  )
  
@@ -186,7 +186,7 @@ setup(
             "foo-bar"
             "=foo.bar.:main",
             # fmt: on
-        ],  # Includes an formatted indentation.
+        ]  # Includes an formatted indentation.
     },
 )
 

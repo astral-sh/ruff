@@ -245,7 +245,7 @@ impl<'a> SimpleTokenizer<'a> {
             return Token {
                 kind: TokenKind::EndOfFile,
                 range: TextRange::empty(self.offset),
-            }
+            };
         };
 
         if self.bogus {
@@ -310,7 +310,7 @@ impl<'a> SimpleTokenizer<'a> {
             return Token {
                 kind: TokenKind::EndOfFile,
                 range: TextRange::empty(self.back_offset),
-            }
+            };
         };
 
         if self.bogus {

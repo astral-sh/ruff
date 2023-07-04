@@ -93,12 +93,6 @@ async def main():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,4 @@
--import asyncio
-+NOT_YET_IMPLEMENTED_StmtImport
- 
- 
- # Control example
 @@ -8,59 +8,70 @@
  
  # Remove brackets for short coroutine/task
@@ -219,7 +213,7 @@ async def main():
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImport
+import asyncio
 
 
 # Control example

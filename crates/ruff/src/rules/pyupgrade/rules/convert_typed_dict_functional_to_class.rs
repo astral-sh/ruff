@@ -79,8 +79,9 @@ fn match_typed_dict_assign<'a>(
         func,
         args,
         keywords,
-        range: _
-    }) = value else {
+        range: _,
+    }) = value
+    else {
         return None;
     };
     if !semantic.match_typing_expr(func, "TypedDict") {
@@ -205,7 +206,7 @@ fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
 fn match_total_from_only_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
     keywords.iter().find(|keyword| {
         let Some(arg) = &keyword.arg else {
-           return  false
+            return false;
         };
         arg.as_str() == "total"
     })
@@ -271,8 +272,8 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     value: &Expr,
 ) {
     let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(targets, value, checker.semantic()) else
-    {
+        match_typed_dict_assign(targets, value, checker.semantic())
+    else {
         return;
     };
 

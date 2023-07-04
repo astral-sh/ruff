@@ -63,8 +63,8 @@ pub(crate) fn unreliable_callable_check(
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(s),
         ..
-    }) = &args[1] else
-    {
+    }) = &args[1]
+    else {
         return;
     };
     if s != "__call__" {

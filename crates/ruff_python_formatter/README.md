@@ -241,6 +241,29 @@ The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/t
 e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
 The Rome repository can be a helpful reference when implementing something in the Ruff formatter
 
+### Checking formatter stability and panics
+
+There are tree common problems with the formatter: The second formatting pass looks different than
+the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
+parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
+of these using the `check-formatter-stability` subcommand in `ruff_dev`
+
+The easiest is to check CPython:
+
+```shell
+git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
+cargo run --bin ruff_dev -- check-formatter-stability crates/ruff/resources/test/cpython
+```
+
+It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we
+only do this occasionally:
+
+```shell
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
+python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
+cargo run --bin ruff_dev -- check-formatter-stability --multi-project target/checkouts
+```
+
 ## The orphan rules and trait structure
 
 For the formatter, we would like to implement `Format` from the rust_formatter crate for all AST

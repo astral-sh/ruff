@@ -299,7 +299,12 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 
 /// SIM101
 pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ } )= expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::Or,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
 
@@ -308,7 +313,13 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
-        let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = &call else {
+        let Expr::Call(ast::ExprCall {
+            func,
+            args,
+            keywords,
+            range: _,
+        }) = &call
+        else {
             continue;
         };
         if args.len() != 2 {
@@ -430,7 +441,13 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 }
 
 fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
-    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _ } )= expr else {
+    let Expr::Compare(ast::ExprCompare {
+        left,
+        ops,
+        comparators,
+        range: _,
+    }) = expr
+    else {
         return None;
     };
     if ops.len() != 1 || comparators.len() != 1 {
@@ -451,7 +468,12 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
 
 /// SIM109
 pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::Or,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
 
@@ -540,7 +562,12 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
 /// SIM220
 pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::And, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::And,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
     if values.len() < 2 {
@@ -594,7 +621,12 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
 
 /// SIM221
 pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::Or,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
     if values.len() < 2 {
@@ -672,7 +704,12 @@ fn is_short_circuit(
     expected_op: BoolOp,
     checker: &Checker,
 ) -> Option<(Edit, ContentAround)> {
-    let Expr::BoolOp(ast::ExprBoolOp { op, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op,
+        values,
+        range: _,
+    }) = expr
+    else {
         return None;
     };
     if *op != expected_op {

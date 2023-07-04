@@ -49,7 +49,9 @@ pub(crate) fn unnecessary_generator_dict(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
+    else {
         return;
     };
     if let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument {

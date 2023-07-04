@@ -277,8 +277,14 @@ aaaaaaaaaaaaaa + {
     dddddddddddddddd,
     eeeeeee,
 }
-aaaaaaaaaaaaaa + [i for i in []]
-aaaaaaaaaaaaaa + (i for i in [])
+(
+    aaaaaaaaaaaaaa
+    + [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+)
+(
+    aaaaaaaaaaaaaa
+    + (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+)
 aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 
 # Wraps it in parentheses if it needs to break both left and right
@@ -293,9 +299,9 @@ not (aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_se
 [
     a
     + [
-        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ]
-    in c,
+    in c
 ]
 
 

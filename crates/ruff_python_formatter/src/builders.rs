@@ -182,7 +182,10 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
 pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     result: FormatResult<()>,
     fmt: &'fmt mut PyFormatter<'ast, 'buf>,
-    last_end: Option<TextSize>,
+    end_of_last_entry: Option<TextSize>,
+    /// We need to track whether we have more than one entry since a sole entry doesn't get a
+    /// magic trailing comma even when expanded
+    len: usize,
 }
 
 impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
@@ -190,7 +193,8 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         Self {
             fmt: f,
             result: Ok(()),
-            last_end: None,
+            end_of_last_entry: None,
+            len: 0,
         }
     }
 
@@ -203,11 +207,12 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         T: Ranged,
     {
         self.result = self.result.and_then(|_| {
-            if self.last_end.is_some() {
+            if self.end_of_last_entry.is_some() {
                 write!(self.fmt, [text(","), soft_line_break_or_space()])?;
             }
 
-            self.last_end = Some(node.end());
+            self.end_of_last_entry = Some(node.end());
+            self.len += 1;
 
             content.fmt(self.fmt)
         });
@@ -243,18 +248,23 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
         self.result.and_then(|_| {
-            if let Some(last_end) = self.last_end.take() {
-                if_group_breaks(&text(",")).fmt(self.fmt)?;
-
-                if self.fmt.options().magic_trailing_comma().is_respect()
+            if let Some(last_end) = self.end_of_last_entry.take() {
+                let magic_trailing_comma = self.fmt.options().magic_trailing_comma().is_respect()
                     && matches!(
                         first_non_trivia_token(last_end, self.fmt.context().contents()),
                         Some(Token {
                             kind: TokenKind::Comma,
                             ..
                         })
-                    )
-                {
+                    );
+
+                // If there is a single entry, only keep the magic trailing comma, don't add it if
+                // it wasn't there. If there is more than one entry, always add it.
+                if magic_trailing_comma || self.len > 1 {
+                    if_group_breaks(&text(",")).fmt(self.fmt)?;
+                }
+
+                if magic_trailing_comma {
                     expand_parent().fmt(self.fmt)?;
                 }
             }

@@ -76,7 +76,7 @@ while x := f(x):
 -y0 = (y1 := f(x))
 -foo(x=(y := f(x)))
 +[NOT_YET_IMPLEMENTED_ExprNamedExpr, y**2, y**3]
-+filtered_data = [i for i in []]
++filtered_data = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
 +(NOT_YET_IMPLEMENTED_ExprNamedExpr)
 +y0 = NOT_YET_IMPLEMENTED_ExprNamedExpr
 +foo(x=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
@@ -117,7 +117,7 @@ while x := f(x):
 +len(NOT_YET_IMPLEMENTED_ExprNamedExpr)
 +foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, cat="vector")
 +foo(cat=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
-+if any((i for i in [])):
++if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
      print(longline)
 -if env_base := os.environ.get("PYTHONUSERBASE", None):
 +if NOT_YET_IMPLEMENTED_ExprNamedExpr:
@@ -150,7 +150,7 @@ if (NOT_YET_IMPLEMENTED_ExprNamedExpr) is None:
 if NOT_YET_IMPLEMENTED_ExprNamedExpr:
     pass
 [NOT_YET_IMPLEMENTED_ExprNamedExpr, y**2, y**3]
-filtered_data = [i for i in []]
+filtered_data = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
 (NOT_YET_IMPLEMENTED_ExprNamedExpr)
 y0 = NOT_YET_IMPLEMENTED_ExprNamedExpr
 foo(x=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
@@ -176,7 +176,7 @@ x = NOT_YET_IMPLEMENTED_ExprNamedExpr
 len(NOT_YET_IMPLEMENTED_ExprNamedExpr)
 foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, cat="vector")
 foo(cat=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
-if any((i for i in [])):
+if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
     print(longline)
 if NOT_YET_IMPLEMENTED_ExprNamedExpr:
     return env_base

@@ -47,7 +47,7 @@ def make_arange(n):
  
  def f():
 -    return (i * 2 async for i in arange(42))
-+    return (i for i in [])
++    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
  
  
  def g():
@@ -55,7 +55,7 @@ def make_arange(n):
 -        something_long * something_long
 -        async for something_long in async_generator(with_an_argument)
 -    )
-+    return (i for i in [])
++    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
  
  
  async def func():
@@ -66,17 +66,17 @@ def make_arange(n):
 -                self.async_inc, arange(8), batch_size=3
 -            )
 -        ]
-+        out_batched = [i for i in []]
++        out_batched = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
  
  
  def awaited_generator_value(n):
 -    return (await awaitable for awaitable in awaitable_list)
-+    return (i for i in [])
++    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
  
  
  def make_arange(n):
 -    return (i * 2 for i in range(n) if await wrap(i))
-+    return (i for i in [])
++    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 ```
 
 ## Ruff Output
@@ -86,24 +86,24 @@ def make_arange(n):
 
 
 def f():
-    return (i for i in [])
+    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 
 
 def g():
-    return (i for i in [])
+    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 
 
 async def func():
     if test:
-        out_batched = [i for i in []]
+        out_batched = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
 
 
 def awaited_generator_value(n):
-    return (i for i in [])
+    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 
 
 def make_arange(n):
-    return (i for i in [])
+    return (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 ```
 
 ## Black Output

@@ -1,5 +1,6 @@
 # Do this (new version)
 from numpy.random import default_rng
+
 rng = default_rng()
 vals = rng.standard_normal(10)
 more_vals = rng.standard_normal(10)
@@ -7,11 +8,13 @@ numbers = rng.integers(high, size=5)
 
 # instead of this (legacy version)
 from numpy import random
+
 vals = random.standard_normal(10)
 more_vals = random.standard_normal(10)
 numbers = random.integers(high, size=5)
 
 import numpy
+
 numpy.random.seed()
 numpy.random.get_state()
 numpy.random.set_state()

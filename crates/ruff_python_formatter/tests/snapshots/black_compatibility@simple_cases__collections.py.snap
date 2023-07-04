@@ -83,31 +83,9 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,40 +1,22 @@
--import core, time, a
-+NOT_YET_IMPLEMENTED_StmtImport
- 
--from . import A, B, C
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
- # keeps existing trailing comma
--from foo import (
--    bar,
--)
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
- # also keeps existing structure
--from foo import (
--    baz,
--    qux,
--)
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
- # `as` works as well
--from foo import (
--    xyzzy as magic,
--)
-+NOT_YET_IMPLEMENTED_StmtImportFrom
+@@ -18,23 +18,12 @@
+     xyzzy as magic,
+ )
  
 -a = {
 -    1,
@@ -132,7 +110,7 @@ if True:
  nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
  nested_long_lines = [
      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-@@ -52,10 +34,7 @@
+@@ -52,10 +41,7 @@
  y = {
      "oneple": (1,),
  }
@@ -149,18 +127,25 @@ if True:
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImport
+import core, time, a
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from . import A, B, C
 
 # keeps existing trailing comma
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from foo import (
+    bar,
+)
 
 # also keeps existing structure
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from foo import (
+    baz,
+    qux,
+)
 
 # `as` works as well
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from foo import (
+    xyzzy as magic,
+)
 
 a = {1, 2, 3}
 b = {1, 2, 3}
