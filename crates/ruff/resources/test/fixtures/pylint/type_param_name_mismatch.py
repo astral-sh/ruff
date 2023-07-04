@@ -18,28 +18,39 @@ Ws = TypeVarTuple(name="Ts")
 
 T = TypeVar("T")
 T = TypeVar(name="T")
-T = TypeVar(some_str)
-T = TypeVar(name=some_str)
 
 T = ParamSpec("T")
 T = ParamSpec(name="T")
-T = ParamSpec(some_str)
-T = ParamSpec(name=some_str)
 
 T = NewType("T", int)
 T = NewType(name="T", tp=int)
-T = NewType(some_str, int)
-T = NewType(name=some_str, tp=int)
 
 Ts = TypeVarTuple("Ts")
 Ts = TypeVarTuple(name="Ts")
-Ts = TypeVarTuple(some_str)
-Ts = TypeVarTuple(name=some_str)
 
 # Errors, but not covered by this rule.
 
-T = TypeVar()  # No name provided.
-T = ParamSpec()  # No name provided.
-T = NewType()  # No name provided.
-T = NewType(tp=int)  # No name provided (but type provided).
-Ts = TypeVarTuple()  # No name provided.
+# Non-string literal name.
+T = TypeVar(some_str)
+T = TypeVar(name=some_str)
+T = TypeVar(1)
+T = TypeVar(name=1)
+T = ParamSpec(some_str)
+T = ParamSpec(name=some_str)
+T = ParamSpec(1)
+T = ParamSpec(name=1)
+T = NewType(some_str, int)
+T = NewType(name=some_str, tp=int)
+T = NewType(1, int)
+T = NewType(name=1, tp=int)
+Ts = TypeVarTuple(some_str)
+Ts = TypeVarTuple(name=some_str)
+Ts = TypeVarTuple(1)
+Ts = TypeVarTuple(name=1)
+
+# No names provided.
+T = TypeVar()
+T = ParamSpec()
+T = NewType()
+T = NewType(tp=int)
+Ts = TypeVarTuple()

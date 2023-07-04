@@ -27,6 +27,34 @@ impl fmt::Display for VarKind {
     }
 }
 
+/// ## What it does
+/// Checks for `TypeVar`, `TypeVarTuple`, `ParamSpec`, and `NewType`
+/// definitions where the name of the type parameter does not match the name of
+/// the variable to which it is assigned.
+///
+/// ## Why is this bad?
+/// Python expects the name of the type variable must be a string equal to the
+/// name of the variable to which it is assigned. Ensuring that the names match
+/// makes it easier to understand the code and reduces the chance of bugs
+/// whilst type-checking.
+///
+/// ## Example
+/// ```python
+/// from typing import TypeVar
+///
+/// T = TypeVar("U")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import TypeVar
+///
+/// T = TypeVar("T")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `typing` — Support for type hints](https://docs.python.org/3/library/typing.html)
+/// - [PEP 484 – Type Hints: Generics](https://peps.python.org/pep-0484/#generics)
 #[violation]
 pub struct TypeParamNameMismatch {
     kind: VarKind,
