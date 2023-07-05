@@ -1292,13 +1292,12 @@ where
             Stmt::If(
                 stmt_if @ ast::StmtIf {
                     test,
-                    body,
                     elif_else_clauses,
-                    range: _,
+                    ..
                 },
             ) => {
                 if self.enabled(Rule::IfTuple) {
-                    pyflakes::rules::if_tuple(self, test, elif_else_clauses);
+                    pyflakes::rules::if_tuple(self, stmt_if);
                 }
                 if self.enabled(Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
@@ -1308,7 +1307,7 @@ where
                     );
                 }
                 if self.enabled(Rule::IfWithSameArms) {
-                    flake8_simplify::rules::if_with_same_arms(self, self.locator, stmt);
+                    flake8_simplify::rules::if_with_same_arms(self, self.locator, stmt_if);
                 }
                 if self.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
@@ -1330,13 +1329,7 @@ where
                     );
                 }
                 if self.enabled(Rule::OutdatedVersionBlock) {
-                    pyupgrade::rules::outdated_version_block(
-                        self,
-                        stmt,
-                        test,
-                        body,
-                        elif_else_clauses,
-                    );
+                    pyupgrade::rules::outdated_version_block(self, stmt_if);
                 }
                 if self.enabled(Rule::CollapsibleElseIf) {
                     if let Some(diagnostic) = pylint::rules::collapsible_else_if(elif_else_clauses)

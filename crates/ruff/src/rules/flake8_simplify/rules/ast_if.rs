@@ -4,7 +4,6 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
     self, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt, StmtIf,
 };
-use std::iter;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -13,6 +12,7 @@ use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::stmt_if::if_elif_branches;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
@@ -672,53 +672,34 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
 }
 
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf {
-        body,
-        elif_else_clauses,
-        ..
-    }) = stmt
-    else {
-        return;
-    };
-
-    // Check adjacent `if` or `elif` branches, ignore `else`
-    let mut branches_iter = iter::once((stmt.start(), body.as_slice()))
-        .chain(
-            elif_else_clauses
-                .iter()
-                .filter(|clause| clause.test.is_some())
-                .map(|clause| (clause.start(), clause.body.as_slice())),
-        )
-        .peekable();
-
-    while let Some((first_start, first_body)) = branches_iter.next() {
-        let Some((second_start, second_body)) = branches_iter.peek() else {
+pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &StmtIf) {
+    let mut branches_iter = if_elif_branches(stmt_if).peekable();
+    while let Some(current_branch) = branches_iter.next() {
+        let Some(following_branch) = branches_iter.peek() else {
             continue;
         };
 
         // The bodies must have the same code ...
-        if first_body.len() != second_body.len() {
+        if current_branch.body.len() != following_branch.body.len() {
             continue;
         }
-        if !first_body
+        if !current_branch
+            .body
             .iter()
-            .zip(second_body.iter())
+            .zip(following_branch.body.iter())
             .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
         {
             continue;
         }
 
         // ...and the same comments
-        let first_range = TextRange::new(first_start, first_body.last().unwrap().end());
         let first_comments: Vec<_> = checker
             .indexer
-            .comments_in_range(first_range, locator)
+            .comments_in_range(current_branch.range, locator)
             .collect();
-        let second_range = TextRange::new(*second_start, second_body.last().unwrap().end());
         let second_comments: Vec<_> = checker
             .indexer
-            .comments_in_range(second_range, locator)
+            .comments_in_range(following_branch.range, locator)
             .collect();
         if first_comments != second_comments {
             continue;
@@ -726,7 +707,10 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt: 
 
         checker.diagnostics.push(Diagnostic::new(
             IfWithSameArms,
-            TextRange::new(first_start, second_body.last().unwrap().end()),
+            TextRange::new(
+                current_branch.range.start(),
+                following_branch.body.last().unwrap().end(),
+            ),
         ));
     }
 }

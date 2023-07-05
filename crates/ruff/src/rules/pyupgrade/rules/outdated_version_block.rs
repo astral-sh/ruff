@@ -1,12 +1,12 @@
 use std::cmp::Ordering;
-use std::iter;
 
 use num_bigint::{BigInt, Sign};
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{self, CmpOp, Constant, ElifElseClause, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, ElifElseClause, Expr, Ranged, StmtIf};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
 
 use crate::autofix::edits::delete_stmt;
@@ -58,13 +58,6 @@ impl AlwaysAutofixableViolation for OutdatedVersionBlock {
     fn autofix_title(&self) -> String {
         "Remove outdated version block".to_string()
     }
-}
-
-/// The set of tokens that can start a block, i.e., the first token in an `if` statement.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum BranchKind {
-    If,
-    Elif,
 }
 
 /// Converts a `BigInt` to a `u32`. If the number is negative, it will return 0.
@@ -126,15 +119,9 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
 /// * If with an elif: delete, turn elif into if
 /// * If with an else: delete, dedent else
 /// * Just an elif: delete, `elif False` can always be removed
-fn fix_py2_block(
-    checker: &Checker,
-    stmt: &Stmt,
-    elif_else_clauses: &[ElifElseClause],
-    branch_kind: BranchKind,
-    branch_range: TextRange,
-) -> Option<Fix> {
-    match branch_kind {
-        BranchKind::If => match elif_else_clauses.first() {
+fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> Option<Fix> {
+    match branch.kind {
+        BranchKind::If => match stmt_if.elif_else_clauses.first() {
             // If we have a lone `if`, delete as statement (insert pass in parent if required)
             None => {
                 let stmt = checker.semantic().stmt();
@@ -153,7 +140,10 @@ fn fix_py2_block(
                         == "elif"
                 );
                 let end_location = range.start() + ("elif".text_len() - "if".text_len());
-                Some(Fix::suggested(Edit::deletion(stmt.start(), end_location)))
+                Some(Fix::suggested(Edit::deletion(
+                    stmt_if.start(),
+                    end_location,
+                )))
             }
             // If we only have an `if` and an `else`, dedent the `else` block
             Some(ElifElseClause {
@@ -168,10 +158,10 @@ fn fix_py2_block(
                             .locator
                             .slice(TextRange::new(start.start(), end.end()))
                             .to_string(),
-                        stmt.range(),
+                        stmt_if.range(),
                     )))
                 } else {
-                    indentation(checker.locator, stmt)
+                    indentation(checker.locator, stmt_if)
                         .and_then(|indentation| {
                             adjust_indentation(
                                 TextRange::new(
@@ -187,8 +177,8 @@ fn fix_py2_block(
                         .map(|contents| {
                             Fix::suggested(Edit::replacement(
                                 contents,
-                                checker.locator.line_start(stmt.start()),
-                                stmt.end(),
+                                checker.locator.line_start(stmt_if.start()),
+                                stmt_if.end(),
                             ))
                         })
                 }
@@ -207,33 +197,27 @@ fn fix_py2_block(
             //                         else:
             // ... to here (exclusive) ^    x = 3
             // ```
-            let next_start = elif_else_clauses
+            let next_start = stmt_if
+                .elif_else_clauses
                 .iter()
                 .map(Ranged::start)
-                .find(|start| *start > branch_range.start());
+                .find(|start| *start > branch.range.start());
             Some(Fix::suggested(Edit::deletion(
-                branch_range.start(),
-                next_start.unwrap_or(branch_range.end()),
+                branch.range.start(),
+                next_start.unwrap_or(branch.range.end()),
             )))
         }
     }
 }
 
 /// Convert a [`Stmt::If`], removing the `else` block.
-fn fix_py3_block(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    branch_kind: BranchKind,
-    branch_range: TextRange,
-) -> Option<Fix> {
-    match branch_kind {
+fn fix_py3_block(checker: &mut Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> Option<Fix> {
+    match branch.kind {
         BranchKind::If => {
-            // If the first statement is an if, use the body of this statement, and ignore
+            // If the first statement is an `if`, use the body of this statement, and ignore
             // the rest.
-            let start = body.first()?;
-            let end = body.last()?;
+            let start = branch.body.first()?;
+            let end = branch.body.last()?;
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 Some(Fix::suggested(Edit::range_replacement(
@@ -241,10 +225,10 @@ fn fix_py3_block(
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
-                    branch_range,
+                    stmt_if.range,
                 )))
             } else {
-                indentation(checker.locator, &stmt)
+                indentation(checker.locator, &stmt_if)
                     .and_then(|indentation| {
                         adjust_indentation(
                             TextRange::new(checker.locator.line_start(start.start()), end.end()),
@@ -257,51 +241,36 @@ fn fix_py3_block(
                     .map(|contents| {
                         Fix::suggested(Edit::replacement(
                             contents,
-                            checker.locator.line_start(branch_range.start()),
-                            branch_range.end(),
+                            checker.locator.line_start(stmt_if.start()),
+                            stmt_if.end(),
                         ))
                     })
             }
         }
         BranchKind::Elif => {
-            // Replace the `elif` with an `else, preserve the body of the elif, and remove
+            // Replace the `elif` with an `else`, preserve the body of the elif, and remove
             // the rest.
-            let end = body.last()?;
-            let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
+            let end = branch.body.last()?;
+            let text = checker
+                .locator
+                .slice(TextRange::new(branch.test.end(), end.end()));
             Some(Fix::suggested(Edit::range_replacement(
                 format!("else{text}"),
-                TextRange::new(branch_range.start(), stmt.end()),
+                TextRange::new(branch.range.start(), stmt_if.end()),
             )))
         }
     }
 }
 
 /// UP036
-pub(crate) fn outdated_version_block(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    if_test: &Expr,
-    if_body: &[Stmt],
-    elif_else_clauses: &[ElifElseClause],
-) {
-    // Check the `if` and all `elif` tests
-    let elif_iter = elif_else_clauses.iter().filter_map(|clause| {
-        Some((
-            clause.test.as_ref()?,
-            clause.body.as_slice(),
-            BranchKind::Elif,
-            clause.range(),
-        ))
-    });
-    let if_elif_tests =
-        iter::once((if_test, if_body, BranchKind::If, stmt.range())).chain(elif_iter);
-    for (test, body, branch_kind, branch_range) in if_elif_tests {
+pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
+    for branch in if_elif_branches(stmt_if) {
         let Expr::Compare(ast::ExprCompare {
             left,
             ops,
             comparators,
             range: _,
-        }) = &test
+        }) = &branch.test
         else {
             continue;
         };
@@ -326,15 +295,10 @@ pub(crate) fn outdated_version_block(
                 let target = checker.settings.target_version;
                 if op == &CmpOp::Lt || op == &CmpOp::LtE {
                     if compare_version(&version, target, op == &CmpOp::LtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(fix) = fix_py2_block(
-                                checker,
-                                stmt,
-                                elif_else_clauses,
-                                branch_kind,
-                                branch_range,
-                            ) {
+                            if let Some(fix) = fix_py2_block(checker, stmt_if, &branch) {
                                 diagnostic.set_fix(fix);
                             }
                         }
@@ -342,11 +306,10 @@ pub(crate) fn outdated_version_block(
                     }
                 } else if op == &CmpOp::Gt || op == &CmpOp::GtE {
                     if compare_version(&version, target, op == &CmpOp::GtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(fix) =
-                                fix_py3_block(checker, stmt, test, body, branch_kind, branch_range)
-                            {
+                            if let Some(fix) = fix_py3_block(checker, stmt_if, &branch) {
                                 diagnostic.set_fix(fix);
                             }
                         }
@@ -360,25 +323,17 @@ pub(crate) fn outdated_version_block(
             }) => {
                 let version_number = bigint_to_u32(number);
                 if version_number == 2 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                     if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(fix) = fix_py2_block(
-                            checker,
-                            stmt,
-                            elif_else_clauses,
-                            branch_kind,
-                            branch_range,
-                        ) {
+                        if let Some(fix) = fix_py2_block(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if version_number == 3 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch.test.range());
                     if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(fix) =
-                            fix_py3_block(checker, stmt, test, body, branch_kind, branch_range)
-                        {
+                        if let Some(fix) = fix_py3_block(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
                     }
