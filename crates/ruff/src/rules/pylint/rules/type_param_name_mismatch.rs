@@ -67,7 +67,13 @@ pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targ
         return;
     };
 
-    let Expr::Call(ast::ExprCall { func, args, keywords, .. }) = value else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        keywords,
+        ..
+    }) = value
+    else {
         return;
     };
 
