@@ -128,19 +128,19 @@ pub struct Options {
     /// imports by module, independent of import style.
     pub force_sort_within_sections: Option<bool>,
     #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
+        default = r#"false"#,
+        value_type = "bool",
         example = r#"
-            force-to-top = ["src"]
+            case-sensitive = true
         "#
     )]
     /// Sort imports taking into account case sensitivity.
     pub case_sensitive: Option<bool>,
     #[option(
-        default = r#"false"#,
-        value_type = "bool",
+        default = r#"[]"#,
+        value_type = "list[str]",
         example = r#"
-            case-sensitive = true
+            force-to-top = ["src"]
         "#
     )]
     /// Force specific imports to the top of their appropriate section.
