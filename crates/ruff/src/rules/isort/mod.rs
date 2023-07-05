@@ -369,7 +369,6 @@ mod tests {
         Ok(())
     }
 
-
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
     fn separate_modules(path: &Path) -> Result<()> {
         let snapshot = format!("1_{}", path.to_string_lossy());

@@ -9,6 +9,7 @@ use super::settings::RelativeImportsOrder;
 use super::sorting::{cmp_import_from, cmp_members, cmp_modules};
 use super::types::{AliasData, CommentSet, ImportBlock, OrderedImportBlock};
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
     order_by_type: bool,
@@ -26,7 +27,9 @@ pub(crate) fn order_imports<'a>(
         block
             .import
             .into_iter()
-            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, force_to_top, case_sensitive)),
+            .sorted_by(|(alias1, _), (alias2, _)| {
+                cmp_modules(alias1, alias2, force_to_top, case_sensitive)
+            }),
     );
 
     // Sort `Stmt::ImportFrom`.
@@ -71,7 +74,7 @@ pub(crate) fn order_imports<'a>(
                                     constants,
                                     variables,
                                     force_to_top,
-                                    case_sensitive
+                                    case_sensitive,
                                 )
                             })
                             .collect::<Vec<(AliasData, CommentSet)>>(),
@@ -99,7 +102,7 @@ pub(crate) fn order_imports<'a>(
                             constants,
                             variables,
                             force_to_top,
-                            case_sensitive
+                            case_sensitive,
                         ),
                     })
                 },

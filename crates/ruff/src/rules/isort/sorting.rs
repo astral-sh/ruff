@@ -63,11 +63,11 @@ pub(crate) fn cmp_modules(
             if case_sensitive {
                 natord::compare(alias1.name, alias2.name)
             } else {
-                natord::compare_ignore_case(alias1.name, alias2.name).then_with(|| {
-                    natord::compare(alias1.name, alias2.name)
-                })
+                natord::compare_ignore_case(alias1.name, alias2.name)
+                    .then_with(|| natord::compare(alias1.name, alias2.name))
             }
-        }).then_with(|| match (alias1.asname, alias2.asname) {
+        })
+        .then_with(|| match (alias1.asname, alias2.asname) {
             (None, None) => Ordering::Equal,
             (None, Some(_)) => Ordering::Less,
             (Some(_), None) => Ordering::Greater,
@@ -76,6 +76,7 @@ pub(crate) fn cmp_modules(
 }
 
 /// Compare two member imports within `Stmt::ImportFrom` blocks.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmp_members(
     alias1: &AliasData,
     alias2: &AliasData,
@@ -178,7 +179,9 @@ pub(crate) fn cmp_either_import(
     case_sensitive: bool,
 ) -> Ordering {
     match (a, b) {
-        (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, force_to_top, case_sensitive),
+        (Import((alias1, _)), Import((alias2, _))) => {
+            cmp_modules(alias1, alias2, force_to_top, case_sensitive)
+        }
         (ImportFrom((import_from, ..)), Import((alias, _))) => {
             cmp_import_import_from(alias, import_from, force_to_top, case_sensitive).reverse()
         }
