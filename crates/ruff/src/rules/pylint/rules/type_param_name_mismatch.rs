@@ -1,11 +1,12 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::type_param_name;
 
 /// ## What it does
 /// Checks for `TypeVar`, `TypeVarTuple`, `ParamSpec`, and `NewType`
@@ -66,17 +67,17 @@ pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targ
         return;
     };
 
-    let Some(param_name) = param_name(value) else {
+    let Expr::Call(ast::ExprCall { func, args, keywords, .. }) = value else {
+        return;
+    };
+
+    let Some(param_name) = type_param_name(args, keywords) else {
         return;
     };
 
     if var_name == param_name {
         return;
     }
-
-    let Expr::Call(ast::ExprCall { func, .. }) = value else {
-        return;
-    };
 
     let Some(kind) = checker
         .semantic()
@@ -136,31 +137,5 @@ impl fmt::Display for VarKind {
             VarKind::TypeVarTuple => fmt.write_str("TypeVarTuple"),
             VarKind::NewType => fmt.write_str("NewType"),
         }
-    }
-}
-
-/// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
-fn param_name(value: &Expr) -> Option<&str> {
-    // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
-    let call = value.as_call_expr()?;
-    let name_param = call
-        .keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "name")
-        })
-        .map(|keyword| &keyword.value)
-        .or_else(|| call.args.get(0))?;
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(name),
-        ..
-    }) = &name_param
-    {
-        Some(name)
-    } else {
-        None
     }
 }
