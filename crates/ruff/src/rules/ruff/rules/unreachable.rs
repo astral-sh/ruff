@@ -485,33 +485,43 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 }
                 // Statements that (can) divert the control flow.
                 Stmt::If(stmt_if) => {
-                    let mut orelse = None;
+                    let after_consequent_block =
+                        self.maybe_next_block_index(after, || needs_next_block(&stmt_if.body));
+                    let after_alternate_block = self.maybe_next_block_index(after, || {
+                        stmt_if
+                            .elif_else_clauses
+                            .last()
+                            .map_or(true, |clause| needs_next_block(&clause.body))
+                    });
+
+                    let consequent =
+                        self.append_blocks_if_not_empty(&stmt_if.body, after_consequent_block);
+
+                    // Block ID of the next elif or else clause.
+                    let mut next_branch = after_alternate_block;
+
                     for clause in stmt_if.elif_else_clauses.iter().rev() {
-                        let next_after_block =
-                            self.maybe_next_block_index(after, || needs_next_block(&clause.body));
-                        let next = self.append_blocks_if_not_empty(&clause.body, next_after_block);
-                        if let Some(test) = &clause.test {
+                        let consequent =
+                            self.append_blocks_if_not_empty(&clause.body, after_consequent_block);
+
+                        next_branch = if let Some(test) = &clause.test {
                             let next = NextBlock::If {
                                 condition: Condition::Test(test),
-                                next,
-                                orelse: orelse.unwrap_or(BlockIndex::MAX),
+                                next: consequent,
+                                orelse: next_branch,
                             };
                             let stmts = std::slice::from_ref(stmt);
                             let block = BasicBlock { stmts, next };
-                            orelse = Some(self.blocks.push(block));
+                            self.blocks.push(block)
                         } else {
-                            orelse = Some(
-                                self.append_blocks_if_not_empty(&clause.body, next_after_block),
-                            );
-                        }
+                            consequent
+                        };
                     }
-                    let next_after_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt_if.body));
-                    let next = self.append_blocks_if_not_empty(&stmt_if.body, next_after_block);
+
                     NextBlock::If {
                         condition: Condition::Test(&stmt_if.test),
-                        next,
-                        orelse: orelse.unwrap_or(BlockIndex::MAX),
+                        next: consequent,
+                        orelse: next_branch,
                     }
                 }
                 Stmt::While(StmtWhile {
@@ -884,7 +894,7 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
 
     match last {
         Stmt::Return(_) | Stmt::Raise(_) => false,
-        Stmt::If(stmt) => needs_next_block(&stmt.body) || stmt.elif_else_clauses.iter().any(|clause| needs_next_block(&clause.body)),
+        Stmt::If(stmt) => needs_next_block(&stmt.body) || stmt.elif_else_clauses.last().map_or(true, |clause| needs_next_block(&clause.body)),
         Stmt::FunctionDef(_)
         | Stmt::AsyncFunctionDef(_)
         | Stmt::Import(_)
@@ -1080,6 +1090,11 @@ mod tests {
                 "first block should always terminate"
             );
 
+            let got_mermaid = MermaidGraph {
+                graph: &got,
+                source: &source,
+            };
+
             // All block index should be valid.
             let valid = BlockIndex::from_usize(got.blocks.len());
             for block in &got.blocks {
@@ -1092,11 +1107,6 @@ mod tests {
                     NextBlock::Terminate => {}
                 }
             }
-
-            let got_mermaid = MermaidGraph {
-                graph: &got,
-                source: &source,
-            };
 
             writeln!(
                 output,
