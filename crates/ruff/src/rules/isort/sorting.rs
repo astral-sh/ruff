@@ -56,11 +56,18 @@ pub(crate) fn cmp_modules(
     alias1: &AliasData,
     alias2: &AliasData,
     force_to_top: &BTreeSet<String>,
+    case_sensitive: bool,
 ) -> Ordering {
     cmp_force_to_top(alias1.name, alias2.name, force_to_top)
-        .then_with(|| natord::compare_ignore_case(alias1.name, alias2.name))
-        .then_with(|| natord::compare(alias1.name, alias2.name))
-        .then_with(|| match (alias1.asname, alias2.asname) {
+        .then_with(|| {
+            if case_sensitive {
+                natord::compare(alias1.name, alias2.name)
+            } else {
+                natord::compare_ignore_case(alias1.name, alias2.name).then_with(|| {
+                    natord::compare(alias1.name, alias2.name)
+                })
+            }
+        }).then_with(|| match (alias1.asname, alias2.asname) {
             (None, None) => Ordering::Equal,
             (None, Some(_)) => Ordering::Less,
             (Some(_), None) => Ordering::Greater,
@@ -77,6 +84,7 @@ pub(crate) fn cmp_members(
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
     force_to_top: &BTreeSet<String>,
+    case_sensitive: bool,
 ) -> Ordering {
     match (alias1.name == "*", alias2.name == "*") {
         (true, false) => Ordering::Less,
@@ -85,9 +93,9 @@ pub(crate) fn cmp_members(
             if order_by_type {
                 prefix(alias1.name, classes, constants, variables)
                     .cmp(&prefix(alias2.name, classes, constants, variables))
-                    .then_with(|| cmp_modules(alias1, alias2, force_to_top))
+                    .then_with(|| cmp_modules(alias1, alias2, force_to_top, case_sensitive))
             } else {
-                cmp_modules(alias1, alias2, force_to_top)
+                cmp_modules(alias1, alias2, force_to_top, case_sensitive)
             }
         }
     }
@@ -170,7 +178,7 @@ pub(crate) fn cmp_either_import(
     case_sensitive: bool,
 ) -> Ordering {
     match (a, b) {
-        (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, force_to_top),
+        (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, force_to_top, case_sensitive),
         (ImportFrom((import_from, ..)), Import((alias, _))) => {
             cmp_import_import_from(alias, import_from, force_to_top, case_sensitive).reverse()
         }

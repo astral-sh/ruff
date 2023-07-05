@@ -26,7 +26,7 @@ pub(crate) fn order_imports<'a>(
         block
             .import
             .into_iter()
-            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, force_to_top)),
+            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, force_to_top, case_sensitive)),
     );
 
     // Sort `Stmt::ImportFrom`.
@@ -71,6 +71,7 @@ pub(crate) fn order_imports<'a>(
                                     constants,
                                     variables,
                                     force_to_top,
+                                    case_sensitive
                                 )
                             })
                             .collect::<Vec<(AliasData, CommentSet)>>(),
@@ -98,6 +99,7 @@ pub(crate) fn order_imports<'a>(
                             constants,
                             variables,
                             force_to_top,
+                            case_sensitive
                         ),
                     })
                 },

@@ -337,7 +337,7 @@ impl Default for Settings {
             combine_as_imports: false,
             force_single_line: false,
             force_sort_within_sections: false,
-            case_sensitive: true,
+            case_sensitive: false,
             force_wrap_aliases: false,
             force_to_top: BTreeSet::new(),
             known_modules: KnownModules::default(),

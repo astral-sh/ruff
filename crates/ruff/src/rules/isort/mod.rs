@@ -313,7 +313,6 @@ mod tests {
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("as_imports_comments.py"))]
-    #[test_case(Path::new("case_sensitive.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
     #[test_case(Path::new("combine_import_from.py"))]
     #[test_case(Path::new("comments.py"))]
@@ -369,6 +368,7 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
 
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
     fn separate_modules(path: &Path) -> Result<()> {
@@ -450,6 +450,24 @@ mod tests {
                         vec![],
                         FxHashMap::default(),
                     ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("case_sensitive.py"))]
+    fn case_sensitive(path: &Path) -> Result<()> {
+        let snapshot = format!("case_sensitive_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    case_sensitive: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
