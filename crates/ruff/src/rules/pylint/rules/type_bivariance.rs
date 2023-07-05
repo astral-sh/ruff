@@ -74,7 +74,13 @@ impl Violation for TypeBivariance {
 
 /// PLC0131
 pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
-    let Expr::Call(ast::ExprCall { func,args, keywords, .. }) = value else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        keywords,
+        ..
+    }) = value
+    else {
         return;
     };
 
