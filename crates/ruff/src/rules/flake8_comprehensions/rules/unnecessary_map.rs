@@ -1,10 +1,13 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, Arguments, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::includes_arg_name;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -95,7 +98,11 @@ pub(crate) fn unnecessary_map(
             };
 
             // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
-            if !matches!(args, [Expr::Lambda(_), _]) {
+            let [Expr::Lambda(ast::ExprLambda { args, body, .. }), _] = args else {
+                return;
+            };
+
+            if late_binding(args, body) {
                 return;
             }
         }
@@ -114,7 +121,11 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if !argument.is_lambda_expr() {
+            let Expr::Lambda(ast::ExprLambda { args, body, .. }) = argument else {
+                return;
+            };
+
+            if late_binding(args, body) {
                 return;
             }
         }
@@ -129,7 +140,7 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            let Expr::Lambda(ast::ExprLambda { body, .. }) = argument else {
+            let Expr::Lambda(ast::ExprLambda { args, body, .. }) = argument else {
                 return;
             };
 
@@ -140,6 +151,10 @@ pub(crate) fn unnecessary_map(
             };
 
             if elts.len() != 2 {
+                return;
+            }
+
+            if late_binding(args, body) {
                 return;
             }
         }
@@ -172,4 +187,81 @@ impl fmt::Display for ObjectType {
             ObjectType::Dict => fmt.write_str("`dict` comprehension"),
         }
     }
+}
+
+/// Returns `true` if the lambda defined by the given arguments and body contains any names that
+/// are late-bound within nested lambdas.
+///
+/// For example, given:
+///
+/// ```python
+/// map(lambda x: lambda: x, range(4))  # (0, 1, 2, 3)
+/// ```
+///
+/// The `x` in the inner lambda is "late-bound". Specifically, rewriting the above as:
+///
+/// ```python
+/// (lambda: x for x in range(4))  # (3, 3, 3, 3)
+/// ```
+///
+/// Would yield an incorrect result, as the `x` in the inner lambda would be bound to the last
+/// value of `x` in the comprehension.
+fn late_binding(args: &Arguments, body: &Expr) -> bool {
+    let mut visitor = LateBindingVisitor::new(args);
+    visitor.visit_expr(body);
+    visitor.late_bound
+}
+
+#[derive(Debug)]
+struct LateBindingVisitor<'a> {
+    /// The arguments to the current lambda.
+    args: &'a Arguments,
+    /// The arguments to any lambdas within the current lambda body.
+    lambdas: Vec<&'a Arguments>,
+    /// Whether any names within the current lambda body are late-bound within nested lambdas.
+    late_bound: bool,
+}
+
+impl<'a> LateBindingVisitor<'a> {
+    fn new(args: &'a Arguments) -> Self {
+        Self {
+            args,
+            lambdas: Vec::new(),
+            late_bound: false,
+        }
+    }
+}
+
+impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
+    fn visit_stmt(&mut self, _stmt: &'a Stmt) {}
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Lambda(ast::ExprLambda { args, .. }) => {
+                self.lambdas.push(args);
+                visitor::walk_expr(self, expr);
+                self.lambdas.pop();
+            }
+            Expr::Name(ast::ExprName {
+                id,
+                ctx: ExprContext::Load,
+                ..
+            }) => {
+                // If we're within a nested lambda...
+                if !self.lambdas.is_empty() {
+                    // If the name is defined in the current lambda...
+                    if includes_arg_name(id, self.args) {
+                        // And isn't overridden by any nested lambdas...
+                        if !self.lambdas.iter().any(|args| includes_arg_name(id, args)) {
+                            // Then it's late-bound.
+                            self.late_bound = true;
+                        }
+                    }
+                }
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
+
+    fn visit_body(&mut self, _body: &'a [Stmt]) {}
 }

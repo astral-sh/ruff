@@ -260,19 +260,19 @@ C417.py:21:1: C417 Unnecessary `map` usage (rewrite using a generator expression
    |
    = help: Replace `map` with a generator expression
 
-C417.py:36:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:39:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
-35 | # False positive: need to preserve the late-binding of `x`.
-36 | callbacks = map(lambda x: lambda: x, range(4))
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+38 | # Error: the `x` is overridden by the inner lambda.
+39 | map(lambda x: lambda x: x, range(4))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
    |
    = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
-33 33 | list(map(func, nums))
-34 34 | 
-35 35 | # False positive: need to preserve the late-binding of `x`.
-36    |-callbacks = map(lambda x: lambda: x, range(4))
-   36 |+callbacks = (lambda: x for x in range(4))
+36 36 | map(lambda x: lambda: x, range(4))
+37 37 | 
+38 38 | # Error: the `x` is overridden by the inner lambda.
+39    |-map(lambda x: lambda x: x, range(4))
+   39 |+(lambda x: x for x in range(4))
 
 
