@@ -32,5 +32,8 @@ def func(arg1: int, arg2: int = 4):
 # Non-error: `func` is not a lambda.
 list(map(func, nums))
 
-# False positive: need to preserve the late-binding of `x`.
-callbacks = map(lambda x: lambda: x, range(4))
+# False positive: need to preserve the late-binding of `x` in the inner lambda.
+map(lambda x: lambda: x, range(4))
+
+# Error: the `x` is overridden by the inner lambda.
+map(lambda x: lambda x: x, range(4))
