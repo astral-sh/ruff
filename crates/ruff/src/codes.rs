@@ -778,7 +778,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "013") => (RuleGroup::Unspecified, rules::ruff::rules::ImplicitOptional),
         #[cfg(feature = "unreachable-code")]
         (Ruff, "014") => (RuleGroup::Nursery, rules::ruff::rules::UnreachableCode),
-        (Ruff, "015") => (RuleGroup::Unspecified, rules::ruff::rules::GetFirstElementOfList),
+        (Ruff, "015") => (RuleGroup::Unspecified, rules::ruff::rules::UnnecessaryListAllocationForFirstElement),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 

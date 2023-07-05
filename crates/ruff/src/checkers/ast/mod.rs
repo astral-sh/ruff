@@ -2219,8 +2219,8 @@ where
                 if self.enabled(Rule::UncapitalizedEnvironmentVariables) {
                     flake8_simplify::rules::use_capital_environment_variables(self, expr);
                 }
-                if self.enabled(Rule::GetFirstElementOfList) {
-                    ruff::rules::get_first_element_of_list(self, value, slice);
+                if self.enabled(Rule::UnnecessaryListAllocationForFirstElement) {
+                    ruff::rules::unnecessary_list_allocation_for_first_element(self, value, slice);
                 }
 
                 pandas_vet::rules::subscript(self, value, expr);

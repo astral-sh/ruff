@@ -33,17 +33,17 @@ use crate::registry::AsRule;
 /// - [Iterators and Iterables in Python: Run Efficient
 /// Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[violation]
-pub struct GetFirstElementOfList {
+pub struct UnnecessaryListAllocationForFirstElement {
     arg: String,
 }
 
-impl GetFirstElementOfList {
+impl UnnecessaryListAllocationForFirstElement {
     pub(crate) fn new(arg: String) -> Self {
         Self { arg }
     }
 }
 
-impl AlwaysAutofixableViolation for GetFirstElementOfList {
+impl AlwaysAutofixableViolation for UnnecessaryListAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -61,26 +61,30 @@ impl AlwaysAutofixableViolation for GetFirstElementOfList {
 }
 
 /// RUF015
-pub(crate) fn get_first_element_of_list(checker: &mut Checker, call: &Expr, slice: &Expr) {
+pub(crate) fn unnecessary_list_allocation_for_first_element(
+    checker: &mut Checker,
+    call: &Expr,
+    slice: &Expr,
+) {
     let Some(ListComponents { func_range, subscript_range, iter_name }) = decompose_list_expr(checker, call, slice) else {
         return;
     };
 
-    let subscript_range =
-        TextRange::at(func_range.start(), func_range.len() + subscript_range.len());
+    let range = TextRange::at(func_range.start(), func_range.len() + subscript_range.len());
     let mut diagnostic = Diagnostic::new(
-        GetFirstElementOfList::new(iter_name.to_string()),
-        subscript_range,
+        UnnecessaryListAllocationForFirstElement::new(iter_name.to_string()),
+        range,
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        // diagnostic.set_fix(Fix::automatic(Edit::range_replacement(content, range)));
+        let replacement = format!("next(iter({}))", iter_name);
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(replacement, range)));
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-/// Simple record struct that represents the components required for a list creation.
+/// Lighweight record struct that represents the components required for a list creation.
 struct ListComponents<'a> {
     /// The [`TextRange`] for the actual list creation - either `list(x)` or `[i for i in x]`
     func_range: &'a TextRange,
