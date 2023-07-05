@@ -11,6 +11,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
+use unicase::UniCase;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
@@ -28,7 +29,7 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
 #[derive(Debug)]
-pub(crate) enum Directive<'a> {
+pub enum Directive<'a> {
     /// The `noqa` directive ignores all rules (e.g., `# noqa`).
     All(All),
     /// The `noqa` directive ignores specific rules (e.g., `# noqa: F401, F841`).
@@ -37,7 +38,7 @@ pub(crate) enum Directive<'a> {
 
 impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
-    pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Option<Self> {
+    pub fn try_extract(text: &'a str, offset: TextSize) -> Option<Self> {
         let caps = NOQA_LINE_REGEX.captures(text)?;
         match (caps.name("noqa"), caps.name("codes")) {
             (Some(noqa), Some(codes)) => {
@@ -66,10 +67,88 @@ impl<'a> Directive<'a> {
             _ => None,
         }
     }
+
+    pub fn try_parse(text: &'a str, offset: TextSize) -> Option<Self> {
+        // Find the `noqa` literal.
+        let noqa_literal_start = UniCase::new(text).find("noqa")?;
+        let noqa_literal_end = noqa_literal_start + 4;
+
+        // Trim any whitespace between the `#` character and the `noqa` literal.
+        let noqa_literal_leading_space = text[..noqa_literal_start]
+            .chars()
+            .rev()
+            .take_while(|c| c.is_whitespace())
+            .map(|c| c.len_utf8())
+            .sum::<usize>();
+
+        // The next character has to be the `#` character.
+        if !text[..noqa_literal_start - noqa_literal_leading_space].ends_with('#') {
+            return None;
+        }
+
+        // The start of the `#` character.
+        let comment_start = noqa_literal_start - noqa_literal_leading_space - 1;
+
+        // The next character is required to be a `:` character.
+        // Otherwise, it's an `all` directive.
+        if !text[noqa_literal_end..].starts_with(':') {
+            let range = TextRange::new(
+                TextSize::try_from(comment_start).unwrap(),
+                TextSize::try_from(noqa_literal_end).unwrap(),
+            );
+            return Some(Self::All(All {
+                range: range.add(offset),
+            }));
+        }
+
+        // Now, find the start of the "codes".
+        let mut codes_start = noqa_literal_end;
+
+        // Skip the `:` character.
+        codes_start += 1;
+
+        // Skip any whitespace between the `:` and the codes.
+        codes_start += text[codes_start..]
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(0);
+
+        // Now, find the end of the codes.
+        let mut codes_end = codes_start;
+
+        // Skip until the end of the comment.
+        codes_end += text[codes_start..]
+            .find(|c: char| matches!(c, '#'))
+            .unwrap_or_else(|| text[codes_start..].len());
+
+        // Trim trailing whitespace.
+        codes_end -= text[..codes_end]
+            .chars()
+            .rev()
+            .take_while(|c| c.is_whitespace())
+            .map(|c| c.len_utf8())
+            .sum::<usize>();
+
+        // Extract the comma-separated list of codes.
+        let codes = text[codes_start..codes_end]
+            .split(',')
+            .map(str::trim)
+            .filter(|code| !code.is_empty())
+            .collect_vec();
+
+        let range = TextRange::new(
+            TextSize::try_from(comment_start).unwrap(),
+            TextSize::try_from(codes_end).unwrap(),
+        );
+
+        return Some(Self::Codes(Codes {
+            range: range.add(offset),
+            codes,
+        }));
+    }
 }
 
 #[derive(Debug)]
-pub(crate) struct All {
+pub struct All {
     range: TextRange,
 }
 
@@ -81,7 +160,7 @@ impl Ranged for All {
 }
 
 #[derive(Debug)]
-pub(crate) struct Codes<'a> {
+pub struct Codes<'a> {
     range: TextRange,
     codes: Vec<&'a str>,
 }
@@ -631,6 +710,48 @@ mod tests {
     #[test]
     fn noqa_codes_multi_space() {
         let source = "#  noqa: F401,  F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_all_leading_comment() {
+        let source = "# Some comment describing the noqa # noqa";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_code_leading_comment() {
+        let source = "# Some comment describing the noqa # noqa: F401";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_codes_leading_comment() {
+        let source = "# Some comment describing the noqa # noqa: F401, F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_all_trailing_comment() {
+        let source = "# noqa # Some comment describing the noqa";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_code_trailing_comment() {
+        let source = "# noqa: F401 # Some comment describing the noqa";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_codes_trailing_comment() {
+        let source = "# noqa: F401, F841 # Some comment describing the noqa";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_invalid_codes() {
+        let source = "# noqa: F401, unused-import, some other code";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 

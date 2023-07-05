@@ -1,41 +1,29 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use smallvec::{smallvec, SmallVec};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use ruff_text_size::TextSize;
 
-pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;
+use ruff::noqa::Directive;
 
-pub fn criterion_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("call_path");
-
-    group.bench_function("v1", |b| {
-        b.iter(|| {
-            let name = black_box("foo.bar.baz");
-            let call_path: CallPath = smallvec![black_box("typing"), black_box("List")];
-            if let Some(..) = call_path.first() {
-                let mut source_path: CallPath = name.split('.').collect();
-                source_path.extend(call_path.into_iter().skip(1));
-                black_box(source_path);
-            }
-        })
-    });
-
-    group.bench_function("v2", |b| {
-        b.iter(|| {
-            let name = black_box("foo.bar.baz");
-            let call_path: CallPath = smallvec![black_box("typing"), black_box("List")];
-            if let Some(..) = call_path.first() {
-                let parts = name.split('.');
-                let mut source_path: CallPath =
-                    SmallVec::with_capacity(parts.count() + call_path.len() - 1);
-                let parts = name.split('.');
-                source_path.extend(parts);
-                source_path.extend(call_path.into_iter().skip(1));
-                black_box(source_path);
-            }
-        })
-    });
-
+pub fn directive_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Directive");
+    for i in [
+        "# noqa: F401",
+        "# noqa: F401, F841",
+        "# noqa",
+        "# type: ignore # noqa: E501",
+        "# type: ignore # nosec",
+        "# some very long comment that # is interspersed with characters but # no directive",
+    ]
+    .iter()
+    {
+        group.bench_with_input(BenchmarkId::new("Regex", i), i, |b, _i| {
+            b.iter(|| Directive::try_extract(black_box(i), TextSize::default()))
+        });
+        group.bench_with_input(BenchmarkId::new("Parser", i), i, |b, _i| {
+            b.iter(|| Directive::try_parse(black_box(i), TextSize::default()))
+        });
+    }
     group.finish();
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(benches, directive_benchmark);
 criterion_main!(benches);
