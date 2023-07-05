@@ -1135,6 +1135,13 @@
     "IsortOptions": {
       "type": "object",
       "properties": {
+        "case-sensitive": {
+          "description": "Sort imports taking into account case sensitivity.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "classes": {
           "description": "An override list of tokens to always recognize as a Class for `order-by-type` regardless of casing.",
           "type": [
