@@ -1659,7 +1659,7 @@ where
                     pylint::rules::type_param_name_mismatch(self, value, targets);
                 }
                 if self.settings.rules.enabled(Rule::TypeBivariance) {
-                    pylint::rules::type_bivariance(self, value, targets);
+                    pylint::rules::type_bivariance(self, value);
                 }
                 if self.is_stub {
                     if self.any_enabled(&[

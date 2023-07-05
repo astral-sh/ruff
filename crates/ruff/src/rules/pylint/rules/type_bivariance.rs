@@ -7,6 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::type_param_name;
 
 /// ## What it does
 /// Checks for `TypeVar` and `ParamSpec` definitions in which the type is
@@ -55,22 +56,25 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct TypeBivariance {
     kind: VarKind,
+    param_name: Option<String>,
 }
 
 impl Violation for TypeBivariance {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Type parameter cannot be both covariant and contravariant")
+        let TypeBivariance { kind, param_name } = self;
+        match param_name {
+            None => format!("`{kind}` cannot be both covariant and contravariant"),
+            Some(param_name) => {
+                format!("`{kind}` \"{param_name}\" cannot be both covariant and contravariant",)
+            }
+        }
     }
 }
 
 /// PLC0131
-pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
-    let [target] = targets else {
-        return;
-    };
-
-    let Expr::Call(ast::ExprCall { func, keywords, .. }) = value else {
+pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
+    let Expr::Call(ast::ExprCall { func,args, keywords, .. }) = value else {
         return;
     };
 
@@ -123,9 +127,13 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr, targets: &[Ex
             return;
         };
 
-        checker
-            .diagnostics
-            .push(Diagnostic::new(TypeBivariance { kind }, target.range()));
+        checker.diagnostics.push(Diagnostic::new(
+            TypeBivariance {
+                kind,
+                param_name: type_param_name(args, keywords).map(ToString::to_string),
+            },
+            func.range(),
+        ));
     }
 }
 
