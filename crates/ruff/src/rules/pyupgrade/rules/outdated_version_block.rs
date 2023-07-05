@@ -131,7 +131,7 @@ fn fix_py2_block(
     stmt: &Stmt,
     elif_else_clauses: &[ElifElseClause],
     branch_kind: BranchKind,
-    range: TextRange,
+    branch_range: TextRange,
 ) -> Option<Fix> {
     match branch_kind {
         BranchKind::If => match elif_else_clauses.first() {
@@ -210,10 +210,10 @@ fn fix_py2_block(
             let next_start = elif_else_clauses
                 .iter()
                 .map(Ranged::start)
-                .find(|start| *start > range.start());
+                .find(|start| *start > branch_range.start());
             Some(Fix::suggested(Edit::deletion(
-                range.start(),
-                next_start.unwrap_or(range.end()),
+                branch_range.start(),
+                next_start.unwrap_or(branch_range.end()),
             )))
         }
     }
@@ -226,7 +226,7 @@ fn fix_py3_block(
     test: &Expr,
     body: &[Stmt],
     branch_kind: BranchKind,
-    range: TextRange,
+    branch_range: TextRange,
 ) -> Option<Fix> {
     match branch_kind {
         BranchKind::If => {
@@ -241,7 +241,7 @@ fn fix_py3_block(
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
-                    range,
+                    branch_range,
                 )))
             } else {
                 indentation(checker.locator, &stmt)
@@ -257,8 +257,8 @@ fn fix_py3_block(
                     .map(|contents| {
                         Fix::suggested(Edit::replacement(
                             contents,
-                            checker.locator.line_start(range.start()),
-                            range.end(),
+                            checker.locator.line_start(branch_range.start()),
+                            branch_range.end(),
                         ))
                     })
             }
@@ -270,7 +270,7 @@ fn fix_py3_block(
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
             Some(Fix::suggested(Edit::range_replacement(
                 format!("else{text}"),
-                TextRange::new(range.start(), stmt.end()),
+                TextRange::new(branch_range.start(), stmt.end()),
             )))
         }
     }
@@ -295,7 +295,7 @@ pub(crate) fn outdated_version_block(
     });
     let if_elif_tests =
         iter::once((if_test, if_body, BranchKind::If, stmt.range())).chain(elif_iter);
-    for (test, body, branch_kind, range) in if_elif_tests {
+    for (test, body, branch_kind, branch_range) in if_elif_tests {
         let Expr::Compare(ast::ExprCompare {
             left,
             ops,
@@ -326,11 +326,15 @@ pub(crate) fn outdated_version_block(
                 let target = checker.settings.target_version;
                 if op == &CmpOp::Lt || op == &CmpOp::LtE {
                     if compare_version(&version, target, op == &CmpOp::LtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
+                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(fix) =
-                                fix_py2_block(checker, stmt, elif_else_clauses, branch_kind, range)
-                            {
+                            if let Some(fix) = fix_py2_block(
+                                checker,
+                                stmt,
+                                elif_else_clauses,
+                                branch_kind,
+                                branch_range,
+                            ) {
                                 diagnostic.set_fix(fix);
                             }
                         }
@@ -338,10 +342,10 @@ pub(crate) fn outdated_version_block(
                     }
                 } else if op == &CmpOp::Gt || op == &CmpOp::GtE {
                     if compare_version(&version, target, op == &CmpOp::GtE) {
-                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
+                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(fix) =
-                                fix_py3_block(checker, stmt, test, body, branch_kind, range)
+                                fix_py3_block(checker, stmt, test, body, branch_kind, branch_range)
                             {
                                 diagnostic.set_fix(fix);
                             }
@@ -356,20 +360,24 @@ pub(crate) fn outdated_version_block(
             }) => {
                 let version_number = bigint_to_u32(number);
                 if version_number == 2 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
                     if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(fix) =
-                            fix_py2_block(checker, stmt, elif_else_clauses, branch_kind, range)
-                        {
+                        if let Some(fix) = fix_py2_block(
+                            checker,
+                            stmt,
+                            elif_else_clauses,
+                            branch_kind,
+                            branch_range,
+                        ) {
                             diagnostic.set_fix(fix);
                         }
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if version_number == 3 && op == &CmpOp::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, range);
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, branch_range);
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(fix) =
-                            fix_py3_block(checker, stmt, test, body, branch_kind, range)
+                            fix_py3_block(checker, stmt, test, body, branch_kind, branch_range)
                         {
                             diagnostic.set_fix(fix);
                         }
