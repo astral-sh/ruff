@@ -10,6 +10,19 @@ pub struct CommentRanges {
     raw: Vec<TextRange>,
 }
 
+impl CommentRanges {
+    /// Returns the comments who are within the range
+    pub fn comments_in_range(&self, range: TextRange) -> &[TextRange] {
+        let start = self
+            .raw
+            .partition_point(|comment| comment.start() < range.start());
+        let end = self
+            .raw
+            .partition_point(|comment| comment.end() < range.end());
+        &self.raw[start..end]
+    }
+}
+
 impl Deref for CommentRanges {
     type Target = [TextRange];
 

@@ -709,22 +709,17 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt: 
             continue;
         }
 
-        // ...and the same statements
-        // TODO(konstin): Don't we have any helper to extract the comments in a specific range?
-        let comments_in_range = |range: TextRange| {
-            checker
-                .indexer
-                .comment_ranges()
-                .iter()
-                .filter(|comment_range| range.contains(comment_range.start()))
-                .map(|comment_range| locator.slice(*comment_range))
-                .collect()
-        };
-
+        // ...and the same comments
         let first_range = TextRange::new(first_start, first_body.last().unwrap().end());
-        let first_comments: Vec<_> = comments_in_range(first_range);
+        let first_comments: Vec<_> = checker
+            .indexer
+            .comments_in_range(first_range, locator)
+            .collect();
         let second_range = TextRange::new(*second_start, second_body.last().unwrap().end());
-        let second_comments: Vec<_> = comments_in_range(second_range);
+        let second_comments: Vec<_> = checker
+            .indexer
+            .comments_in_range(second_range, locator)
+            .collect();
         if first_comments != second_comments {
             continue;
         }
