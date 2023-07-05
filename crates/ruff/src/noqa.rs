@@ -20,7 +20,7 @@ use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)",
+        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)",
     )
     .unwrap()
 });
@@ -566,28 +566,127 @@ impl FromIterator<TextRange> for NoqaMapping {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
     use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::source_code::Locator;
     use ruff_python_whitespace::LineEnding;
 
-    use crate::noqa::{add_noqa_inner, NoqaMapping, NOQA_LINE_REGEX};
+    use crate::noqa::{add_noqa_inner, Directive, NoqaMapping};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
-    use crate::rules::pyflakes;
+    use crate::rules::pyflakes::rules::UnusedVariable;
 
     #[test]
-    fn regex() {
-        assert!(NOQA_LINE_REGEX.is_match("# noqa"));
-        assert!(NOQA_LINE_REGEX.is_match("# NoQA"));
+    fn noqa_all() {
+        let source = "# noqa";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(6));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
 
-        assert!(NOQA_LINE_REGEX.is_match("# noqa: F401"));
-        assert!(NOQA_LINE_REGEX.is_match("# NoQA: F401"));
-        assert!(NOQA_LINE_REGEX.is_match("# noqa: F401, E501"));
+    #[test]
+    fn noqa_code() {
+        let source = "# noqa: F401";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(12));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
 
-        assert!(NOQA_LINE_REGEX.is_match("# noqa:F401"));
-        assert!(NOQA_LINE_REGEX.is_match("# NoQA:F401"));
-        assert!(NOQA_LINE_REGEX.is_match("# noqa:F401, E501"));
+    #[test]
+    fn noqa_codes() {
+        let source = "# noqa: F401, F841";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(18));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_all_case_insensitive() {
+        let source = "# NOQA";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(6));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_code_case_insensitive() {
+        let source = "# NOQA: F401";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(12));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_codes_case_insensitive() {
+        let source = "# NOQA: F401, F841";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(18));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_leading_space() {
+        let source = "#   # noqa: F401";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(16));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_trailing_space() {
+        let source = "# noqa: F401   #";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(16));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_all_no_space() {
+        let source = "#noqa";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(5));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_code_no_space() {
+        let source = "#noqa:F401";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(10));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_codes_no_space() {
+        let source = "#noqa:F401,F841";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(15));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_all_multi_space() {
+        let source = "#  noqa";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(7));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_code_multi_space() {
+        let source = "#  noqa: F401";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(13));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
+    }
+
+    #[test]
+    fn noqa_codes_multi_space() {
+        let source = "#  noqa: F401,  F841";
+        let range = TextRange::new(TextSize::from(0), TextSize::from(20));
+        let locator = Locator::new(source);
+        assert_debug_snapshot!(Directive::extract(range, &locator));
     }
 
     #[test]
@@ -605,7 +704,7 @@ mod tests {
         assert_eq!(output, format!("{contents}"));
 
         let diagnostics = [Diagnostic::new(
-            pyflakes::rules::UnusedVariable {
+            UnusedVariable {
                 name: "x".to_string(),
             },
             TextRange::new(TextSize::from(0), TextSize::from(0)),
@@ -629,7 +728,7 @@ mod tests {
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
             Diagnostic::new(
-                pyflakes::rules::UnusedVariable {
+                UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
@@ -653,7 +752,7 @@ mod tests {
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
             Diagnostic::new(
-                pyflakes::rules::UnusedVariable {
+                UnusedVariable {
                     name: "x".to_string(),
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),

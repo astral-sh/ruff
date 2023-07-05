@@ -1,0 +1,5 @@
+---
+source: crates/ruff/src/noqa.rs
+expression: "Directive::extract(range, &locator)"
+---
+None
