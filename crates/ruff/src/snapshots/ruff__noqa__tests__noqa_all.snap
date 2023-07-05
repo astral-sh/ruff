@@ -1,13 +1,11 @@
 ---
 source: crates/ruff/src/noqa.rs
-expression: "Directive::extract(range, &locator)"
+expression: "Directive::try_extract(range, &locator)"
 ---
 Some(
     All(
         All {
-            leading_space_len: 0,
-            noqa_range: 0..6,
-            trailing_space_len: 0,
+            range: 0..6,
         },
     ),
 )

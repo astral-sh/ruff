@@ -1,13 +1,11 @@
 ---
 source: crates/ruff/src/noqa.rs
-expression: "Directive::extract(range, &locator)"
+expression: "Directive::try_extract(range, &locator)"
 ---
 Some(
     Codes(
         Codes {
-            leading_space_len: 3,
-            noqa_range: 4..16,
-            trailing_space_len: 0,
+            range: 4..16,
             codes: [
                 "F401",
             ],
