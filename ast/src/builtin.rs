@@ -1,4 +1,4 @@
-//! `builtin_types` in asdl.py and Attributed
+//! `builtin_types` in Attributed
 
 use rustpython_parser_core::text_size::TextRange;
 
