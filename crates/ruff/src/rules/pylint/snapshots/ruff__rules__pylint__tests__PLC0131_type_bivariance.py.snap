@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-type_bivariance.py:5:1: PLC0131 Type variance cannot be both covariant and contravariant
+type_bivariance.py:5:1: PLC0131 Type parameter cannot be both covariant and contravariant
   |
 3 | # Errors.
 4 | 
@@ -10,7 +10,7 @@ type_bivariance.py:5:1: PLC0131 Type variance cannot be both covariant and contr
 6 | T = TypeVar(name="T", covariant=True, contravariant=True)
   |
 
-type_bivariance.py:6:1: PLC0131 Type variance cannot be both covariant and contravariant
+type_bivariance.py:6:1: PLC0131 Type parameter cannot be both covariant and contravariant
   |
 5 | T = TypeVar("T", covariant=True, contravariant=True)
 6 | T = TypeVar(name="T", covariant=True, contravariant=True)
@@ -19,7 +19,7 @@ type_bivariance.py:6:1: PLC0131 Type variance cannot be both covariant and contr
 8 | T = ParamSpec("T", covariant=True, contravariant=True)
   |
 
-type_bivariance.py:8:1: PLC0131 Type variance cannot be both covariant and contravariant
+type_bivariance.py:8:1: PLC0131 Type parameter cannot be both covariant and contravariant
   |
 6 | T = TypeVar(name="T", covariant=True, contravariant=True)
 7 | 
@@ -28,7 +28,7 @@ type_bivariance.py:8:1: PLC0131 Type variance cannot be both covariant and contr
 9 | T = ParamSpec(name="T", covariant=True, contravariant=True)
   |
 
-type_bivariance.py:9:1: PLC0131 Type variance cannot be both covariant and contravariant
+type_bivariance.py:9:1: PLC0131 Type parameter cannot be both covariant and contravariant
    |
  8 | T = ParamSpec("T", covariant=True, contravariant=True)
  9 | T = ParamSpec(name="T", covariant=True, contravariant=True)

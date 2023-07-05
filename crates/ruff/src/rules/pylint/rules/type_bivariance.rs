@@ -1,40 +1,43 @@
 use std::fmt;
 
+use rustpython_parser::ast::{self, Expr, Ranged};
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use rustpython_parser::ast::{self, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `TypeVar` and `ParamSpec` definitions in which the type variance
-/// is both covariant and contravariant.
+/// Checks for `TypeVar` and `ParamSpec` definitions in which the type is
+/// both covariant and contravariant.
 ///
 /// ## Why is this bad?
-/// By default, generic types are invariant. This means that a `list[Animal]`
-/// accepts `Animal` elements and nothing else (not even `Animal` subclasses
-/// or superclasses).
-///
-/// Sometimes you want to allow a generic type to be covariant or
-/// contravariant. Covariance means that a generic type accepts subclasses of
-/// the type parameter; for example, `list[Animal]` accepts `list[Dog]`. On the
-/// other hand, contravariance means that a generic type accepts superclasses
-/// of the type parameter; for example, `list[Dog]` accepts `list[Animal]`.
-///
-/// However, a type cannot be both covariant and contravariant. This is because
-/// a type cannot be both a subclass and a superclass of another type.
+/// By default, Python's generic types are invariant, but can be marked as
+/// either covariant or contravariant via the `covariant` and `contravariant`
+/// keyword arguments. While the API does allow you to mark a type as both
+/// covariant and contravariant, this is not supported by the type system,
+/// and should be avoided.
 ///
 /// Instead, change the variance of the type to be either covariant,
 /// contravariant, or invariant. If you want to describe both covariance and
-/// contravariance, consider using two type parameters, one for covariance and
-/// one for contravariance.
+/// contravariance, consider using two separate type parameters.
+///
+/// For context: an "invariant" generic type only accepts values that exactly
+/// match the type parameter; for example, `list[Dog]` accepts only `list[Dog]`,
+/// not `list[Animal]` (superclass) or `list[Bulldog]` (subclass). This is
+/// the default behavior for Python's generic types.
+///
+/// A "covariant" generic type accepts subclasses of the type parameter; for
+/// example, `Sequence[Animal]` accepts `Sequence[Dog]`. A "contravariant"
+/// generic type accepts superclasses of the type parameter; for example,
+/// `Callable[Dog]` accepts `Callable[Animal]`.
 ///
 /// ## Example
 /// ```python
 /// from typing import TypeVar
 ///
-/// T_bi = TypeVar("T_bi", covariant=True, contravariant=True)
+/// T = TypeVar("T", covariant=True, contravariant=True)
 /// ```
 ///
 /// Use instead:
@@ -54,14 +57,24 @@ pub struct TypeBivariance {
     kind: VarKind,
 }
 
+impl Violation for TypeBivariance {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Type parameter cannot be both covariant and contravariant")
+    }
+}
+
 /// PLC0131
 pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
     let [target] = targets else {
         return;
     };
-    let Expr::Call(call) = value else { return };
-    let covariant = call
-        .keywords
+
+    let Expr::Call(ast::ExprCall { func, keywords, .. }) = value else {
+        return;
+    };
+
+    let Some(covariant) = keywords
         .iter()
         .find(|keyword| {
             keyword
@@ -69,9 +82,12 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr, targets: &[Ex
                 .as_ref()
                 .map_or(false, |keyword| keyword.as_str() == "covariant")
         })
-        .map(|keyword| &keyword.value);
-    let contravariant = call
-        .keywords
+        .map(|keyword| &keyword.value)
+    else {
+        return;
+    };
+
+    let Some(contravariant) = keywords
         .iter()
         .find(|keyword| {
             keyword
@@ -79,44 +95,37 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr, targets: &[Ex
                 .as_ref()
                 .map_or(false, |keyword| keyword.as_str() == "contravariant")
         })
-        .map(|keyword| &keyword.value);
-    if let (Some(covariant), Some(contravariant)) = (covariant, contravariant) {
-        if is_const_true(covariant) && is_const_true(contravariant) {
-            let Expr::Call(ast::ExprCall { func, .. }) = value else {
-                return;
-            };
-            let Some(kind) = checker
-                .semantic()
-                .resolve_call_path(func)
-                .and_then(|call_path| {
-                    if checker
-                        .semantic()
-                        .match_typing_call_path(&call_path, "ParamSpec")
-                    {
-                        Some(VarKind::ParamSpec)
-                    } else if checker
-                        .semantic()
-                        .match_typing_call_path(&call_path, "TypeVar")
-                    {
-                        Some(VarKind::TypeVar)
-                    } else {
-                        None
-                    }
-                })
-                else {
-                    return;
-                };
-            checker
-                .diagnostics
-                .push(Diagnostic::new(TypeBivariance { kind }, target.range()));
-        }
-    }
-}
+        .map(|keyword| &keyword.value)
+    else {
+        return;
+    };
 
-impl Violation for TypeBivariance {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Type variance cannot be both covariant and contravariant")
+    if is_const_true(covariant) && is_const_true(contravariant) {
+        let Some(kind) = checker
+            .semantic()
+            .resolve_call_path(func)
+            .and_then(|call_path| {
+                if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "ParamSpec")
+                {
+                    Some(VarKind::ParamSpec)
+                } else if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "TypeVar")
+                {
+                    Some(VarKind::TypeVar)
+                } else {
+                    None
+                }
+            })
+        else {
+            return;
+        };
+
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TypeBivariance { kind }, target.range()));
     }
 }
 
