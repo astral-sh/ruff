@@ -116,6 +116,7 @@ pub(crate) fn cmp_import_from(
     import_from2: &ImportFromData,
     relative_imports_order: RelativeImportsOrder,
     force_to_top: &BTreeSet<String>,
+    case_sensitive: bool,
 ) -> Ordering {
     cmp_levels(
         import_from1.level,
@@ -133,8 +134,13 @@ pub(crate) fn cmp_import_from(
         (None, None) => Ordering::Equal,
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
-        (Some(module1), Some(module2)) => natord::compare_ignore_case(module1, module2)
-            .then_with(|| natord::compare(module1, module2)),
+        (Some(module1), Some(module2)) => {
+            if case_sensitive {
+                natord::compare(module1, module2)
+            } else {
+                natord::compare_ignore_case(module1, module2)
+            }
+        }
     })
 }
 
@@ -143,9 +149,14 @@ fn cmp_import_import_from(
     import: &AliasData,
     import_from: &ImportFromData,
     force_to_top: &BTreeSet<String>,
+    case_sensitive: bool,
 ) -> Ordering {
     cmp_force_to_top(import.name, &import_from.module_name(), force_to_top).then_with(|| {
-        natord::compare_ignore_case(import.name, import_from.module.unwrap_or_default())
+        if case_sensitive {
+            natord::compare(import.name, import_from.module.unwrap_or_default())
+        } else {
+            natord::compare_ignore_case(import.name, import_from.module.unwrap_or_default())
+        }
     })
 }
 
@@ -156,20 +167,22 @@ pub(crate) fn cmp_either_import(
     b: &EitherImport,
     relative_imports_order: RelativeImportsOrder,
     force_to_top: &BTreeSet<String>,
+    case_sensitive: bool,
 ) -> Ordering {
     match (a, b) {
         (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, force_to_top),
         (ImportFrom((import_from, ..)), Import((alias, _))) => {
-            cmp_import_import_from(alias, import_from, force_to_top).reverse()
+            cmp_import_import_from(alias, import_from, force_to_top, case_sensitive).reverse()
         }
         (Import((alias, _)), ImportFrom((import_from, ..))) => {
-            cmp_import_import_from(alias, import_from, force_to_top)
+            cmp_import_import_from(alias, import_from, force_to_top, case_sensitive)
         }
         (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => cmp_import_from(
             import_from1,
             import_from2,
             relative_imports_order,
             force_to_top,
+            case_sensitive,
         ),
     }
 }

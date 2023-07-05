@@ -74,6 +74,7 @@ pub(crate) fn format_imports(
     combine_as_imports: bool,
     force_single_line: bool,
     force_sort_within_sections: bool,
+    case_sensitive: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
@@ -114,6 +115,7 @@ pub(crate) fn format_imports(
             src,
             package,
             force_sort_within_sections,
+            case_sensitive,
             force_wrap_aliases,
             force_to_top,
             known_modules,
@@ -171,6 +173,7 @@ fn format_import_block(
     src: &[PathBuf],
     package: Option<&Path>,
     force_sort_within_sections: bool,
+    case_sensitive: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
@@ -206,6 +209,7 @@ fn format_import_block(
         let imports = order_imports(
             import_block,
             order_by_type,
+            case_sensitive,
             relative_imports_order,
             classes,
             constants,
@@ -222,7 +226,13 @@ fn format_import_block(
                 .collect::<Vec<EitherImport>>();
             if force_sort_within_sections {
                 imports.sort_by(|import1, import2| {
-                    cmp_either_import(import1, import2, relative_imports_order, force_to_top)
+                    cmp_either_import(
+                        import1,
+                        import2,
+                        relative_imports_order,
+                        force_to_top,
+                        case_sensitive,
+                    )
                 });
             };
             imports
@@ -303,6 +313,7 @@ mod tests {
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("as_imports_comments.py"))]
+    #[test_case(Path::new("case_sensitive.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
     #[test_case(Path::new("combine_import_from.py"))]
     #[test_case(Path::new("comments.py"))]

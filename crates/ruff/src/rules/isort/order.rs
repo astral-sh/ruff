@@ -12,6 +12,7 @@ use super::types::{AliasData, CommentSet, ImportBlock, OrderedImportBlock};
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
     order_by_type: bool,
+    case_sensitive: bool,
     relative_imports_order: RelativeImportsOrder,
     classes: &'a BTreeSet<String>,
     constants: &'a BTreeSet<String>,
@@ -83,6 +84,7 @@ pub(crate) fn order_imports<'a>(
                         import_from2,
                         relative_imports_order,
                         force_to_top,
+                        case_sensitive,
                     )
                     .then_with(|| match (aliases1.first(), aliases2.first()) {
                         (None, None) => Ordering::Equal,

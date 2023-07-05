@@ -134,6 +134,15 @@ pub struct Options {
             force-to-top = ["src"]
         "#
     )]
+    /// Sort imports taking into account case sensitivity.
+    pub case_sensitive: Option<bool>,
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            case-sensitive = true
+        "#
+    )]
     /// Force specific imports to the top of their appropriate section.
     pub force_to_top: Option<Vec<String>>,
     #[option(
@@ -303,6 +312,7 @@ pub struct Settings {
     pub combine_as_imports: bool,
     pub force_single_line: bool,
     pub force_sort_within_sections: bool,
+    pub case_sensitive: bool,
     pub force_wrap_aliases: bool,
     pub force_to_top: BTreeSet<String>,
     pub known_modules: KnownModules,
@@ -327,6 +337,7 @@ impl Default for Settings {
             combine_as_imports: false,
             force_single_line: false,
             force_sort_within_sections: false,
+            case_sensitive: true,
             force_wrap_aliases: false,
             force_to_top: BTreeSet::new(),
             known_modules: KnownModules::default(),
@@ -429,6 +440,7 @@ impl From<Options> for Settings {
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
             force_single_line: options.force_single_line.unwrap_or(false),
             force_sort_within_sections: options.force_sort_within_sections.unwrap_or(false),
+            case_sensitive: options.case_sensitive.unwrap_or(false),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
             force_to_top: BTreeSet::from_iter(options.force_to_top.unwrap_or_default()),
             known_modules: KnownModules::new(
@@ -468,6 +480,7 @@ impl From<Settings> for Options {
             ),
             force_single_line: Some(settings.force_single_line),
             force_sort_within_sections: Some(settings.force_sort_within_sections),
+            case_sensitive: Some(settings.case_sensitive),
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             force_to_top: Some(settings.force_to_top.into_iter().collect()),
             known_first_party: Some(
