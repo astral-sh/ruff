@@ -94,32 +94,17 @@ pub(crate) fn check_noqa(
     if analyze_directives && settings.rules.enabled(Rule::UnusedNOQA) {
         for line in noqa_directives.lines() {
             match &line.directive {
-                Directive::All(All {
-                    leading_space_len,
-                    noqa_range,
-                    trailing_space_len,
-                }) => {
+                Directive::All(All { range }) => {
                     if line.matches.is_empty() {
-                        let mut diagnostic =
-                            Diagnostic::new(UnusedNOQA { codes: None }, *noqa_range);
+                        let mut diagnostic = Diagnostic::new(UnusedNOQA { codes: None }, *range);
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
                             #[allow(deprecated)]
-                            diagnostic.set_fix_from_edit(delete_noqa(
-                                *leading_space_len,
-                                *noqa_range,
-                                *trailing_space_len,
-                                locator,
-                            ));
+                            diagnostic.set_fix_from_edit(delete_noqa(*range, locator));
                         }
                         diagnostics.push(diagnostic);
                     }
                 }
-                Directive::Codes(Codes {
-                    leading_space_len,
-                    noqa_range,
-                    codes,
-                    trailing_space_len,
-                }) => {
+                Directive::Codes(Codes { range, codes }) => {
                     let mut disabled_codes = vec![];
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
@@ -174,22 +159,17 @@ pub(crate) fn check_noqa(
                                         .collect(),
                                 }),
                             },
-                            *noqa_range,
+                            *range,
                         );
                         if settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
                                 #[allow(deprecated)]
-                                diagnostic.set_fix_from_edit(delete_noqa(
-                                    *leading_space_len,
-                                    *noqa_range,
-                                    *trailing_space_len,
-                                    locator,
-                                ));
+                                diagnostic.set_fix_from_edit(delete_noqa(*range, locator));
                             } else {
                                 #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
-                                    *noqa_range,
+                                    *range,
                                 )));
                             }
                         }
@@ -205,39 +185,46 @@ pub(crate) fn check_noqa(
 }
 
 /// Generate a [`Edit`] to delete a `noqa` directive.
-fn delete_noqa(
-    leading_space_len: TextSize,
-    noqa_range: TextRange,
-    trailing_space_len: TextSize,
-    locator: &Locator,
-) -> Edit {
-    let line_range = locator.line_range(noqa_range.start());
+fn delete_noqa(range: TextRange, locator: &Locator) -> Edit {
+    let line_range = locator.line_range(range.start());
+
+    // Compute the leading space.
+    let prefix = locator.slice(TextRange::new(line_range.start(), range.start()));
+    let leading_space = prefix
+        .rfind(|c: char| !c.is_whitespace())
+        .map_or(prefix.len(), |i| prefix.len() - i - 1);
+    let leading_space_len = TextSize::try_from(leading_space).unwrap();
+
+    // Compute the trailing space.
+    let suffix = locator.slice(TextRange::new(range.end(), line_range.end()));
+    let trailing_space = suffix
+        .find(|c: char| !c.is_whitespace())
+        .map_or(suffix.len(), |i| i);
+    let trailing_space_len = TextSize::try_from(trailing_space).unwrap();
 
     // Ex) `# noqa`
     if line_range
         == TextRange::new(
-            noqa_range.start() - leading_space_len,
-            noqa_range.end() + trailing_space_len,
+            range.start() - leading_space_len,
+            range.end() + trailing_space_len,
         )
     {
         let full_line_end = locator.full_line_end(line_range.end());
         Edit::deletion(line_range.start(), full_line_end)
     }
     // Ex) `x = 1  # noqa`
-    else if noqa_range.end() + trailing_space_len == line_range.end() {
-        Edit::deletion(noqa_range.start() - leading_space_len, line_range.end())
+    else if range.end() + trailing_space_len == line_range.end() {
+        Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
     // Ex) `x = 1  # noqa  # type: ignore`
-    else if locator.contents()[usize::from(noqa_range.end() + trailing_space_len)..]
-        .starts_with('#')
-    {
-        Edit::deletion(noqa_range.start(), noqa_range.end() + trailing_space_len)
+    else if locator.contents()[usize::from(range.end() + trailing_space_len)..].starts_with('#') {
+        Edit::deletion(range.start(), range.end() + trailing_space_len)
     }
     // Ex) `x = 1  # noqa here`
     else {
         Edit::deletion(
-            noqa_range.start() + "# ".text_len(),
-            noqa_range.end() + trailing_space_len,
+            range.start() + "# ".text_len(),
+            range.end() + trailing_space_len,
         )
     }
 }

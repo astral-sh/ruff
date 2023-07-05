@@ -19,10 +19,8 @@ use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)",
-    )
-    .unwrap()
+    Regex::new(r"(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*))?)")
+        .unwrap()
 });
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
@@ -39,76 +37,47 @@ impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
     pub(crate) fn try_extract(range: TextRange, locator: &'a Locator) -> Option<Self> {
         let text = &locator.contents()[range];
-        match NOQA_LINE_REGEX.captures(text) {
-            Some(caps) => match (
-                caps.name("leading_spaces"),
-                caps.name("noqa"),
-                caps.name("codes"),
-                caps.name("trailing_spaces"),
-            ) {
-                (Some(leading_spaces), Some(noqa), Some(codes), Some(trailing_spaces)) => {
-                    let codes = codes
-                        .as_str()
-                        .split(|c: char| c.is_whitespace() || c == ',')
-                        .map(str::trim)
-                        .filter(|code| !code.is_empty())
-                        .collect_vec();
-                    let start = range.start() + TextSize::try_from(noqa.start()).unwrap();
-                    if codes.is_empty() {
-                        #[allow(deprecated)]
-                        let line = locator.compute_line_index(start);
-                        warn!("Expected rule codes on `noqa` directive: \"{line}\"");
-                    }
-
-                    let leading_space_len = leading_spaces.as_str().text_len();
-                    let noqa_range = TextRange::at(start, noqa.as_str().text_len());
-                    let trailing_space_len = trailing_spaces.as_str().text_len();
-
-                    Some(Self::Codes(Codes {
-                        leading_space_len,
-                        noqa_range,
-                        trailing_space_len,
-                        codes,
-                    }))
+        let caps = NOQA_LINE_REGEX.captures(text)?;
+        match (caps.name("noqa"), caps.name("codes")) {
+            (Some(noqa), Some(codes)) => {
+                let codes = codes
+                    .as_str()
+                    .split(|c: char| c.is_whitespace() || c == ',')
+                    .map(str::trim)
+                    .filter(|code| !code.is_empty())
+                    .collect_vec();
+                let start = range.start() + TextSize::try_from(noqa.start()).unwrap();
+                if codes.is_empty() {
+                    #[allow(deprecated)]
+                    let line = locator.compute_line_index(start);
+                    warn!("Expected rule codes on `noqa` directive: \"{line}\"");
                 }
-                (Some(leading_spaces), Some(noqa), None, Some(trailing_spaces)) => {
-                    let leading_space_len = leading_spaces.as_str().text_len();
-                    let noqa_range = TextRange::at(
-                        range.start() + TextSize::try_from(noqa.start()).unwrap(),
-                        noqa.as_str().text_len(),
-                    );
-                    let trailing_space_len = trailing_spaces.as_str().text_len();
-                    Some(Self::All(All {
-                        leading_space_len,
-                        noqa_range,
-                        trailing_space_len,
-                    }))
-                }
-                _ => None,
-            },
-            None => None,
+
+                let range = TextRange::at(start, noqa.as_str().text_len());
+                Some(Self::Codes(Codes { range, codes }))
+            }
+            (Some(noqa), None) => {
+                let range = TextRange::at(
+                    range.start() + TextSize::try_from(noqa.start()).unwrap(),
+                    noqa.as_str().text_len(),
+                );
+                Some(Self::All(All { range }))
+            }
+            _ => None,
         }
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct All {
-    /// The length of the leading whitespace before the `noqa` directive.
-    pub(crate) leading_space_len: TextSize,
     /// The range of the `noqa` directive.
-    pub(crate) noqa_range: TextRange,
-    /// The length of the trailing whitespace after the `noqa` directive.
-    pub(crate) trailing_space_len: TextSize,
+    pub(crate) range: TextRange,
 }
 
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
-    /// The length of the leading whitespace before the `noqa` directive.
-    pub(crate) leading_space_len: TextSize,
     /// The range of the `noqa` directive.
-    pub(crate) noqa_range: TextRange,
-    /// The length of the trailing whitespace after the `noqa` directive.
-    pub(crate) trailing_space_len: TextSize,
+    pub(crate) range: TextRange,
     /// The codes that are ignored by the `noqa` directive.
     pub(crate) codes: Vec<&'a str>,
 }
@@ -132,8 +101,8 @@ pub(crate) fn rule_is_ignored(
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
     match Directive::try_extract(line_range, locator) {
-        Some(Directive::All(..)) => true,
-        Some(Directive::Codes(Codes { codes, .. })) => includes(code, &codes),
+        Some(Directive::All(_)) => true,
+        Some(Directive::Codes(Codes { codes, range: _ })) => includes(code, &codes),
         None => false,
     }
 }
@@ -289,10 +258,10 @@ fn add_noqa_inner(
                 directives.find_line_with_directive(noqa_line_for.resolve(parent))
             {
                 match &directive_line.directive {
-                    Directive::All(..) => {
+                    Directive::All(_) => {
                         continue;
                     }
-                    Directive::Codes(Codes { codes, .. }) => {
+                    Directive::Codes(Codes { codes, range: _ }) => {
                         if includes(diagnostic.kind.rule(), codes) {
                             continue;
                         }
@@ -306,10 +275,10 @@ fn add_noqa_inner(
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
             match &directive_line.directive {
-                Directive::All(..) => {
+                Directive::All(_) => {
                     continue;
                 }
-                Directive::Codes(Codes { codes, .. }) => {
+                Directive::Codes(Codes { codes, range: _ }) => {
                     let rule = diagnostic.kind.rule();
                     if !includes(rule, codes) {
                         matches_by_line
@@ -355,12 +324,10 @@ fn add_noqa_inner(
                 output.push_str(&line_ending);
                 count += 1;
             }
-            Some(Directive::All(..)) => {
+            Some(Directive::All(_)) => {
                 // Does not get inserted into the map.
             }
-            Some(Directive::Codes(Codes {
-                noqa_range, codes, ..
-            })) => {
+            Some(Directive::Codes(Codes { range, codes })) => {
                 // Reconstruct the line based on the preserved rule codes.
                 // This enables us to tally the number of edits.
                 let output_start = output.len();
@@ -368,7 +335,7 @@ fn add_noqa_inner(
                 // Add existing content.
                 output.push_str(
                     locator
-                        .slice(TextRange::new(offset, noqa_range.start()))
+                        .slice(TextRange::new(offset, range.start()))
                         .trim_end(),
                 );
 
@@ -433,12 +400,11 @@ impl<'a> NoqaDirectives<'a> {
     ) -> Self {
         let mut directives = Vec::new();
 
-        for comment_range in comment_ranges {
-            let line_range = locator.line_range(comment_range.start());
-            if let Some(directive) = Directive::try_extract(line_range, locator) {
+        for range in comment_ranges {
+            if let Some(directive) = Directive::try_extract(*range, locator) {
                 // noqa comments are guaranteed to be single line.
                 directives.push(NoqaDirectiveLine {
-                    range: line_range,
+                    range: locator.line_range(range.start()),
                     directive,
                     matches: Vec::new(),
                 });
