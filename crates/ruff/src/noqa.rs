@@ -25,99 +25,94 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     .unwrap()
 });
 
+/// A directive to ignore a set of rules for a given line of Python source code (e.g.,
+/// `# noqa: F401, F841`).
 #[derive(Debug)]
 pub(crate) enum Directive<'a> {
+    /// No `noqa` directive was found.
     None,
-    // (leading spaces, noqa_range, trailing_spaces)
-    All(TextSize, TextRange, TextSize),
-    // (leading spaces, start_offset, end_offset, codes, trailing_spaces)
-    Codes(TextSize, TextRange, Vec<&'a str>, TextSize),
+    /// The `noqa` directive ignores all rules (e.g., `# noqa`).
+    All(All),
+    /// The `noqa` directive ignores specific rules (e.g., `# noqa: F401, F841`).
+    Codes(Codes<'a>),
 }
 
-/// Extract the noqa `Directive` from a line of Python source code.
-pub(crate) fn extract_noqa_directive<'a>(range: TextRange, locator: &'a Locator) -> Directive<'a> {
-    let text = &locator.contents()[range];
-    match NOQA_LINE_REGEX.captures(text) {
-        Some(caps) => match (
-            caps.name("leading_spaces"),
-            caps.name("noqa"),
-            caps.name("codes"),
-            caps.name("trailing_spaces"),
-        ) {
-            (Some(leading_spaces), Some(noqa), Some(codes), Some(trailing_spaces)) => {
-                let codes = codes
-                    .as_str()
-                    .split(|c: char| c.is_whitespace() || c == ',')
-                    .map(str::trim)
-                    .filter(|code| !code.is_empty())
-                    .collect_vec();
-                let start = range.start() + TextSize::try_from(noqa.start()).unwrap();
-                if codes.is_empty() {
-                    #[allow(deprecated)]
-                    let line = locator.compute_line_index(start);
-                    warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+impl<'a> Directive<'a> {
+    /// Extract the noqa `Directive` from a line of Python source code.
+    pub(crate) fn extract(range: TextRange, locator: &'a Locator) -> Self {
+        let text = &locator.contents()[range];
+        match NOQA_LINE_REGEX.captures(text) {
+            Some(caps) => match (
+                caps.name("leading_spaces"),
+                caps.name("noqa"),
+                caps.name("codes"),
+                caps.name("trailing_spaces"),
+            ) {
+                (Some(leading_spaces), Some(noqa), Some(codes), Some(trailing_spaces)) => {
+                    let codes = codes
+                        .as_str()
+                        .split(|c: char| c.is_whitespace() || c == ',')
+                        .map(str::trim)
+                        .filter(|code| !code.is_empty())
+                        .collect_vec();
+                    let start = range.start() + TextSize::try_from(noqa.start()).unwrap();
+                    if codes.is_empty() {
+                        #[allow(deprecated)]
+                        let line = locator.compute_line_index(start);
+                        warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                    }
+
+                    let leading_space_len = leading_spaces.as_str().text_len();
+                    let noqa_range = TextRange::at(start, noqa.as_str().text_len());
+                    let trailing_space_len = trailing_spaces.as_str().text_len();
+
+                    Self::Codes(Codes {
+                        leading_space_len,
+                        noqa_range,
+                        trailing_space_len,
+                        codes,
+                    })
                 }
-                Directive::Codes(
-                    leading_spaces.as_str().text_len(),
-                    TextRange::at(start, noqa.as_str().text_len()),
-                    codes,
-                    trailing_spaces.as_str().text_len(),
-                )
-            }
-
-            (Some(leading_spaces), Some(noqa), None, Some(trailing_spaces)) => Directive::All(
-                leading_spaces.as_str().text_len(),
-                TextRange::at(
-                    range.start() + TextSize::try_from(noqa.start()).unwrap(),
-                    noqa.as_str().text_len(),
-                ),
-                trailing_spaces.as_str().text_len(),
-            ),
-            _ => Directive::None,
-        },
-        None => Directive::None,
-    }
-}
-
-enum ParsedExemption<'a> {
-    None,
-    All,
-    Codes(Vec<&'a str>),
-}
-
-/// Return a [`ParsedExemption`] for a given comment line.
-fn parse_file_exemption(line: &str) -> ParsedExemption {
-    let line = line.trim_whitespace_start();
-
-    if line.starts_with("# flake8: noqa")
-        || line.starts_with("# flake8: NOQA")
-        || line.starts_with("# flake8: NoQA")
-    {
-        return ParsedExemption::All;
-    }
-
-    if let Some(remainder) = line
-        .strip_prefix("# ruff: noqa")
-        .or_else(|| line.strip_prefix("# ruff: NOQA"))
-        .or_else(|| line.strip_prefix("# ruff: NoQA"))
-    {
-        if remainder.is_empty() {
-            return ParsedExemption::All;
-        } else if let Some(codes) = remainder.strip_prefix(':') {
-            let codes = codes
-                .split(|c: char| c.is_whitespace() || c == ',')
-                .map(str::trim)
-                .filter(|code| !code.is_empty())
-                .collect_vec();
-            if codes.is_empty() {
-                warn!("Expected rule codes on `noqa` directive: \"{line}\"");
-            }
-            return ParsedExemption::Codes(codes);
+                (Some(leading_spaces), Some(noqa), None, Some(trailing_spaces)) => {
+                    let leading_space_len = leading_spaces.as_str().text_len();
+                    let noqa_range = TextRange::at(
+                        range.start() + TextSize::try_from(noqa.start()).unwrap(),
+                        noqa.as_str().text_len(),
+                    );
+                    let trailing_space_len = trailing_spaces.as_str().text_len();
+                    Self::All(All {
+                        leading_space_len,
+                        noqa_range,
+                        trailing_space_len,
+                    })
+                }
+                _ => Self::None,
+            },
+            None => Self::None,
         }
-        warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
     }
+}
 
-    ParsedExemption::None
+#[derive(Debug)]
+pub(crate) struct All {
+    /// The length of the leading whitespace before the `noqa` directive.
+    pub(crate) leading_space_len: TextSize,
+    /// The range of the `noqa` directive.
+    pub(crate) noqa_range: TextRange,
+    /// The length of the trailing whitespace after the `noqa` directive.
+    pub(crate) trailing_space_len: TextSize,
+}
+
+#[derive(Debug)]
+pub(crate) struct Codes<'a> {
+    /// The length of the leading whitespace before the `noqa` directive.
+    pub(crate) leading_space_len: TextSize,
+    /// The range of the `noqa` directive.
+    pub(crate) noqa_range: TextRange,
+    /// The length of the trailing whitespace after the `noqa` directive.
+    pub(crate) trailing_space_len: TextSize,
+    /// The codes that are ignored by the `noqa` directive.
+    pub(crate) codes: Vec<&'a str>,
 }
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
@@ -138,47 +133,105 @@ pub(crate) fn rule_is_ignored(
 ) -> bool {
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
-    match extract_noqa_directive(line_range, locator) {
+    match Directive::extract(line_range, locator) {
         Directive::None => false,
         Directive::All(..) => true,
-        Directive::Codes(.., codes, _) => includes(code, &codes),
+        Directive::Codes(Codes { codes, .. }) => includes(code, &codes),
     }
 }
 
+/// The file-level exemptions extracted from a given Python file.
+#[derive(Debug)]
 pub(crate) enum FileExemption {
+    /// No file-level exemption.
     None,
+    /// The file is exempt from all rules.
     All,
+    /// The file is exempt from the given rules.
     Codes(Vec<NoqaCode>),
 }
 
-/// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
-/// globally ignored within the file.
-pub(crate) fn file_exemption(contents: &str, comment_ranges: &[TextRange]) -> FileExemption {
-    let mut exempt_codes: Vec<NoqaCode> = vec![];
+impl FileExemption {
+    /// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
+    /// globally ignored within the file.
+    pub(crate) fn extract(contents: &str, comment_ranges: &[TextRange]) -> Self {
+        let mut exempt_codes: Vec<NoqaCode> = vec![];
 
-    for range in comment_ranges {
-        match parse_file_exemption(&contents[*range]) {
-            ParsedExemption::All => {
-                return FileExemption::All;
+        for range in comment_ranges {
+            match ParsedFileExemption::extract(&contents[*range]) {
+                ParsedFileExemption::All => {
+                    return Self::All;
+                }
+                ParsedFileExemption::Codes(codes) => {
+                    exempt_codes.extend(codes.into_iter().filter_map(|code| {
+                        if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
+                        {
+                            Some(rule.noqa_code())
+                        } else {
+                            warn!("Invalid code provided to `# ruff: noqa`: {}", code);
+                            None
+                        }
+                    }));
+                }
+                ParsedFileExemption::None => {}
             }
-            ParsedExemption::Codes(codes) => {
-                exempt_codes.extend(codes.into_iter().filter_map(|code| {
-                    if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
-                        Some(rule.noqa_code())
-                    } else {
-                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
-                        None
-                    }
-                }));
-            }
-            ParsedExemption::None => {}
+        }
+
+        if exempt_codes.is_empty() {
+            Self::None
+        } else {
+            Self::Codes(exempt_codes)
         }
     }
+}
 
-    if exempt_codes.is_empty() {
-        FileExemption::None
-    } else {
-        FileExemption::Codes(exempt_codes)
+/// An individual file-level exemption (e.g., `# ruff: noqa` or `# ruff: noqa: F401, F841`). Like
+/// [`FileExemption`], but only for a single line, as opposed to an aggregated set of exemptions
+/// across a source file.
+#[derive(Debug)]
+enum ParsedFileExemption<'a> {
+    /// No file-level exemption was found.
+    None,
+    /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
+    All,
+    /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
+    Codes(Vec<&'a str>),
+}
+
+impl<'a> ParsedFileExemption<'a> {
+    /// Return a [`ParsedFileExemption`] for a given comment line.
+    fn extract(line: &'a str) -> Self {
+        let line = line.trim_whitespace_start();
+
+        if line.starts_with("# flake8: noqa")
+            || line.starts_with("# flake8: NOQA")
+            || line.starts_with("# flake8: NoQA")
+        {
+            return Self::All;
+        }
+
+        if let Some(remainder) = line
+            .strip_prefix("# ruff: noqa")
+            .or_else(|| line.strip_prefix("# ruff: NOQA"))
+            .or_else(|| line.strip_prefix("# ruff: NoQA"))
+        {
+            if remainder.is_empty() {
+                return Self::All;
+            } else if let Some(codes) = remainder.strip_prefix(':') {
+                let codes = codes
+                    .split(|c: char| c.is_whitespace() || c == ',')
+                    .map(str::trim)
+                    .filter(|code| !code.is_empty())
+                    .collect_vec();
+                if codes.is_empty() {
+                    warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                }
+                return Self::Codes(codes);
+            }
+            warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
+        }
+
+        Self::None
     }
 }
 
@@ -215,7 +268,7 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = file_exemption(locator.contents(), commented_ranges);
+    let exemption = FileExemption::extract(locator.contents(), commented_ranges);
     let directives = NoqaDirectives::from_commented_ranges(commented_ranges, locator);
 
     // Mark any non-ignored diagnostics.
@@ -243,7 +296,7 @@ fn add_noqa_inner(
                     Directive::All(..) => {
                         continue;
                     }
-                    Directive::Codes(.., codes, _) => {
+                    Directive::Codes(Codes { codes, .. }) => {
                         if includes(diagnostic.kind.rule(), codes) {
                             continue;
                         }
@@ -261,7 +314,7 @@ fn add_noqa_inner(
                 Directive::All(..) => {
                     continue;
                 }
-                Directive::Codes(.., codes, _) => {
+                Directive::Codes(Codes { codes, .. }) => {
                     let rule = diagnostic.kind.rule();
                     if !includes(rule, codes) {
                         matches_by_line
@@ -311,7 +364,9 @@ fn add_noqa_inner(
             Some(Directive::All(..)) => {
                 // Does not get inserted into the map.
             }
-            Some(Directive::Codes(_, noqa_range, existing, _)) => {
+            Some(Directive::Codes(Codes {
+                noqa_range, codes, ..
+            })) => {
                 // Reconstruct the line based on the preserved rule codes.
                 // This enables us to tally the number of edits.
                 let output_start = output.len();
@@ -331,8 +386,8 @@ fn add_noqa_inner(
                     &mut output,
                     rules
                         .iter()
-                        .map(|r| r.noqa_code().to_string())
-                        .chain(existing.iter().map(ToString::to_string))
+                        .map(|rule| rule.noqa_code().to_string())
+                        .chain(codes.iter().map(ToString::to_string))
                         .sorted_unstable(),
                 );
 
@@ -386,7 +441,7 @@ impl<'a> NoqaDirectives<'a> {
 
         for comment_range in comment_ranges {
             let line_range = locator.line_range(comment_range.start());
-            let directive = match extract_noqa_directive(line_range, locator) {
+            let directive = match Directive::extract(line_range, locator) {
                 Directive::None => {
                     continue;
                 }
