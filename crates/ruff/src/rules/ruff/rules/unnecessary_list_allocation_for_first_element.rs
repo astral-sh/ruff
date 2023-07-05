@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Constant, Expr};
@@ -65,65 +65,36 @@ pub(crate) fn unnecessary_list_allocation_for_first_element(
     checker: &mut Checker,
     call: &Expr,
     slice: &Expr,
+    subscript_range: &TextRange,
 ) {
-    let Some(ListComponents { func_range, subscript_range, iter_name }) = decompose_list_expr(checker, call, slice) else {
+    if !indexes_first_element(slice) {
+        return;
+    }
+    let Some(iter_name) = get_iterable_name(checker, call) else {
         return;
     };
 
-    let range = TextRange::at(func_range.start(), func_range.len() + subscript_range.len());
     let mut diagnostic = Diagnostic::new(
         UnnecessaryListAllocationForFirstElement::new(iter_name.to_string()),
-        range,
+        *subscript_range,
     );
 
     if checker.patch(diagnostic.kind.rule()) {
         let replacement = format!("next(iter({}))", iter_name);
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(replacement, range)));
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            replacement,
+            *subscript_range,
+        )));
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-/// Lighweight record struct that represents the components required for a list creation.
-struct ListComponents<'a> {
-    /// The [`TextRange`] for the actual list creation - either `list(x)` or `[i for i in x]`
-    func_range: &'a TextRange,
-    /// The subscript's (e.g., `[0]`) [`TextRange`]
-    subscript_range: &'a TextRange,
-    /// The name of the iterable - the "x" in `list(x)` and `[i for i in x]`
-    iter_name: &'a str,
-}
-
-impl<'a> ListComponents<'a> {
-    fn new(func_range: &'a TextRange, slice_range: &'a TextRange, arg_name: &'a str) -> Self {
-        Self {
-            func_range,
-            subscript_range: slice_range,
-            iter_name: arg_name,
-        }
-    }
-}
-
-// Decompose an [`Expr`] into the parts relevant for the diagnostic. If the [`Expr`] in question
-// isn't a list, return None
-fn decompose_list_expr<'a>(
-    checker: &mut Checker,
-    expr: &'a Expr,
-    slice: &'a Expr,
-) -> Option<ListComponents<'a>> {
-    // Ensure slice is at 0
-    let Expr::Constant(ast::ExprConstant{ value: Constant::Int(slice_index), range: slice_range, .. }) = slice else {
-        return None;
-    };
-    if slice_index.to_i64() != Some(0i64) {
-        return None;
-    }
-
+/// Fetch the name of the iterable from a list expression.
+fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a String> {
     // Decompose.
-    let list_components = match expr {
-        Expr::Call(ast::ExprCall {
-            func, range, args, ..
-        }) => {
+    let name = match expr {
+        Expr::Call(ast::ExprCall { func, args, .. }) => {
             let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
                 return None;
             };
@@ -135,13 +106,11 @@ fn decompose_list_expr<'a>(
                 return None;
             };
 
-            Some(ListComponents::new(range, slice_range, arg_name))
+            Some(arg_name)
         }
-        Expr::ListComp(ast::ExprListComp {
-            range, generators, ..
-        }) => {
-            // If there's more than 1 generator, we can't safely say that it's invalid. For
-            // example, `[(i, j) for i in x for j in y][0]`
+        Expr::ListComp(ast::ExprListComp { generators, .. }) => {
+            // If there's more than 1 generator, we can't safely say that it fits the diagnostic conditions -
+            // for example, `[i + j for i in x for j in y][0]`
             if generators.len() != 1 {
                 return None;
             }
@@ -151,10 +120,37 @@ fn decompose_list_expr<'a>(
                 return None;
             };
 
-            Some(ListComponents::new(range, slice_range, arg_name.as_str()))
+            Some(arg_name)
         }
         _ => None,
     };
 
-    list_components
+    name
+}
+
+fn indexes_first_element(expr: &Expr) -> bool {
+    match expr {
+        Expr::Constant(ast::ExprConstant { .. }) => get_index_value(expr) == Some(0i64),
+        Expr::Slice(ast::ExprSlice { lower, upper, .. }) => {
+            let lower_index = lower.as_ref().and_then(|l| get_index_value(&l));
+            let upper_index = upper.as_ref().and_then(|u| get_index_value(&u));
+
+            if lower_index.is_none() || lower_index == Some(0i64) {
+                return upper_index == Some(1i64);
+            } else {
+                return false;
+            }
+        }
+        _ => false,
+    }
+}
+
+fn get_index_value(expr: &Expr) -> Option<i64> {
+    match expr {
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(value),
+            ..
+        }) => value.to_i64(),
+        _ => None,
+    }
 }
