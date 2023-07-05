@@ -5,11 +5,13 @@ print()  # noqa # comment
 print()  # noqa  # comment
 print()  # noqa comment
 print()  # noqa  comment
+print()  #noqa
 print(a)  # noqa
 print(a)  # noqa # comment
 print(a)  # noqa  # comment
 print(a)  # noqa comment
 print(a)  # noqa  comment
+print(a)  #noqa comment
 
 # noqa: E501, F821
 # noqa: E501, F821 # comment
@@ -23,3 +25,4 @@ print(a)  # noqa: E501, F821 # comment
 print(a)  # noqa: E501, F821  # comment
 print(a)  # noqa: E501, F821 comment
 print(a)  # noqa: E501, F821  comment
+print(a)  #noqa: E501, F821  comment

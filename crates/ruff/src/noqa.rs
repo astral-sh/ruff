@@ -20,7 +20,7 @@ use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)",
+        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:#\s*noqa)(?::\s?(?P<codes>[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)",
     )
     .unwrap()
 });
@@ -526,6 +526,9 @@ mod tests {
         assert!(NOQA_LINE_REGEX.is_match("# noqa"));
         assert!(NOQA_LINE_REGEX.is_match("# NoQA"));
 
+        assert!(NOQA_LINE_REGEX.is_match("#noqa"));
+        assert!(NOQA_LINE_REGEX.is_match("#NoQA"));
+
         assert!(NOQA_LINE_REGEX.is_match("# noqa: F401"));
         assert!(NOQA_LINE_REGEX.is_match("# NoQA: F401"));
         assert!(NOQA_LINE_REGEX.is_match("# noqa: F401, E501"));
@@ -533,6 +536,10 @@ mod tests {
         assert!(NOQA_LINE_REGEX.is_match("# noqa:F401"));
         assert!(NOQA_LINE_REGEX.is_match("# NoQA:F401"));
         assert!(NOQA_LINE_REGEX.is_match("# noqa:F401, E501"));
+
+        assert!(NOQA_LINE_REGEX.is_match("#noqa:F401"));
+        assert!(NOQA_LINE_REGEX.is_match("#NoQA:F401"));
+        assert!(NOQA_LINE_REGEX.is_match("#noqa:F401, E501"));
     }
 
     #[test]
