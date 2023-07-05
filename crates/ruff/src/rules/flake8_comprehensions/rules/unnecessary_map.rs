@@ -1,8 +1,9 @@
-use ruff_text_size::TextRange;
+use std::fmt;
+
 use rustpython_parser::ast::{self, Expr, Ranged};
 
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -40,7 +41,7 @@ use super::helpers;
 ///   `{v: v ** 2 for v in values}`.
 #[violation]
 pub struct UnnecessaryMap {
-    obj_type: String,
+    object_type: ObjectType,
 }
 
 impl Violation for UnnecessaryMap {
@@ -48,21 +49,13 @@ impl Violation for UnnecessaryMap {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryMap { obj_type } = self;
-        if obj_type == "generator" {
-            format!("Unnecessary `map` usage (rewrite using a generator expression)")
-        } else {
-            format!("Unnecessary `map` usage (rewrite using a `{obj_type}` comprehension)")
-        }
+        let UnnecessaryMap { object_type } = self;
+        format!("Unnecessary `map` usage (rewrite using a {object_type})")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let UnnecessaryMap { obj_type } = self;
-        Some(if obj_type == "generator" {
-            format!("Replace `map` using a generator expression")
-        } else {
-            format!("Replace `map` using a `{obj_type}` comprehension")
-        })
+        let UnnecessaryMap { object_type } = self;
+        Some(format!("Replace `map` with a {object_type}"))
     }
 }
 
@@ -74,116 +67,109 @@ pub(crate) fn unnecessary_map(
     func: &Expr,
     args: &[Expr],
 ) {
-    fn create_diagnostic(kind: &str, location: TextRange) -> Diagnostic {
-        Diagnostic::new(
-            UnnecessaryMap {
-                obj_type: kind.to_string(),
-            },
-            location,
-        )
-    }
-
     let Some(id) = helpers::expr_name(func) else {
         return;
     };
-    match id {
-        "map" => {
-            if !checker.semantic().is_builtin(id) {
-                return;
-            }
 
-            // Exclude the parent if already matched by other arms
-            if let Some(Expr::Call(ast::ExprCall { func: f, .. })) = parent {
-                if let Some(id_parent) = helpers::expr_name(f) {
-                    if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
+    let object_type = match id {
+        "map" => ObjectType::Generator,
+        "list" => ObjectType::List,
+        "set" => ObjectType::Set,
+        "dict" => ObjectType::Dict,
+        _ => return,
+    };
+
+    if !checker.semantic().is_builtin(id) {
+        return;
+    }
+
+    match object_type {
+        ObjectType::Generator => {
+            // Exclude the parent if already matched by other arms.
+            if let Some(Expr::Call(ast::ExprCall { func, .. })) = parent {
+                if let Some(name) = helpers::expr_name(func) {
+                    if matches!(name, "list" | "set" | "dict") {
                         return;
                     }
                 }
             };
 
-            if args.len() == 2 && matches!(&args[0], Expr::Lambda(_)) {
-                let mut diagnostic = create_diagnostic("generator", expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.try_set_fix_from_edit(|| {
-                        fixes::fix_unnecessary_map(
-                            checker.locator,
-                            checker.stylist,
-                            expr,
-                            parent,
-                            "generator",
-                        )
-                    });
-                }
-                checker.diagnostics.push(diagnostic);
+            // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
+            if !matches!(args, [Expr::Lambda(_), _]) {
+                return;
             }
         }
-        "list" | "set" => {
-            if !checker.semantic().is_builtin(id) {
+        ObjectType::List | ObjectType::Set => {
+            // Only flag, e.g., `list(map(lambda x: x + 1, iterable))`.
+            let [Expr::Call(ast::ExprCall { func, args, .. })] = args else {
+                return;
+            };
+
+            if args.len() != 2 {
                 return;
             }
 
-            if let Some(Expr::Call(ast::ExprCall { func, args, .. })) = args.first() {
-                if args.len() != 2 {
-                    return;
-                }
-                let Some(argument) =
-                    helpers::first_argument_with_matching_function("map", func, args)
-                else {
-                    return;
-                };
-                if let Expr::Lambda(_) = argument {
-                    let mut diagnostic = create_diagnostic(id, expr.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
-                            fixes::fix_unnecessary_map(
-                                checker.locator,
-                                checker.stylist,
-                                expr,
-                                parent,
-                                id,
-                            )
-                        });
-                    }
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-        }
-        "dict" => {
-            if !checker.semantic().is_builtin(id) {
+            let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
+            else {
+                return;
+            };
+
+            if !argument.is_lambda_expr() {
                 return;
             }
+        }
+        ObjectType::Dict => {
+            // Only flag, e.g., `dict(map(lambda v: (v, v ** 2), values))`.
+            let [Expr::Call(ast::ExprCall { func, args, .. })] = args else {
+                return;
+            };
 
-            if args.len() == 1 {
-                if let Expr::Call(ast::ExprCall { func, args, .. }) = &args[0] {
-                    let Some(argument) =
-                        helpers::first_argument_with_matching_function("map", func, args)
-                    else {
-                        return;
-                    };
-                    if let Expr::Lambda(ast::ExprLambda { body, .. }) = argument {
-                        if matches!(body.as_ref(), Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. } ) if elts.len() == 2)
-                        {
-                            let mut diagnostic = create_diagnostic(id, expr.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                #[allow(deprecated)]
-                                diagnostic.try_set_fix_from_edit(|| {
-                                    fixes::fix_unnecessary_map(
-                                        checker.locator,
-                                        checker.stylist,
-                                        expr,
-                                        parent,
-                                        id,
-                                    )
-                                });
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                }
+            let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
+            else {
+                return;
+            };
+
+            let Expr::Lambda(ast::ExprLambda { body, .. }) = argument else {
+                return;
+            };
+
+            let (Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. })) =
+                body.as_ref()
+            else {
+                return;
+            };
+
+            if elts.len() != 2 {
+                return;
             }
         }
-        _ => (),
+    }
+
+    let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_map(checker.locator, checker.stylist, expr, parent, object_type)
+                .map(Fix::suggested)
+        });
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum ObjectType {
+    Generator,
+    List,
+    Set,
+    Dict,
+}
+
+impl fmt::Display for ObjectType {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ObjectType::Generator => fmt.write_str("generator expression"),
+            ObjectType::List => fmt.write_str("`list` comprehension"),
+            ObjectType::Set => fmt.write_str("`set` comprehension"),
+            ObjectType::Dict => fmt.write_str("`dict` comprehension"),
+        }
     }
 }
