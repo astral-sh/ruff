@@ -9,6 +9,7 @@ use log::warn;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
@@ -70,16 +71,34 @@ impl<'a> Directive<'a> {
 
 #[derive(Debug)]
 pub(crate) struct All {
+    range: TextRange,
+}
+
+impl Ranged for All {
     /// The range of the `noqa` directive.
-    pub(crate) range: TextRange,
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
-    /// The range of the `noqa` directive.
-    pub(crate) range: TextRange,
+    range: TextRange,
+    codes: Vec<&'a str>,
+}
+
+impl Codes<'_> {
     /// The codes that are ignored by the `noqa` directive.
-    pub(crate) codes: Vec<&'a str>,
+    pub(crate) fn codes(&self) -> &[&str] {
+        &self.codes
+    }
+}
+
+impl Ranged for Codes<'_> {
+    /// The range of the `noqa` directive.
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
