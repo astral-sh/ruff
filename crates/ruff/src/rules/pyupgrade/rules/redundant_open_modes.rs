@@ -3,7 +3,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, Result};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
+use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -168,15 +168,15 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
             fix_end = Some(range.end());
             break;
         }
-        if delete_first_arg && matches!(tok, Tok::Name { .. }) {
+        if delete_first_arg && tok.is_name() {
             fix_end = Some(range.start());
             break;
         }
-        if matches!(tok, Tok::Lpar) {
+        if tok.is_lpar() {
             is_first_arg = true;
             fix_start = Some(range.end());
         }
-        if matches!(tok, Tok::Comma) {
+        if tok.is_comma() {
             is_first_arg = false;
             if !delete_first_arg {
                 fix_start = Some(range.start());

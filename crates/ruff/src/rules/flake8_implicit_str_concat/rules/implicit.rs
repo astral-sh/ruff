@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -91,21 +90,20 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 /// ISC001, ISC002
 pub(crate) fn implicit(
+    diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     settings: &Settings,
     locator: &Locator,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
+) {
     for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
         .flatten()
         .filter(|(tok, _)| {
-            !matches!(tok, Tok::Comment(..))
-                && (settings.allow_multiline || !matches!(tok, Tok::NonLogicalNewline))
+            !tok.is_comment() && (settings.allow_multiline || !tok.is_non_logical_newline())
         })
         .tuple_windows()
     {
-        if matches!(a_tok, Tok::String { .. }) && matches!(b_tok, Tok::String { .. }) {
+        if a_tok.is_string() && b_tok.is_string() {
             if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
                 diagnostics.push(Diagnostic::new(
                     MultiLineImplicitStringConcatenation,
@@ -125,7 +123,6 @@ pub(crate) fn implicit(
             };
         };
     }
-    diagnostics
 }
 
 fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator) -> Option<Fix> {
