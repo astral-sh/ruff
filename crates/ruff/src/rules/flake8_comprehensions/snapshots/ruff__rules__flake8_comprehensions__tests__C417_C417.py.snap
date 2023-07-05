@@ -10,7 +10,7 @@ C417.py:3:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
 4 | map(lambda x: str(x), nums)
 5 | list(map(lambda x: x * 2, nums))
   |
-  = help: Replace `map` using a generator expression
+  = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
 1 1 | # Errors.
@@ -30,7 +30,7 @@ C417.py:4:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
 5 | list(map(lambda x: x * 2, nums))
 6 | set(map(lambda x: x % 2 == 0, nums))
   |
-  = help: Replace `map` using a generator expression
+  = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
 1 1 | # Errors.
@@ -51,7 +51,7 @@ C417.py:5:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehens
 6 | set(map(lambda x: x % 2 == 0, nums))
 7 | dict(map(lambda v: (v, v**2), nums))
   |
-  = help: Replace `map` using a `list` comprehension
+  = help: Replace `map` with a `list` comprehension
 
 ℹ Suggested fix
 2 2 | nums = [1, 2, 3]
@@ -72,7 +72,7 @@ C417.py:6:1: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehensi
 7 | dict(map(lambda v: (v, v**2), nums))
 8 | map(lambda: "const", nums)
   |
-  = help: Replace `map` using a `set` comprehension
+  = help: Replace `map` with a `set` comprehension
 
 ℹ Suggested fix
 3 3 | map(lambda x: x + 1, nums)
@@ -93,7 +93,7 @@ C417.py:7:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehens
 8 | map(lambda: "const", nums)
 9 | map(lambda _: 3.0, nums)
   |
-  = help: Replace `map` using a `dict` comprehension
+  = help: Replace `map` with a `dict` comprehension
 
 ℹ Suggested fix
 4 4 | map(lambda x: str(x), nums)
@@ -114,7 +114,7 @@ C417.py:8:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
  9 | map(lambda _: 3.0, nums)
 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
    |
-   = help: Replace `map` using a generator expression
+   = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
 5 5 | list(map(lambda x: x * 2, nums))
@@ -135,7 +135,7 @@ C417.py:9:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 11 | all(map(lambda v: isinstance(v, dict), nums))
    |
-   = help: Replace `map` using a generator expression
+   = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
 6  6  | set(map(lambda x: x % 2 == 0, nums))
@@ -156,7 +156,7 @@ C417.py:10:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expre
 11 | all(map(lambda v: isinstance(v, dict), nums))
 12 | filter(func, map(lambda v: v, nums))
    |
-   = help: Replace `map` using a generator expression
+   = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
 7  7  | dict(map(lambda v: (v, v**2), nums))
@@ -176,7 +176,7 @@ C417.py:11:5: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
 12 | filter(func, map(lambda v: v, nums))
    |
-   = help: Replace `map` using a generator expression
+   = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
 8  8  | map(lambda: "const", nums)
@@ -197,7 +197,7 @@ C417.py:12:14: C417 [*] Unnecessary `map` usage (rewrite using a generator expre
 13 | 
 14 | # When inside f-string, then the fix should be surrounded by whitespace
    |
-   = help: Replace `map` using a generator expression
+   = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
 9  9  | map(lambda _: 3.0, nums)
@@ -216,7 +216,7 @@ C417.py:15:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehens
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
 16 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
    |
-   = help: Replace `map` using a `set` comprehension
+   = help: Replace `map` with a `set` comprehension
 
 ℹ Suggested fix
 12 12 | filter(func, map(lambda v: v, nums))
@@ -237,7 +237,7 @@ C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehen
 17 | 
 18 | # Error, but unfixable.
    |
-   = help: Replace `map` using a `dict` comprehension
+   = help: Replace `map` with a `dict` comprehension
 
 ℹ Suggested fix
 13 13 | 
@@ -258,6 +258,21 @@ C417.py:21:1: C417 Unnecessary `map` usage (rewrite using a generator expression
 22 | 
 23 | # False negatives.
    |
-   = help: Replace `map` using a generator expression
+   = help: Replace `map` with a generator expression
+
+C417.py:36:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+35 | # False positive: need to preserve the late-binding of `x`.
+36 | callbacks = map(lambda x: lambda: x, range(4))
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+   |
+   = help: Replace `map` with a generator expression
+
+ℹ Suggested fix
+33 33 | list(map(func, nums))
+34 34 | 
+35 35 | # False positive: need to preserve the late-binding of `x`.
+36    |-callbacks = map(lambda x: lambda: x, range(4))
+   36 |+callbacks = (lambda: x for x in range(4))
 
 
