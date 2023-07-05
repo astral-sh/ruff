@@ -11,10 +11,12 @@ DTZ002.py:4:1: DTZ002 The use of `datetime.datetime.today()` is not allowed, use
   |
 
 DTZ002.py:9:1: DTZ002 The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead
-  |
-8 | # unqualified
-9 | datetime.today()
-  | ^^^^^^^^^^^^^^^^ DTZ002
-  |
+   |
+ 8 | # unqualified
+ 9 | datetime.today()
+   | ^^^^^^^^^^^^^^^^ DTZ002
+10 | 
+11 | # uses `astimezone` method
+   |
 
 

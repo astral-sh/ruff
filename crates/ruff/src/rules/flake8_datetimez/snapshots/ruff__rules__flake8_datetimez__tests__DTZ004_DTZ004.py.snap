@@ -11,10 +11,12 @@ DTZ004.py:4:1: DTZ004 The use of `datetime.datetime.utcfromtimestamp()` is not a
   |
 
 DTZ004.py:9:1: DTZ004 The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead
-  |
-8 | # unqualified
-9 | datetime.utcfromtimestamp(1234)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
-  |
+   |
+ 8 | # unqualified
+ 9 | datetime.utcfromtimestamp(1234)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
+10 | 
+11 | # uses `astimezone` method
+   |
 
 
