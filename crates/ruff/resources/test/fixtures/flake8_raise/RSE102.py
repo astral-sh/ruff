@@ -29,6 +29,26 @@ raise TypeError(
     # Hello, world!
 )
 
+# OK
 raise AssertionError
 
+# OK
 raise AttributeError("test message")
+
+
+def return_error():
+    return ValueError("Something")
+
+
+# OK
+raise return_error()
+
+
+class Class:
+    @staticmethod
+    def error():
+        return ValueError("Something")
+
+
+# OK
+raise Class.error()

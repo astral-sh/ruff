@@ -414,7 +414,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_read`], but
     /// doesn't add any read references to the resolved symbol.
-    pub fn lookup(&mut self, symbol: &str) -> Option<BindingId> {
+    pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
         if self.in_forward_reference() {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
@@ -454,6 +454,32 @@ impl<'a> SemanticModel<'a> {
         }
 
         None
+    }
+
+    /// Lookup a qualified attribute in the current scope.
+    ///
+    /// For example, given `["Class", "method"`], resolve the `BindingKind::ClassDefinition`
+    /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
+    /// `Class#method`.
+    pub fn lookup_attribute(&'a self, value: &'a Expr) -> Option<BindingId> {
+        let call_path = collect_call_path(value)?;
+
+        // Find the symbol in the current scope.
+        let (symbol, attribute) = call_path.split_first()?;
+        let mut binding_id = self.lookup_symbol(symbol)?;
+
+        // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
+        let mut tail = attribute;
+        while let Some((symbol, rest)) = tail.split_first() {
+            // Find the next symbol in the class scope.
+            let BindingKind::ClassDefinition(scope_id) = self.binding(binding_id).kind else {
+                return None;
+            };
+            binding_id = self.scopes[scope_id].get(symbol)?;
+            tail = rest;
+        }
+
+        Some(binding_id)
     }
 
     /// Given a `BindingId`, return the `BindingId` of the submodule import that it aliases.
