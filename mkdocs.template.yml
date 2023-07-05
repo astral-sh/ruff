@@ -5,6 +5,7 @@ theme:
   favicon: assets/ruff-favicon.png
   features:
     - navigation.instant
+    - navigation.instant.prefetch
     - navigation.tracking
     - content.code.annotate
     - toc.integrate
