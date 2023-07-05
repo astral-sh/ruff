@@ -148,6 +148,9 @@ pub struct Options {
     )]
     /// A list of modules to consider first-party, regardless of whether they
     /// can be identified as such via introspection of the local filesystem.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub known_first_party: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -158,6 +161,9 @@ pub struct Options {
     )]
     /// A list of modules to consider third-party, regardless of whether they
     /// can be identified as such via introspection of the local filesystem.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub known_third_party: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -168,6 +174,9 @@ pub struct Options {
     )]
     /// A list of modules to consider being a local folder.
     /// Generally, this is reserved for relative imports (`from . import module`).
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub known_local_folder: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -178,6 +187,9 @@ pub struct Options {
     )]
     /// A list of modules to consider standard-library, in addition to those
     /// known to Ruff in advance.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub extra_standard_library: Option<Vec<String>>,
     #[option(
         default = r#"furthest-to-closest"#,
