@@ -29,8 +29,6 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
 /// `# noqa: F401, F841`).
 #[derive(Debug)]
 pub(crate) enum Directive<'a> {
-    /// No `noqa` directive was found.
-    None,
     /// The `noqa` directive ignores all rules (e.g., `# noqa`).
     All(All),
     /// The `noqa` directive ignores specific rules (e.g., `# noqa: F401, F841`).
@@ -39,7 +37,7 @@ pub(crate) enum Directive<'a> {
 
 impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
-    pub(crate) fn extract(range: TextRange, locator: &'a Locator) -> Self {
+    pub(crate) fn try_extract(range: TextRange, locator: &'a Locator) -> Option<Self> {
         let text = &locator.contents()[range];
         match NOQA_LINE_REGEX.captures(text) {
             Some(caps) => match (
@@ -66,12 +64,12 @@ impl<'a> Directive<'a> {
                     let noqa_range = TextRange::at(start, noqa.as_str().text_len());
                     let trailing_space_len = trailing_spaces.as_str().text_len();
 
-                    Self::Codes(Codes {
+                    Some(Self::Codes(Codes {
                         leading_space_len,
                         noqa_range,
                         trailing_space_len,
                         codes,
-                    })
+                    }))
                 }
                 (Some(leading_spaces), Some(noqa), None, Some(trailing_spaces)) => {
                     let leading_space_len = leading_spaces.as_str().text_len();
@@ -80,15 +78,15 @@ impl<'a> Directive<'a> {
                         noqa.as_str().text_len(),
                     );
                     let trailing_space_len = trailing_spaces.as_str().text_len();
-                    Self::All(All {
+                    Some(Self::All(All {
                         leading_space_len,
                         noqa_range,
                         trailing_space_len,
-                    })
+                    }))
                 }
-                _ => Self::None,
+                _ => None,
             },
-            None => Self::None,
+            None => None,
         }
     }
 }
@@ -133,18 +131,16 @@ pub(crate) fn rule_is_ignored(
 ) -> bool {
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
-    match Directive::extract(line_range, locator) {
-        Directive::None => false,
-        Directive::All(..) => true,
-        Directive::Codes(Codes { codes, .. }) => includes(code, &codes),
+    match Directive::try_extract(line_range, locator) {
+        Some(Directive::All(..)) => true,
+        Some(Directive::Codes(Codes { codes, .. })) => includes(code, &codes),
+        None => false,
     }
 }
 
 /// The file-level exemptions extracted from a given Python file.
 #[derive(Debug)]
 pub(crate) enum FileExemption {
-    /// No file-level exemption.
-    None,
     /// The file is exempt from all rules.
     All,
     /// The file is exempt from the given rules.
@@ -154,13 +150,13 @@ pub(crate) enum FileExemption {
 impl FileExemption {
     /// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
     /// globally ignored within the file.
-    pub(crate) fn extract(contents: &str, comment_ranges: &[TextRange]) -> Self {
+    pub(crate) fn try_extract(contents: &str, comment_ranges: &[TextRange]) -> Option<Self> {
         let mut exempt_codes: Vec<NoqaCode> = vec![];
 
         for range in comment_ranges {
             match ParsedFileExemption::extract(&contents[*range]) {
                 ParsedFileExemption::All => {
-                    return Self::All;
+                    return Some(Self::All);
                 }
                 ParsedFileExemption::Codes(codes) => {
                     exempt_codes.extend(codes.into_iter().filter_map(|code| {
@@ -178,9 +174,9 @@ impl FileExemption {
         }
 
         if exempt_codes.is_empty() {
-            Self::None
+            None
         } else {
-            Self::Codes(exempt_codes)
+            Some(Self::Codes(exempt_codes))
         }
     }
 }
@@ -268,23 +264,23 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::extract(locator.contents(), commented_ranges);
+    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges);
     let directives = NoqaDirectives::from_commented_ranges(commented_ranges, locator);
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
         match &exemption {
-            FileExemption::All => {
+            Some(FileExemption::All) => {
                 // If the file is exempted, don't add any noqa directives.
                 continue;
             }
-            FileExemption::Codes(codes) => {
+            Some(FileExemption::Codes(codes)) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
                 if codes.contains(&diagnostic.kind.rule().noqa_code()) {
                     continue;
                 }
             }
-            FileExemption::None => {}
+            None => {}
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
@@ -301,14 +297,13 @@ fn add_noqa_inner(
                             continue;
                         }
                     }
-                    Directive::None => {}
                 }
             }
         }
 
         let noqa_offset = noqa_line_for.resolve(diagnostic.start());
 
-        // Or ignored by the directive itself
+        // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
             match &directive_line.directive {
                 Directive::All(..) => {
@@ -327,7 +322,6 @@ fn add_noqa_inner(
                     }
                     continue;
                 }
-                Directive::None => {}
             }
         }
 
@@ -349,7 +343,7 @@ fn add_noqa_inner(
         let line = locator.full_line(offset);
 
         match directive {
-            None | Some(Directive::None) => {
+            None => {
                 // Add existing content.
                 output.push_str(line.trim_end());
 
@@ -441,19 +435,14 @@ impl<'a> NoqaDirectives<'a> {
 
         for comment_range in comment_ranges {
             let line_range = locator.line_range(comment_range.start());
-            let directive = match Directive::extract(line_range, locator) {
-                Directive::None => {
-                    continue;
-                }
-                directive @ (Directive::All(..) | Directive::Codes(..)) => directive,
+            if let Some(directive) = Directive::try_extract(line_range, locator) {
+                // noqa comments are guaranteed to be single line.
+                directives.push(NoqaDirectiveLine {
+                    range: line_range,
+                    directive,
+                    matches: Vec::new(),
+                });
             };
-
-            // noqa comments are guaranteed to be single line.
-            directives.push(NoqaDirectiveLine {
-                range: line_range,
-                directive,
-                matches: Vec::new(),
-            });
         }
 
         // Extend a mapping at the end of the file to also include the EOF token.
@@ -582,7 +571,7 @@ mod tests {
         let source = "# noqa";
         let range = TextRange::new(TextSize::from(0), TextSize::from(6));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -590,7 +579,7 @@ mod tests {
         let source = "# noqa: F401";
         let range = TextRange::new(TextSize::from(0), TextSize::from(12));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -598,7 +587,7 @@ mod tests {
         let source = "# noqa: F401, F841";
         let range = TextRange::new(TextSize::from(0), TextSize::from(18));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -606,7 +595,7 @@ mod tests {
         let source = "# NOQA";
         let range = TextRange::new(TextSize::from(0), TextSize::from(6));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -614,7 +603,7 @@ mod tests {
         let source = "# NOQA: F401";
         let range = TextRange::new(TextSize::from(0), TextSize::from(12));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -622,7 +611,7 @@ mod tests {
         let source = "# NOQA: F401, F841";
         let range = TextRange::new(TextSize::from(0), TextSize::from(18));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -630,7 +619,7 @@ mod tests {
         let source = "#   # noqa: F401";
         let range = TextRange::new(TextSize::from(0), TextSize::from(16));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -638,7 +627,7 @@ mod tests {
         let source = "# noqa: F401   #";
         let range = TextRange::new(TextSize::from(0), TextSize::from(16));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -646,7 +635,7 @@ mod tests {
         let source = "#noqa";
         let range = TextRange::new(TextSize::from(0), TextSize::from(5));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -654,7 +643,7 @@ mod tests {
         let source = "#noqa:F401";
         let range = TextRange::new(TextSize::from(0), TextSize::from(10));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -662,7 +651,7 @@ mod tests {
         let source = "#noqa:F401,F841";
         let range = TextRange::new(TextSize::from(0), TextSize::from(15));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -670,7 +659,7 @@ mod tests {
         let source = "#  noqa";
         let range = TextRange::new(TextSize::from(0), TextSize::from(7));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -678,7 +667,7 @@ mod tests {
         let source = "#  noqa: F401";
         let range = TextRange::new(TextSize::from(0), TextSize::from(13));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
@@ -686,7 +675,7 @@ mod tests {
         let source = "#  noqa: F401,  F841";
         let range = TextRange::new(TextSize::from(0), TextSize::from(20));
         let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(range, &locator));
     }
 
     #[test]
