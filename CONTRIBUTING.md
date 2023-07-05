@@ -256,7 +256,7 @@ To preview any changes to the documentation locally:
 1. Run the development server with:
 
    ```shell
-   mkdocs serve
+   mkdocs serve -f mkdocs.generated.yml
    ```
 
 The documentation should then be available locally at

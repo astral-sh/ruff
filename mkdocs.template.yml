@@ -23,7 +23,7 @@ theme:
       toggle:
         icon: material/weather-night
         name: Switch to light mode
-  custom_dir: .overrides
+  custom_dir: docs/.overrides
 repo_url: https://github.com/astral-sh/ruff
 repo_name: ruff
 site_author: charliermarsh
@@ -50,3 +50,6 @@ plugins:
   - search
 extra_css:
   - stylesheets/extra.css
+extra:
+  analytics:
+    provider: fathom
