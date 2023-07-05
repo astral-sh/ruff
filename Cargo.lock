@@ -746,7 +746,7 @@ dependencies = [
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.275"
+version = "0.0.277"
 dependencies = [
  "anyhow",
  "clap",
@@ -1829,7 +1829,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.275"
+version = "0.0.277"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1865,6 +1865,7 @@ dependencies = [
  "result-like",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_index",
  "ruff_macros",
  "ruff_python_ast",
  "ruff_python_semantic",
@@ -1926,7 +1927,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.275"
+version = "0.0.277"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",

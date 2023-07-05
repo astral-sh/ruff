@@ -51,24 +51,14 @@ impl Violation for DjangoNullableModelStringField {
     }
 }
 
-const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
-    "CharField",
-    "TextField",
-    "SlugField",
-    "EmailField",
-    "FilePathField",
-    "URLField",
-];
-
 /// DJ001
-pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
-    let mut errors = Vec::new();
+pub(crate) fn nullable_model_string_field(checker: &mut Checker, body: &[Stmt]) {
     for statement in body.iter() {
         let Stmt::Assign(ast::StmtAssign { value, .. }) = statement else {
             continue;
         };
         if let Some(field_name) = is_nullable_field(checker, value) {
-            errors.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
                 },
@@ -76,7 +66,6 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> V
             ));
         }
     }
-    errors
 }
 
 fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
@@ -88,7 +77,10 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
         return None;
     };
 
-    if !NOT_NULL_TRUE_FIELDS.contains(&valid_field_name) {
+    if !matches!(
+        valid_field_name,
+        "CharField" | "TextField" | "SlugField" | "EmailField" | "FilePathField" | "URLField"
+    ) {
         return None;
     }
 

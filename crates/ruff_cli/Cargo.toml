@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.275"
+version = "0.0.277"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }

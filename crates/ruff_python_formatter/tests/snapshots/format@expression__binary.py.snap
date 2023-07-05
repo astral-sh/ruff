@@ -299,9 +299,9 @@ not (aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_se
 [
     a
     + [
-        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ]
-    in c,
+    in c
 ]
 
 

@@ -120,12 +120,6 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,4 @@
--import random
-+NOT_YET_IMPLEMENTED_StmtImport
- 
- 
- def foo1():
 @@ -27,16 +27,16 @@
  
  
@@ -151,7 +145,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImport
+import random
 
 
 def foo1():

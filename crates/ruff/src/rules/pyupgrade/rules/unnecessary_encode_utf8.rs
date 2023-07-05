@@ -191,7 +191,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                func.start(),
+                                func.end(),
                                 kwarg.range(),
                                 args,
                                 kwargs,
@@ -213,7 +213,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                func.start(),
+                                func.end(),
                                 arg.range(),
                                 args,
                                 kwargs,
@@ -242,7 +242,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                func.start(),
+                                func.end(),
                                 kwarg.range(),
                                 args,
                                 kwargs,
@@ -264,7 +264,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                func.start(),
+                                func.end(),
                                 arg.range(),
                                 args,
                                 kwargs,

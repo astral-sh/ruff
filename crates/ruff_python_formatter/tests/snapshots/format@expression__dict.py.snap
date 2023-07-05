@@ -69,7 +69,7 @@ a = {
 # before
 {
     # open
-    key: value,  # key  # colon  # value
+    key: value  # key  # colon  # value
 }  # close
 # after
 
@@ -82,7 +82,7 @@ a = {
 }
 
 {
-    **b,  # middle with single item
+    **b  # middle with single item
 }
 
 {

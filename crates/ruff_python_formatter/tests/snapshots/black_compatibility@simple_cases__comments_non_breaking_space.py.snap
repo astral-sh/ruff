@@ -31,18 +31,7 @@ def function(a:int=42):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,4 @@
--from .config import (
--    ConfigTypeAttributes,
--    Int,
--    Path,  # String,
--    # DEFAULT_TYPE_ATTRIBUTES,
--)
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
- result = 1  # A simple comment
- result = (1,)  # Another one
-@@ -14,9 +9,9 @@
+@@ -14,9 +14,9 @@
  
  
  def function(a: int = 42):
@@ -60,7 +49,12 @@ def function(a:int=42):
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from .config import (
+    ConfigTypeAttributes,
+    Int,
+    Path,  # String,
+    # DEFAULT_TYPE_ATTRIBUTES,
+)
 
 result = 1  # A simple comment
 result = (1,)  # Another one
