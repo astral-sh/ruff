@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt::{Display, Write};
 use std::fs;
+use std::ops::Add;
 use std::path::Path;
 
 use anyhow::Result;
@@ -36,8 +37,7 @@ pub(crate) enum Directive<'a> {
 
 impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
-    pub(crate) fn try_extract(range: TextRange, locator: &'a Locator) -> Option<Self> {
-        let text = &locator.contents()[range];
+    pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Option<Self> {
         let caps = NOQA_LINE_REGEX.captures(text)?;
         match (caps.name("noqa"), caps.name("codes")) {
             (Some(noqa), Some(codes)) => {
@@ -47,19 +47,18 @@ impl<'a> Directive<'a> {
                     .map(str::trim)
                     .filter(|code| !code.is_empty())
                     .collect_vec();
-                let start = range.start() + TextSize::try_from(noqa.start()).unwrap();
                 if codes.is_empty() {
-                    #[allow(deprecated)]
-                    let line = locator.compute_line_index(start);
-                    warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                    warn!("Expected rule codes on `noqa` directive: \"{text}\"");
                 }
-
-                let range = TextRange::at(start, noqa.as_str().text_len());
+                let range = TextRange::at(
+                    TextSize::try_from(noqa.start()).unwrap().add(offset),
+                    noqa.as_str().text_len(),
+                );
                 Some(Self::Codes(Codes { range, codes }))
             }
             (Some(noqa), None) => {
                 let range = TextRange::at(
-                    range.start() + TextSize::try_from(noqa.start()).unwrap(),
+                    TextSize::try_from(noqa.start()).unwrap().add(offset),
                     noqa.as_str().text_len(),
                 );
                 Some(Self::All(All { range }))
@@ -119,7 +118,7 @@ pub(crate) fn rule_is_ignored(
 ) -> bool {
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
-    match Directive::try_extract(line_range, locator) {
+    match Directive::try_extract(locator.slice(line_range), line_range.start()) {
         Some(Directive::All(_)) => true,
         Some(Directive::Codes(Codes { codes, range: _ })) => includes(code, &codes),
         None => false,
@@ -401,9 +400,11 @@ fn push_codes<I: Display>(str: &mut String, codes: impl Iterator<Item = I>) {
 
 #[derive(Debug)]
 pub(crate) struct NoqaDirectiveLine<'a> {
-    // The range of the text line for which the noqa directive applies.
+    /// The range of the text line for which the noqa directive applies.
     pub(crate) range: TextRange,
+    /// The noqa directive.
     pub(crate) directive: Directive<'a>,
+    /// The codes that are ignored by the directive.
     pub(crate) matches: Vec<NoqaCode>,
 }
 
@@ -420,7 +421,7 @@ impl<'a> NoqaDirectives<'a> {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            if let Some(directive) = Directive::try_extract(*range, locator) {
+            if let Some(directive) = Directive::try_extract(locator.slice(*range), range.start()) {
                 // noqa comments are guaranteed to be single line.
                 directives.push(NoqaDirectiveLine {
                     range: locator.line_range(range.start()),
@@ -554,113 +555,85 @@ mod tests {
     #[test]
     fn noqa_all() {
         let source = "# noqa";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(6));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code() {
         let source = "# noqa: F401";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(12));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes() {
         let source = "# noqa: F401, F841";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(18));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_case_insensitive() {
         let source = "# NOQA";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(6));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_case_insensitive() {
         let source = "# NOQA: F401";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(12));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_case_insensitive() {
         let source = "# NOQA: F401, F841";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(18));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_leading_space() {
         let source = "#   # noqa: F401";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(16));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_trailing_space() {
         let source = "# noqa: F401   #";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(16));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_no_space() {
         let source = "#noqa";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(5));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_no_space() {
         let source = "#noqa:F401";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(10));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_no_space() {
         let source = "#noqa:F401,F841";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(15));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_multi_space() {
         let source = "#  noqa";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(7));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_multi_space() {
         let source = "#  noqa: F401";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(13));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_multi_space() {
         let source = "#  noqa: F401,  F841";
-        let range = TextRange::new(TextSize::from(0), TextSize::from(20));
-        let locator = Locator::new(source);
-        assert_debug_snapshot!(Directive::try_extract(range, &locator));
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
     #[test]
