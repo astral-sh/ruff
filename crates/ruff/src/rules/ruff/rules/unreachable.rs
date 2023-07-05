@@ -484,17 +484,34 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     self.unconditional_next_block(after)
                 }
                 // Statements that (can) divert the control flow.
-                Stmt::If(stmt) => {
+                Stmt::If(stmt_if) => {
+                    let mut orelse = None;
+                    for clause in stmt_if.elif_else_clauses.iter().rev() {
+                        let next_after_block =
+                            self.maybe_next_block_index(after, || needs_next_block(&clause.body));
+                        let next = self.append_blocks_if_not_empty(&clause.body, next_after_block);
+                        if let Some(test) = &clause.test {
+                            let next = NextBlock::If {
+                                condition: Condition::Test(test),
+                                next,
+                                orelse: orelse.unwrap_or(BlockIndex::MAX),
+                            };
+                            let stmts = std::slice::from_ref(stmt);
+                            let block = BasicBlock { stmts, next };
+                            orelse = Some(self.blocks.push(block));
+                        } else {
+                            orelse = Some(
+                                self.append_blocks_if_not_empty(&clause.body, next_after_block),
+                            );
+                        }
+                    }
                     let next_after_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt.body));
-                    let orelse_after_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt.orelse));
-                    let next = self.append_blocks_if_not_empty(&stmt.body, next_after_block);
-                    let orelse = self.append_blocks_if_not_empty(&stmt.orelse, orelse_after_block);
+                        self.maybe_next_block_index(after, || needs_next_block(&stmt_if.body));
+                    let next = self.append_blocks_if_not_empty(&stmt_if.body, next_after_block);
                     NextBlock::If {
-                        condition: Condition::Test(&stmt.test),
+                        condition: Condition::Test(&stmt_if.test),
                         next,
-                        orelse,
+                        orelse: orelse.unwrap_or(BlockIndex::MAX),
                     }
                 }
                 Stmt::While(StmtWhile {
@@ -867,7 +884,7 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
 
     match last {
         Stmt::Return(_) | Stmt::Raise(_) => false,
-        Stmt::If(stmt) => needs_next_block(&stmt.body) || needs_next_block(&stmt.orelse),
+        Stmt::If(stmt) => needs_next_block(&stmt.body) || stmt.elif_else_clauses.iter().any(|clause| needs_next_block(&clause.body)),
         Stmt::FunctionDef(_)
         | Stmt::AsyncFunctionDef(_)
         | Stmt::Import(_)
