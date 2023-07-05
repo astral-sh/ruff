@@ -22,7 +22,7 @@ pub(crate) fn check_noqa(
     settings: &Settings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
-    let exemption = FileExemption::extract(locator.contents(), comment_ranges);
+    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges);
 
     // Extract all `noqa` directives.
     let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, locator);
@@ -37,19 +37,19 @@ pub(crate) fn check_noqa(
         }
 
         match &exemption {
-            FileExemption::All => {
+            Some(FileExemption::All) => {
                 // If the file is exempted, ignore all diagnostics.
                 ignored_diagnostics.push(index);
                 continue;
             }
-            FileExemption::Codes(codes) => {
+            Some(FileExemption::Codes(codes)) => {
                 // If the diagnostic is ignored by a global exemption, ignore it.
                 if codes.contains(&diagnostic.kind.rule().noqa_code()) {
                     ignored_diagnostics.push(index);
                     continue;
                 }
             }
-            FileExemption::None => {}
+            None => {}
         }
 
         let noqa_offsets = diagnostic
@@ -81,7 +81,6 @@ pub(crate) fn check_noqa(
                             false
                         }
                     }
-                    Directive::None => unreachable!(),
                 };
 
                 if suppressed {
@@ -197,7 +196,6 @@ pub(crate) fn check_noqa(
                         diagnostics.push(diagnostic);
                     }
                 }
-                Directive::None => {}
             }
         }
     }
