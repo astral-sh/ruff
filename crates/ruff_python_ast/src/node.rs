@@ -4281,6 +4281,8 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::StmtFunctionDef(_)
                 | AnyNodeRef::StmtAsyncFunctionDef(_)
                 | AnyNodeRef::StmtClassDef(_)
+                | AnyNodeRef::StmtTry(_)
+                | AnyNodeRef::StmtTryStar(_)
         )
     }
 }
