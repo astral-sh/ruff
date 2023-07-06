@@ -141,11 +141,11 @@ impl FileExemption {
         let mut exempt_codes: Vec<NoqaCode> = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::extract(&contents[*range]) {
-                ParsedFileExemption::All => {
+            match ParsedFileExemption::try_extract(&contents[*range]) {
+                Some(ParsedFileExemption::All) => {
                     return Some(Self::All);
                 }
-                ParsedFileExemption::Codes(codes) => {
+                Some(ParsedFileExemption::Codes(codes)) => {
                     exempt_codes.extend(codes.into_iter().filter_map(|code| {
                         if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
                         {
@@ -156,7 +156,7 @@ impl FileExemption {
                         }
                     }));
                 }
-                ParsedFileExemption::None => {}
+                None => {}
             }
         }
 
@@ -173,8 +173,6 @@ impl FileExemption {
 /// across a source file.
 #[derive(Debug)]
 enum ParsedFileExemption<'a> {
-    /// No file-level exemption was found.
-    None,
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
@@ -183,14 +181,14 @@ enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn extract(line: &'a str) -> Self {
+    fn try_extract(line: &'a str) -> Option<Self> {
         let line = line.trim_whitespace_start();
 
         if line.starts_with("# flake8: noqa")
             || line.starts_with("# flake8: NOQA")
             || line.starts_with("# flake8: NoQA")
         {
-            return Self::All;
+            return Some(Self::All);
         }
 
         if let Some(remainder) = line
@@ -199,7 +197,7 @@ impl<'a> ParsedFileExemption<'a> {
             .or_else(|| line.strip_prefix("# ruff: NoQA"))
         {
             if remainder.is_empty() {
-                return Self::All;
+                return Some(Self::All);
             } else if let Some(codes) = remainder.strip_prefix(':') {
                 let codes = codes
                     .split(|c: char| c.is_whitespace() || c == ',')
@@ -209,12 +207,12 @@ impl<'a> ParsedFileExemption<'a> {
                 if codes.is_empty() {
                     warn!("Expected rule codes on `noqa` directive: \"{line}\"");
                 }
-                return Self::Codes(codes);
+                return Some(Self::Codes(codes));
             }
             warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
         }
 
-        Self::None
+        None
     }
 }
 
