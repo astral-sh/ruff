@@ -3148,6 +3148,10 @@ where
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
                     }
+
+                    if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                    }
                 }
             }
             Expr::UnaryOp(ast::ExprUnaryOp {
