@@ -90,12 +90,12 @@ pub(crate) fn unnecessary_list_allocation_for_first_element(
     checker.diagnostics.push(diagnostic);
 }
 
-/// Fetch the name of the iterable from a list expression.
-fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a String> {
-    // Decompose.
-    let name = match expr {
+/// Fetch the name of the iterable from a list expression if the expression returns an unmodified list
+/// which can be sliced into.
+fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a str> {
+    match expr {
         Expr::Call(ast::ExprCall { func, args, .. }) => {
-            let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+            let Some(id) = get_name_id(func.as_ref()) else {
                 return None;
             };
             if !(id == "list" && checker.semantic().is_builtin("list")) {
@@ -106,51 +106,81 @@ fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a St
                 return None;
             };
 
-            Some(arg_name)
+            Some(arg_name.as_str())
         }
-        Expr::ListComp(ast::ExprListComp { generators, .. }) => {
+        Expr::ListComp(ast::ExprListComp {
+            elt, generators, ..
+        }) => {
+            // If the `elt` field is anything other than a [`Expr::Name`], we can't be sure that it
+            // doesn't modify the elements of the underlying iterator - for example, `[i + 1 for i in x][0]`.
+            if !matches!(elt.as_ref(), Expr::Name(ast::ExprName { .. })) {
+                return None;
+            }
+
             // If there's more than 1 generator, we can't safely say that it fits the diagnostic conditions -
-            // for example, `[i + j for i in x for j in y][0]`
+            // for example, `[(i, j) for i in x for j in y][0]`.
             if generators.len() != 1 {
                 return None;
             }
 
             let generator = &generators[0];
-            let Expr::Name(ast::ExprName { id: arg_name, .. }) = &generator.iter else {
+            let Some(arg_name) = get_name_id(&generator.iter) else {
                 return None;
             };
-
             Some(arg_name)
         }
         _ => None,
-    };
-
-    name
+    }
 }
 
+/// Check that the slice [`Expr`] is functionally equivalent to slicing into the first element.
 fn indexes_first_element(expr: &Expr) -> bool {
     match expr {
-        Expr::Constant(ast::ExprConstant { .. }) => get_index_value(expr) == Some(0i64),
-        Expr::Slice(ast::ExprSlice { lower, upper, .. }) => {
-            let lower_index = lower.as_ref().and_then(|l| get_index_value(&l));
-            let upper_index = upper.as_ref().and_then(|u| get_index_value(&u));
+        Expr::Constant(ast::ExprConstant { .. }) => {
+            get_effective_index(expr).unwrap_or(0i64) == 0i64
+        }
+        Expr::Slice(ast::ExprSlice {
+            step: step_value,
+            lower: lower_index,
+            upper: upper_index,
+            ..
+        }) => {
+            let lower = lower_index
+                .as_ref()
+                .and_then(|l| get_effective_index(l))
+                .unwrap_or(0i64);
+            let upper = upper_index
+                .as_ref()
+                .and_then(|u| get_effective_index(u))
+                .unwrap_or(i64::MAX);
+            let step = step_value
+                .as_ref()
+                .and_then(|s| get_effective_index(s))
+                .unwrap_or(1i64);
 
-            if lower_index.is_none() || lower_index == Some(0i64) {
-                return upper_index == Some(1i64);
-            } else {
-                return false;
+            if lower == 0i64 && upper <= step {
+                return true;
             }
+
+            false
         }
         _ => false,
     }
 }
 
-fn get_index_value(expr: &Expr) -> Option<i64> {
+fn get_effective_index(expr: &Expr) -> Option<i64> {
     match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
         }) => value.to_i64(),
+        _ => None,
+    }
+}
+
+fn get_name_id(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Name(ast::ExprName { id, .. }) => Some(id),
         _ => None,
     }
 }
