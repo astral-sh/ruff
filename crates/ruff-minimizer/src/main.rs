@@ -57,6 +57,9 @@ fn make_line_candidates(input: &str) -> (usize, Box<dyn Iterator<Item = String> 
         if removed_line < lines.len() {
             let mut result = String::new();
             result.push_str(&lines[..removed_line].join("\n"));
+            if removed_line > 0 {
+                result.push_str("\n");
+            }
             result.push_str(&lines[removed_line + 1..].join("\n"));
             removed_line += 1;
             Some(result)
