@@ -10,7 +10,7 @@ use crate::registry::AsRule;
 /// Ensures that instead of creating a new list and indexing into it to find the first element of a
 /// collection (e.g., `list(...)[0]`), Python iterators are used.
 ///
-/// Why is this bad?
+/// ## Why is this bad?
 /// Creating a new list of great size can involve significant memory/speed concerns. Python's `next(iter(...))`
 /// pattern can be used in lieu of creating a new list. This pattern will lazily fetch the first
 /// element of the collection, avoiding the memory overhead involved with new list allocation.
