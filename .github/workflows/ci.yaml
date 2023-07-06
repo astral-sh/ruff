@@ -277,5 +277,9 @@ jobs:
         run: python scripts/generate_mkdocs.py
       - name: "Check docs formatting"
         run: python scripts/check_docs_formatted.py
-      - name: "Build docs"
+      - name: "Build Insiders docs"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: mkdocs build --strict -f mkdocs.insiders.yml
+      - name: "Build docs"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
+        run: mkdocs build --strict -f mkdocs.generated.yml
