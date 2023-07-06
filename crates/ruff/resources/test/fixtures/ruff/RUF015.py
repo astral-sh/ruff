@@ -26,8 +26,10 @@ list(x)[::]
 [i for i in x][::2]
 [i for i in x][::]
 
-# Fine - modifies the first element
+# Fine - doesn't mirror the underlying list
 [i + 1 for i in x][0]
+[i for i in x if i > 5][0]
+[(i, i + 1) for i in x][0]
 
 y = range(10)
 # Fine - multiple generators

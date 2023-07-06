@@ -128,6 +128,11 @@ fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a st
             }
 
             let generator = &generators[0];
+            // Ignore if there's an `if` statement in the comprehension, since it filters the list.
+            if !generator.ifs.is_empty() {
+                return None;
+            }
+
             let Some(arg_name) = get_name_id(&generator.iter) else {
                 return None;
             };
