@@ -80,4 +80,4 @@ field23: typing_extensions.Literal[1] | typing_extensions.Literal[2]  # Error
 field24: typing.Union[Literal[1], typing.Union[Literal[2], str]]  # Error
 
 # Should emit in cases with mixed `typing.Union` and `|`
-field24: typing.Union[Literal[1], Literal[2] | str]  # Error
+field25: typing.Union[Literal[1], Literal[2] | str]  # Error
