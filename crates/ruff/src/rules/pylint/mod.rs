@@ -85,6 +85,8 @@ mod tests {
         Path::new("too_many_return_statements.py")
     )]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"))]
+    #[test_case(Rule::TypeBivariance, Path::new("type_bivariance.py"))]
+    #[test_case(Rule::TypeParamNameMismatch, Path::new("type_param_name_mismatch.py"))]
     #[test_case(
         Rule::UnexpectedSpecialMethodSignature,
         Path::new("unexpected_special_method_signature.py")

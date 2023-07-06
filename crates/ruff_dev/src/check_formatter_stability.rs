@@ -4,8 +4,9 @@
 //! checking entire repositories.
 
 use std::fmt::{Display, Formatter};
-use std::io::stdout;
+use std::fs::File;
 use std::io::Write;
+use std::io::{stdout, BufWriter};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -49,6 +50,9 @@ pub(crate) struct Args {
     /// Checks each project inside a directory
     #[arg(long)]
     pub(crate) multi_project: bool,
+    /// Write all errors to this file in addition to stdout
+    #[arg(long)]
+    pub(crate) error_file: Option<PathBuf>,
 }
 
 /// Generate ourself a `try_parse_from` impl for `CheckArgs`. This is a strange way to use clap but
@@ -69,6 +73,12 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         #[allow(clippy::print_stdout)]
         {
             print!("{}", result.display(args.format));
+            println!(
+                "Found {} stability errors in {} files in {:.2}s",
+                result.diagnostics.len(),
+                result.file_count,
+                result.duration.as_secs_f32(),
+            );
         }
 
         result.is_success()
@@ -114,6 +124,7 @@ fn check_multi_project(args: &Args) -> bool {
 
                     match check_repo(&Args {
                         files: vec![path.clone()],
+                        error_file: args.error_file.clone(),
                         ..*args
                     }) {
                         Ok(result) => sender.send(Message::Finished { result, path }),
@@ -126,6 +137,9 @@ fn check_multi_project(args: &Args) -> bool {
 
         scope.spawn(|_| {
             let mut stdout = stdout().lock();
+            let mut error_file = args.error_file.as_ref().map(|error_file| {
+                BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
+            });
 
             for message in receiver {
                 match message {
@@ -135,13 +149,19 @@ fn check_multi_project(args: &Args) -> bool {
                     Message::Finished { path, result } => {
                         total_errors += result.diagnostics.len();
                         total_files += result.file_count;
+
                         writeln!(
                             stdout,
-                            "Finished {}\n{}\n",
+                            "Finished {} with {} files in {:.2}s",
                             path.display(),
-                            result.display(args.format)
+                            result.file_count,
+                            result.duration.as_secs_f32(),
                         )
                         .unwrap();
+                        write!(stdout, "{}", result.display(args.format)).unwrap();
+                        if let Some(error_file) = &mut error_file {
+                            write!(error_file, "{}", result.display(args.format)).unwrap();
+                        }
                         all_success = all_success && result.is_success();
                     }
                     Message::Failed { path, error } => {
@@ -157,8 +177,10 @@ fn check_multi_project(args: &Args) -> bool {
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{total_errors} stability errors in {total_files} files");
-        println!("Finished in {}s", duration.as_secs_f32());
+        println!(
+            "{total_errors} stability errors in {total_files} files in {}s",
+            duration.as_secs_f32()
+        );
     }
 
     all_success
@@ -295,23 +317,11 @@ struct DisplayCheckRepoResult<'a> {
 }
 
 impl Display for DisplayCheckRepoResult<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let CheckRepoResult {
-            duration,
-            file_count,
-            diagnostics,
-        } = self.result;
-
-        for diagnostic in diagnostics {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for diagnostic in &self.result.diagnostics {
             write!(f, "{}", diagnostic.display(self.format))?;
         }
-
-        writeln!(
-            f,
-            "Formatting {} files twice took {:.2}s",
-            file_count,
-            duration.as_secs_f32()
-        )
+        Ok(())
     }
 }
 

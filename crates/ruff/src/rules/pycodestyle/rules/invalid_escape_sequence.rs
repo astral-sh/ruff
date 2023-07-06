@@ -40,25 +40,24 @@ impl AlwaysAutofixableViolation for InvalidEscapeSequence {
 
 /// W605
 pub(crate) fn invalid_escape_sequence(
+    diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     range: TextRange,
     autofix: bool,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     let text = locator.slice(range);
 
     // Determine whether the string is single- or triple-quoted.
     let Some(leading_quote) = leading_quote(text) else {
-        return diagnostics;
+        return;
     };
     let Some(trailing_quote) = trailing_quote(text) else {
-        return diagnostics;
+        return;
     };
     let body = &text[leading_quote.len()..text.len() - trailing_quote.len()];
 
     if leading_quote.contains(['r', 'R']) {
-        return diagnostics;
+        return;
     }
 
     let start_offset = range.start() + TextSize::try_from(leading_quote.len()).unwrap();
@@ -67,6 +66,7 @@ pub(crate) fn invalid_escape_sequence(
 
     let mut contains_valid_escape_sequence = false;
 
+    let mut invalid_escape_sequence = Vec::new();
     while let Some((i, c)) = chars_iter.next() {
         if c != '\\' {
             continue;
@@ -122,14 +122,13 @@ pub(crate) fn invalid_escape_sequence(
 
         let location = start_offset + TextSize::try_from(i).unwrap();
         let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
-        let diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
-        diagnostics.push(diagnostic);
+        invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(*next_char), range));
     }
 
     if autofix {
         if contains_valid_escape_sequence {
             // Escape with backslash.
-            for diagnostic in &mut diagnostics {
+            for diagnostic in &mut invalid_escape_sequence {
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     r"\".to_string(),
                     diagnostic.range().start() + TextSize::from(1),
@@ -137,7 +136,7 @@ pub(crate) fn invalid_escape_sequence(
             }
         } else {
             // Turn into raw string.
-            for diagnostic in &mut diagnostics {
+            for diagnostic in &mut invalid_escape_sequence {
                 // If necessary, add a space between any leading keyword (`return`, `yield`,
                 // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
                 // `returnr"foo"` is not.
@@ -159,5 +158,5 @@ pub(crate) fn invalid_escape_sequence(
         }
     }
 
-    diagnostics
+    diagnostics.extend(invalid_escape_sequence);
 }

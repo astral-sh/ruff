@@ -52,21 +52,20 @@ impl Violation for DjangoModelWithoutDunderStr {
 
 /// DJ008
 pub(crate) fn model_without_dunder_str(
-    checker: &Checker,
-    bases: &[Expr],
-    body: &[Stmt],
-    class_location: &Stmt,
-) -> Option<Diagnostic> {
+    checker: &mut Checker,
+    ast::StmtClassDef {
+        name, bases, body, ..
+    }: &ast::StmtClassDef,
+) {
     if !is_non_abstract_model(bases, body, checker.semantic()) {
-        return None;
+        return;
     }
-    if !has_dunder_method(body) {
-        return Some(Diagnostic::new(
-            DjangoModelWithoutDunderStr,
-            class_location.range(),
-        ));
+    if has_dunder_method(body) {
+        return;
     }
-    None
+    checker
+        .diagnostics
+        .push(Diagnostic::new(DjangoModelWithoutDunderStr, name.range()));
 }
 
 fn has_dunder_method(body: &[Stmt]) -> bool {

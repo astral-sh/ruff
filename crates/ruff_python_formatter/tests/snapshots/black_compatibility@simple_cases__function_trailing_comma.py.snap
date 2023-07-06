@@ -73,15 +73,6 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -27,7 +27,7 @@
-     call(
-         arg={
-             "explode": "this",
--        }
-+        },
-     )
-     call2(
-         arg=[1, 2, 3],
 @@ -35,7 +35,9 @@
      x = {
          "a": 1,
@@ -93,7 +84,7 @@ some_module.some_function(
      if (
          a
          == {
-@@ -47,22 +49,24 @@
+@@ -47,14 +49,16 @@
              "f": 6,
              "g": 7,
              "h": 8,
@@ -114,17 +105,6 @@ some_module.some_function(
      json = {
          "k": {
              "k2": {
-                 "k3": [
-                     1,
--                ]
--            }
--        }
-+                ],
-+            },
-+        },
-     }
- 
- 
 @@ -80,18 +84,14 @@
      pass
  
@@ -182,7 +162,7 @@ def f(
     call(
         arg={
             "explode": "this",
-        },
+        }
     )
     call2(
         arg=[1, 2, 3],
@@ -219,9 +199,9 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
             "k2": {
                 "k3": [
                     1,
-                ],
-            },
-        },
+                ]
+            }
+        }
     }
 
 

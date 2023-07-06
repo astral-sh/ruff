@@ -1,17 +1,15 @@
 use std::fmt;
 
-use anyhow::Result;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::Decorator;
-use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::collect_arg_names;
+use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::visibility::is_abstract;
@@ -24,21 +22,6 @@ use crate::registry::{AsRule, Rule};
 use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
 };
-
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Parentheses {
-    None,
-    Empty,
-}
-
-impl fmt::Display for Parentheses {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Parentheses::None => fmt.write_str(""),
-            Parentheses::Empty => fmt.write_str("()"),
-        }
-    }
-}
 
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
@@ -196,8 +179,23 @@ impl AlwaysAutofixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, PartialEq, Eq)]
+enum Parentheses {
+    None,
+    Empty,
+}
+
+impl fmt::Display for Parentheses {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Parentheses::None => fmt.write_str(""),
+            Parentheses::Empty => fmt.write_str("()"),
+        }
+    }
+}
+
 /// Visitor that skips functions
+#[derive(Debug, Default)]
 struct SkipFunctionsVisitor<'a> {
     has_return_with_value: bool,
     has_yield_from: bool,
@@ -245,7 +243,7 @@ where
     }
 }
 
-fn get_fixture_decorator<'a>(
+fn fixture_decorator<'a>(
     decorators: &'a [Decorator],
     semantic: &SemanticModel,
 ) -> Option<&'a Decorator> {
@@ -271,16 +269,6 @@ fn pytest_fixture_parentheses(
     checker.diagnostics.push(diagnostic);
 }
 
-pub(crate) fn fix_extraneous_scope_function(
-    locator: &Locator,
-    stmt_at: TextSize,
-    expr_range: TextRange,
-    args: &[Expr],
-    keywords: &[Keyword],
-) -> Result<Edit> {
-    remove_argument(locator, stmt_at, expr_range, args, keywords, false)
-}
-
 /// PT001, PT002, PT003
 fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Decorator) {
     match &decorator.expression {
@@ -290,28 +278,31 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             keywords,
             range: _,
         }) => {
-            if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
-                && !checker.settings.flake8_pytest_style.fixture_parentheses
-                && args.is_empty()
-                && keywords.is_empty()
-            {
-                let fix = Fix::automatic(Edit::deletion(func.end(), decorator.end()));
-                pytest_fixture_parentheses(
-                    checker,
-                    decorator,
-                    fix,
-                    Parentheses::None,
-                    Parentheses::Empty,
-                );
+            if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
+                if !checker.settings.flake8_pytest_style.fixture_parentheses
+                    && args.is_empty()
+                    && keywords.is_empty()
+                {
+                    let fix = Fix::automatic(Edit::deletion(func.end(), decorator.end()));
+                    pytest_fixture_parentheses(
+                        checker,
+                        decorator,
+                        fix,
+                        Parentheses::None,
+                        Parentheses::Empty,
+                    );
+                }
             }
 
-            if checker.enabled(Rule::PytestFixturePositionalArgs) && !args.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    PytestFixturePositionalArgs {
-                        function: func_name.to_string(),
-                    },
-                    decorator.range(),
-                ));
+            if checker.enabled(Rule::PytestFixturePositionalArgs) {
+                if !args.is_empty() {
+                    checker.diagnostics.push(Diagnostic::new(
+                        PytestFixturePositionalArgs {
+                            function: func_name.to_string(),
+                        },
+                        decorator.range(),
+                    ));
+                }
             }
 
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
@@ -324,16 +315,16 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                         let mut diagnostic =
                             Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            let expr_range = diagnostic.range();
-                            #[allow(deprecated)]
-                            diagnostic.try_set_fix_from_edit(|| {
-                                fix_extraneous_scope_function(
+                            diagnostic.try_set_fix(|| {
+                                remove_argument(
                                     checker.locator,
-                                    decorator.start(),
-                                    expr_range,
+                                    func.end(),
+                                    scope_keyword.range,
                                     args,
                                     keywords,
+                                    false,
                                 )
+                                .map(Fix::suggested)
                             });
                         }
                         checker.diagnostics.push(diagnostic);
@@ -342,20 +333,20 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
         }
         _ => {
-            if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
-                && checker.settings.flake8_pytest_style.fixture_parentheses
-            {
-                let fix = Fix::automatic(Edit::insertion(
-                    Parentheses::Empty.to_string(),
-                    decorator.end(),
-                ));
-                pytest_fixture_parentheses(
-                    checker,
-                    decorator,
-                    fix,
-                    Parentheses::Empty,
-                    Parentheses::None,
-                );
+            if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
+                if checker.settings.flake8_pytest_style.fixture_parentheses {
+                    let fix = Fix::automatic(Edit::insertion(
+                        Parentheses::Empty.to_string(),
+                        decorator.end(),
+                    ));
+                    pytest_fixture_parentheses(
+                        checker,
+                        decorator,
+                        fix,
+                        Parentheses::Empty,
+                        Parentheses::None,
+                    );
+                }
             }
         }
     }
@@ -455,7 +446,7 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 
 /// PT021
 fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[Stmt]) {
-    if !collect_arg_names(args).contains(&"request") {
+    if !includes_arg_name("request", args) {
         return;
     }
 
@@ -511,7 +502,7 @@ pub(crate) fn fixture(
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
-    let decorator = get_fixture_decorator(decorators, checker.semantic());
+    let decorator = fixture_decorator(decorators, checker.semantic());
     if let Some(decorator) = decorator {
         if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
             || checker.enabled(Rule::PytestFixturePositionalArgs)

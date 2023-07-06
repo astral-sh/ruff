@@ -4,7 +4,7 @@ use std::path::Path;
 
 use num_traits::Zero;
 use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use rustpython_ast::CmpOp;
 use rustpython_parser::ast::{
     self, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
@@ -669,25 +669,28 @@ pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
     handled_exceptions
 }
 
-/// Return the set of all bound argument names.
-pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
-    let mut arg_names: FxHashSet<&'a str> = FxHashSet::default();
-    for arg_with_default in &arguments.posonlyargs {
-        arg_names.insert(arg_with_default.def.arg.as_str());
-    }
-    for arg_with_default in &arguments.args {
-        arg_names.insert(arg_with_default.def.arg.as_str());
+/// Returns `true` if the given name is included in the given [`Arguments`].
+pub fn includes_arg_name(name: &str, arguments: &Arguments) -> bool {
+    if arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+        .any(|arg| arg.def.arg.as_str() == name)
+    {
+        return true;
     }
     if let Some(arg) = &arguments.vararg {
-        arg_names.insert(arg.arg.as_str());
-    }
-    for arg_with_default in &arguments.kwonlyargs {
-        arg_names.insert(arg_with_default.def.arg.as_str());
+        if arg.arg.as_str() == name {
+            return true;
+        }
     }
     if let Some(arg) = &arguments.kwarg {
-        arg_names.insert(arg.arg.as_str());
+        if arg.arg.as_str() == name {
+            return true;
+        }
     }
-    arg_names
+    false
 }
 
 /// Given an [`Expr`] that can be callable or not (like a decorator, which could

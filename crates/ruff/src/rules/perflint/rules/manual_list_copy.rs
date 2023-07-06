@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::any_over_expr;
 
 use crate::checkers::ast::Checker;
 
@@ -44,7 +45,11 @@ impl Violation for ManualListCopy {
 }
 
 /// PERF402
-pub(crate) fn manual_list_copy(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return;
+    };
+
     let [stmt] = body else {
         return;
     };
@@ -53,17 +58,45 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, body: &[Stmt]) {
         return;
     };
 
-    let Expr::Call(ast::ExprCall { func, range, .. }) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        range,
+        args,
+        keywords,
+    }) = value.as_ref()
+    else {
         return;
     };
 
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    if !keywords.is_empty() {
         return;
-    };
-
-    if matches!(attr.as_str(), "append" | "insert") {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ManualListCopy, *range));
     }
+
+    let [arg] = args.as_slice() else {
+        return;
+    };
+
+    // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
+    if !arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
+        return;
+    }
+
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        return;
+    };
+
+    if !matches!(attr.as_str(), "append" | "insert") {
+        return;
+    }
+
+    // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
+    if any_over_expr(value, &|expr| {
+        expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+    }) {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(ManualListCopy, *range));
 }

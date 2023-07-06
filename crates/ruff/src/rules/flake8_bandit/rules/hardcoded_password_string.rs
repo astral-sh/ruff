@@ -3,6 +3,8 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::Checker;
+
 use super::super::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
@@ -73,12 +75,13 @@ fn password_target(target: &Expr) -> Option<&str> {
 
 /// S105
 pub(crate) fn compare_to_hardcoded_password_string(
+    checker: &mut Checker,
     left: &Expr,
     comparators: &[Expr],
-) -> Vec<Diagnostic> {
-    comparators
-        .iter()
-        .filter_map(|comp| {
+) {
+    checker
+        .diagnostics
+        .extend(comparators.iter().filter_map(|comp| {
             string_literal(comp).filter(|string| !string.is_empty())?;
             let Some(name) = password_target(left) else {
                 return None;
@@ -89,29 +92,29 @@ pub(crate) fn compare_to_hardcoded_password_string(
                 },
                 comp.range(),
             ))
-        })
-        .collect()
+        }));
 }
 
 /// S105
 pub(crate) fn assign_hardcoded_password_string(
+    checker: &mut Checker,
     value: &Expr,
     targets: &[Expr],
-) -> Option<Diagnostic> {
+) {
     if string_literal(value)
         .filter(|string| !string.is_empty())
         .is_some()
     {
         for target in targets {
             if let Some(name) = password_target(target) {
-                return Some(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     HardcodedPasswordString {
                         name: name.to_string(),
                     },
                     value.range(),
                 ));
+                return;
             }
         }
     }
-    None
 }

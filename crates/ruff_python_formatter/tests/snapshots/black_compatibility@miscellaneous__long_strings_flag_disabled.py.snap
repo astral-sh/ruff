@@ -312,15 +312,6 @@ long_unmergable_string_with_pragma = (
  
  y = "Short string"
  
-@@ -12,7 +12,7 @@
- )
- 
- print(
--    "This is a really long string inside of a print statement with no extra arguments attached at the end of it."
-+    "This is a really long string inside of a print statement with no extra arguments attached at the end of it.",
- )
- 
- D1 = {
 @@ -70,8 +70,8 @@
  bad_split3 = (
      "What if we have inline comments on "  # First Comment
@@ -367,7 +358,7 @@ long_unmergable_string_with_pragma = (
  
  comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
  
-@@ -165,30 +163,18 @@
+@@ -165,25 +163,13 @@
  
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
@@ -397,12 +388,6 @@ long_unmergable_string_with_pragma = (
  
  some_function_call(
      "With a reallly generic name and with a really really long string that is, at some point down the line, "
-     + added
--    + " to a variable and then added to another string."
-+    + " to a variable and then added to another string.",
- )
- 
- some_function_call(
 @@ -212,29 +198,25 @@
  )
  
@@ -412,7 +397,7 @@ long_unmergable_string_with_pragma = (
 -        " which should NOT be there."
 -    ),
 +    "This is a really long string argument to a function that has a trailing comma"
-+    " which should NOT be there.",
++    " which should NOT be there."
  )
  
  func_with_bad_comma(
@@ -421,7 +406,7 @@ long_unmergable_string_with_pragma = (
 -        " which should NOT be there."
 -    ),  # comment after comma
 +    "This is a really long string argument to a function that has a trailing comma"
-+    " which should NOT be there.",  # comment after comma
++    " which should NOT be there."  # comment after comma
  )
  
  func_with_bad_parens_that_wont_fit_in_one_line(
@@ -498,7 +483,7 @@ print(
 )
 
 print(
-    "This is a really long string inside of a print statement with no extra arguments attached at the end of it.",
+    "This is a really long string inside of a print statement with no extra arguments attached at the end of it."
 )
 
 D1 = {
@@ -660,7 +645,7 @@ NOT_YET_IMPLEMENTED_StmtAssert
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "
     + added
-    + " to a variable and then added to another string.",
+    + " to a variable and then added to another string."
 )
 
 some_function_call(
@@ -685,12 +670,12 @@ func_with_bad_comma(
 
 func_with_bad_comma(
     "This is a really long string argument to a function that has a trailing comma"
-    " which should NOT be there.",
+    " which should NOT be there."
 )
 
 func_with_bad_comma(
     "This is a really long string argument to a function that has a trailing comma"
-    " which should NOT be there.",  # comment after comma
+    " which should NOT be there."  # comment after comma
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(

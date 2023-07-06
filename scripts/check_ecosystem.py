@@ -89,6 +89,7 @@ REPOSITORIES: list[Repository] = [
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
     Repository("pypa", "setuptools", "main"),
+    Repository("pypa", "pip", "main"),
     Repository("python", "mypy", "master"),
     Repository("DisnakeDev", "disnake", "master"),
     Repository("scikit-build", "scikit-build", "main"),

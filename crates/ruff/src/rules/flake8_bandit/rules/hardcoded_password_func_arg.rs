@@ -1,5 +1,6 @@
 use rustpython_parser::ast::{Keyword, Ranged};
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -48,10 +49,10 @@ impl Violation for HardcodedPasswordFuncArg {
 }
 
 /// S106
-pub(crate) fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnostic> {
-    keywords
-        .iter()
-        .filter_map(|keyword| {
+pub(crate) fn hardcoded_password_func_arg(checker: &mut Checker, keywords: &[Keyword]) {
+    checker
+        .diagnostics
+        .extend(keywords.iter().filter_map(|keyword| {
             string_literal(&keyword.value).filter(|string| !string.is_empty())?;
             let arg = keyword.arg.as_ref()?;
             if !matches_password_name(arg) {
@@ -63,6 +64,5 @@ pub(crate) fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnosti
                 },
                 keyword.range(),
             ))
-        })
-        .collect()
+        }));
 }

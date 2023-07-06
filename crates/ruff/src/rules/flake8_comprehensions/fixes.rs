@@ -14,6 +14,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::autofix::codemods::CodegenStylist;
+use crate::rules::flake8_comprehensions::rules::ObjectType;
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
@@ -888,7 +889,7 @@ pub(crate) fn fix_unnecessary_map(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
     parent: Option<&rustpython_parser::ast::Expr>,
-    kind: &str,
+    object_type: ObjectType,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -948,8 +949,8 @@ pub(crate) fn fix_unnecessary_map(
             whitespace_after_in: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
         });
 
-        match kind {
-            "generator" => {
+        match object_type {
+            ObjectType::Generator => {
                 tree = Expression::GeneratorExp(Box::new(GeneratorExp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
@@ -957,7 +958,7 @@ pub(crate) fn fix_unnecessary_map(
                     rpar: vec![RightParen::default()],
                 }));
             }
-            "list" => {
+            ObjectType::List => {
                 tree = Expression::ListComp(Box::new(ListComp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
@@ -967,7 +968,7 @@ pub(crate) fn fix_unnecessary_map(
                     rpar: vec![],
                 }));
             }
-            "set" => {
+            ObjectType::Set => {
                 tree = Expression::SetComp(Box::new(SetComp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
@@ -977,7 +978,7 @@ pub(crate) fn fix_unnecessary_map(
                     rbrace: RightCurlyBrace::default(),
                 }));
             }
-            "dict" => {
+            ObjectType::Dict => {
                 let (key, value) = if let Expression::Tuple(tuple) = func_body.body.as_ref() {
                     if tuple.elements.len() != 2 {
                         bail!("Expected two elements")
@@ -1009,17 +1010,14 @@ pub(crate) fn fix_unnecessary_map(
                     ),
                 }));
             }
-            _ => {
-                bail!("Expected generator, list, set or dict");
-            }
         }
 
         let mut content = tree.codegen_stylist(stylist);
 
         // If the expression is embedded in an f-string, surround it with spaces to avoid
         // syntax errors.
-        if kind == "set" || kind == "dict" {
-            if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
+        if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
+            if parent.map_or(false, rustpython_parser::ast::Expr::is_formatted_value_expr) {
                 content = format!(" {content} ");
             }
         }

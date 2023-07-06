@@ -298,6 +298,16 @@ fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
+/// Returns `true` if this is an assignment to a simple `Final`-annotated variable.
+fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(value, Expr::Name(_) | Expr::Attribute(_)) {
+        if semantic.match_typing_expr(annotation, "Final") {
+            return true;
+        }
+    }
+    false
+}
+
 /// Returns `true` if the a class is an enum, based on its base classes.
 fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
     return bases.iter().any(|expr| {
@@ -436,6 +446,9 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
     if is_type_var_like_call(value, checker.semantic()) {
+        return;
+    }
+    if is_final_assignment(annotation, value, checker.semantic()) {
         return;
     }
     if is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {

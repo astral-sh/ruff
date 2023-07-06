@@ -1,58 +1,26 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
-DJ008.py:6:1: DJ008 Model does not define `__str__` method
+DJ008.py:6:7: DJ008 Model does not define `__str__` method
+  |
+5 | # Models without __str__
+6 | class TestModel1(models.Model):
+  |       ^^^^^^^^^^ DJ008
+7 |     new_field = models.CharField(max_length=10)
+  |
+
+DJ008.py:21:7: DJ008 Model does not define `__str__` method
    |
- 5 |   # Models without __str__
- 6 | / class TestModel1(models.Model):
- 7 | |     new_field = models.CharField(max_length=10)
- 8 | | 
- 9 | |     class Meta:
-10 | |         verbose_name = "test model"
-11 | |         verbose_name_plural = "test models"
-12 | | 
-13 | |     @property
-14 | |     def my_brand_new_property(self):
-15 | |         return 1
-16 | | 
-17 | |     def my_beautiful_method(self):
-18 | |         return 2
-   | |________________^ DJ008
+21 | class TestModel2(Model):
+   |       ^^^^^^^^^^ DJ008
+22 |     new_field = models.CharField(max_length=10)
    |
 
-DJ008.py:21:1: DJ008 Model does not define `__str__` method
+DJ008.py:36:7: DJ008 Model does not define `__str__` method
    |
-21 | / class TestModel2(Model):
-22 | |     new_field = models.CharField(max_length=10)
-23 | | 
-24 | |     class Meta:
-25 | |         verbose_name = "test model"
-26 | |         verbose_name_plural = "test models"
-27 | | 
-28 | |     @property
-29 | |     def my_brand_new_property(self):
-30 | |         return 1
-31 | | 
-32 | |     def my_beautiful_method(self):
-33 | |         return 2
-   | |________________^ DJ008
-   |
-
-DJ008.py:36:1: DJ008 Model does not define `__str__` method
-   |
-36 | / class TestModel3(Model):
-37 | |     new_field = models.CharField(max_length=10)
-38 | | 
-39 | |     class Meta:
-40 | |         abstract = False
-41 | | 
-42 | |     @property
-43 | |     def my_brand_new_property(self):
-44 | |         return 1
-45 | | 
-46 | |     def my_beautiful_method(self):
-47 | |         return 2
-   | |________________^ DJ008
+36 | class TestModel3(Model):
+   |       ^^^^^^^^^^ DJ008
+37 |     new_field = models.CharField(max_length=10)
    |
 
 

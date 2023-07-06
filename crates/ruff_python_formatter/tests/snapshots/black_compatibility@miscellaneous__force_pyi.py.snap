@@ -43,21 +43,20 @@ def eggs() -> Union[str, int]: ...
 --- Black
 +++ Ruff
 @@ -1,32 +1,58 @@
--from typing import Union
-+NOT_YET_IMPLEMENTED_StmtImportFrom
-+
+ from typing import Union
  
++
  @bird
 -def zoo(): ...
 +def zoo():
 +    ...
-+
-+
-+class A:
-+    ...
  
 -class A: ...
  
++class A:
++    ...
++
++
  @bar
  class B:
 -    def BMethod(self) -> None: ...
@@ -94,14 +93,14 @@ def eggs() -> Union[str, int]: ...
 +
 +class F(A, C):
 +    ...
++
++
++def spam() -> None:
++    ...
  
 -class F(A, C): ...
  
 -def spam() -> None: ...
-+def spam() -> None:
-+    ...
-+
-+
  @overload
 -def spam(arg: str) -> str: ...
 +def spam(arg: str) -> str:
@@ -120,7 +119,7 @@ def eggs() -> Union[str, int]: ...
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from typing import Union
 
 
 @bird

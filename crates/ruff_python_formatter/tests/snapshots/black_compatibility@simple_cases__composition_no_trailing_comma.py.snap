@@ -203,15 +203,6 @@ class C:
                          print(i)
          xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
              push_manager=context.request.resource_manager,
-@@ -37,7 +37,7 @@
-             batch_size=Yyyy2YyyyYyyyyYyyy.FULL_SIZE,
-         ).push(
-             # Only send the first n items.
--            items=items[:num_items]
-+            items=items[:num_items],
-         )
-         return (
-             'Utterly failed doctest test for %s\n   File "%s", line %s, in %s\n\n%s'
 @@ -47,113 +47,46 @@
      def omitting_trailers(self) -> None:
          get_collection(
@@ -418,7 +409,7 @@ class C:
             batch_size=Yyyy2YyyyYyyyyYyyy.FULL_SIZE,
         ).push(
             # Only send the first n items.
-            items=items[:num_items],
+            items=items[:num_items]
         )
         return (
             'Utterly failed doctest test for %s\n   File "%s", line %s, in %s\n\n%s'

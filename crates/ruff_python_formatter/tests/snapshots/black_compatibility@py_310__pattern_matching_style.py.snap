@@ -84,7 +84,7 @@ match match(
  
 -match(arg)  # comment
 +match(
-+    arg,  # comment
++    arg  # comment
 +)
  
  match()
@@ -93,7 +93,7 @@ match match(
  
 -case(arg)  # comment
 +case(
-+    arg,  # comment
++    arg  # comment
 +)
  
  case()
@@ -103,7 +103,7 @@ match match(
  
 -re.match(something)  # fast
 +re.match(
-+    something,  # fast
++    something  # fast
 +)
  re.match()
 -match match():
@@ -120,7 +120,7 @@ match match(
 NOT_YET_IMPLEMENTED_StmtMatch
 
 match(
-    arg,  # comment
+    arg  # comment
 )
 
 match()
@@ -128,7 +128,7 @@ match()
 match()
 
 case(
-    arg,  # comment
+    arg  # comment
 )
 
 case()
@@ -137,7 +137,7 @@ case()
 
 
 re.match(
-    something,  # fast
+    something  # fast
 )
 re.match()
 NOT_YET_IMPLEMENTED_StmtMatch
