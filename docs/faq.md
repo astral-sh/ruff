@@ -30,6 +30,7 @@ Ruff also re-implements some of the most popular Flake8 plugins and related code
 natively, including:
 
 - [autoflake](https://pypi.org/project/autoflake/)
+- [dlint](https://pypi.org/project/dlint/)
 - [eradicate](https://pypi.org/project/eradicate/)
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
 - [flake8-annotations](https://pypi.org/project/flake8-annotations/)
