@@ -1,7 +1,6 @@
 use num_traits::ToPrimitive;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::contains_effect;
 use rustpython_parser::ast::{self, Constant, Expr};
 
 use crate::checkers::ast::Checker;
