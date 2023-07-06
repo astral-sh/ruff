@@ -380,15 +380,18 @@ impl TryFrom<Options> for Settings {
         let mut section_order: Vec<_> = options
             .section_order
             .unwrap_or_else(|| ImportType::iter().map(ImportSection::Known).collect());
-        let known_first_party = match options.known_first_party {
-            Some(names) => names
-                .into_iter()
-                .map(|name| {
-                    IdentifierPattern::new(&name).map_err(SettingsError::InvalidKnownFirstParty)
-                })
-                .collect::<Result<Vec<_>, Self::Error>>()?,
-            None => vec![],
-        };
+        let known_first_party = options
+            .known_first_party
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| {
+                        IdentifierPattern::new(&name).map_err(SettingsError::InvalidKnownFirstParty)
+                    })
+                    .collect::<Result<Vec<_>, Self::Error>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
         let known_third_party = match options.known_third_party {
             Some(names) => names
                 .into_iter()
@@ -421,7 +424,7 @@ impl TryFrom<Options> for Settings {
         let sections = options.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<String>> = sections
+        let sections: FxHashMap<String, Vec<glob::Pattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
@@ -430,20 +433,15 @@ impl TryFrom<Options> for Settings {
                 }
                 ImportSection::UserDefined(section) => Some((section, modules)),
             })
-            .collect();
-
-        let sections_pattern: FxHashMap<String, Vec<glob::Pattern>> = sections
-            .clone()
-            .into_iter()
             .map(|(section, modules)| {
-                let modules_pattern = modules
+                let modules = modules
                     .into_iter()
                     .map(|module| {
                         IdentifierPattern::new(&module)
                             .map_err(SettingsError::InvalidUserDefinedSection)
                     })
                     .collect::<Result<Vec<_>, Self::Error>>()?;
-                Ok((section, modules_pattern))
+                Ok((section, modules))
             })
             .collect::<Result<_, _>>()?;
 
@@ -513,7 +511,7 @@ impl TryFrom<Options> for Settings {
                 known_third_party,
                 known_local_folder,
                 extra_standard_library,
-                sections_pattern,
+                sections,
             ),
             order_by_type: options.order_by_type.unwrap_or(true),
             relative_imports_order: options.relative_imports_order.unwrap_or_default(),
