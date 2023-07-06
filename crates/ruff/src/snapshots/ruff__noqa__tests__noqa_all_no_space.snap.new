@@ -1,0 +1,12 @@
+---
+source: crates/ruff/src/noqa.rs
+assertion_line: 696
+expression: "Directive::try_parse(source, TextSize::default())"
+---
+Some(
+    All(
+        All {
+            range: 0..5,
+        },
+    ),
+)

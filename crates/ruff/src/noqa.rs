@@ -4,6 +4,7 @@ use std::fs;
 use std::ops::Add;
 use std::path::Path;
 
+use aho_corasick::AhoCorasick;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
@@ -11,7 +12,6 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
-use unicase::UniCase;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
@@ -25,6 +25,19 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*))?)")
         .unwrap()
 });
+
+static NOQA_MATCHER: Lazy<AhoCorasick> = Lazy::new(|| {
+    AhoCorasick::builder()
+        .ascii_case_insensitive(true)
+        .build(["noqa"])
+        .unwrap()
+});
+
+static FINDER_1: Lazy<memchr::memmem::Finder> = Lazy::new(|| memchr::memmem::Finder::new(b"noqa"));
+
+static FINDER_2: Lazy<memchr::memmem::Finder> = Lazy::new(|| memchr::memmem::Finder::new(b"NOQA"));
+
+static FINDER_3: Lazy<memchr::memmem::Finder> = Lazy::new(|| memchr::memmem::Finder::new(b"NoQA"));
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
@@ -69,28 +82,32 @@ impl<'a> Directive<'a> {
     }
 
     pub fn try_parse(text: &'a str, offset: TextSize) -> Option<Self> {
-        // Find the `noqa` literal.
-        let noqa_literal_start = UniCase::new(text).find("noqa")?;
-        let noqa_literal_end = noqa_literal_start + 4;
+        // let bytes = text.as_bytes();
+
+        let position = text.find("noqa")?;
+
+        // // Find the `noqa` literal.
+        // for position in FINDER_1
+        //     .find_iter(bytes)
+        //     .chain(FINDER_2.find_iter(bytes))
+        //     .chain(FINDER_3.find_iter(bytes))
+        // {
+        let mut comment_start = position;
 
         // Trim any whitespace between the `#` character and the `noqa` literal.
-        let noqa_literal_leading_space = text[..noqa_literal_start]
-            .chars()
-            .rev()
-            .take_while(|c| c.is_whitespace())
-            .map(|c| c.len_utf8())
-            .sum::<usize>();
+        comment_start -= text[..comment_start].len() - text[..comment_start].trim_end().len();
 
         // The next character has to be the `#` character.
-        if !text[..noqa_literal_start - noqa_literal_leading_space].ends_with('#') {
+        if !text[..comment_start].ends_with('#') {
             return None;
         }
 
         // The start of the `#` character.
-        let comment_start = noqa_literal_start - noqa_literal_leading_space - 1;
+        comment_start -= 1;
 
         // The next character is required to be a `:` character.
         // Otherwise, it's an `all` directive.
+        let noqa_literal_end = position + 4;
         if !text[noqa_literal_end..].starts_with(':') {
             let range = TextRange::new(
                 TextSize::try_from(comment_start).unwrap(),
@@ -121,12 +138,7 @@ impl<'a> Directive<'a> {
             .unwrap_or_else(|| text[codes_start..].len());
 
         // Trim trailing whitespace.
-        codes_end -= text[..codes_end]
-            .chars()
-            .rev()
-            .take_while(|c| c.is_whitespace())
-            .map(|c| c.len_utf8())
-            .sum::<usize>();
+        codes_end -= text[..codes_end].len() - text[..codes_end].trim_end().len();
 
         // Extract the comma-separated list of codes.
         let codes = text[codes_start..codes_end]
@@ -144,6 +156,157 @@ impl<'a> Directive<'a> {
             range: range.add(offset),
             codes,
         }));
+        // }
+
+        // None
+    }
+
+    pub fn try_parse_aho_corasick(text: &'a str, offset: TextSize) -> Option<Self> {
+        for mat in NOQA_MATCHER.find_iter(text) {
+            let mut comment_start = mat.start();
+
+            // Trim any whitespace between the `#` character and the `noqa` literal.
+            comment_start -= text[..comment_start].len() - text[..comment_start].trim_end().len();
+
+            // The next character has to be the `#` character.
+            if !text[..comment_start].ends_with('#') {
+                continue;
+            }
+
+            // The start of the `#` character.
+            comment_start -= 1;
+
+            // The next character is required to be a `:` character.
+            // Otherwise, it's an `all` directive.
+            let noqa_literal_end = mat.end();
+            if !text[noqa_literal_end..].starts_with(':') {
+                let range = TextRange::new(
+                    TextSize::try_from(comment_start).unwrap(),
+                    TextSize::try_from(noqa_literal_end).unwrap(),
+                );
+                return Some(Self::All(All {
+                    range: range.add(offset),
+                }));
+            }
+
+            // Now, find the start of the "codes".
+            let mut codes_start = noqa_literal_end;
+
+            // Skip the `:` character.
+            codes_start += 1;
+
+            // Skip any whitespace between the `:` and the codes.
+            codes_start += text[codes_start..]
+                .find(|c: char| !c.is_whitespace())
+                .unwrap_or(0);
+
+            // Now, find the end of the codes.
+            let mut codes_end = codes_start;
+
+            // Skip until the end of the comment.
+            codes_end += text[codes_start..]
+                .find(|c: char| matches!(c, '#'))
+                .unwrap_or_else(|| text[codes_start..].len());
+
+            // Trim trailing whitespace.
+            codes_end -= text[..codes_end].len() - text[..codes_end].trim_end().len();
+
+            // Extract the comma-separated list of codes.
+            let codes = text[codes_start..codes_end]
+                .split(',')
+                .map(str::trim)
+                .filter(|code| !code.is_empty())
+                .collect_vec();
+
+            let range = TextRange::new(
+                TextSize::try_from(comment_start).unwrap(),
+                TextSize::try_from(codes_end).unwrap(),
+            );
+
+            return Some(Self::Codes(Codes {
+                range: range.add(offset),
+                codes,
+            }));
+        }
+
+        None
+    }
+
+    pub fn try_parse_memchr(text: &'a str, offset: TextSize) -> Option<Self> {
+        // Find the `noqa` literal.
+        let bytes = text.as_bytes();
+        for position in FINDER_1
+            .find_iter(bytes)
+            .chain(FINDER_2.find_iter(bytes))
+            .chain(FINDER_3.find_iter(bytes))
+        {
+            let mut comment_start = position;
+
+            // Trim any whitespace between the `#` character and the `noqa` literal.
+            comment_start -= text[..comment_start].len() - text[..comment_start].trim_end().len();
+
+            // The next character has to be the `#` character.
+            if !text[..comment_start].ends_with('#') {
+                continue;
+            }
+
+            // The start of the `#` character.
+            comment_start -= 1;
+
+            // The next character is required to be a `:` character.
+            // Otherwise, it's an `all` directive.
+            let noqa_literal_end = position + 4;
+            if !text[noqa_literal_end..].starts_with(':') {
+                let range = TextRange::new(
+                    TextSize::try_from(comment_start).unwrap(),
+                    TextSize::try_from(noqa_literal_end).unwrap(),
+                );
+                return Some(Self::All(All {
+                    range: range.add(offset),
+                }));
+            }
+
+            // Now, find the start of the "codes".
+            let mut codes_start = noqa_literal_end;
+
+            // Skip the `:` character.
+            codes_start += 1;
+
+            // Skip any whitespace between the `:` and the codes.
+            codes_start += text[codes_start..]
+                .find(|c: char| !c.is_whitespace())
+                .unwrap_or(0);
+
+            // Now, find the end of the codes.
+            let mut codes_end = codes_start;
+
+            // Skip until the end of the comment.
+            codes_end += text[codes_start..]
+                .find(|c: char| matches!(c, '#'))
+                .unwrap_or_else(|| text[codes_start..].len());
+
+            // Trim trailing whitespace.
+            codes_end -= text[..codes_end].len() - text[..codes_end].trim_end().len();
+
+            // Extract the comma-separated list of codes.
+            let codes = text[codes_start..codes_end]
+                .split(',')
+                .map(str::trim)
+                .filter(|code| !code.is_empty())
+                .collect_vec();
+
+            let range = TextRange::new(
+                TextSize::try_from(comment_start).unwrap(),
+                TextSize::try_from(codes_end).unwrap(),
+            );
+
+            return Some(Self::Codes(Codes {
+                range: range.add(offset),
+                codes,
+            }));
+        }
+
+        None
     }
 }
 
@@ -632,127 +795,127 @@ mod tests {
     #[test]
     fn noqa_all() {
         let source = "# noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code() {
         let source = "# noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes() {
         let source = "# noqa: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_case_insensitive() {
         let source = "# NOQA";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_case_insensitive() {
         let source = "# NOQA: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_case_insensitive() {
         let source = "# NOQA: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_leading_space() {
         let source = "#   # noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_trailing_space() {
         let source = "# noqa: F401   #";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_no_space() {
         let source = "#noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_no_space() {
         let source = "#noqa:F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_no_space() {
         let source = "#noqa:F401,F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_multi_space() {
         let source = "#  noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_multi_space() {
         let source = "#  noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_multi_space() {
         let source = "#  noqa: F401,  F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_leading_comment() {
         let source = "# Some comment describing the noqa # noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_leading_comment() {
         let source = "# Some comment describing the noqa # noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_leading_comment() {
         let source = "# Some comment describing the noqa # noqa: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_all_trailing_comment() {
         let source = "# noqa # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_code_trailing_comment() {
         let source = "# noqa: F401 # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_codes_trailing_comment() {
         let source = "# noqa: F401, F841 # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]
     fn noqa_invalid_codes() {
         let source = "# noqa: F401, unused-import, some other code";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_parse(source, TextSize::default()));
     }
 
     #[test]

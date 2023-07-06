@@ -18,8 +18,14 @@ pub fn directive_benchmark(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Regex", i), i, |b, _i| {
             b.iter(|| Directive::try_extract(black_box(i), TextSize::default()))
         });
-        group.bench_with_input(BenchmarkId::new("Parser", i), i, |b, _i| {
+        group.bench_with_input(BenchmarkId::new("Find", i), i, |b, _i| {
             b.iter(|| Directive::try_parse(black_box(i), TextSize::default()))
+        });
+        group.bench_with_input(BenchmarkId::new("AhoCorasick", i), i, |b, _i| {
+            b.iter(|| Directive::try_parse_aho_corasick(black_box(i), TextSize::default()))
+        });
+        group.bench_with_input(BenchmarkId::new("Memchr", i), i, |b, _i| {
+            b.iter(|| Directive::try_parse_memchr(black_box(i), TextSize::default()))
         });
     }
     group.finish();

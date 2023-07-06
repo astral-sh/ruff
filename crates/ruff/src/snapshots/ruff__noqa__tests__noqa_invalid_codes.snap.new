@@ -1,0 +1,17 @@
+---
+source: crates/ruff/src/noqa.rs
+assertion_line: 768
+expression: "Directive::try_parse(source, TextSize::default())"
+---
+Some(
+    Codes(
+        Codes {
+            range: 0..44,
+            codes: [
+                "F401",
+                "unused-import",
+                "some other code",
+            ],
+        },
+    ),
+)
