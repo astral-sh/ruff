@@ -335,89 +335,89 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     }
 
     // The comment must be between two statements...
-    if let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
-    {
-        // ...and the following statement must be the first statement in an alternate body of the parent...
-        if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
-            // ```python
-            // if test:
-            //     a
-            //     # comment
-            //     b
-            // ```
-            return CommentPlacement::Default(comment);
-        }
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
 
-        if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
-            // The `elif` or except handlers have their own body to which we can attach the trailing comment
+    // ...and the following statement must be the first statement in an alternate body of the parent...
+    if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
+        // ```python
+        // if test:
+        //     a
+        //     # comment
+        //     b
+        // ```
+        return CommentPlacement::Default(comment);
+    }
+
+    if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
+        // The `elif` or except handlers have their own body to which we can attach the trailing comment
+        // ```python
+        // if test:
+        //     a
+        // elif c: # comment
+        //     b
+        // ```
+        if following.is_except_handler() {
+            return CommentPlacement::trailing(following, comment);
+        } else if following.is_stmt_if() {
+            // We have to exclude for following if statements that are not elif by checking the
+            // indentation
             // ```python
-            // if test:
-            //     a
-            // elif c: # comment
-            //     b
-            // ```
-            if following.is_except_handler() {
-                return CommentPlacement::trailing(following, comment);
-            } else if following.is_stmt_if() {
-                // We have to exclude for following if statements that are not elif by checking the
-                // indentation
-                // ```python
-                // if True:
-                //     pass
-                // else:  # Comment
-                //     if False:
-                //         pass
-                //     pass
-                // ```
-                let base_if_indent =
-                    whitespace::indentation_at_offset(locator, following.range().start());
-                let maybe_elif_indent = whitespace::indentation_at_offset(
-                    locator,
-                    comment.enclosing_node().range().start(),
-                );
-                if base_if_indent == maybe_elif_indent {
-                    return CommentPlacement::trailing(following, comment);
-                }
-            }
-            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
-            // This means, there's no good place to attach the comments to.
-            // Make this a dangling comments and manually format the comment in
-            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
-            // to correctly identify the comments for the `finally` and `orelse` block by looking
-            // at the comment's range.
-            //
-            // ```python
-            // while x == y:
+            // if True:
             //     pass
-            // else: # trailing
-            //     print("nooop")
+            // else:  # Comment
+            //     if False:
+            //         pass
+            //     pass
             // ```
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
-        } else {
-            // Trailing comment of the preceding statement
-            // ```python
-            // while test:
-            //     a # comment
-            // else:
-            //     b
-            // ```
-            if preceding.is_node_with_body() {
-                // We can't set this as a trailing comment of the function declaration because it
-                // will then move behind the function block instead of sticking with the pass
-                // ```python
-                // if True:
-                //     def f():
-                //         pass  # a
-                // else:
-                //     pass
-                // ```
-                CommentPlacement::Default(comment)
-            } else {
-                CommentPlacement::trailing(preceding, comment)
+            let base_if_indent =
+                whitespace::indentation_at_offset(locator, following.range().start());
+            let maybe_elif_indent = whitespace::indentation_at_offset(
+                locator,
+                comment.enclosing_node().range().start(),
+            );
+            if base_if_indent == maybe_elif_indent {
+                return CommentPlacement::trailing(following, comment);
             }
         }
+        // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
+        // This means, there's no good place to attach the comments to.
+        // Make this a dangling comments and manually format the comment in
+        // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
+        // to correctly identify the comments for the `finally` and `orelse` block by looking
+        // at the comment's range.
+        //
+        // ```python
+        // while x == y:
+        //     pass
+        // else: # trailing
+        //     print("nooop")
+        // ```
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::Default(comment)
+        // Trailing comment of the preceding statement
+        // ```python
+        // while test:
+        //     a # comment
+        // else:
+        //     b
+        // ```
+        if preceding.is_node_with_body() {
+            // We can't set this as a trailing comment of the function declaration because it
+            // will then move behind the function block instead of sticking with the pass
+            // ```python
+            // if True:
+            //     def f():
+            //         pass  # a
+            // else:
+            //     pass
+            // ```
+            CommentPlacement::Default(comment)
+        } else {
+            CommentPlacement::trailing(preceding, comment)
+        }
     }
 }
 
