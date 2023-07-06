@@ -2189,6 +2189,11 @@ where
                     }
                 }
 
+                // Ex) Union[...]
+                if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                    flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                }
+
                 if self.semantic.match_typing_expr(value, "Literal") {
                     self.semantic.flags |= SemanticModelFlags::LITERAL;
                 }

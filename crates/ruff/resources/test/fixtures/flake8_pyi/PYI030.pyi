@@ -70,8 +70,14 @@ field20: typing.Union[
 # Should handle multiple unions with multiple members
 field21: Literal[1, 2] | Literal[3, 4]  # Error
 
-# Should emit in cases with `typing.Union`` instead of `|`
+# Should emit in cases with `typing.Union` instead of `|`
 field22: typing.Union[Literal[1], Literal[2]]  # Error
 
 # Should emit in cases with `typing_extensions.Literal`
 field23: typing_extensions.Literal[1] | typing_extensions.Literal[2]  # Error
+
+# Should emit in cases with nested `typing.Union`
+field24: typing.Union[Literal[1], typing.Union[Literal[2], str]]  # Error
+
+# Should emit in cases with mixed `typing.Union` and `|`
+field24: typing.Union[Literal[1], Literal[2] | str]  # Error

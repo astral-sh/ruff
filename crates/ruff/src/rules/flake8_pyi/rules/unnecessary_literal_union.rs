@@ -10,7 +10,8 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of multiple literal types in a union.
 ///
 /// ## Why is this bad?
-/// Literal types accept multiple arguments and it is clearer to specify them as a single literal.
+/// Literal types accept multiple arguments and it is clearer to specify them
+/// as a single literal.
 ///
 /// ## Example
 /// ```python
@@ -37,15 +38,26 @@ impl Violation for UnnecessaryLiteralUnion {
 }
 
 /// PYI030
-pub(crate) fn unnecessary_literal_union(checker: &mut Checker, expr: &Expr) {
-    let mut literal_members = Vec::new();
-    collect_literal_members(&mut literal_members, checker.semantic(), expr);
+pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Expr) {
+    let mut literal_exprs = Vec::new();
+
+    // Adds a member to `literal_exprs` if it is a `Literal` annotation
+    let mut collect_literal_expr = |expr: &'a Expr| {
+        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            if checker.semantic().match_typing_expr(&*value, "Literal") {
+                literal_exprs.push(slice);
+            }
+        }
+    };
+
+    // Traverse the union, collect all literal members
+    traverse_union(&mut collect_literal_expr, expr, checker.semantic());
 
     // Raise a violation if more than one
-    if literal_members.len() > 1 {
+    if literal_exprs.len() > 1 {
         let diagnostic = Diagnostic::new(
             UnnecessaryLiteralUnion {
-                members: literal_members
+                members: literal_exprs
                     .into_iter()
                     .map(|m| checker.locator.slice(m.range()).to_string())
                     .collect(),
@@ -57,20 +69,12 @@ pub(crate) fn unnecessary_literal_union(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-/// Collect literal expressions from a union.
-fn collect_literal_members<'a>(
-    literal_members: &mut Vec<&'a Expr>,
-    model: &SemanticModel,
-    expr: &'a Expr,
-) {
-    // The union data structure usually looks like this:
-    //  a | b | c -> (a | b) | c
-    //
-    // However, parenthesized expressions can coerce it into any structure:
-    //  a | (b | c)
-    //
-    // So we have to traverse both branches in order (left, then right), to report members
-    // in the order they appear in the source code.
+/// Traverse a "union" type annotation, calling `func` on each expression in the union.
+fn traverse_union<'a, F>(func: &mut F, expr: &'a Expr, semantic: &SemanticModel)
+where
+    F: FnMut(&'a Expr),
+{
+    // Ex) x | y
     if let Expr::BinOp(ast::ExprBinOp {
         op: Operator::BitOr,
         left,
@@ -78,15 +82,34 @@ fn collect_literal_members<'a>(
         range: _,
     }) = expr
     {
-        // Traverse left subtree, then the right subtree, propagating the previous node.
-        collect_literal_members(literal_members, model, left);
-        collect_literal_members(literal_members, model, right);
+        // The union data structure usually looks like this:
+        //  a | b | c -> (a | b) | c
+        //
+        // However, parenthesized expressions can coerce it into any structure:
+        //  a | (b | c)
+        //
+        // So we have to traverse both branches in order (left, then right), to report members
+        // in the order they appear in the source code.
+
+        // Traverse the left then right arms
+        traverse_union(func, left, semantic);
+        traverse_union(func, right, semantic);
+        return;
     }
 
-    // If it's a literal expression add it to the members
+    // Ex) Union[x, y]
     if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
-        if model.match_typing_expr(value, "Literal") {
-            literal_members.push(slice);
+        if semantic.match_typing_expr(value, "Union") {
+            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                // Traverse each element of the tuple within the union recursively to handle cases
+                // such as `Union[..., Union[...]]
+                elts.iter()
+                    .for_each(|elt| traverse_union(func, elt, semantic));
+                return;
+            }
         }
     }
+
+    // Otherwise, call the function on expression
+    func(expr)
 }
