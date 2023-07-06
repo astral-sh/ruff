@@ -252,18 +252,25 @@ jobs:
   docs:
     name: "mkdocs"
     runs-on: ubuntu-latest
+    env:
+      MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
       - name: "Add SSH key"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         uses: webfactory/ssh-agent@v0.7.0
         with:
           ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
-      - name: "Install dependencies"
+      - name: "Install Insiders dependencies"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: pip install -r docs/requirements-insiders.txt
+      - name: "Install dependencies"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
+        run: pip install -r docs/requirements.txt
       - name: "Update README File"
         run: python scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
