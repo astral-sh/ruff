@@ -7,12 +7,13 @@ use ruff_python_ast::helpers::{is_const_none, SimpleCallArgs};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of the Python `requests` module without a timeout.
+/// Checks for uses of the Python `requests` module that omit the `timeout`
+/// parameter.
 ///
 /// ## Why is this bad?
 /// The `timeout` parameter is used to set the maximum time to wait for a
-/// response from the server. Without a timeout, the program may hang
-/// indefinitely waiting for a response.
+/// response from the server. By omitting the `timeout` parameter, the program
+/// may hang indefinitely while awaiting a response.
 ///
 /// ## Example
 /// ```python

@@ -10,7 +10,7 @@ use ruff_python_semantic::SemanticModel;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for particularly permissive file permissions.
+/// Checks for files with overly permissive permissions.
 ///
 /// ## Why is this bad?
 /// Overly permissive file permissions may allow unintended access and
@@ -43,7 +43,7 @@ impl Violation for BadFilePermissions {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadFilePermissions { mask } = self;
-        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory",)
+        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")
     }
 }
 

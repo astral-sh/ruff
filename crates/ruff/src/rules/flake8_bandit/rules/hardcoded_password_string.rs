@@ -8,16 +8,16 @@ use crate::checkers::ast::Checker;
 use super::super::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
-/// Checks for hardcoded password strings.
+/// Checks for potential uses of hardcoded passwords in strings.
 ///
 /// ## Why is this bad?
-/// Hardcoded passwords are a security risk as they can be easily discovered
-/// by attackers and used to gain unauthorized access. As they are hardcoded,
-/// this vulnerability cannot be easily fixed by the end user without changing
-/// the source code.
+/// Including a hardcoded password in source code is a security risk, as an
+/// attacker could discover the password and use it to gain unauthorized
+/// access.
 ///
-/// Instead of hardcoding passwords, consider storing them in configuration
-/// files or other stores that are not committed to version control.
+/// Instead, store passwords and other secrets in configuration files,
+/// environment variables, or other sources that are excluded from version
+/// control.
 ///
 /// ## Example
 /// ```python

@@ -7,10 +7,11 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 
 /// ## What it does
-/// Checks for `try`-`except`-`continue` statements.
+/// Checks for uses of the `try`-`except`-`continue` pattern.
 ///
 /// ## Why is this bad?
-/// Suppressing exception messages may hide errors that could otherwise reveal
+/// The `try`-`except`-`continue` pattern suppresses all exceptions.
+/// Suppressing exceptions may hide errors that could otherwise reveal
 /// unexpected behavior, security vulnerabilities, or malicious activity.
 /// Instead, consider logging the exception.
 ///

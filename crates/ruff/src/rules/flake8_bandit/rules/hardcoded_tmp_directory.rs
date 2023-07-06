@@ -4,14 +4,15 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
-/// Checks for hardcoded temporary file or directory paths.
+/// Checks for the use of hardcoded temporary file or directory paths.
 ///
 /// ## Why is this bad?
-/// Hardcoded temporary file or directory paths with permissive read and write
-/// permissions are insecure as they can be easily discovered by attackers who
-/// can use them to supply malicious or otherwise unexpected files to the
-/// program. Other programs may also read or write to these files, causing
-/// unexpected behavior.
+/// The use of hardcoded paths for temporary files can be insecure. If an
+/// attacker discovers the location of a hardcoded path, they can replace the
+/// contents of the file or directory with a malicious payload.
+///
+/// Other programs may also read or write contents to these hardcoded paths,
+/// causing unexpected behavior.
 ///
 /// ## Example
 /// ```python

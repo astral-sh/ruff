@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
-/// Checks for hardcoded bindings to all interfaces (`0.0.0.0`).
+/// Checks for hardcoded bindings to all network interfaces (`0.0.0.0`).
 ///
 /// ## Why is this bad?
 /// Binding to all network interfaces is insecure as it allows access from

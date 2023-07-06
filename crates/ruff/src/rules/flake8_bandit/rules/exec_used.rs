@@ -6,10 +6,11 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of builtin `exec` function.
+/// Checks for uses of the builtin `exec` function.
 ///
 /// ## Why is this bad?
-/// The `exec()` function is insecure as it enables arbitrary code execution.
+/// The `exec()` function is insecure as it allows for arbitrary code
+/// execution.
 ///
 /// ## Example
 /// ```python
