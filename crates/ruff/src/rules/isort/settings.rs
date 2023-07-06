@@ -385,41 +385,45 @@ impl TryFrom<Options> for Settings {
             .map(|names| {
                 names
                     .into_iter()
-                    .map(|name| {
-                        IdentifierPattern::new(&name).map_err(SettingsError::InvalidKnownFirstParty)
-                    })
-                    .collect::<Result<Vec<_>, Self::Error>>()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
             })
-            .transpose()?
+            .transpose()
+            .map_err(SettingsError::InvalidKnownFirstParty)?
             .unwrap_or_default();
-        let known_third_party = match options.known_third_party {
-            Some(names) => names
-                .into_iter()
-                .map(|name| {
-                    IdentifierPattern::new(&name).map_err(SettingsError::InvalidKnownThirdParty)
-                })
-                .collect::<Result<Vec<_>, Self::Error>>()?,
-            None => vec![],
-        };
-        let known_local_folder = match options.known_local_folder {
-            Some(names) => names
-                .into_iter()
-                .map(|name| {
-                    IdentifierPattern::new(&name).map_err(SettingsError::InvalidKnownLocalFolder)
-                })
-                .collect::<Result<Vec<_>, Self::Error>>()?,
-            None => vec![],
-        };
-        let extra_standard_library = match options.extra_standard_library {
-            Some(names) => names
-                .into_iter()
-                .map(|name| {
-                    IdentifierPattern::new(&name)
-                        .map_err(SettingsError::InvalidExtraStandardLibrary)
-                })
-                .collect::<Result<Vec<_>, Self::Error>>()?,
-            None => vec![],
-        };
+        let known_third_party = options
+            .known_third_party
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
+            })
+            .transpose()
+            .map_err(SettingsError::InvalidKnownThirdParty)?
+            .unwrap_or_default();
+        let known_local_folder = options
+            .known_local_folder
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
+            })
+            .transpose()
+            .map_err(SettingsError::InvalidKnownLocalFolder)?
+            .unwrap_or_default();
+        let extra_standard_library = options
+            .extra_standard_library
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
+            })
+            .transpose()
+            .map_err(SettingsError::InvalidExtraStandardLibrary)?
+            .unwrap_or_default();
         let no_lines_before = options.no_lines_before.unwrap_or_default();
         let sections = options.sections.unwrap_or_default();
 

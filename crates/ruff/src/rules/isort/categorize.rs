@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
+use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
 
 use log::debug;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -11,6 +12,7 @@ use ruff_macros::CacheKey;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
 use crate::settings::types::PythonVersion;
+use crate::warn_user_once;
 
 use super::types::{ImportBlock, Importable};
 
@@ -251,6 +253,17 @@ impl KnownModules {
             )
             .collect();
 
+        // Warn in the case of duplicate modules.
+        let mut seen =
+            FxHashSet::with_capacity_and_hasher(known.len(), BuildHasherDefault::default());
+        for (module, _) in &known {
+            if !seen.insert(module) {
+                warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");
+                break;
+            }
+        }
+
+        // Check if any of the known modules are submodules.
         let has_submodules = known
             .iter()
             .any(|(module, _)| module.as_str().contains('.'));

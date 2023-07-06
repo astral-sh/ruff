@@ -369,7 +369,7 @@ mod tests {
         Ok(())
     }
 
-    fn to_pattern(pattern: &str) -> glob::Pattern {
+    fn pattern(pattern: &str) -> glob::Pattern {
         glob::Pattern::new(pattern).unwrap()
     }
 
@@ -381,8 +381,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec![to_pattern("foo.bar"), to_pattern("baz")],
-                        vec![to_pattern("foo"), to_pattern("__future__")],
+                        vec![pattern("foo.bar"), pattern("baz")],
+                        vec![pattern("foo"), pattern("__future__")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -405,8 +405,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec![to_pattern("foo.*"), to_pattern("baz")],
-                        vec![to_pattern("foo"), to_pattern("__future__")],
+                        vec![pattern("foo.*"), pattern("baz")],
+                        vec![pattern("foo"), pattern("__future__")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -429,8 +429,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec![to_pattern("foo")],
-                        vec![to_pattern("foo.bar")],
+                        vec![pattern("foo")],
+                        vec![pattern("foo.bar")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -473,7 +473,7 @@ mod tests {
                     known_modules: KnownModules::new(
                         vec![],
                         vec![],
-                        vec![to_pattern("ruff")],
+                        vec![pattern("ruff")],
                         vec![],
                         FxHashMap::default(),
                     ),
@@ -989,7 +989,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec![to_pattern("django")])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
@@ -1018,11 +1018,11 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec![to_pattern("library")],
+                        vec![pattern("library")],
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec![to_pattern("django")])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
