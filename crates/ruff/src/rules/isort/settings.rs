@@ -574,8 +574,7 @@ impl From<Settings> for Options {
                 settings
                     .known_modules
                     .modules_for_known_type(ImportType::StandardLibrary)
-                    .into_iter()
-                    .map(|module| module.to_string())
+                    .map(ToString::to_string)
                     .collect(),
             ),
             force_single_line: Some(settings.force_single_line),
@@ -586,24 +585,21 @@ impl From<Settings> for Options {
                 settings
                     .known_modules
                     .modules_for_known_type(ImportType::FirstParty)
-                    .into_iter()
-                    .map(|module| module.to_string())
+                    .map(ToString::to_string)
                     .collect(),
             ),
             known_third_party: Some(
                 settings
                     .known_modules
                     .modules_for_known_type(ImportType::ThirdParty)
-                    .into_iter()
-                    .map(|module| module.to_string())
+                    .map(ToString::to_string)
                     .collect(),
             ),
             known_local_folder: Some(
                 settings
                     .known_modules
                     .modules_for_known_type(ImportType::LocalFolder)
-                    .into_iter()
-                    .map(|module| module.to_string())
+                    .map(ToString::to_string)
                     .collect(),
             ),
             order_by_type: Some(settings.order_by_type),
@@ -624,11 +620,10 @@ impl From<Settings> for Options {
                     .user_defined()
                     .into_iter()
                     .map(|(section, modules)| {
-                        let modules_str = modules
-                            .into_iter()
-                            .map(|module| module.to_string())
-                            .collect();
-                        (ImportSection::UserDefined(section), modules_str)
+                        (
+                            ImportSection::UserDefined(section.to_string()),
+                            modules.into_iter().map(ToString::to_string).collect(),
+                        )
                     })
                     .collect(),
             ),
