@@ -2226,7 +2226,7 @@ where
                 }
                 if self.enabled(Rule::UnnecessaryListAllocationForFirstElement) {
                     ruff::rules::unnecessary_list_allocation_for_first_element(
-                        self, value, slice, range,
+                        self, value, slice, *range,
                     );
                 }
 

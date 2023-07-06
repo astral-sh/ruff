@@ -65,7 +65,7 @@ pub(crate) fn unnecessary_list_allocation_for_first_element(
     checker: &mut Checker,
     call: &Expr,
     slice: &Expr,
-    subscript_range: &TextRange,
+    subscript_range: TextRange,
 ) {
     if !indexes_first_element(slice) {
         return;
@@ -76,14 +76,14 @@ pub(crate) fn unnecessary_list_allocation_for_first_element(
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryListAllocationForFirstElement::new(iter_name.to_string()),
-        *subscript_range,
+        subscript_range,
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        let replacement = format!("next(iter({}))", iter_name);
+        let replacement = format!("next(iter({iter_name}))");
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             replacement,
-            *subscript_range,
+            subscript_range,
         )));
     }
 
