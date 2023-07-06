@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/noqa.rs
+expression: "Directive::try_extract(range, &locator)"
+---
+Some(
+    Codes(
+        Codes {
+            range: 0..18,
+            codes: [
+                "F401",
+                "F841",
+            ],
+        },
+    ),
+)

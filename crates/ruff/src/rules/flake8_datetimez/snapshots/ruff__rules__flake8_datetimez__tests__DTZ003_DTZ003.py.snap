@@ -11,10 +11,12 @@ DTZ003.py:4:1: DTZ003 The use of `datetime.datetime.utcnow()` is not allowed, us
   |
 
 DTZ003.py:9:1: DTZ003 The use of `datetime.datetime.utcnow()` is not allowed, use `datetime.datetime.now(tz=)` instead
-  |
-8 | # unqualified
-9 | datetime.utcnow()
-  | ^^^^^^^^^^^^^^^^^ DTZ003
-  |
+   |
+ 8 | # unqualified
+ 9 | datetime.utcnow()
+   | ^^^^^^^^^^^^^^^^^ DTZ003
+10 | 
+11 | # uses `astimezone` method
+   |
 
 

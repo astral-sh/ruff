@@ -17,3 +17,10 @@ def f():
     result = []
     for i in items:
         result.append(i * i)  # OK
+
+
+def f():
+    items = [1, 2, 3, 4]
+    result = {}
+    for i in items:
+        result[i].append(i * i)  # OK

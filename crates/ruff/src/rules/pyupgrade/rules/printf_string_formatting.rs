@@ -344,7 +344,7 @@ pub(crate) fn printf_string_formatting(
     )
     .flatten()
     {
-        if matches!(tok, Tok::String { .. }) {
+        if tok.is_string() {
             strings.push(range);
         } else if matches!(tok, Tok::Rpar) {
             // If we hit a right paren, we have to preserve it.

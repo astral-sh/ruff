@@ -2,7 +2,7 @@
 use anyhow::{bail, Result};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{self, ExceptHandler, Expr, Keyword, Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
+use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers;
@@ -98,7 +98,7 @@ pub(crate) fn remove_argument(
         // Case 1: there is only one argument.
         let mut count = 0u32;
         for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
-            if matches!(tok, Tok::Lpar) {
+            if tok.is_lpar() {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
                         range.start()
@@ -109,7 +109,7 @@ pub(crate) fn remove_argument(
                 count = count.saturating_add(1);
             }
 
-            if matches!(tok, Tok::Rpar) {
+            if tok.is_rpar() {
                 count = count.saturating_sub(1);
                 if count == 0 {
                     fix_end = Some(if remove_parentheses {
@@ -131,11 +131,11 @@ pub(crate) fn remove_argument(
         let mut seen_comma = false;
         for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if seen_comma {
-                if matches!(tok, Tok::NonLogicalNewline) {
+                if tok.is_non_logical_newline() {
                     // Also delete any non-logical newlines after the comma.
                     continue;
                 }
-                fix_end = Some(if matches!(tok, Tok::Newline) {
+                fix_end = Some(if tok.is_newline() {
                     range.end()
                 } else {
                     range.start()
@@ -145,7 +145,7 @@ pub(crate) fn remove_argument(
             if range.start() == expr_range.start() {
                 fix_start = Some(range.start());
             }
-            if fix_start.is_some() && matches!(tok, Tok::Comma) {
+            if fix_start.is_some() && tok.is_comma() {
                 seen_comma = true;
             }
         }
@@ -157,7 +157,7 @@ pub(crate) fn remove_argument(
                 fix_end = Some(expr_range.end());
                 break;
             }
-            if matches!(tok, Tok::Comma) {
+            if tok.is_comma() {
                 fix_start = Some(range.start());
             }
         }

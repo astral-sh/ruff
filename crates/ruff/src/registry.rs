@@ -18,8 +18,10 @@ pub trait AsRule {
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
-        let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
-        Ok(prefix.rules().next().unwrap())
+        linter
+            .all_rules()
+            .find(|rule| rule.noqa_code().suffix() == code)
+            .ok_or(FromCodeError::Unknown)
     }
 }
 

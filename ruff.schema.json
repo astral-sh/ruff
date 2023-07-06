@@ -1135,6 +1135,13 @@
     "IsortOptions": {
       "type": "object",
       "properties": {
+        "case-sensitive": {
+          "description": "Sort imports taking into account case sensitivity.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "classes": {
           "description": "An override list of tokens to always recognize as a Class for `order-by-type` regardless of casing.",
           "type": [
@@ -1586,17 +1593,17 @@
     "Quote": {
       "oneOf": [
         {
-          "description": "Use single quotes.",
-          "type": "string",
-          "enum": [
-            "single"
-          ]
-        },
-        {
           "description": "Use double quotes.",
           "type": "string",
           "enum": [
             "double"
+          ]
+        },
+        {
+          "description": "Use single quotes.",
+          "type": "string",
+          "enum": [
+            "single"
           ]
         }
       ]
@@ -2121,6 +2128,10 @@
         "PL",
         "PLC",
         "PLC0",
+        "PLC01",
+        "PLC013",
+        "PLC0131",
+        "PLC0132",
         "PLC02",
         "PLC020",
         "PLC0205",
