@@ -13,3 +13,7 @@ Thank you for contributing to Ruff! To help us out with reviewing, please consid
 ## Test Plan
 
 <!-- How was it tested? -->
+
+## Issue Links
+
+<!-- What issue(s) does this PR close? -->
