@@ -15,11 +15,15 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// from typing import Literal
+///
 /// field: Literal[1] | Literal[2]
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import Literal
+///
 /// field: Literal[1, 2]
 /// ```
 #[violation]
