@@ -489,22 +489,26 @@ impl LogicalLinesBuilder {
     fn finish_line(&mut self) {
         let end = self.tokens.len() as u32;
         if self.current_line.tokens_start < end {
-            let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
-                .iter()
-                .all(|token| token.kind.is_newline());
-            if is_empty {
-                self.current_blank_lines += 1;
-                self.current_blank_characters += end - self.current_line.tokens_start;
-            } else {
-                self.lines.push(Line {
-                    flags: self.current_line.flags,
-                    preceding_blank_lines: self.current_blank_lines,
-                    preceding_blank_characters: self.current_blank_characters,
-                    tokens_start: self.current_line.tokens_start,
-                    tokens_end: end,
-                });
-                self.current_blank_lines = 0;
-                self.current_blank_characters = 0;
+            // Do not take comment only lines into account when it comes to empty lines.
+            if self.current_line.flags != TokenFlags::COMMENT {
+                let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
+                    .iter()
+                    .all(|token| token.kind.is_newline());
+                if is_empty {
+                    // self.current_line.flags.
+                    self.current_blank_lines += 1;
+                    self.current_blank_characters += end - self.current_line.tokens_start;
+                } else {
+                    self.lines.push(Line {
+                        flags: self.current_line.flags,
+                        preceding_blank_lines: self.current_blank_lines,
+                        preceding_blank_characters: self.current_blank_characters,
+                        tokens_start: self.current_line.tokens_start,
+                        tokens_end: end,
+                    });
+                    self.current_blank_lines = 0;
+                    self.current_blank_characters = 0;
+                }
             }
 
             self.current_line = CurrentLine {
