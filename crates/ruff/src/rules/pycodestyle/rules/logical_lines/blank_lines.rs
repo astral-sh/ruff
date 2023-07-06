@@ -347,7 +347,7 @@ pub(crate) fn blank_lines(
                 locator.line_start(token.range().start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if token.kind() == TokenKind::Def
+        } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
             && !tracked_vars.follows_decorator
             && !tracked_vars.is_in_class
             && !tracked_vars.is_in_fn
