@@ -1,6 +1,7 @@
 use crate::comments::{dangling_comments, CommentLinePosition, Comments};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -54,14 +55,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 
         let items = format_with(|f| f.join_comma_separated().nodes(elts.iter()).finish());
 
-        write!(
-            f,
-            [group(&format_args![
-                text("["),
-                soft_block_indent(&items),
-                text("]")
-            ])]
-        )
+        parenthesized("[", &items, "]").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {

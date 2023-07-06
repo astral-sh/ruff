@@ -1,10 +1,11 @@
 use crate::builders::PyFormatterExtensions;
 use crate::comments::{dangling_comments, Comments};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{format_with, group, soft_block_indent, text};
+use ruff_formatter::prelude::{format_with, group, text};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprCall;
 
@@ -56,7 +57,6 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
             f,
             [
                 func.format(),
-                text("("),
                 // The outer group is for things like
                 // ```python
                 // get_collection(
@@ -73,8 +73,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
                 // )
                 // ```
                 // TODO(konstin): Doesn't work see wrongly formatted test
-                &group(&soft_block_indent(&group(&all_args))),
-                text(")")
+                parenthesized("(", &group(&all_args), ")")
             ]
         )
     }
