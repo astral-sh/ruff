@@ -360,9 +360,9 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Dagster](https://github.com/dagster-io/dagster)
 - Databricks ([MLflow](https://github.com/mlflow/mlflow))
 - [FastAPI](https://github.com/tiangolo/fastapi)
-- [HTTPX](https://github.com/encode/httpx)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
+- [HTTPX](https://github.com/encode/httpx)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
   [Datasets](https://github.com/huggingface/datasets),
   [Diffusers](https://github.com/huggingface/diffusers))
