@@ -362,6 +362,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
+- [HTTPX](https://github.com/encode/httpx)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
   [Datasets](https://github.com/huggingface/datasets),
   [Diffusers](https://github.com/huggingface/diffusers))
