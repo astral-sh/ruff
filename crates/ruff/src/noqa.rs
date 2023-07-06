@@ -11,6 +11,7 @@ use log::warn;
 use once_cell::sync::Lazy;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
+use unicase::UniCase;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
@@ -115,10 +116,10 @@ impl<'a> Directive<'a> {
 
     /// Lex an individual rule code (e.g., `F401`).
     fn lex_code(text: &str) -> Option<&str> {
-        let prefix = text.chars().take_while(|c| c.is_ascii_uppercase()).count();
+        let prefix = text.chars().take_while(char::is_ascii_uppercase).count();
         let suffix = text[prefix..]
             .chars()
-            .take_while(|c| c.is_ascii_digit())
+            .take_while(char::is_ascii_digit)
             .count();
         if prefix > 0 && suffix > 0 {
             Some(&text[..prefix + suffix])
@@ -232,7 +233,7 @@ impl FileExemption {
 /// [`FileExemption`], but only for a single line, as opposed to an aggregated set of exemptions
 /// across a source file.
 #[derive(Debug)]
-enum ParsedFileExemption<'a> {
+pub enum ParsedFileExemption<'a> {
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
@@ -241,7 +242,77 @@ enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(line: &'a str) -> Option<Self> {
+    pub fn parse(line: &'a str) -> Option<Self> {
+        let line = line.trim_whitespace_start();
+
+        if line.len() >= "# flake8: noqa".len() {
+            if UniCase::new(&line[.."# flake8: noqa".len()]) == UniCase::new("# flake8: noqa") {
+                return Some(Self::All);
+            }
+        }
+
+        if line.len() >= "# ruff: noqa".len() {
+            if UniCase::new(&line[.."# ruff: noqa".len()]) == UniCase::new("# ruff: noqa") {
+                let remainder = &line["# ruff: noqa".len()..];
+                if remainder.is_empty() {
+                    return Some(Self::All);
+                } else if let Some(codes) = remainder.strip_prefix(':') {
+                    let codes = codes
+                        .split(|c: char| c.is_whitespace() || c == ',')
+                        .map(str::trim)
+                        .filter(|code| !code.is_empty())
+                        .collect_vec();
+                    if codes.is_empty() {
+                        warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                    }
+                    return Some(Self::Codes(codes));
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Return a [`ParsedFileExemption`] for a given comment line.
+    pub fn matches(line: &'a str) -> Option<Self> {
+        let line = line.trim_whitespace_start();
+
+        if line.len() >= "# flake8: noqa".len() {
+            if matches!(
+                &line[.."# flake8: noqa".len()],
+                "# flake8: noqa" | "# flake8: NOQA" | "# flake8: NoQA"
+            ) {
+                return Some(Self::All);
+            }
+        }
+
+        if line.len() >= "# ruff: noqa".len() {
+            if matches!(
+                &line[.."# ruff: noqa".len()],
+                "# ruff: noqa" | "# ruff: NOQA" | "# ruff: NoQA"
+            ) {
+                let remainder = &line["# ruff: noqa".len()..];
+                if remainder.is_empty() {
+                    return Some(Self::All);
+                } else if let Some(codes) = remainder.strip_prefix(':') {
+                    let codes = codes
+                        .split(|c: char| c.is_whitespace() || c == ',')
+                        .map(str::trim)
+                        .filter(|code| !code.is_empty())
+                        .collect_vec();
+                    if codes.is_empty() {
+                        warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                    }
+                    return Some(Self::Codes(codes));
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Return a [`ParsedFileExemption`] for a given comment line.
+    pub fn extract(line: &'a str) -> Option<Self> {
         let line = line.trim_whitespace_start();
 
         if line.starts_with("# flake8: noqa")

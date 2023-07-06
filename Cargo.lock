@@ -1818,6 +1818,7 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
+ "criterion",
  "dirs 5.0.1",
  "fern",
  "glob",
@@ -1872,6 +1873,7 @@ dependencies = [
  "thiserror",
  "toml",
  "typed-arena",
+ "unicase",
  "unicode-width",
  "unicode_names2",
 ]
@@ -2884,6 +2886,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96bd2f2237fe450fcd0a1d2f5f4e91711124f7857ba2e964247776ebeeb7b0c4"
 dependencies = [
  "unic-common",
+]
+
+[[package]]
+name = "unicase"
+version = "2.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50f37be617794602aabbeee0be4f259dc1778fabe05e2d67ee8f79326d5cb4f6"
+dependencies = [
+ "version_check",
 ]
 
 [[package]]
