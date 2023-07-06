@@ -1,7 +1,6 @@
 use num_traits::ToPrimitive;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Constant, Expr};
 
 use crate::checkers::ast::Checker;
@@ -63,28 +62,26 @@ impl AlwaysAutofixableViolation for UnnecessaryListAllocationForFirstElement {
 /// RUF015
 pub(crate) fn unnecessary_list_allocation_for_first_element(
     checker: &mut Checker,
-    call: &Expr,
-    slice: &Expr,
-    subscript_range: TextRange,
+    subscript: &Expr,
 ) {
+    let Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) = subscript else {
+        return;
+    };
     if !indexes_first_element(slice) {
         return;
     }
-    let Some(iter_name) = get_iterable_name(checker, call) else {
+    let Some(iter_name) = get_iterable_name(checker, value) else {
         return;
     };
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryListAllocationForFirstElement::new(iter_name.to_string()),
-        subscript_range,
+        *range,
     );
 
     if checker.patch(diagnostic.kind.rule()) {
         let replacement = format!("next(iter({iter_name}))");
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            replacement,
-            subscript_range,
-        )));
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(replacement, *range)));
     }
 
     checker.diagnostics.push(diagnostic);

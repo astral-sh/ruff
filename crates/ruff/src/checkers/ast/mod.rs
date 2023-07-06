@@ -2139,12 +2139,7 @@ where
 
         // Pre-visit.
         match expr {
-            Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                range,
-                ..
-            }) => {
+            subscript @ Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.any_enabled(&[
                     Rule::FutureRewritableTypeAnnotation,
@@ -2225,9 +2220,7 @@ where
                     flake8_simplify::rules::use_capital_environment_variables(self, expr);
                 }
                 if self.enabled(Rule::UnnecessaryListAllocationForFirstElement) {
-                    ruff::rules::unnecessary_list_allocation_for_first_element(
-                        self, value, slice, *range,
-                    );
+                    ruff::rules::unnecessary_list_allocation_for_first_element(self, subscript);
                 }
 
                 pandas_vet::rules::subscript(self, value, expr);
