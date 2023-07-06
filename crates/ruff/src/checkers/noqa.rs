@@ -23,7 +23,7 @@ pub(crate) fn check_noqa(
     settings: &Settings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges);
+    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, locator);
 
     // Extract all `noqa` directives.
     let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, locator);
