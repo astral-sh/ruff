@@ -83,7 +83,7 @@ impl<'a> Directive<'a> {
                     let mut codes = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
-                    while let Some(code) = Directive::lex_code(&text[codes_end + leading_space..]) {
+                    while let Some(code) = Directive::eat_code(&text[codes_end + leading_space..]) {
                         codes.push(code);
                         codes_end += leading_space;
                         codes_end += code.len();
@@ -125,8 +125,8 @@ impl<'a> Directive<'a> {
         None
     }
 
-    /// Lex an individual rule code (e.g., `F401`).
-    fn lex_code(text: &str) -> Option<&str> {
+    /// Eat an individual rule code (e.g., `F401`).
+    fn eat_code(text: &str) -> Option<&str> {
         // Extract, e.g., the `F` in `F401`.
         let prefix = text.chars().take_while(char::is_ascii_uppercase).count();
         // Extract, e.g., the `401` in `F401`.
@@ -246,7 +246,7 @@ impl FileExemption {
 /// [`FileExemption`], but only for a single line, as opposed to an aggregated set of exemptions
 /// across a source file.
 #[derive(Debug)]
-enum ParsedFileExemption<'a> {
+pub enum ParsedFileExemption<'a> {
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
@@ -255,7 +255,7 @@ enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(line: &'a str) -> Option<Self> {
+    pub fn try_regex(line: &'a str) -> Option<Self> {
         let line = line.trim_whitespace_start();
 
         if line.starts_with("# flake8: noqa")
@@ -287,6 +287,152 @@ impl<'a> ParsedFileExemption<'a> {
         }
 
         None
+    }
+
+    /// Return a [`ParsedFileExemption`] for a given comment line.
+    pub fn try_extract(line: &'a str) -> Option<Self> {
+        let line = ParsedFileExemption::eat_whitespace(line);
+        let line = ParsedFileExemption::eat_char(line, '#')?;
+        let line = ParsedFileExemption::eat_whitespace(line);
+
+        if let Some(line) = ParsedFileExemption::eat_flake8(line) {
+            // Ex) `# flake8: noqa`
+            let line = ParsedFileExemption::eat_whitespace(line);
+            let line = ParsedFileExemption::eat_char(line, ':')?;
+            let line = ParsedFileExemption::eat_whitespace(line);
+            let line = ParsedFileExemption::eat_noqa(line)?;
+
+            Some(Self::All)
+        } else if let Some(line) = ParsedFileExemption::eat_ruff(line) {
+            let line = ParsedFileExemption::eat_whitespace(line);
+            let line = ParsedFileExemption::eat_char(line, ':')?;
+            let line = ParsedFileExemption::eat_whitespace(line);
+            let line = ParsedFileExemption::eat_noqa(line)?;
+
+            if line.is_empty() {
+                // Ex) `# ruff: noqa`
+                Some(Self::All)
+            } else {
+                // Ex) `# ruff: noqa: F401, F841`
+                let line = ParsedFileExemption::eat_whitespace(line);
+                let Some(line) = ParsedFileExemption::eat_char(line, ':') else {
+                    warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
+                    return None;
+                };
+                let line = ParsedFileExemption::eat_whitespace(line);
+
+                // Extract the codes from the line (e.g., `F401, F841`).
+                let mut codes = vec![];
+                let mut line = line;
+                while let Some(code) = ParsedFileExemption::eat_code(line) {
+                    codes.push(code);
+                    line = &line[code.len()..];
+
+                    // Codes can be comma- or whitespace-delimited.
+                    if let Some(rest) = ParsedFileExemption::eat_delimiter(line)
+                        .map(ParsedFileExemption::eat_whitespace)
+                    {
+                        line = rest;
+                    } else {
+                        break;
+                    }
+                }
+
+                Some(Self::Codes(codes))
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Eat optional leading whitespace.
+    #[inline]
+    fn eat_whitespace(line: &str) -> &str {
+        line.trim_start()
+    }
+
+    /// Eat a specific character, or return `None` if the character is not the first character in
+    /// the line.
+    #[inline]
+    fn eat_char(line: &str, c: char) -> Option<&str> {
+        let mut chars = line.chars();
+        if chars.next() == Some(c) {
+            Some(chars.as_str())
+        } else {
+            None
+        }
+    }
+
+    /// Eat the "flake8" prefix of a `noqa` directive.
+    #[inline]
+    fn eat_flake8(line: &str) -> Option<&str> {
+        line.strip_prefix("flake8")
+    }
+
+    /// Eat the "ruff" prefix of a `noqa` directive.
+    #[inline]
+    fn eat_ruff(line: &str) -> Option<&str> {
+        line.strip_prefix("ruff")
+    }
+
+    /// Eat a `noqa` directive with case-insensitive matching.
+    #[inline]
+    fn eat_noqa(line: &str) -> Option<&str> {
+        let mut chars = line.bytes();
+        if chars
+            .next()
+            .map_or(false, |c| c.to_ascii_lowercase() == b'n')
+        {
+            if chars
+                .next()
+                .map_or(false, |c| c.to_ascii_lowercase() == b'o')
+            {
+                if chars
+                    .next()
+                    .map_or(false, |c| c.to_ascii_lowercase() == b'q')
+                {
+                    if chars
+                        .next()
+                        .map_or(false, |c| c.to_ascii_lowercase() == b'a')
+                    {
+                        return Some(chars.as_str());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Eat a code delimiter, which can either be a comma or whitespace.
+    #[inline]
+    fn eat_delimiter(line: &str) -> Option<&str> {
+        let mut chars = line.chars();
+        if let Some(c) = chars.next() {
+            if c == ',' || c.is_whitespace() {
+                Some(chars.as_str())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Eat an individual rule code (e.g., `F401`).
+    #[inline]
+    fn eat_code(line: &str) -> Option<&str> {
+        // Extract, e.g., the `F` in `F401`.
+        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
+        // Extract, e.g., the `401` in `F401`.
+        let suffix = line[prefix..]
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .count();
+        if prefix > 0 && suffix > 0 {
+            Some(&line[..prefix + suffix])
+        } else {
+            None
+        }
     }
 }
 
@@ -620,7 +766,7 @@ mod tests {
     use ruff_python_ast::source_code::Locator;
     use ruff_python_whitespace::LineEnding;
 
-    use crate::noqa::{add_noqa_inner, Directive, NoqaMapping};
+    use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::rules::pyflakes::rules::UnusedVariable;
 
@@ -748,6 +894,55 @@ mod tests {
     fn noqa_invalid_codes() {
         let source = "# noqa: F401, unused-import, some other code";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn flake8_exemption_all() {
+        let source = "# flake8: noqa";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+    }
+
+    #[test]
+    fn ruff_exemption_all() {
+        let source = "# ruff: noqa";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+    }
+
+    #[test]
+    fn flake8_exemption_all_no_space() {
+        let source = "#flake8:noqa";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+    }
+
+    #[test]
+    fn ruff_exemption_all_no_space() {
+        let source = "#ruff:noqa";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+    }
+
+    #[test]
+    fn flake8_exemption_codes() {
+        // Note: Flake8 doesn't support this; it's treated as a blanket exemption.
+        let source = "# flake8: noqa: F401, F841";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+    }
+
+    #[test]
+    fn ruff_exemption_codes() {
+        let source = "# ruff: noqa: F401, F841";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+    }
+
+    #[test]
+    fn flake8_exemption_all_case_insensitive() {
+        let source = "# flake8: NoQa";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+    }
+
+    #[test]
+    fn ruff_exemption_all_case_insensitive() {
+        let source = "# ruff: NoQa";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
     }
 
     #[test]
