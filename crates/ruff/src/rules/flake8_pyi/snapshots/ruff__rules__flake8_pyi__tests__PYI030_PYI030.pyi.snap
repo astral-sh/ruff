@@ -35,15 +35,6 @@ PYI030.pyi:22:9: PYI030 Multiple literal members in a union. Use a single litera
 24 | field5: Literal[1] | str | Literal[2]  # Error
    |
 
-PYI030.pyi:22:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-   |
-21 | # Should emit in longer unions, even if not directly adjacent.
-22 | field3: Literal[1] | Literal[2] | str  # Error
-   |         ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-23 | field4: str | Literal[1] | Literal[2]  # Error
-24 | field5: Literal[1] | str | Literal[2]  # Error
-   |
-
 PYI030.pyi:23:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 21 | # Should emit in longer unions, even if not directly adjacent.
@@ -69,16 +60,6 @@ PYI030.pyi:25:9: PYI030 Multiple literal members in a union. Use a single litera
 24 | field5: Literal[1] | str | Literal[2]  # Error
 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-26 | 
-27 | # Should emit for non-type unions.
-   |
-
-PYI030.pyi:25:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-   |
-23 | field4: str | Literal[1] | Literal[2]  # Error
-24 | field5: Literal[1] | str | Literal[2]  # Error
-25 | field6: Literal[1] | bool | Literal[2] | str  # Error
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 26 | 
 27 | # Should emit for non-type unions.
    |
@@ -136,40 +117,12 @@ PYI030.pyi:41:10: PYI030 Multiple literal members in a union. Use a single liter
 42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
    |
 
-PYI030.pyi:41:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-   |
-40 | # Should emit for unions with more than two cases
-41 | field12: Literal[1] | Literal[2] | Literal[3]  # Error
-   |          ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
-   |
-
 PYI030.pyi:42:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
    |
 40 | # Should emit for unions with more than two cases
 41 | field12: Literal[1] | Literal[2] | Literal[3]  # Error
 42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-43 | 
-44 | # Should emit for unions with more than two cases, even if not directly adjacent
-   |
-
-PYI030.pyi:42:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
-   |
-40 | # Should emit for unions with more than two cases
-41 | field12: Literal[1] | Literal[2] | Literal[3]  # Error
-42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-43 | 
-44 | # Should emit for unions with more than two cases, even if not directly adjacent
-   |
-
-PYI030.pyi:42:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-   |
-40 | # Should emit for unions with more than two cases
-41 | field12: Literal[1] | Literal[2] | Literal[3]  # Error
-42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
-   |          ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 43 | 
 44 | # Should emit for unions with more than two cases, even if not directly adjacent
    |
@@ -183,38 +136,11 @@ PYI030.pyi:45:10: PYI030 Multiple literal members in a union. Use a single liter
 47 | # Should emit for unions with mixed literal internal types
    |
 
-PYI030.pyi:45:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-   |
-44 | # Should emit for unions with more than two cases, even if not directly adjacent
-45 | field14: Literal[1] | Literal[2] | str | Literal[3]  # Error
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-46 | 
-47 | # Should emit for unions with mixed literal internal types
-   |
-
-PYI030.pyi:45:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-   |
-44 | # Should emit for unions with more than two cases, even if not directly adjacent
-45 | field14: Literal[1] | Literal[2] | str | Literal[3]  # Error
-   |          ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-46 | 
-47 | # Should emit for unions with mixed literal internal types
-   |
-
 PYI030.pyi:48:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, "foo", True]`
    |
 47 | # Should emit for unions with mixed literal internal types
 48 | field15: Literal[1] | Literal["foo"] | Literal[True]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
-49 | 
-50 | # Shouldn't emit for duplicate field types with same value; covered by Y016
-   |
-
-PYI030.pyi:48:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, "foo"]`
-   |
-47 | # Should emit for unions with mixed literal internal types
-48 | field15: Literal[1] | Literal["foo"] | Literal[True]  # Error
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 49 | 
 50 | # Shouldn't emit for duplicate field types with same value; covered by Y016
    |
@@ -291,7 +217,7 @@ PYI030.pyi:80:10: PYI030 Multiple literal members in a union. Use a single liter
 PYI030.pyi:83:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 82 | # Should emit in cases with mixed `typing.Union` and `|`
-83 | field24: typing.Union[Literal[1], Literal[2] | str]  # Error
+83 | field25: typing.Union[Literal[1], Literal[2] | str]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
    |
 

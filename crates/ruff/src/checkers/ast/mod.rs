@@ -3141,6 +3141,7 @@ where
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic.in_type_definition()
+                        // Avoid duplicate checks if the parent is an `|`
                         && self.semantic.expr_parent().map_or(true, |parent| {
                             !matches!(
                                 parent,
@@ -3154,7 +3155,18 @@ where
                         flake8_pyi::rules::duplicate_union_member(self, expr);
                     }
 
-                    if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                    if self.enabled(Rule::UnnecessaryLiteralUnion)
+                        // Avoid duplicate checks if the parent is an `|`
+                        && self.semantic.expr_parent().map_or(true, |parent| {
+                            !matches!(
+                                parent,
+                                Expr::BinOp(ast::ExprBinOp {
+                                    op: Operator::BitOr,
+                                    ..
+                                })
+                            )
+                        })
+                    {
                         flake8_pyi::rules::unnecessary_literal_union(self, expr);
                     }
                 }
