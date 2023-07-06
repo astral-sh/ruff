@@ -1,4 +1,5 @@
 import typing
+import typing_extensions
 from typing import Literal
 
 # Shouldn't affect non-union field types.
@@ -58,7 +59,7 @@ field18: dict[Literal[1], Literal[2]]  # OK
 # Should respect name of literal type used
 field19: typing.Literal[1] | typing.Literal[2]  # Error: PYI030 Multiple literal members in a union. Use a single literal e.g. `typing.Literal[1, 2]`.
 
-# Should handle newlines
+# Should emit in cases with newlines
 field20: typing.Union[
     Literal[
         1  # test
@@ -67,4 +68,10 @@ field20: typing.Union[
 ]  # Error: PYI030 Multiple literal members in a union. Use a single literal e.g. `typing.Union[typing.Literal[1], typing.Literal[2]]`.
 
 # Should handle multiple unions with multiple members
-field16: Literal[1, 2] | Literal[3, 4]  # Error: PYI030 Multiple literal members in a union. Use a single literal e.g. `typing.Literal[1, 2, 3, 4]`.
+field21: Literal[1, 2] | Literal[3, 4]  # Error: PYI030 Multiple literal members in a union. Use a single literal e.g. `typing.Literal[1, 2, 3, 4]`.
+
+# Should emit in cases with `typing.Union`` instead of `|`
+field22: typing.Union[Literal[1], Literal[2]]  # Error: PYI030 Multiple literal members in a union. Use a single literal e.g. `typing.Union[typing.Literal[1], typing.Literal[2]]`.
+
+# Should emit in cases with `typing_extensions.Literal`
+field23: typing_extensions.Literal[1] | typing_extensions.Literal[2]  # Error: PYI030 Multiple literal members in a union. Use a single literal e.g. `typing_extensions.Literal[1], typing_extensions.Literal[2]]`.
