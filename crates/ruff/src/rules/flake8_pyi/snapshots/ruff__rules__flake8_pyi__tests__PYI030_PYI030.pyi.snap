@@ -219,6 +219,15 @@ PYI030.pyi:83:10: PYI030 Multiple literal members in a union. Use a single liter
 82 | # Should emit in cases with mixed `typing.Union` and `|`
 83 | field25: typing.Union[Literal[1], Literal[2] | str]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+84 | 
+85 | # Should emit only once in cases with multiple nested `typing.Union`
+   |
+
+PYI030.pyi:86:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+   |
+85 | # Should emit only once in cases with multiple nested `typing.Union`
+86 | field24: typing.Union[Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]]]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
    |
 
 
