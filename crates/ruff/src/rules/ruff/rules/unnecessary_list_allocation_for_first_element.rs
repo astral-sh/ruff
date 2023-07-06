@@ -1,6 +1,7 @@
 use num_traits::ToPrimitive;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::contains_effect;
 use rustpython_parser::ast::{self, Constant, Expr};
 
 use crate::checkers::ast::Checker;
@@ -67,7 +68,9 @@ pub(crate) fn unnecessary_list_allocation_for_first_element(
     let Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) = subscript else {
         return;
     };
-    if !indexes_first_element(slice) {
+
+    let (indexes_first_element, in_slice) = classify_subscript(slice);
+    if !indexes_first_element {
         return;
     }
     let Some(iter_name) = get_iterable_name(checker, value) else {
@@ -80,7 +83,12 @@ pub(crate) fn unnecessary_list_allocation_for_first_element(
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        let replacement = format!("next(iter({iter_name}))");
+        let replacement = if in_slice {
+            format!("[next(iter({iter_name}))]")
+        } else {
+            format!("next(iter({iter_name}))")
+        };
+
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(replacement, *range)));
     }
 
@@ -130,11 +138,14 @@ fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a st
     }
 }
 
-/// Check that the slice [`Expr`] is functionally equivalent to slicing into the first element.
-fn indexes_first_element(expr: &Expr) -> bool {
+/// Check that the slice [`Expr`] is functionally equivalent to slicing into the first element. The
+/// first `bool` checks that the element is in fact first, the second checks if it's a slice or an
+/// index.
+fn classify_subscript(expr: &Expr) -> (bool, bool) {
     match expr {
         Expr::Constant(ast::ExprConstant { .. }) => {
-            get_effective_index(expr).unwrap_or(0i64) == 0i64
+            let effective_index = get_effective_index(expr);
+            (acts_as_zero(effective_index), false)
         }
         Expr::Slice(ast::ExprSlice {
             step: step_value,
@@ -142,26 +153,22 @@ fn indexes_first_element(expr: &Expr) -> bool {
             upper: upper_index,
             ..
         }) => {
-            let lower = lower_index
-                .as_ref()
-                .and_then(|l| get_effective_index(l))
-                .unwrap_or(0i64);
-            let upper = upper_index
-                .as_ref()
-                .and_then(|u| get_effective_index(u))
-                .unwrap_or(i64::MAX);
-            let step = step_value
-                .as_ref()
-                .and_then(|s| get_effective_index(s))
-                .unwrap_or(1i64);
+            let lower = lower_index.as_ref().and_then(|l| get_effective_index(l));
+            let upper = upper_index.as_ref().and_then(|u| get_effective_index(u));
+            let step = step_value.as_ref().and_then(|s| get_effective_index(s));
 
-            if lower == 0i64 && upper <= step {
-                return true;
+            let in_slice = upper.is_some() || step.is_some();
+            if acts_as_zero(lower) {
+                if upper.unwrap_or(i64::MAX) > step.unwrap_or(1i64) {
+                    return (false, in_slice);
+                }
+
+                return (true, in_slice);
             }
 
-            false
+            (false, in_slice)
         }
-        _ => false,
+        _ => (false, false),
     }
 }
 
@@ -180,4 +187,8 @@ fn get_name_id(expr: &Expr) -> Option<&str> {
         Expr::Name(ast::ExprName { id, .. }) => Some(id),
         _ => None,
     }
+}
+
+fn acts_as_zero(i: Option<i64>) -> bool {
+    i.is_none() || i == Some(0i64)
 }

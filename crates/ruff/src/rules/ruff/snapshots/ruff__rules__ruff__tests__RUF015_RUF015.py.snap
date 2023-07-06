@@ -37,7 +37,7 @@ RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over `list(x)[0]` or equivalent
 3 3 | # RUF015
 4 4 | list(x)[0]
 5   |-list(x)[:1]
-  5 |+next(iter(x))
+  5 |+[next(iter(x))]
 6 6 | list(x)[:1:1]
 7 7 | list(x)[:1:2]
 8 8 | [i for i in x][0]
@@ -58,7 +58,7 @@ RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over `list(x)[0]` or equivalent
 4 4 | list(x)[0]
 5 5 | list(x)[:1]
 6   |-list(x)[:1:1]
-  6 |+next(iter(x))
+  6 |+[next(iter(x))]
 7 7 | list(x)[:1:2]
 8 8 | [i for i in x][0]
 9 9 | [i for i in x][:1]
@@ -79,7 +79,7 @@ RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over `list(x)[0]` or equivalent
 5 5 | list(x)[:1]
 6 6 | list(x)[:1:1]
 7   |-list(x)[:1:2]
-  7 |+next(iter(x))
+  7 |+[next(iter(x))]
 8 8 | [i for i in x][0]
 9 9 | [i for i in x][:1]
 10 10 | [i for i in x][:1:1]
@@ -121,7 +121,7 @@ RUF015.py:9:1: RUF015 [*] Prefer `next(iter(x))` over `list(x)[0]` or equivalent
 7  7  | list(x)[:1:2]
 8  8  | [i for i in x][0]
 9     |-[i for i in x][:1]
-   9  |+next(iter(x))
+   9  |+[next(iter(x))]
 10 10 | [i for i in x][:1:1]
 11 11 | [i for i in x][:1:2]
 12 12 | 
@@ -141,7 +141,7 @@ RUF015.py:10:1: RUF015 [*] Prefer `next(iter(x))` over `list(x)[0]` or equivalen
 8  8  | [i for i in x][0]
 9  9  | [i for i in x][:1]
 10    |-[i for i in x][:1:1]
-   10 |+next(iter(x))
+   10 |+[next(iter(x))]
 11 11 | [i for i in x][:1:2]
 12 12 | 
 13 13 | # Fine - not indexing (solely) the first element
@@ -162,7 +162,7 @@ RUF015.py:11:1: RUF015 [*] Prefer `next(iter(x))` over `list(x)[0]` or equivalen
 9  9  | [i for i in x][:1]
 10 10 | [i for i in x][:1:1]
 11    |-[i for i in x][:1:2]
-   11 |+next(iter(x))
+   11 |+[next(iter(x))]
 12 12 | 
 13 13 | # Fine - not indexing (solely) the first element
 14 14 | list(x)
