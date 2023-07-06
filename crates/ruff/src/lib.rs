@@ -27,7 +27,7 @@ pub mod line_width;
 pub mod linter;
 pub mod logging;
 pub mod message;
-pub mod noqa;
+mod noqa;
 pub mod packaging;
 pub mod pyproject_toml;
 pub mod registry;

@@ -14,7 +14,7 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_whitespace::{LineEnding, PythonWhitespace};
+use ruff_python_whitespace::LineEnding;
 
 use crate::codes::NoqaCode;
 use crate::registry::{AsRule, Rule, RuleSet};
@@ -83,7 +83,7 @@ impl<'a> Directive<'a> {
                     let mut codes = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
-                    while let Some(code) = Directive::eat_code(&text[codes_end + leading_space..]) {
+                    while let Some(code) = Directive::lex_code(&text[codes_end + leading_space..]) {
                         codes.push(code);
                         codes_end += leading_space;
                         codes_end += code.len();
@@ -125,17 +125,18 @@ impl<'a> Directive<'a> {
         None
     }
 
-    /// Eat an individual rule code (e.g., `F401`).
-    fn eat_code(text: &str) -> Option<&str> {
+    /// Lex an individual rule code (e.g., `F401`).
+    #[inline]
+    fn lex_code(line: &str) -> Option<&str> {
         // Extract, e.g., the `F` in `F401`.
-        let prefix = text.chars().take_while(char::is_ascii_uppercase).count();
+        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
         // Extract, e.g., the `401` in `F401`.
-        let suffix = text[prefix..]
+        let suffix = line[prefix..]
             .chars()
             .take_while(char::is_ascii_digit)
             .count();
         if prefix > 0 && suffix > 0 {
-            Some(&text[..prefix + suffix])
+            Some(&line[..prefix + suffix])
         } else {
             None
         }
@@ -246,7 +247,7 @@ impl FileExemption {
 /// [`FileExemption`], but only for a single line, as opposed to an aggregated set of exemptions
 /// across a source file.
 #[derive(Debug)]
-pub enum ParsedFileExemption<'a> {
+enum ParsedFileExemption<'a> {
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
@@ -255,82 +256,46 @@ pub enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    pub fn try_regex(line: &'a str) -> Option<Self> {
-        let line = line.trim_whitespace_start();
+    fn try_extract(line: &'a str) -> Option<Self> {
+        let line = ParsedFileExemption::lex_whitespace(line);
+        let line = ParsedFileExemption::lex_char(line, '#')?;
+        let line = ParsedFileExemption::lex_whitespace(line);
 
-        if line.starts_with("# flake8: noqa")
-            || line.starts_with("# flake8: NOQA")
-            || line.starts_with("# flake8: NoQA")
-        {
-            return Some(Self::All);
-        }
-
-        if let Some(remainder) = line
-            .strip_prefix("# ruff: noqa")
-            .or_else(|| line.strip_prefix("# ruff: NOQA"))
-            .or_else(|| line.strip_prefix("# ruff: NoQA"))
-        {
-            if remainder.is_empty() {
-                return Some(Self::All);
-            } else if let Some(codes) = remainder.strip_prefix(':') {
-                let codes = codes
-                    .split(|c: char| c.is_whitespace() || c == ',')
-                    .map(str::trim)
-                    .filter(|code| !code.is_empty())
-                    .collect_vec();
-                if codes.is_empty() {
-                    warn!("Expected rule codes on `noqa` directive: \"{line}\"");
-                }
-                return Some(Self::Codes(codes));
-            }
-            warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
-        }
-
-        None
-    }
-
-    /// Return a [`ParsedFileExemption`] for a given comment line.
-    pub fn try_extract(line: &'a str) -> Option<Self> {
-        let line = ParsedFileExemption::eat_whitespace(line);
-        let line = ParsedFileExemption::eat_char(line, '#')?;
-        let line = ParsedFileExemption::eat_whitespace(line);
-
-        if let Some(line) = ParsedFileExemption::eat_flake8(line) {
+        if let Some(line) = ParsedFileExemption::lex_flake8(line) {
             // Ex) `# flake8: noqa`
-            let line = ParsedFileExemption::eat_whitespace(line);
-            let line = ParsedFileExemption::eat_char(line, ':')?;
-            let line = ParsedFileExemption::eat_whitespace(line);
-            let line = ParsedFileExemption::eat_noqa(line)?;
-
+            let line = ParsedFileExemption::lex_whitespace(line);
+            let line = ParsedFileExemption::lex_char(line, ':')?;
+            let line = ParsedFileExemption::lex_whitespace(line);
+            ParsedFileExemption::lex_noqa(line)?;
             Some(Self::All)
-        } else if let Some(line) = ParsedFileExemption::eat_ruff(line) {
-            let line = ParsedFileExemption::eat_whitespace(line);
-            let line = ParsedFileExemption::eat_char(line, ':')?;
-            let line = ParsedFileExemption::eat_whitespace(line);
-            let line = ParsedFileExemption::eat_noqa(line)?;
+        } else if let Some(line) = ParsedFileExemption::lex_ruff(line) {
+            let line = ParsedFileExemption::lex_whitespace(line);
+            let line = ParsedFileExemption::lex_char(line, ':')?;
+            let line = ParsedFileExemption::lex_whitespace(line);
+            let line = ParsedFileExemption::lex_noqa(line)?;
 
             if line.is_empty() {
                 // Ex) `# ruff: noqa`
                 Some(Self::All)
             } else {
                 // Ex) `# ruff: noqa: F401, F841`
-                let line = ParsedFileExemption::eat_whitespace(line);
-                let Some(line) = ParsedFileExemption::eat_char(line, ':') else {
+                let line = ParsedFileExemption::lex_whitespace(line);
+                let Some(line) = ParsedFileExemption::lex_char(line, ':') else {
                     warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
                     return None;
                 };
-                let line = ParsedFileExemption::eat_whitespace(line);
+                let line = ParsedFileExemption::lex_whitespace(line);
 
                 // Extract the codes from the line (e.g., `F401, F841`).
                 let mut codes = vec![];
                 let mut line = line;
-                while let Some(code) = ParsedFileExemption::eat_code(line) {
+                while let Some(code) = ParsedFileExemption::lex_code(line) {
                     codes.push(code);
                     line = &line[code.len()..];
 
                     // Codes can be comma- or whitespace-delimited.
-                    if let Some(rest) = ParsedFileExemption::eat_delimiter(line)
-                        .map(ParsedFileExemption::eat_whitespace)
+                    if let Some(rest) = ParsedFileExemption::lex_delimiter(line)
+                        .map(ParsedFileExemption::lex_whitespace)
                     {
                         line = rest;
                     } else {
@@ -345,16 +310,16 @@ impl<'a> ParsedFileExemption<'a> {
         }
     }
 
-    /// Eat optional leading whitespace.
+    /// Lex optional leading whitespace.
     #[inline]
-    fn eat_whitespace(line: &str) -> &str {
+    fn lex_whitespace(line: &str) -> &str {
         line.trim_start()
     }
 
-    /// Eat a specific character, or return `None` if the character is not the first character in
+    /// Lex a specific character, or return `None` if the character is not the first character in
     /// the line.
     #[inline]
-    fn eat_char(line: &str, c: char) -> Option<&str> {
+    fn lex_char(line: &str, c: char) -> Option<&str> {
         let mut chars = line.chars();
         if chars.next() == Some(c) {
             Some(chars.as_str())
@@ -363,37 +328,37 @@ impl<'a> ParsedFileExemption<'a> {
         }
     }
 
-    /// Eat the "flake8" prefix of a `noqa` directive.
+    /// Lex the "flake8" prefix of a `noqa` directive.
     #[inline]
-    fn eat_flake8(line: &str) -> Option<&str> {
+    fn lex_flake8(line: &str) -> Option<&str> {
         line.strip_prefix("flake8")
     }
 
-    /// Eat the "ruff" prefix of a `noqa` directive.
+    /// Lex the "ruff" prefix of a `noqa` directive.
     #[inline]
-    fn eat_ruff(line: &str) -> Option<&str> {
+    fn lex_ruff(line: &str) -> Option<&str> {
         line.strip_prefix("ruff")
     }
 
-    /// Eat a `noqa` directive with case-insensitive matching.
+    /// Lex a `noqa` directive with case-insensitive matching.
     #[inline]
-    fn eat_noqa(line: &str) -> Option<&str> {
-        let mut chars = line.bytes();
+    fn lex_noqa(line: &str) -> Option<&str> {
+        let mut chars = line.chars();
         if chars
             .next()
-            .map_or(false, |c| c.to_ascii_lowercase() == b'n')
+            .map_or(false, |c| c.to_ascii_lowercase() == 'n')
         {
             if chars
                 .next()
-                .map_or(false, |c| c.to_ascii_lowercase() == b'o')
+                .map_or(false, |c| c.to_ascii_lowercase() == 'o')
             {
                 if chars
                     .next()
-                    .map_or(false, |c| c.to_ascii_lowercase() == b'q')
+                    .map_or(false, |c| c.to_ascii_lowercase() == 'q')
                 {
                     if chars
                         .next()
-                        .map_or(false, |c| c.to_ascii_lowercase() == b'a')
+                        .map_or(false, |c| c.to_ascii_lowercase() == 'a')
                     {
                         return Some(chars.as_str());
                     }
@@ -403,9 +368,9 @@ impl<'a> ParsedFileExemption<'a> {
         None
     }
 
-    /// Eat a code delimiter, which can either be a comma or whitespace.
+    /// Lex a code delimiter, which can either be a comma or whitespace.
     #[inline]
-    fn eat_delimiter(line: &str) -> Option<&str> {
+    fn lex_delimiter(line: &str) -> Option<&str> {
         let mut chars = line.chars();
         if let Some(c) = chars.next() {
             if c == ',' || c.is_whitespace() {
@@ -418,9 +383,9 @@ impl<'a> ParsedFileExemption<'a> {
         }
     }
 
-    /// Eat an individual rule code (e.g., `F401`).
+    /// Lex an individual rule code (e.g., `F401`).
     #[inline]
-    fn eat_code(line: &str) -> Option<&str> {
+    fn lex_code(line: &str) -> Option<&str> {
         // Extract, e.g., the `F` in `F401`.
         let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
         // Extract, e.g., the `401` in `F401`.
