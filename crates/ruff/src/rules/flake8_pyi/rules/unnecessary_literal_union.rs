@@ -44,7 +44,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut collect_literal_expr = |expr: &'a Expr| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
-            if checker.semantic().match_typing_expr(&*value, "Literal") {
+            if checker.semantic().match_typing_expr(value, "Literal") {
                 literal_exprs.push(slice);
             }
         }
@@ -111,5 +111,5 @@ where
     }
 
     // Otherwise, call the function on expression
-    func(expr)
+    func(expr);
 }
