@@ -55,7 +55,9 @@ pub(crate) fn unnecessary_literal_set(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function("set", func, args, keywords) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("set", func, args, keywords)
+    else {
         return;
     };
     if !checker.semantic().is_builtin("set") {

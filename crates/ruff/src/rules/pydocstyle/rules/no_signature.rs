@@ -58,7 +58,8 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
-    }) = docstring.definition else {
+    }) = docstring.definition
+    else {
         return;
     };
     let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = stmt else {

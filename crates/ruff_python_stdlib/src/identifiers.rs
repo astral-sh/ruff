@@ -1,4 +1,4 @@
-use crate::keyword::KWLIST;
+use crate::keyword::is_keyword;
 
 /// Returns `true` if a string is a valid Python identifier (e.g., variable
 /// name).
@@ -18,7 +18,7 @@ pub fn is_identifier(name: &str) -> bool {
     }
 
     // Is the identifier a keyword?
-    if KWLIST.contains(&name) {
+    if is_keyword(name) {
         return false;
     }
 
@@ -52,7 +52,7 @@ pub fn is_module_name(name: &str) -> bool {
     }
 
     // Is the identifier a keyword?
-    if KWLIST.contains(&name) {
+    if is_keyword(name) {
         return false;
     }
 
@@ -70,7 +70,7 @@ pub fn is_migration_name(name: &str) -> bool {
     }
 
     // Is the identifier a keyword?
-    if KWLIST.contains(&name) {
+    if is_keyword(name) {
         return false;
     }
 

@@ -42,6 +42,8 @@ DTZ005.py:18:1: DTZ005 The use of `datetime.datetime.now()` without `tz` argumen
 17 | # no args unqualified
 18 | datetime.now()
    | ^^^^^^^^^^^^^^ DTZ005
+19 | 
+20 | # uses `astimezone` method
    |
 
 

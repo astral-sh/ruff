@@ -327,7 +327,7 @@ mod tests {
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
-            &settings::Settings::for_rules(&Linter::Flake8TypeChecking),
+            &settings::Settings::for_rules(Linter::Flake8TypeChecking.rules()),
         );
         assert_messages!(snapshot, diagnostics);
     }

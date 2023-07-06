@@ -107,7 +107,8 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
-    }) = docstring.definition else {
+    }) = docstring.definition
+    else {
         return;
     };
 

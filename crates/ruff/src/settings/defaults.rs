@@ -1,10 +1,11 @@
-use std::collections::HashSet;
-
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use std::collections::HashSet;
 
+use super::types::{FilePattern, PythonVersion};
+use super::Settings;
 use crate::codes::{self, RuleCodePrefix};
 use crate::line_width::{LineLength, TabSize};
 use crate::registry::Linter;
@@ -14,12 +15,9 @@ use crate::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::types::FilePatternSet;
-
-use super::types::{FilePattern, PythonVersion};
-use super::Settings;
 
 pub const PREFIXES: &[RuleSelector] = &[
     prefix_to_selector(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E)),
@@ -41,14 +39,18 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
         FilePattern::Builtin(".git"),
         FilePattern::Builtin(".git-rewrite"),
         FilePattern::Builtin(".hg"),
+        FilePattern::Builtin(".ipynb_checkpoints"),
         FilePattern::Builtin(".mypy_cache"),
         FilePattern::Builtin(".nox"),
         FilePattern::Builtin(".pants.d"),
+        FilePattern::Builtin(".pyenv"),
+        FilePattern::Builtin(".pytest_cache"),
         FilePattern::Builtin(".pytype"),
         FilePattern::Builtin(".ruff_cache"),
         FilePattern::Builtin(".svn"),
         FilePattern::Builtin(".tox"),
         FilePattern::Builtin(".venv"),
+        FilePattern::Builtin(".vscode"),
         FilePattern::Builtin("__pypackages__"),
         FilePattern::Builtin("_build"),
         FilePattern::Builtin("buck-out"),
@@ -114,6 +116,7 @@ impl Default for Settings {
             pydocstyle: pydocstyle::settings::Settings::default(),
             pyflakes: pyflakes::settings::Settings::default(),
             pylint: pylint::settings::Settings::default(),
+            pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }
 }

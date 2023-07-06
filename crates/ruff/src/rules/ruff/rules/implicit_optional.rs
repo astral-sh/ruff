@@ -191,7 +191,7 @@ impl<'a> TypingTarget<'a> {
                 if semantic.match_typing_expr(value, "Optional") {
                     return Some(TypingTarget::Optional);
                 }
-                let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else{
+                let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else {
                     return None;
                 };
                 if semantic.match_typing_expr(value, "Literal") {
@@ -266,31 +266,41 @@ impl<'a> TypingTarget<'a> {
             | TypingTarget::Any
             | TypingTarget::Object => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator, target_version) else {
+                let Some(new_target) =
+                    TypingTarget::try_from_expr(element, semantic, locator, target_version)
+                else {
                     return false;
                 };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match new_target {
                     TypingTarget::None => true,
-                    TypingTarget::Literal(_) => new_target.contains_none(semantic, locator, target_version),
+                    TypingTarget::Literal(_) => {
+                        new_target.contains_none(semantic, locator, target_version)
+                    }
                     _ => false,
                 }
             }),
             TypingTarget::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator, target_version) else {
+                let Some(new_target) =
+                    TypingTarget::try_from_expr(element, semantic, locator, target_version)
+                else {
                     return false;
                 };
                 new_target.contains_none(semantic, locator, target_version)
             }),
             TypingTarget::Annotated(element) => {
-                let Some(new_target) = TypingTarget::try_from_expr(element, semantic, locator, target_version) else {
+                let Some(new_target) =
+                    TypingTarget::try_from_expr(element, semantic, locator, target_version)
+                else {
                     return false;
                 };
                 new_target.contains_none(semantic, locator, target_version)
             }
             TypingTarget::ForwardReference(expr) => {
-                let Some(new_target) = TypingTarget::try_from_expr(expr, semantic, locator, target_version) else {
+                let Some(new_target) =
+                    TypingTarget::try_from_expr(expr, semantic, locator, target_version)
+                else {
                     return false;
                 };
                 new_target.contains_none(semantic, locator, target_version)
@@ -312,7 +322,8 @@ fn type_hint_explicitly_allows_none<'a>(
     locator: &Locator,
     target_version: PythonVersion,
 ) -> Option<&'a Expr> {
-    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator, target_version) else {
+    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator, target_version)
+    else {
         return Some(annotation);
     };
     match target {
@@ -392,14 +403,12 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         .chain(&arguments.args)
         .chain(&arguments.kwonlyargs)
     {
-        let Some(default) = default else {
-            continue
-        };
+        let Some(default) = default else { continue };
         if !is_const_none(default) {
             continue;
         }
         let Some(annotation) = &def.annotation else {
-            continue
+            continue;
         };
 
         if let Expr::Constant(ast::ExprConstant {
@@ -410,7 +419,12 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         {
             // Quoted annotation.
             if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator) {
-                let Some(expr) = type_hint_explicitly_allows_none(&annotation, checker.semantic(), checker.locator, checker.settings.target_version) else {
+                let Some(expr) = type_hint_explicitly_allows_none(
+                    &annotation,
+                    checker.semantic(),
+                    checker.locator,
+                    checker.settings.target_version,
+                ) else {
                     continue;
                 };
                 let conversion_type = checker.settings.target_version.into();
@@ -426,7 +440,12 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             }
         } else {
             // Unquoted annotation.
-            let Some(expr) = type_hint_explicitly_allows_none(annotation, checker.semantic(), checker.locator, checker.settings.target_version) else {
+            let Some(expr) = type_hint_explicitly_allows_none(
+                annotation,
+                checker.semantic(),
+                checker.locator,
+                checker.settings.target_version,
+            ) else {
                 continue;
             };
             let conversion_type = checker.settings.target_version.into();

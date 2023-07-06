@@ -11,7 +11,12 @@ pub struct FormatExprListComp;
 
 impl FormatNodeRule<ExprListComp> for FormatExprListComp {
     fn fmt_fields(&self, _item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented_custom_text("[i for i in []]")])
+        write!(
+            f,
+            [not_yet_implemented_custom_text(
+                "[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]"
+            )]
+        )
     }
 }
 

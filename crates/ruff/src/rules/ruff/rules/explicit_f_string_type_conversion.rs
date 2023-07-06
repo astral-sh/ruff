@@ -82,12 +82,26 @@ pub(crate) fn explicit_f_string_type_conversion(
             args,
             keywords,
             ..
-        }) = value.as_ref() else {
+        }) = value.as_ref()
+        else {
             continue;
         };
 
         // Can't be a conversion otherwise.
-        if args.len() != 1 || !keywords.is_empty() {
+        if !keywords.is_empty() {
+            continue;
+        }
+
+        // Can't be a conversion otherwise.
+        let [arg] = args.as_slice() else {
+            continue;
+        };
+
+        // Avoid attempting to rewrite, e.g., `f"{str({})}"`; the curly braces are problematic.
+        if matches!(
+            arg,
+            Expr::Dict(_) | Expr::Set(_) | Expr::DictComp(_) | Expr::SetComp(_)
+        ) {
             continue;
         }
 

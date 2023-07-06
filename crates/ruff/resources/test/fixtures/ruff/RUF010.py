@@ -34,3 +34,7 @@ f"{ascii(bla)}"  # OK
     " intermediary content "
     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
 )
+
+
+# OK
+f"{str({})}"

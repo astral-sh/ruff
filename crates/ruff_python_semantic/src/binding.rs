@@ -126,11 +126,11 @@ impl<'a> Binding<'a> {
         }
         matches!(
             existing.kind,
-            BindingKind::ClassDefinition
-                | BindingKind::FunctionDefinition
-                | BindingKind::Import(..)
-                | BindingKind::FromImport(..)
-                | BindingKind::SubmoduleImport(..)
+            BindingKind::ClassDefinition(_)
+                | BindingKind::FunctionDefinition(_)
+                | BindingKind::Import(_)
+                | BindingKind::FromImport(_)
+                | BindingKind::SubmoduleImport(_)
         )
     }
 
@@ -372,14 +372,14 @@ pub enum BindingKind<'a> {
     /// class Foo:
     ///     ...
     /// ```
-    ClassDefinition,
+    ClassDefinition(ScopeId),
 
     /// A binding for a function, like `foo` in:
     /// ```python
     /// def foo():
     ///     ...
     /// ```
-    FunctionDefinition,
+    FunctionDefinition(ScopeId),
 
     /// A binding for an `__all__` export, like `__all__` in:
     /// ```python

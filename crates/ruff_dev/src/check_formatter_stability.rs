@@ -2,23 +2,28 @@
 //! known as formatter stability or formatter idempotency, and that the formatter prints
 //! syntactically valid code. As our test cases cover only a limited amount of code, this allows
 //! checking entire repositories.
-#![allow(clippy::print_stdout)]
 
-use anyhow::Context;
+use std::fmt::{Display, Formatter};
+use std::fs::File;
+use std::io::Write;
+use std::io::{stdout, BufWriter};
+use std::panic::catch_unwind;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use std::sync::mpsc::channel;
+use std::time::{Duration, Instant};
+use std::{fmt, fs, iter};
+
+use anyhow::{bail, Context};
 use clap::Parser;
 use log::debug;
+use similar::{ChangeTag, TextDiff};
+
 use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::CheckArgs;
 use ruff_cli::resolve::resolve;
 use ruff_python_formatter::{format_module, PyFormatOptions};
-use similar::{ChangeTag, TextDiff};
-use std::io::Write;
-use std::panic::catch_unwind;
-use std::path::{Path, PathBuf};
-use std::process::ExitCode;
-use std::time::Instant;
-use std::{fs, io, iter};
 
 /// Control the verbosity of the output
 #[derive(Copy, Clone, PartialEq, Eq, clap::ValueEnum, Default)]
@@ -45,6 +50,9 @@ pub(crate) struct Args {
     /// Checks each project inside a directory
     #[arg(long)]
     pub(crate) multi_project: bool,
+    /// Write all errors to this file in addition to stdout
+    #[arg(long)]
+    pub(crate) error_file: Option<PathBuf>,
 }
 
 /// Generate ourself a `try_parse_from` impl for `CheckArgs`. This is a strange way to use clap but
@@ -58,24 +66,22 @@ struct WrapperArgs {
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
-        let mut all_success = true;
-        for base_dir in &args.files {
-            for dir in base_dir.read_dir()? {
-                let dir = dir?;
-                println!("Starting {}", dir.path().display());
-                let success = check_repo(&Args {
-                    files: vec![dir.path().clone()],
-                    ..*args
-                });
-                println!("Finished {}: {:?}", dir.path().display(), success);
-                if !matches!(success, Ok(true)) {
-                    all_success = false;
-                }
-            }
-        }
-        all_success
+        check_multi_project(args)
     } else {
-        check_repo(args)?
+        let result = check_repo(args)?;
+
+        #[allow(clippy::print_stdout)]
+        {
+            print!("{}", result.display(args.format));
+            println!(
+                "Found {} stability errors in {} files in {:.2}s",
+                result.diagnostics.len(),
+                result.file_count,
+                result.duration.as_secs_f32(),
+            );
+        }
+
+        result.is_success()
     };
     if all_success {
         Ok(ExitCode::SUCCESS)
@@ -84,8 +90,104 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     }
 }
 
+enum Message {
+    Start {
+        path: PathBuf,
+    },
+    Failed {
+        path: PathBuf,
+        error: anyhow::Error,
+    },
+    Finished {
+        path: PathBuf,
+        result: CheckRepoResult,
+    },
+}
+
+fn check_multi_project(args: &Args) -> bool {
+    let mut all_success = true;
+    let mut total_errors = 0;
+    let mut total_files = 0;
+    let start = Instant::now();
+
+    rayon::scope(|scope| {
+        let (sender, receiver) = channel();
+
+        for base_dir in &args.files {
+            for dir in base_dir.read_dir().unwrap() {
+                let path = dir.unwrap().path().clone();
+
+                let sender = sender.clone();
+
+                scope.spawn(move |_| {
+                    sender.send(Message::Start { path: path.clone() }).unwrap();
+
+                    match check_repo(&Args {
+                        files: vec![path.clone()],
+                        error_file: args.error_file.clone(),
+                        ..*args
+                    }) {
+                        Ok(result) => sender.send(Message::Finished { result, path }),
+                        Err(error) => sender.send(Message::Failed { error, path }),
+                    }
+                    .unwrap();
+                });
+            }
+        }
+
+        scope.spawn(|_| {
+            let mut stdout = stdout().lock();
+            let mut error_file = args.error_file.as_ref().map(|error_file| {
+                BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
+            });
+
+            for message in receiver {
+                match message {
+                    Message::Start { path } => {
+                        writeln!(stdout, "Starting {}", path.display()).unwrap();
+                    }
+                    Message::Finished { path, result } => {
+                        total_errors += result.diagnostics.len();
+                        total_files += result.file_count;
+
+                        writeln!(
+                            stdout,
+                            "Finished {} with {} files in {:.2}s",
+                            path.display(),
+                            result.file_count,
+                            result.duration.as_secs_f32(),
+                        )
+                        .unwrap();
+                        write!(stdout, "{}", result.display(args.format)).unwrap();
+                        if let Some(error_file) = &mut error_file {
+                            write!(error_file, "{}", result.display(args.format)).unwrap();
+                        }
+                        all_success = all_success && result.is_success();
+                    }
+                    Message::Failed { path, error } => {
+                        writeln!(stdout, "Failed {}: {}", path.display(), error).unwrap();
+                        all_success = false;
+                    }
+                }
+            }
+        });
+    });
+
+    let duration = start.elapsed();
+
+    #[allow(clippy::print_stdout)]
+    {
+        println!(
+            "{total_errors} stability errors in {total_files} files in {}s",
+            duration.as_secs_f32()
+        );
+    }
+
+    all_success
+}
+
 /// Returns whether the check was successful
-pub(crate) fn check_repo(args: &Args) -> anyhow::Result<bool> {
+fn check_repo(args: &Args) -> anyhow::Result<CheckRepoResult> {
     let start = Instant::now();
 
     // Find files to check (or in this case, format twice). Adapted from ruff_cli
@@ -107,10 +209,13 @@ pub(crate) fn check_repo(args: &Args) -> anyhow::Result<bool> {
     ])
     .unwrap();
     let (paths, _resolver) = python_files_in_path(&cli.files, &pyproject_config, &overrides)?;
-    assert!(!paths.is_empty(), "no python files in {:?}", cli.files);
+
+    if paths.is_empty() {
+        bail!("no python files in {:?}", cli.files)
+    }
 
     let mut formatted_counter = 0;
-    let errors = paths
+    let errors: Vec<_> = paths
         .into_iter()
         .map(|dir_entry| {
             // Doesn't make sense to recover here in this test script
@@ -127,8 +232,14 @@ pub(crate) fn check_repo(args: &Args) -> anyhow::Result<bool> {
             let result = match catch_unwind(|| check_file(&file)) {
                 Ok(result) => result,
                 Err(panic) => {
-                    if let Ok(message) = panic.downcast::<String>() {
-                        Err(FormatterStabilityError::Panic { message: *message })
+                    if let Some(message) = panic.downcast_ref::<String>() {
+                        Err(FormatterStabilityError::Panic {
+                            message: message.clone(),
+                        })
+                    } else if let Some(&message) = panic.downcast_ref::<&str>() {
+                        Err(FormatterStabilityError::Panic {
+                            message: message.to_string(),
+                        })
                     } else {
                         Err(FormatterStabilityError::Panic {
                             // This should not happen, but it can
@@ -141,94 +252,27 @@ pub(crate) fn check_repo(args: &Args) -> anyhow::Result<bool> {
         })
         // We only care about the errors
         .filter_map(|(result, file)| match result {
-            Err(err) => Some((err, file)),
+            Err(error) => Some(Diagnostic { file, error }),
             Ok(()) => None,
-        });
+        })
+        .collect();
 
-    let mut any_errors = false;
-
-    // Don't collect the iterator so we already see errors while it's still processing
-    for (error, file) in errors {
-        any_errors = true;
-        match error {
-            FormatterStabilityError::Unstable {
-                formatted,
-                reformatted,
-            } => {
-                println!("Unstable formatting {}", file.display());
-                match args.format {
-                    Format::Minimal => {}
-                    Format::Default => {
-                        diff_show_only_changes(
-                            io::stdout().lock().by_ref(),
-                            &formatted,
-                            &reformatted,
-                        )?;
-                    }
-                    Format::Full => {
-                        let diff = TextDiff::from_lines(&formatted, &reformatted)
-                            .unified_diff()
-                            .header("Formatted once", "Formatted twice")
-                            .to_string();
-                        println!(
-                            r#"Reformatting the formatted code a second time resulted in formatting changes.
----
-{diff}---
-
-Formatted once:
----
-{formatted}---
-
-Formatted twice:
----
-{reformatted}---"#,
-                        );
-                    }
-                }
-            }
-            FormatterStabilityError::InvalidSyntax { err, formatted } => {
-                println!(
-                    "Formatter generated invalid syntax {}: {}",
-                    file.display(),
-                    err
-                );
-                if args.format == Format::Full {
-                    println!("---\n{formatted}\n---\n");
-                }
-            }
-            FormatterStabilityError::Panic { message } => {
-                println!("Panic {}: {}", file.display(), message);
-            }
-            FormatterStabilityError::Other(err) => {
-                println!("Uncategorized error {}: {}", file.display(), err);
-            }
-        }
-
-        if args.exit_first_error {
-            return Ok(false);
-        }
-    }
     let duration = start.elapsed();
-    println!(
-        "Formatting {} files twice took {:.2}s",
-        formatted_counter,
-        duration.as_secs_f32()
-    );
 
-    if any_errors {
-        Ok(false)
-    } else {
-        Ok(true)
-    }
+    Ok(CheckRepoResult {
+        duration,
+        file_count: formatted_counter,
+        diagnostics: errors,
+    })
 }
 
 /// A compact diff that only shows a header and changes, but nothing unchanged. This makes viewing
 /// multiple errors easier.
 fn diff_show_only_changes(
-    writer: &mut impl Write,
+    writer: &mut Formatter,
     formatted: &str,
     reformatted: &str,
-) -> io::Result<()> {
+) -> fmt::Result {
     for changes in TextDiff::from_lines(formatted, reformatted)
         .unified_diff()
         .iter_hunks()
@@ -242,10 +286,122 @@ fn diff_show_only_changes(
                 writeln!(writer, "{}", changes.header())?;
             }
             write!(writer, "{}", change.tag())?;
-            writer.write_all(change.value().as_bytes())?;
+            writer.write_str(change.value())?;
         }
     }
     Ok(())
+}
+
+struct CheckRepoResult {
+    duration: Duration,
+    file_count: usize,
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl CheckRepoResult {
+    fn display(&self, format: Format) -> DisplayCheckRepoResult {
+        DisplayCheckRepoResult {
+            result: self,
+            format,
+        }
+    }
+
+    fn is_success(&self) -> bool {
+        self.diagnostics.is_empty()
+    }
+}
+
+struct DisplayCheckRepoResult<'a> {
+    result: &'a CheckRepoResult,
+    format: Format,
+}
+
+impl Display for DisplayCheckRepoResult<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for diagnostic in &self.result.diagnostics {
+            write!(f, "{}", diagnostic.display(self.format))?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct Diagnostic {
+    file: PathBuf,
+    error: FormatterStabilityError,
+}
+
+impl Diagnostic {
+    fn display(&self, format: Format) -> DisplayDiagnostic {
+        DisplayDiagnostic {
+            diagnostic: self,
+            format,
+        }
+    }
+}
+
+struct DisplayDiagnostic<'a> {
+    format: Format,
+    diagnostic: &'a Diagnostic,
+}
+
+impl Display for DisplayDiagnostic<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let Diagnostic { file, error } = &self.diagnostic;
+
+        match error {
+            FormatterStabilityError::Unstable {
+                formatted,
+                reformatted,
+            } => {
+                writeln!(f, "Unstable formatting {}", file.display())?;
+                match self.format {
+                    Format::Minimal => {}
+                    Format::Default => {
+                        diff_show_only_changes(f, formatted, reformatted)?;
+                    }
+                    Format::Full => {
+                        let diff = TextDiff::from_lines(formatted.as_str(), reformatted.as_str())
+                            .unified_diff()
+                            .header("Formatted once", "Formatted twice")
+                            .to_string();
+                        writeln!(
+                            f,
+                            r#"Reformatting the formatted code a second time resulted in formatting changes.
+---
+{diff}---
+
+Formatted once:
+---
+{formatted}---
+
+Formatted twice:
+---
+{reformatted}---\n"#,
+                        )?;
+                    }
+                }
+            }
+            FormatterStabilityError::InvalidSyntax { err, formatted } => {
+                writeln!(
+                    f,
+                    "Formatter generated invalid syntax {}: {}",
+                    file.display(),
+                    err
+                )?;
+                if self.format == Format::Full {
+                    writeln!(f, "---\n{formatted}\n---\n")?;
+                }
+            }
+            FormatterStabilityError::Panic { message } => {
+                writeln!(f, "Panic {}: {}", file.display(), message)?;
+            }
+            FormatterStabilityError::Other(err) => {
+                writeln!(f, "Uncategorized error {}: {}", file.display(), err)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

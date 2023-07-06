@@ -1,0 +1,336 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/conditional_expression.py
+---
+## Input
+
+```py
+long_kwargs_single_line = my_function(
+    foo="test, this is a sample value",
+    bar=some_long_value_name_foo_bar_baz if some_boolean_variable else some_fallback_value_foo_bar_baz,
+    baz="hello, this is a another value",
+)
+
+multiline_kwargs_indented = my_function(
+    foo="test, this is a sample value",
+    bar=some_long_value_name_foo_bar_baz
+    if some_boolean_variable
+    else some_fallback_value_foo_bar_baz,
+    baz="hello, this is a another value",
+)
+
+imploding_kwargs = my_function(
+    foo="test, this is a sample value",
+    bar=a
+    if foo
+    else b,
+    baz="hello, this is a another value",
+)
+
+imploding_line = (
+    1
+    if 1 + 1 == 2
+    else 0
+)
+
+exploding_line = "hello this is a slightly long string" if some_long_value_name_foo_bar_baz else "this one is a little shorter"
+
+positional_argument_test(some_long_value_name_foo_bar_baz if some_boolean_variable else some_fallback_value_foo_bar_baz)
+
+def weird_default_argument(x=some_long_value_name_foo_bar_baz
+        if SOME_CONSTANT
+        else some_fallback_value_foo_bar_baz):
+    pass
+
+nested = "hello this is a slightly long string" if (some_long_value_name_foo_bar_baz if
+                                                    nesting_test_expressions else some_fallback_value_foo_bar_baz) \
+    else "this one is a little shorter"
+
+generator_expression = (
+    some_long_value_name_foo_bar_baz if some_boolean_variable else some_fallback_value_foo_bar_baz for some_boolean_variable in some_iterable
+)
+
+
+def limit_offset_sql(self, low_mark, high_mark):
+    """Return LIMIT/OFFSET SQL clause."""
+    limit, offset = self._get_limit_offset_params(low_mark, high_mark)
+    return " ".join(
+        sql
+        for sql in (
+            "LIMIT %d" % limit if limit else None,
+            ("OFFSET %d" % offset) if offset else None,
+        )
+        if sql
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,90 +1,50 @@
+ long_kwargs_single_line = my_function(
+     foo="test, this is a sample value",
+-    bar=(
+-        some_long_value_name_foo_bar_baz
+-        if some_boolean_variable
+-        else some_fallback_value_foo_bar_baz
+-    ),
++    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+     baz="hello, this is a another value",
+ )
+ 
+ multiline_kwargs_indented = my_function(
+     foo="test, this is a sample value",
+-    bar=(
+-        some_long_value_name_foo_bar_baz
+-        if some_boolean_variable
+-        else some_fallback_value_foo_bar_baz
+-    ),
++    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+     baz="hello, this is a another value",
+ )
+ 
+ imploding_kwargs = my_function(
+     foo="test, this is a sample value",
+-    bar=a if foo else b,
++    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+     baz="hello, this is a another value",
+ )
+ 
+-imploding_line = 1 if 1 + 1 == 2 else 0
++imploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+ 
+-exploding_line = (
+-    "hello this is a slightly long string"
+-    if some_long_value_name_foo_bar_baz
+-    else "this one is a little shorter"
+-)
++exploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+ 
+ positional_argument_test(
+-    some_long_value_name_foo_bar_baz
+-    if some_boolean_variable
+-    else some_fallback_value_foo_bar_baz
++    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+ )
+ 
+ 
+ def weird_default_argument(
+-    x=(
+-        some_long_value_name_foo_bar_baz
+-        if SOME_CONSTANT
+-        else some_fallback_value_foo_bar_baz
+-    ),
++    x=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+ ):
+     pass
+ 
+ 
+-nested = (
+-    "hello this is a slightly long string"
+-    if (
+-        some_long_value_name_foo_bar_baz
+-        if nesting_test_expressions
+-        else some_fallback_value_foo_bar_baz
+-    )
+-    else "this one is a little shorter"
+-)
++nested = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+ 
+-generator_expression = (
+-    (
+-        some_long_value_name_foo_bar_baz
+-        if some_boolean_variable
+-        else some_fallback_value_foo_bar_baz
+-    )
+-    for some_boolean_variable in some_iterable
+-)
++generator_expression = (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+ 
+ 
+ def limit_offset_sql(self, low_mark, high_mark):
+     """Return LIMIT/OFFSET SQL clause."""
+     limit, offset = self._get_limit_offset_params(low_mark, high_mark)
+     return " ".join(
+-        sql
+-        for sql in (
+-            "LIMIT %d" % limit if limit else None,
+-            ("OFFSET %d" % offset) if offset else None,
+-        )
+-        if sql
++        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+     )
+ 
+ 
+ def something():
+     clone._iterable_class = (
+-        NamedValuesListIterable
+-        if named
+-        else FlatValuesListIterable if flat else ValuesListIterable
++        NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+     )
+```
+
+## Ruff Output
+
+```py
+long_kwargs_single_line = my_function(
+    foo="test, this is a sample value",
+    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    baz="hello, this is a another value",
+)
+
+multiline_kwargs_indented = my_function(
+    foo="test, this is a sample value",
+    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    baz="hello, this is a another value",
+)
+
+imploding_kwargs = my_function(
+    foo="test, this is a sample value",
+    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    baz="hello, this is a another value",
+)
+
+imploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+
+exploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+
+positional_argument_test(
+    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+)
+
+
+def weird_default_argument(
+    x=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+):
+    pass
+
+
+nested = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+
+generator_expression = (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+
+
+def limit_offset_sql(self, low_mark, high_mark):
+    """Return LIMIT/OFFSET SQL clause."""
+    limit, offset = self._get_limit_offset_params(low_mark, high_mark)
+    return " ".join(
+        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+    )
+```
+
+## Black Output
+
+```py
+long_kwargs_single_line = my_function(
+    foo="test, this is a sample value",
+    bar=(
+        some_long_value_name_foo_bar_baz
+        if some_boolean_variable
+        else some_fallback_value_foo_bar_baz
+    ),
+    baz="hello, this is a another value",
+)
+
+multiline_kwargs_indented = my_function(
+    foo="test, this is a sample value",
+    bar=(
+        some_long_value_name_foo_bar_baz
+        if some_boolean_variable
+        else some_fallback_value_foo_bar_baz
+    ),
+    baz="hello, this is a another value",
+)
+
+imploding_kwargs = my_function(
+    foo="test, this is a sample value",
+    bar=a if foo else b,
+    baz="hello, this is a another value",
+)
+
+imploding_line = 1 if 1 + 1 == 2 else 0
+
+exploding_line = (
+    "hello this is a slightly long string"
+    if some_long_value_name_foo_bar_baz
+    else "this one is a little shorter"
+)
+
+positional_argument_test(
+    some_long_value_name_foo_bar_baz
+    if some_boolean_variable
+    else some_fallback_value_foo_bar_baz
+)
+
+
+def weird_default_argument(
+    x=(
+        some_long_value_name_foo_bar_baz
+        if SOME_CONSTANT
+        else some_fallback_value_foo_bar_baz
+    ),
+):
+    pass
+
+
+nested = (
+    "hello this is a slightly long string"
+    if (
+        some_long_value_name_foo_bar_baz
+        if nesting_test_expressions
+        else some_fallback_value_foo_bar_baz
+    )
+    else "this one is a little shorter"
+)
+
+generator_expression = (
+    (
+        some_long_value_name_foo_bar_baz
+        if some_boolean_variable
+        else some_fallback_value_foo_bar_baz
+    )
+    for some_boolean_variable in some_iterable
+)
+
+
+def limit_offset_sql(self, low_mark, high_mark):
+    """Return LIMIT/OFFSET SQL clause."""
+    limit, offset = self._get_limit_offset_params(low_mark, high_mark)
+    return " ".join(
+        sql
+        for sql in (
+            "LIMIT %d" % limit if limit else None,
+            ("OFFSET %d" % offset) if offset else None,
+        )
+        if sql
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable if flat else ValuesListIterable
+    )
+```
+
+

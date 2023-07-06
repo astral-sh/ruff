@@ -1,7 +1,7 @@
 use rustpython_parser::ast::{self, Expr};
 
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{BindingKind, SemanticModel};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///
@@ -61,6 +61,25 @@ pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &Semant
                 call_path.as_slice(),
                 ["pydantic", "BaseModel" | "BaseSettings"]
             )
+        })
+    })
+}
+
+/// Returns `true` if the given function is an instantiation of a class that implements the
+/// descriptor protocol.
+///
+/// See: <https://docs.python.org/3.10/reference/datamodel.html#descriptors>
+pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.lookup_attribute(func).map_or(false, |id| {
+        let BindingKind::ClassDefinition(scope_id) = semantic.binding(id).kind else {
+            return false;
+        };
+
+        // Look for `__get__`, `__set__`, and `__delete__` methods.
+        ["__get__", "__set__", "__delete__"].iter().any(|method| {
+            semantic.scopes[scope_id].get(method).map_or(false, |id| {
+                semantic.binding(id).kind.is_function_definition()
+            })
         })
     })
 }

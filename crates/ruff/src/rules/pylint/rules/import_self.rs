@@ -60,7 +60,8 @@ pub(crate) fn import_from_self(
     let Some(module_path) = module_path else {
         return None;
     };
-    let Some(imported_module_path) = resolve_imported_module_path(level, module, Some(module_path)) else {
+    let Some(imported_module_path) = resolve_imported_module_path(level, module, Some(module_path))
+    else {
         return None;
     };
 

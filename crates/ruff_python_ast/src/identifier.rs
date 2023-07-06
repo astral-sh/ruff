@@ -187,8 +187,9 @@ pub fn except(handler: &ExceptHandler, locator: &Locator) -> TextRange {
 /// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
 pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt else {
+    | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+    | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
+    else {
         return None;
     };
 

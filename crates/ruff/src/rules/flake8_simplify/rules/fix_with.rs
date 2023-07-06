@@ -54,13 +54,12 @@ pub(crate) fn fix_multiple_with_statements(
     let With {
         body: Suite::IndentedBlock(ref mut outer_body),
         ..
-    } = outer_with else {
+    } = outer_with
+    else {
         bail!("Expected outer with to have indented body")
     };
 
-    let [Statement::Compound(CompoundStatement::With(inner_with))] =
-        &mut *outer_body.body
-    else {
+    let [Statement::Compound(CompoundStatement::With(inner_with))] = &mut *outer_body.body else {
         bail!("Expected one inner with statement");
     };
 

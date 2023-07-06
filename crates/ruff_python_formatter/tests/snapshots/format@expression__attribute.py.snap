@@ -111,7 +111,7 @@ x53 = (
 
 ## Output
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from argparse import Namespace
 
 a = Namespace()
 
