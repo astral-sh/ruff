@@ -11,7 +11,6 @@ use log::warn;
 use once_cell::sync::Lazy;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
-use unicase::UniCase;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
@@ -31,7 +30,7 @@ static NOQA_MATCHER: Lazy<AhoCorasick> = Lazy::new(|| {
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
 #[derive(Debug)]
-pub enum Directive<'a> {
+pub(crate) enum Directive<'a> {
     /// The `noqa` directive ignores all rules (e.g., `# noqa`).
     All(All),
     /// The `noqa` directive ignores specific rules (e.g., `# noqa: F401, F841`).
@@ -40,75 +39,87 @@ pub enum Directive<'a> {
 
 impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
-    pub fn try_extract(text: &'a str, offset: TextSize) -> Option<Self> {
+    pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Option<Self> {
         for mat in NOQA_MATCHER.find_iter(text) {
-            let mut comment_start = mat.start();
+            let noqa_literal_start = mat.start();
+
+            // Determine the start of the comment.
+            let mut comment_start = noqa_literal_start;
 
             // Trim any whitespace between the `#` character and the `noqa` literal.
-            comment_start -= text[..comment_start].len() - text[..comment_start].trim_end().len();
+            comment_start = text[..comment_start].trim_end().len();
 
             // The next character has to be the `#` character.
-            if !text[..comment_start].ends_with('#') {
+            if text[..comment_start]
+                .chars()
+                .last()
+                .map_or(false, |c| c != '#')
+            {
                 continue;
             }
+            comment_start -= '#'.len_utf8();
 
-            // The start of the `#` character.
-            comment_start -= 1;
-
-            // If the next character is `:`, then it's a list of codes. Otherwise, it's an `all`
-            // directive.
+            // If the next character is `:`, then it's a list of codes. Otherwise, it's a directive
+            // to ignore all rules.
             let noqa_literal_end = mat.end();
-            return Some(if text[noqa_literal_end..].starts_with(':') {
-                // E.g., `# noqa: F401, F841`.
-                let mut codes_start = noqa_literal_end;
+            return Some(
+                if text[noqa_literal_end..]
+                    .chars()
+                    .next()
+                    .map_or(false, |c| c == ':')
+                {
+                    // E.g., `# noqa: F401, F841`.
+                    let mut codes_start = noqa_literal_end;
 
-                // Skip the `:` character.
-                codes_start += 1;
+                    // Skip the `:` character.
+                    codes_start += ':'.len_utf8();
 
-                // Skip any whitespace between the `:` and the codes.
-                codes_start += text[codes_start..]
-                    .find(|c: char| !c.is_whitespace())
-                    .unwrap_or(0);
-
-                // Extract the comma-separated list of codes.
-                let mut codes = vec![];
-                let mut codes_end = codes_start;
-                let mut leading_space = 0;
-                while let Some(code) = Directive::lex_code(&text[codes_end + leading_space..]) {
-                    codes.push(code);
-                    codes_end += leading_space;
-                    codes_end += code.len();
-
-                    // Codes can be comma- or whitespace-delimited. Compute the length of the
-                    // delimiter, but only add it in the next iteration, once we find the next
-                    // code.
-                    leading_space = text[codes_end..]
-                        .find(|c: char| !(c.is_whitespace() || c == ','))
+                    // Skip any whitespace between the `:` and the codes.
+                    codes_start += text[codes_start..]
+                        .find(|c: char| !c.is_whitespace())
                         .unwrap_or(0);
-                    if leading_space == 0 {
-                        break;
+
+                    // Extract the comma-separated list of codes.
+                    let mut codes = vec![];
+                    let mut codes_end = codes_start;
+                    let mut leading_space = 0;
+                    while let Some(code) = Directive::lex_code(&text[codes_end + leading_space..]) {
+                        codes.push(code);
+                        codes_end += leading_space;
+                        codes_end += code.len();
+
+                        // Codes can be comma- or whitespace-delimited. Compute the length of the
+                        // delimiter, but only add it in the next iteration, once we find the next
+                        // code.
+                        if let Some(space_between) =
+                            text[codes_end..].find(|c: char| !(c.is_whitespace() || c == ','))
+                        {
+                            leading_space = space_between;
+                        } else {
+                            break;
+                        }
                     }
-                }
 
-                let range = TextRange::new(
-                    TextSize::try_from(comment_start).unwrap(),
-                    TextSize::try_from(codes_end).unwrap(),
-                );
+                    let range = TextRange::new(
+                        TextSize::try_from(comment_start).unwrap(),
+                        TextSize::try_from(codes_end).unwrap(),
+                    );
 
-                Self::Codes(Codes {
-                    range: range.add(offset),
-                    codes,
-                })
-            } else {
-                // E.g., `# noqa`.
-                let range = TextRange::new(
-                    TextSize::try_from(comment_start).unwrap(),
-                    TextSize::try_from(noqa_literal_end).unwrap(),
-                );
-                Self::All(All {
-                    range: range.add(offset),
-                })
-            });
+                    Self::Codes(Codes {
+                        range: range.add(offset),
+                        codes,
+                    })
+                } else {
+                    // E.g., `# noqa`.
+                    let range = TextRange::new(
+                        TextSize::try_from(comment_start).unwrap(),
+                        TextSize::try_from(noqa_literal_end).unwrap(),
+                    );
+                    Self::All(All {
+                        range: range.add(offset),
+                    })
+                },
+            );
         }
 
         None
@@ -116,7 +127,9 @@ impl<'a> Directive<'a> {
 
     /// Lex an individual rule code (e.g., `F401`).
     fn lex_code(text: &str) -> Option<&str> {
+        // Extract, e.g., the `F` in `F401`.
         let prefix = text.chars().take_while(char::is_ascii_uppercase).count();
+        // Extract, e.g., the `401` in `F401`.
         let suffix = text[prefix..]
             .chars()
             .take_while(char::is_ascii_digit)
@@ -130,7 +143,7 @@ impl<'a> Directive<'a> {
 }
 
 #[derive(Debug)]
-pub struct All {
+pub(crate) struct All {
     range: TextRange,
 }
 
@@ -142,7 +155,7 @@ impl Ranged for All {
 }
 
 #[derive(Debug)]
-pub struct Codes<'a> {
+pub(crate) struct Codes<'a> {
     range: TextRange,
     codes: Vec<&'a str>,
 }
@@ -233,7 +246,7 @@ impl FileExemption {
 /// [`FileExemption`], but only for a single line, as opposed to an aggregated set of exemptions
 /// across a source file.
 #[derive(Debug)]
-pub enum ParsedFileExemption<'a> {
+enum ParsedFileExemption<'a> {
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
@@ -242,77 +255,7 @@ pub enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    pub fn parse(line: &'a str) -> Option<Self> {
-        let line = line.trim_whitespace_start();
-
-        if line.len() >= "# flake8: noqa".len() {
-            if UniCase::new(&line[.."# flake8: noqa".len()]) == UniCase::new("# flake8: noqa") {
-                return Some(Self::All);
-            }
-        }
-
-        if line.len() >= "# ruff: noqa".len() {
-            if UniCase::new(&line[.."# ruff: noqa".len()]) == UniCase::new("# ruff: noqa") {
-                let remainder = &line["# ruff: noqa".len()..];
-                if remainder.is_empty() {
-                    return Some(Self::All);
-                } else if let Some(codes) = remainder.strip_prefix(':') {
-                    let codes = codes
-                        .split(|c: char| c.is_whitespace() || c == ',')
-                        .map(str::trim)
-                        .filter(|code| !code.is_empty())
-                        .collect_vec();
-                    if codes.is_empty() {
-                        warn!("Expected rule codes on `noqa` directive: \"{line}\"");
-                    }
-                    return Some(Self::Codes(codes));
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Return a [`ParsedFileExemption`] for a given comment line.
-    pub fn matches(line: &'a str) -> Option<Self> {
-        let line = line.trim_whitespace_start();
-
-        if line.len() >= "# flake8: noqa".len() {
-            if matches!(
-                &line[.."# flake8: noqa".len()],
-                "# flake8: noqa" | "# flake8: NOQA" | "# flake8: NoQA"
-            ) {
-                return Some(Self::All);
-            }
-        }
-
-        if line.len() >= "# ruff: noqa".len() {
-            if matches!(
-                &line[.."# ruff: noqa".len()],
-                "# ruff: noqa" | "# ruff: NOQA" | "# ruff: NoQA"
-            ) {
-                let remainder = &line["# ruff: noqa".len()..];
-                if remainder.is_empty() {
-                    return Some(Self::All);
-                } else if let Some(codes) = remainder.strip_prefix(':') {
-                    let codes = codes
-                        .split(|c: char| c.is_whitespace() || c == ',')
-                        .map(str::trim)
-                        .filter(|code| !code.is_empty())
-                        .collect_vec();
-                    if codes.is_empty() {
-                        warn!("Expected rule codes on `noqa` directive: \"{line}\"");
-                    }
-                    return Some(Self::Codes(codes));
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Return a [`ParsedFileExemption`] for a given comment line.
-    pub fn extract(line: &'a str) -> Option<Self> {
+    fn try_extract(line: &'a str) -> Option<Self> {
         let line = line.trim_whitespace_start();
 
         if line.starts_with("# flake8: noqa")
@@ -619,7 +562,7 @@ impl NoqaMapping {
     }
 
     /// Returns the re-mapped position or `position` if no mapping exists.
-    pub fn resolve(&self, offset: TextSize) -> TextSize {
+    pub(crate) fn resolve(&self, offset: TextSize) -> TextSize {
         let index = self.ranges.binary_search_by(|range| {
             if range.end() < offset {
                 std::cmp::Ordering::Less
@@ -637,7 +580,7 @@ impl NoqaMapping {
         }
     }
 
-    pub fn push_mapping(&mut self, range: TextRange) {
+    pub(crate) fn push_mapping(&mut self, range: TextRange) {
         if let Some(last_range) = self.ranges.last_mut() {
             // Strictly sorted insertion
             if last_range.end() <= range.start() {
