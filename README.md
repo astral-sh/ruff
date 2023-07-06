@@ -34,7 +34,8 @@ An extremely fast Python linter, written in Rust.
 - ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
   built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
+- ⌨️ First-party [editor integrations](https://beta.ruff.rs/docs/editor-integrations/) for
+  [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -361,11 +362,13 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
+- [HTTPX](https://github.com/encode/httpx)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
   [Datasets](https://github.com/huggingface/datasets),
   [Diffusers](https://github.com/huggingface/diffusers))
 - [Hatch](https://github.com/pypa/hatch)
 - [Home Assistant](https://github.com/home-assistant/core)
+- ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [LangChain](https://github.com/hwchase17/langchain)

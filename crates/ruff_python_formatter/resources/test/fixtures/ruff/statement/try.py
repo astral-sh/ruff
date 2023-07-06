@@ -89,3 +89,13 @@ else:
 # before finally
 finally:
     ...
+
+# try and try star are statements with body
+# Minimized from https://github.com/python/cpython/blob/99b00efd5edfd5b26bf9e2a35cbfc96277fdcbb1/Lib/getpass.py#L68-L91
+try:
+    try:
+        pass
+    finally:
+        print(1)  # issue7208
+except A:
+    pass

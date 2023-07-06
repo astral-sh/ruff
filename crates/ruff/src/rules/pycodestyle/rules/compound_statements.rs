@@ -100,13 +100,12 @@ impl AlwaysAutofixableViolation for UselessSemicolon {
 
 /// E701, E702, E703
 pub(crate) fn compound_statements(
+    diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
     locator: &Locator,
     indexer: &Indexer,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     // Track the last seen instance of a variety of tokens.
     let mut colon = None;
     let mut semi = None;
@@ -311,6 +310,4 @@ pub(crate) fn compound_statements(
             _ => {}
         };
     }
-
-    diagnostics
 }

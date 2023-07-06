@@ -464,12 +464,11 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
 
 /// Generate `flake8-quote` diagnostics from a token stream.
 pub(crate) fn from_tokens(
+    diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     // Keep track of sequences of strings, which represent implicit string
     // concatenation, and should thus be handled as a single unit.
     let mut sequence = vec![];
@@ -488,7 +487,7 @@ pub(crate) fn from_tokens(
                 diagnostics.push(diagnostic);
             }
         } else {
-            if matches!(tok, Tok::String { .. }) {
+            if tok.is_string() {
                 // If this is a string, add it to the sequence.
                 sequence.push(range);
             } else if !matches!(tok, Tok::Comment(..) | Tok::NonLogicalNewline) {
@@ -506,6 +505,4 @@ pub(crate) fn from_tokens(
         diagnostics.extend(strings(locator, &sequence, settings));
         sequence.clear();
     }
-
-    diagnostics
 }

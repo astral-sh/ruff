@@ -23,6 +23,3 @@ ignore = [
 
 [tool.ruff.isort]
 required-imports = ["from __future__ import annotations"]
-
-[tool.ruff.pydocstyle]
-convention = "pep257"

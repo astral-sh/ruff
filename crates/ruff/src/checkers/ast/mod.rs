@@ -1658,6 +1658,9 @@ where
                 if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                     pylint::rules::type_param_name_mismatch(self, value, targets);
                 }
+                if self.settings.rules.enabled(Rule::TypeBivariance) {
+                    pylint::rules::type_bivariance(self, value);
+                }
                 if self.is_stub {
                     if self.any_enabled(&[
                         Rule::UnprefixedTypeParam,
@@ -1778,7 +1781,6 @@ where
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
-                name,
                 args,
                 decorator_list,
                 returns,
@@ -1786,7 +1788,6 @@ where
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 body,
-                name,
                 args,
                 decorator_list,
                 returns,
@@ -1844,13 +1845,6 @@ where
                         self.visit_annotation(expr);
                     };
                 }
-
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::FunctionDefinition,
-                    BindingFlags::empty(),
-                );
 
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Function,
@@ -2061,19 +2055,28 @@ where
 
         // Post-visit.
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
-                self.deferred.scopes.push(self.semantic.scope_id);
-                self.semantic.pop_scope();
-                self.semantic.pop_definition();
-            }
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                self.deferred.scopes.push(self.semantic.scope_id);
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
                 self.add_binding(
                     name,
                     stmt.identifier(),
-                    BindingKind::ClassDefinition,
+                    BindingKind::FunctionDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
+            }
+            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
+                self.semantic.pop_scope();
+                self.semantic.pop_definition();
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::ClassDefinition(scope_id),
                     BindingFlags::empty(),
                 );
             }
@@ -3884,7 +3887,7 @@ where
                         }
 
                         // Store the existing binding, if any.
-                        let existing_id = self.semantic.lookup(name);
+                        let existing_id = self.semantic.lookup_symbol(name);
 
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(

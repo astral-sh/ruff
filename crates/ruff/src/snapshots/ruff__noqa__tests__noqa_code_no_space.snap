@@ -1,0 +1,14 @@
+---
+source: crates/ruff/src/noqa.rs
+expression: "Directive::try_extract(source, TextSize::default())"
+---
+Some(
+    Codes(
+        Codes {
+            range: 0..10,
+            codes: [
+                "F401",
+            ],
+        },
+    ),
+)

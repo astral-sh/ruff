@@ -127,6 +127,7 @@ pub(crate) fn organize_imports(
         settings.isort.combine_as_imports,
         settings.isort.force_single_line,
         settings.isort.force_sort_within_sections,
+        settings.isort.case_sensitive,
         settings.isort.force_wrap_aliases,
         &settings.isort.force_to_top,
         &settings.isort.known_modules,
