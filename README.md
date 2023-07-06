@@ -369,6 +369,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Hatch](https://github.com/pypa/hatch)
 - [Home Assistant](https://github.com/home-assistant/core)
 - [Ibis](https://github.com/ibis-project/ibis)
+- ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [LangChain](https://github.com/hwchase17/langchain)
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
