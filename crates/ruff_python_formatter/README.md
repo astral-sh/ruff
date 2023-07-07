@@ -251,7 +251,7 @@ cargo run --bin ruff_dev -- format-dev --write my_project
 
 This will format all files that `ruff check` would lint and computes the [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index), a measure for how close the original and formatted versions are. The Jaccard index is 1 if there were no changes at all, while 0 means every line was changed. If you run this on a black formatted projects, this tells you how similar the ruff formatter is to black for the given project, with our goal being as close to 1 as possible.
 
-There are tree common problems with the formatter: The second formatting pass looks different than
+There are three common problems with the formatter: The second formatting pass looks different than
 the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
 parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
 of these using the `--stability-check` option in the `format-dev` subcommand:
