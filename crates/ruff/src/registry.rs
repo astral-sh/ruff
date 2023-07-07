@@ -112,7 +112,7 @@ pub enum Linter {
     /// [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
     #[prefix = "ICN"]
     Flake8ImportConventions,
-    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/)
+    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
     #[prefix = "G"]
     Flake8LoggingFormat,
     /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
@@ -181,7 +181,7 @@ pub enum Linter {
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
-    /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
+    /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
     /// [flynt](https://pypi.org/project/flynt/)
