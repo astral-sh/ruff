@@ -54,7 +54,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
-      # cargo insta 1.30.0 fails for some reason
+      # cargo insta 1.30.0 fails for some reason (https://github.com/mitsuhiko/insta/issues/392)
       - run: cargo install cargo-insta@=1.29.0
       - run: pip install black[d]==23.1.0
       - name: "Run tests (Ubuntu)"
