@@ -127,11 +127,20 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    // We have to special case this here since the python tokenizer doesn't work with toml
+    // We have to special case this here since the Python tokenizer doesn't work with TOML.
     if is_project_toml(path) {
-        let contents = std::fs::read_to_string(path)?;
-        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-        let messages = lint_pyproject_toml(source_file)?;
+        let messages = if settings
+            .lib
+            .rules
+            .iter_enabled()
+            .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+        {
+            let contents = std::fs::read_to_string(path)?;
+            let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+            lint_pyproject_toml(source_file, &settings.lib)?
+        } else {
+            vec![]
+        };
         return Ok(Diagnostics {
             messages,
             ..Diagnostics::default()
