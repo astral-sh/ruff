@@ -22,6 +22,7 @@ pub(crate) use stub_body_multiple_statements::*;
 pub(crate) use type_alias_naming::*;
 pub(crate) use type_comment_in_stub::*;
 pub(crate) use unaliased_collections_abc_set_import::*;
+pub(crate) use unnecessary_literal_union::*;
 pub(crate) use unrecognized_platform::*;
 pub(crate) use unrecognized_version_info::*;
 
@@ -49,5 +50,6 @@ mod stub_body_multiple_statements;
 mod type_alias_naming;
 mod type_comment_in_stub;
 mod unaliased_collections_abc_set_import;
+mod unnecessary_literal_union;
 mod unrecognized_platform;
 mod unrecognized_version_info;

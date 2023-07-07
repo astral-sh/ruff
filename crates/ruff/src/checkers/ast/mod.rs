@@ -2189,6 +2189,22 @@ where
                     }
                 }
 
+                // Ex) Union[...]
+                if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                    let mut check = true;
+
+                    // Avoid duplicate checks if the parent is an `Union[...]`
+                    if let Some(Expr::Subscript(ast::ExprSubscript { value, .. })) =
+                        self.semantic.expr_grandparent()
+                    {
+                        check = !self.semantic.match_typing_expr(value, "Union");
+                    }
+
+                    if check {
+                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                    }
+                }
+
                 if self.semantic.match_typing_expr(value, "Literal") {
                     self.semantic.flags |= SemanticModelFlags::LITERAL;
                 }
@@ -3136,17 +3152,23 @@ where
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic.in_type_definition()
-                        && self.semantic.expr_parent().map_or(true, |parent| {
-                            !matches!(
-                                parent,
-                                Expr::BinOp(ast::ExprBinOp {
-                                    op: Operator::BitOr,
-                                    ..
-                                })
-                            )
-                        })
+                        // Avoid duplicate checks if the parent is an `|`
+                        && !matches!(
+                            self.semantic.expr_parent(),
+                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                        )
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
+                    }
+
+                    if self.enabled(Rule::UnnecessaryLiteralUnion)
+                        // Avoid duplicate checks if the parent is an `|`
+                        && !matches!(
+                            self.semantic.expr_parent(),
+                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                        )
+                    {
+                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
                     }
                 }
             }
