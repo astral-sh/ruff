@@ -46,7 +46,7 @@ impl Violation for InvalidIndexType {
 }
 
 /// RUF015
-/// Expects a `Subscript` expression
+/// Expects components of a `Subscript` expression
 pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, slice: &'a Expr) {
     // If the value being indexed is a list, tuple, string, or comprehension
     if matches!(
