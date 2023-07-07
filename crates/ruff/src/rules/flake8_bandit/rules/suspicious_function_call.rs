@@ -106,7 +106,7 @@ impl Violation for SuspiciousMarshalUsage {
 /// ## Why is this bad?
 /// Weak or broken cryptographic hash functions may be susceptible to
 /// collision attacks (where two different inputs produce the same hash) or
-/// prei-image attacks (where an attacker can find an input that produces a
+/// pre-image attacks (where an attacker can find an input that produces a
 /// given hash). This can lead to security vulnerabilities in applications
 /// that rely on these hash functions.
 ///
@@ -272,22 +272,31 @@ impl Violation for SuspiciousMktempUsage {
 }
 
 /// ## What it does
-/// Checks for uses of the bulitin `eval()` function.
+/// Checks for uses of the builtin `eval()` function.
 ///
 /// ## Why is this bad?
-/// TODO: Add explanation.
+/// The `eval()` function is insecure as it enables arbitrary code execution.
+///
+/// If you need to evaluate an expression from a string, consider using
+/// `ast.literal_eval()` instead, which will raise an exception if the
+/// expression is not a valid Python literal.
 ///
 /// ## Example
 /// ```python
+/// x = eval(input("Enter a number: "))
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from ast import literal_eval
+///
+/// x = literal_eval(input("Enter a number: "))
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `marshal` — Internal Python object serialization](https://docs.python.org/3/library/marshal.html)
-/// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+/// - [Python documentation: `eval`](https://docs.python.org/3/library/functions.html#eval)
+/// - [Python documentation: `literal_eval`](https://docs.python.org/3/library/ast.html#ast.literal_eval)
+/// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
 #[violation]
 pub struct SuspiciousEvalUsage;
 
@@ -546,6 +555,37 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
+/// which protects against XML attacks.
+///
+/// ## Example
+/// ```python
+/// from xml.dom.expatbuilder import parse
+///
+/// parse("untrusted.xml")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from defusedxml.expatbuilder import parse
+///
+/// tree = parse("untrusted.xml")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml` — XML processing modules](https://docs.python.org/3/library/xml.html)
+/// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLExpatBuilderUsage;
 
@@ -556,6 +596,37 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
+/// which protects against XML attacks.
+///
+/// ## Example
+/// ```python
+/// from xml.sax import make_parser
+///
+/// make_parser()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from defusedxml.sax import make_parser
+///
+/// make_parser()
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml` — XML processing modules](https://docs.python.org/3/library/xml.html)
+/// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLSaxUsage;
 
@@ -566,6 +637,37 @@ impl Violation for SuspiciousXMLSaxUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
+/// which protects against XML attacks.
+///
+/// ## Example
+/// ```python
+/// from xml.dom.minidom import parse
+///
+/// content = parse("untrusted.xml")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from defusedxml.minidom import parse
+///
+/// content = parse("untrusted.xml")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml` — XML processing modules](https://docs.python.org/3/library/xml.html)
+/// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLMiniDOMUsage;
 
@@ -576,6 +678,37 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
+/// which protects against XML attacks.
+///
+/// ## Example
+/// ```python
+/// from xml.dom.pulldom import parse
+///
+/// content = parse("untrusted.xml")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from defusedxml.pulldom import parse
+///
+/// content = parse("untrusted.xml")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml` — XML processing modules](https://docs.python.org/3/library/xml.html)
+/// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLPullDOMUsage;
 
@@ -586,16 +719,67 @@ impl Violation for SuspiciousXMLPullDOMUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// ## Example
+/// ```python
+/// from lxml import etree
+///
+/// content = etree.parse("untrusted.xml")
+/// ```
+///
+/// ## References
+/// - [PyPI: `lxml`](https://pypi.org/project/lxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLETreeUsage;
 
 impl Violation for SuspiciousXMLETreeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        format!("Using `lxml` to parse untrusted data is known to be vulnerable to XML attacks")
     }
 }
 
+/// ## What it does
+/// Checks for uses of `ssl._create_unverified_context`.
+///
+/// ## Why is this bad?
+/// [PEP 476](https://peps.python.org/pep-0476/) enabled certificate and
+/// hostname validation by default in Python HTTPS clients. Previously, Python
+/// did not validate certificates by default, which could allow an attacker to
+/// perform a "man in the middle" attack where they intercept and modify the
+/// traffic between the client and server.
+///
+/// To support legacy environments, `ssl._create_unverified_context` reverts to
+/// the previous behavior that does perform verification. Otherwise, use
+/// `ssl.create_default_context` to create a secure context.
+///
+/// ## Example
+/// ```python
+/// import ssl
+///
+/// context = ssl._create_unverified_context()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import ssl
+///
+/// context = ssl.create_default_context()
+/// ```
+///
+/// ## References
+/// - [PEP 476 – Enabling certificate verification by default for stdlib http clients: Opting out](https://peps.python.org/pep-0476/#opting-out)
+/// - [Python documentation: `ssl` — TLS/SSL wrapper for socket objects](https://docs.python.org/3/library/ssl.html)
 #[violation]
 pub struct SuspiciousUnverifiedContextUsage;
 
@@ -606,6 +790,17 @@ impl Violation for SuspiciousUnverifiedContextUsage {
     }
 }
 
+/// ## What it does
+/// Checks for the use of Telnet-related functions.
+///
+/// ## Why is this bad?
+/// Telnet is considered insecure because it does not encrypt data sent over
+/// the connection and is vulnerable to numerous attacks.
+///
+/// Instead, consider using a more secure protocol such as SSH.
+///
+/// ## References
+/// - [Python documentation: `telnetlib` — Telnet client](https://docs.python.org/3/library/telnetlib.html)
 #[violation]
 pub struct SuspiciousTelnetUsage;
 
@@ -616,6 +811,17 @@ impl Violation for SuspiciousTelnetUsage {
     }
 }
 
+/// ## What it does
+/// Checks for the use of FTP-related functions.
+///
+/// ## Why is this bad?
+/// FTP is considered insecure because it does not encrypt data sent over the
+/// connection and is vulnerable to numerous attacks.
+///
+/// Instead, consider using FTPS (which secures FTP using SSL/TLS) or SFTP.
+///
+/// ## References
+/// - [Python documentation: `ftplib` — FTP protocol client](https://docs.python.org/3/library/ftplib.html)
 #[violation]
 pub struct SuspiciousFTPLibUsage;
 
