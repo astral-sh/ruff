@@ -2190,7 +2190,7 @@ where
                 }
 
                 // Ex) Union[...]
-                if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                if self.any_enabled(&[Rule::UnnecessaryLiteralUnion, Rule::DuplicateUnionMember]) {
                     let mut check = true;
 
                     // Avoid duplicate checks if the parent is an `Union[...]`
@@ -2201,7 +2201,12 @@ where
                     }
 
                     if check {
-                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                        if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                            flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                        }
+                        if self.enabled(Rule::DuplicateUnionMember) {
+                            flake8_pyi::rules::duplicate_union_member(self, expr);
+                        }
                     }
                 }
 
