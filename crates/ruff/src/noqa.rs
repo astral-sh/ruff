@@ -83,7 +83,7 @@ impl<'a> Directive<'a> {
                     let mut codes = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
-                    while let Some(code) = Directive::lex_code(&text[codes_end + leading_space..]) {
+                    while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
                         codes.push(code);
                         codes_end += leading_space;
                         codes_end += code.len();
@@ -257,46 +257,44 @@ enum ParsedFileExemption<'a> {
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
     fn try_extract(line: &'a str) -> Option<Self> {
-        let line = ParsedFileExemption::lex_whitespace(line);
-        let line = ParsedFileExemption::lex_char(line, '#')?;
-        let line = ParsedFileExemption::lex_whitespace(line);
+        let line = Self::lex_whitespace(line);
+        let line = Self::lex_char(line, '#')?;
+        let line = Self::lex_whitespace(line);
 
-        if let Some(line) = ParsedFileExemption::lex_flake8(line) {
+        if let Some(line) = Self::lex_flake8(line) {
             // Ex) `# flake8: noqa`
-            let line = ParsedFileExemption::lex_whitespace(line);
-            let line = ParsedFileExemption::lex_char(line, ':')?;
-            let line = ParsedFileExemption::lex_whitespace(line);
-            ParsedFileExemption::lex_noqa(line)?;
+            let line = Self::lex_whitespace(line);
+            let line = Self::lex_char(line, ':')?;
+            let line = Self::lex_whitespace(line);
+            Self::lex_noqa(line)?;
             Some(Self::All)
-        } else if let Some(line) = ParsedFileExemption::lex_ruff(line) {
-            let line = ParsedFileExemption::lex_whitespace(line);
-            let line = ParsedFileExemption::lex_char(line, ':')?;
-            let line = ParsedFileExemption::lex_whitespace(line);
-            let line = ParsedFileExemption::lex_noqa(line)?;
+        } else if let Some(line) = Self::lex_ruff(line) {
+            let line = Self::lex_whitespace(line);
+            let line = Self::lex_char(line, ':')?;
+            let line = Self::lex_whitespace(line);
+            let line = Self::lex_noqa(line)?;
 
             if line.is_empty() {
                 // Ex) `# ruff: noqa`
                 Some(Self::All)
             } else {
                 // Ex) `# ruff: noqa: F401, F841`
-                let line = ParsedFileExemption::lex_whitespace(line);
-                let Some(line) = ParsedFileExemption::lex_char(line, ':') else {
+                let line = Self::lex_whitespace(line);
+                let Some(line) = Self::lex_char(line, ':') else {
                     warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
                     return None;
                 };
-                let line = ParsedFileExemption::lex_whitespace(line);
+                let line = Self::lex_whitespace(line);
 
                 // Extract the codes from the line (e.g., `F401, F841`).
                 let mut codes = vec![];
                 let mut line = line;
-                while let Some(code) = ParsedFileExemption::lex_code(line) {
+                while let Some(code) = Self::lex_code(line) {
                     codes.push(code);
                     line = &line[code.len()..];
 
                     // Codes can be comma- or whitespace-delimited.
-                    if let Some(rest) = ParsedFileExemption::lex_delimiter(line)
-                        .map(ParsedFileExemption::lex_whitespace)
-                    {
+                    if let Some(rest) = Self::lex_delimiter(line).map(Self::lex_whitespace) {
                         line = rest;
                     } else {
                         break;
@@ -343,29 +341,10 @@ impl<'a> ParsedFileExemption<'a> {
     /// Lex a `noqa` directive with case-insensitive matching.
     #[inline]
     fn lex_noqa(line: &str) -> Option<&str> {
-        let mut chars = line.chars();
-        if chars
-            .next()
-            .map_or(false, |c| c.to_ascii_lowercase() == 'n')
-        {
-            if chars
-                .next()
-                .map_or(false, |c| c.to_ascii_lowercase() == 'o')
-            {
-                if chars
-                    .next()
-                    .map_or(false, |c| c.to_ascii_lowercase() == 'q')
-                {
-                    if chars
-                        .next()
-                        .map_or(false, |c| c.to_ascii_lowercase() == 'a')
-                    {
-                        return Some(chars.as_str());
-                    }
-                }
-            }
+        match line.as_bytes() {
+            [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..] => Some(&line["noqa".len()..]),
+            _ => None,
         }
-        None
     }
 
     /// Lex a code delimiter, which can either be a comma or whitespace.
