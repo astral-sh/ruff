@@ -51,7 +51,7 @@ fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ign
 /// Currently only used for computing the Jaccard index
 ///
 /// The [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index) can be defined as
-/// ```
+/// ```text
 /// J(A, B) = |A∩B| / (|A\B| + |B\A| + |A∩B|)
 /// ```
 /// where in our case `A` is the black formatted input, `B` is the ruff formatted output and the
