@@ -116,9 +116,9 @@ pub(crate) fn mutable_argument_default(
                 check_lines.push_str(indentation);
                 let check_edit = Edit::insertion(check_lines, body[0].start());
 
-                diagnostic.set_fix(Fix::automatic_edits(arg_edit, [check_edit]));
-                checker.diagnostics.push(diagnostic);
+                diagnostic.set_fix(Fix::manual_edits(arg_edit, [check_edit]));
             }
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
