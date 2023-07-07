@@ -165,24 +165,21 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         format_dev_multi_project(args)
     } else {
         let result = format_dev_project(&args.files, args.stability_check, args.write, true)?;
+        let error_count = result.error_count();
 
         #[allow(clippy::print_stdout)]
         {
             print!("{}", result.display(args.format));
             println!(
                 "Found {} stability errors in {} files (jaccard index {:.3}) in {:.2}s",
-                result
-                    .diagnostics
-                    .iter()
-                    .filter(|diagnostics| !diagnostics.error.is_success())
-                    .count(),
+                error_count,
                 result.file_count,
                 result.statistics.jaccard_index(),
                 result.duration.as_secs_f32(),
             );
         }
 
-        !result.is_success()
+        error_count == 0
     };
     if all_success {
         Ok(ExitCode::SUCCESS)
@@ -208,7 +205,6 @@ enum Message {
 
 /// Checks a directory of projects
 fn format_dev_multi_project(args: &Args) -> bool {
-    let mut all_success = true;
     let mut total_errors = 0;
     let mut total_files = 0;
     let start = Instant::now();
@@ -253,7 +249,7 @@ fn format_dev_multi_project(args: &Args) -> bool {
                         bar.println(path.display().to_string());
                     }
                     Message::Finished { path, result } => {
-                        total_errors += result.diagnostics.len();
+                        total_errors += result.error_count();
                         total_files += result.file_count;
 
                         bar.println(format!(
@@ -267,12 +263,10 @@ fn format_dev_multi_project(args: &Args) -> bool {
                         if let Some(error_file) = &mut error_file {
                             write!(error_file, "{}", result.display(args.format)).unwrap();
                         }
-                        all_success = all_success && !result.is_success();
                         bar.inc(1);
                     }
                     Message::Failed { path, error } => {
                         bar.println(format!("Failed {}: {}", path.display(), error));
-                        all_success = false;
                         bar.inc(1);
                     }
                 }
@@ -291,7 +285,7 @@ fn format_dev_multi_project(args: &Args) -> bool {
         );
     }
 
-    all_success
+    total_errors == 0
 }
 
 fn format_dev_project(
@@ -414,12 +408,12 @@ impl CheckRepoResult {
         }
     }
 
-    /// We also emit diagnostics if the input file was already invalid or the were io errors. This
-    /// method helps to differentiate
-    fn is_success(&self) -> bool {
+    /// Count the actual errors excluding invalid input files and io errors
+    fn error_count(&self) -> usize {
         self.diagnostics
             .iter()
-            .all(|diagnostic| diagnostic.error.is_success())
+            .filter(|diagnostics| !diagnostics.error.is_success())
+            .count()
     }
 }
 
