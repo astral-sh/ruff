@@ -2191,14 +2191,16 @@ where
 
                 // Ex) Union[...]
                 if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                    let mut check = true;
+
                     // Avoid duplicate checks if the parent is an `Union[...]`
-                    if self.semantic.expr_parent().map_or(true, |parent| {
-                        if let Expr::Subscript(ast::ExprSubscript { value, .. }) = parent {
-                            !self.semantic.match_typing_expr(value, "Union")
-                        } else {
-                            false
-                        }
-                    }) {
+                    if let Some(Expr::Subscript(ast::ExprSubscript { value, .. })) =
+                        self.semantic.expr_grandparent()
+                    {
+                        check = !self.semantic.match_typing_expr(value, "Union")
+                    }
+
+                    if check {
                         flake8_pyi::rules::unnecessary_literal_union(self, expr);
                     }
                 }
