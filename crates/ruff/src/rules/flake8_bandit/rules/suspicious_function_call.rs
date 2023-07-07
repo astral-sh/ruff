@@ -115,22 +115,20 @@ impl Violation for SuspiciousMarshalUsage {
 ///
 /// ## Example
 /// ```python
-/// import hashlib
+/// from cryptography.hazmat.primitives import hashes
 ///
-///
-/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
-///     hash = hashlib.md5(certificate).hexdigest()
-///     return hash == known_hash
+/// digest = hashes.Hash(hashes.MD5())
+/// digest.update(b"Hello, world!")
+/// digest.finalize()
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// import hashlib
+/// from cryptography.hazmat.primitives import hashes
 ///
-///
-/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
-///     hash = hashlib.sha256(certificate).hexdigest()
-///     return hash == known_hash
+/// digest = hashes.Hash(hashes.SHA256())
+/// digest.update(b"Hello, world!")
+/// digest.finalize()
 /// ```
 ///
 /// ## References
@@ -754,10 +752,10 @@ impl Violation for SuspiciousXMLETreeUsage {
 ///
 /// ## Why is this bad?
 /// [PEP 476](https://peps.python.org/pep-0476/) enabled certificate and
-/// hostname validation by default in Python HTTPS clients. Previously, Python
-/// did not validate certificates by default, which could allow an attacker to
-/// perform a "man in the middle" attack where they intercept and modify the
-/// traffic between the client and server.
+/// hostname validation by default in Python standard library HTTP clients.
+/// Previously, Python did not validate certificates by default, which could
+/// allow an attacker to perform a "man in the middle" attack where they
+/// intercept and modify the traffic between the client and server.
 ///
 /// To support legacy environments, `ssl._create_unverified_context` reverts to
 /// the previous behavior that does perform verification. Otherwise, use
