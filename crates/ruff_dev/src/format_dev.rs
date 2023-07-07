@@ -48,7 +48,7 @@ fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ign
     Ok(paths)
 }
 
-/// Currently only used for computing the Jaccard index
+/// Collects statistics over the formatted files, currently only computes the Jaccard index
 ///
 /// The [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index) can be defined as
 /// ```text
@@ -56,14 +56,16 @@ fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ign
 /// ```
 /// where in our case `A` is the black formatted input, `B` is the ruff formatted output and the
 /// intersection are the lines in the diff that didn't change. We don't just track intersection and
-/// union so we can make statistics about size changes.
+/// union so we can make statistics about size changes. If the input is not black formatted, this
+/// only becomes a measure for the changes made to the codebase during the initial formatting.
 #[derive(Default, Debug, Copy, Clone)]
 pub(crate) struct Statistics {
-    /// The size of `A\B`, the number of lines only in black formatted input
+    /// The size of `A\B`, the number of lines only in the input, which we assume to be black
+    /// formatted
     black_input: u32,
-    /// The size of `B\A`, the number of lines only in formatted output
+    /// The size of `B\A`, the number of lines only in the formatted output
     ruff_output: u32,
-    /// The number of lines unchanged between during formatting
+    /// The number of matching identical lines
     intersection: u32,
 }
 
@@ -129,7 +131,8 @@ pub(crate) enum Format {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(clap::Args)]
 pub(crate) struct Args {
-    /// Like `ruff check`'s files
+    /// Like `ruff check`'s files. See `--multi-project` if you want to format an ecosystem
+    /// checkout.
     pub(crate) files: Vec<PathBuf>,
     /// Check stability
     ///
@@ -139,7 +142,7 @@ pub(crate) struct Args {
     /// checking entire repositories.
     #[arg(long)]
     pub(crate) stability_check: bool,
-    /// Format the files. Without this flag, the input files are not modified
+    /// Format the files. Without this flag, the python files are not modified
     #[arg(long)]
     pub(crate) write: bool,
     /// Control the verbosity of the output
@@ -148,7 +151,8 @@ pub(crate) struct Args {
     /// Print only the first error and exit, `-x` is same as pytest
     #[arg(long, short = 'x')]
     pub(crate) exit_first_error: bool,
-    /// Checks each project inside a directory
+    /// Checks each project inside a directory, useful e.g. if you want to check all of the
+    /// ecosystem checkouts.
     #[arg(long)]
     pub(crate) multi_project: bool,
     /// Write all errors to this file in addition to stdout. Only used in multi-project mode.
@@ -158,9 +162,9 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
-        check_multi_project(args)
+        format_dev_multi_project(args)
     } else {
-        let result = check_repo(args, args.stability_check, args.write, true)?;
+        let result = format_dev_project(&args.files, args.stability_check, args.write, true)?;
 
         #[allow(clippy::print_stdout)]
         {
@@ -187,6 +191,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     }
 }
 
+/// Each `path` is one of the `files` in `Args`
 enum Message {
     Start {
         path: PathBuf,
@@ -201,7 +206,8 @@ enum Message {
     },
 }
 
-fn check_multi_project(args: &Args) -> bool {
+/// Checks a directory of projects
+fn format_dev_multi_project(args: &Args) -> bool {
     let mut all_success = true;
     let mut total_errors = 0;
     let mut total_files = 0;
@@ -210,6 +216,7 @@ fn check_multi_project(args: &Args) -> bool {
     rayon::scope(|scope| {
         let (sender, receiver) = channel();
 
+        // Workers, to check is subdirectory in parallel
         for base_dir in &args.files {
             for dir in base_dir.read_dir().unwrap() {
                 let path = dir.unwrap().path().clone();
@@ -219,12 +226,12 @@ fn check_multi_project(args: &Args) -> bool {
                 scope.spawn(move |_| {
                     sender.send(Message::Start { path: path.clone() }).unwrap();
 
-                    let args = Args {
-                        files: vec![path.clone()],
-                        error_file: args.error_file.clone(),
-                        ..*args
-                    };
-                    match check_repo(&args, args.stability_check, args.write, false) {
+                    match format_dev_project(
+                        &[path.clone()],
+                        args.stability_check,
+                        args.write,
+                        false,
+                    ) {
                         Ok(result) => sender.send(Message::Finished { result, path }),
                         Err(error) => sender.send(Message::Failed { error, path }),
                     }
@@ -233,6 +240,7 @@ fn check_multi_project(args: &Args) -> bool {
             }
         }
 
+        // Main thread, writing to stdout
         scope.spawn(|_| {
             let mut error_file = args.error_file.as_ref().map(|error_file| {
                 BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
@@ -286,9 +294,8 @@ fn check_multi_project(args: &Args) -> bool {
     all_success
 }
 
-/// Returns whether the check was successful
-fn check_repo(
-    args: &Args,
+fn format_dev_project(
+    files: &[PathBuf],
     stability_check: bool,
     write: bool,
     progress_bar: bool,
@@ -297,7 +304,7 @@ fn check_repo(
 
     // Find files to check (or in this case, format twice). Adapted from ruff_cli
     // First argument is ignored
-    let paths = ruff_check_paths(&args.files)?;
+    let paths = ruff_check_paths(files)?;
 
     let bar = progress_bar.then(|| ProgressBar::new(paths.len() as u64));
     let result_iter = paths
@@ -316,7 +323,7 @@ fn check_repo(
 
             let file = dir_entry.path().to_path_buf();
             // Handle panics (mostly in `debug_assert!`)
-            let result = match catch_unwind(|| check_file(&file, stability_check, write)) {
+            let result = match catch_unwind(|| format_dev_file(&file, stability_check, write)) {
                 Ok(result) => result,
                 Err(panic) => {
                     if let Some(message) = panic.downcast_ref::<String>() {
@@ -407,8 +414,8 @@ impl CheckRepoResult {
         }
     }
 
-    /// Whether there was any ruff bug, as opposed to input files that were already broken or io
-    /// errors
+    /// We also emit diagnostics if the input file was already invalid or the were io errors. This
+    /// method helps to differentiate
     fn is_success(&self) -> bool {
         self.diagnostics
             .iter()
@@ -525,7 +532,7 @@ enum CheckFileError {
         formatted: String,
         reformatted: String,
     },
-    /// The input file was already invalid
+    /// The input file was already invalid (not a bug)
     SyntaxErrorInInput(FormatModuleError),
     /// The formatter introduced a syntax error
     SyntaxErrorInOutput {
@@ -536,7 +543,7 @@ enum CheckFileError {
     FormatError(FormatError),
     /// The printer failed (bug)
     PrintError(PrintError),
-    /// Failed to read the file (this sometimes happens e.g. with strange filenames)
+    /// Failed to read the file, this sometimes happens e.g. with strange filenames (not a bug)
     IoError(io::Error),
     /// From `catch_unwind`
     Panic { message: String },
@@ -546,13 +553,12 @@ impl CheckFileError {
     /// Returns `false` if this is a formatter bug or `true` is if it is something outside of ruff
     fn is_success(&self) -> bool {
         match self {
-            CheckFileError::Unstable { .. } => false,
-            CheckFileError::SyntaxErrorInInput(_) => true,
-            CheckFileError::SyntaxErrorInOutput { .. } => false,
-            CheckFileError::FormatError(_) => false,
-            CheckFileError::PrintError(_) => false,
-            CheckFileError::IoError(_) => true,
-            CheckFileError::Panic { .. } => false,
+            CheckFileError::SyntaxErrorInInput(_) | CheckFileError::IoError(_) => true,
+            CheckFileError::Unstable { .. }
+            | CheckFileError::SyntaxErrorInOutput { .. }
+            | CheckFileError::FormatError(_)
+            | CheckFileError::PrintError(_)
+            | CheckFileError::Panic { .. } => false,
         }
     }
 }
@@ -563,8 +569,7 @@ impl From<io::Error> for CheckFileError {
     }
 }
 
-/// Run the formatter twice on the given file. Does not write back to the file
-fn check_file(
+fn format_dev_file(
     input_path: &Path,
     stability_check: bool,
     write: bool,
