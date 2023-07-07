@@ -9,7 +9,7 @@ B006_B008.py:63:25: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 60 60 | # Flag mutable literals/comprehensions
 61 61 | 
 62 62 | 
@@ -29,7 +29,7 @@ B006_B008.py:67:30: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 64 64 |     ...
 65 65 | 
 66 66 | 
@@ -51,7 +51,7 @@ B006_B008.py:72:52: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 69 69 | 
 70 70 | class Foo:
 71 71 |     @staticmethod
@@ -71,7 +71,7 @@ B006_B008.py:76:20: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 73 73 |         pass
 74 74 | 
 75 75 | 
@@ -91,7 +91,7 @@ B006_B008.py:80:20: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 77 77 |     ...
 78 78 | 
 79 79 | 
@@ -111,7 +111,7 @@ B006_B008.py:84:32: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 81 81 |     ...
 82 82 | 
 83 83 | 
@@ -131,7 +131,7 @@ B006_B008.py:88:26: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 85 85 |     ...
 86 86 | 
 87 87 | 
@@ -152,7 +152,7 @@ B006_B008.py:93:46: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 90 90 | 
 91 91 | 
 92 92 | # N.B. we're also flagging the function call in the comprehension
@@ -172,7 +172,7 @@ B006_B008.py:97:46: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 94  94  |     pass
 95  95  | 
 96  96  | 
@@ -192,7 +192,7 @@ B006_B008.py:101:45: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 98  98  |     pass
 99  99  | 
 100 100 | 
@@ -212,7 +212,7 @@ B006_B008.py:105:33: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 102 102 |     pass
 103 103 | 
 104 104 | 
@@ -234,7 +234,7 @@ B006_B008.py:226:20: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 223 223 | 
 224 224 | # B006 and B008
 225 225 | # We should handle arbitrary nesting of these B008.
@@ -256,7 +256,7 @@ B006_B008.py:263:27: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 260 260 | 
 261 261 | 
 262 262 | def mutable_annotations(
@@ -281,7 +281,7 @@ B006_B008.py:264:35: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 261 261 | 
 262 262 | def mutable_annotations(
 263 263 |     a: list[int] | None = [],
@@ -305,7 +305,7 @@ B006_B008.py:265:62: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 262 262 | def mutable_annotations(
 263 263 |     a: list[int] | None = [],
 264 264 |     b: Optional[Dict[int, int]] = {},
@@ -328,7 +328,7 @@ B006_B008.py:266:80: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
-ℹ Fix
+ℹ Possible fix
 263 263 |     a: list[int] | None = [],
 264 264 |     b: Optional[Dict[int, int]] = {},
 265 265 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
