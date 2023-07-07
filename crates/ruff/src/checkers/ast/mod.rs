@@ -1811,7 +1811,7 @@ where
                 {
                     if let Some(expr) = &arg_with_default.def.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1823,7 +1823,7 @@ where
                 if let Some(arg) = &args.vararg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1832,7 +1832,7 @@ where
                 if let Some(arg) = &args.kwarg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1840,7 +1840,7 @@ where
                 }
                 for expr in returns {
                     if runtime_annotation {
-                        self.visit_type_definition(expr);
+                        self.visit_runtime_annotation(expr);
                     } else {
                         self.visit_annotation(expr);
                     };
@@ -1992,7 +1992,7 @@ where
                 };
 
                 if runtime_annotation {
-                    self.visit_type_definition(annotation);
+                    self.visit_runtime_annotation(annotation);
                 } else {
                     self.visit_annotation(annotation);
                 }
@@ -2089,7 +2089,7 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let flags_snapshot = self.semantic.flags;
-        self.semantic.flags |= SemanticModelFlags::ANNOTATION;
+        self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
     }
@@ -4122,6 +4122,14 @@ impl<'a> Checker<'a> {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
+    fn visit_runtime_annotation(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::RUNTIME_ANNOTATION;
+        self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }
 
