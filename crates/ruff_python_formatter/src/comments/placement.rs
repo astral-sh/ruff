@@ -1186,22 +1186,24 @@ fn handle_expr_if_comment<'a>(
         orelse,
     } = expr_if;
 
+    if comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
     // Find the if and the else
     let if_token =
         find_only_token_str_in_range(TextRange::new(body.end(), test.start()), locator, "if");
     let else_token =
         find_only_token_str_in_range(TextRange::new(test.end(), orelse.start()), locator, "else");
 
-    if if_token.range.start() < comment.slice().start()
-        && comment.slice().start() < test.start()
-        && comment.line_position().is_end_of_line()
-    {
+    // Between `if` and `test`
+    if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
         return CommentPlacement::leading(test.as_ref().into(), comment);
     }
 
+    // Between `else` and `orelse`
     if else_token.range.start() < comment.slice().start()
         && comment.slice().start() < orelse.start()
-        && comment.line_position().is_end_of_line()
     {
         return CommentPlacement::leading(orelse.as_ref().into(), comment);
     }
