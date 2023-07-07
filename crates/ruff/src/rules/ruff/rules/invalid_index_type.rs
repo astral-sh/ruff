@@ -79,24 +79,21 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
             }
             // If the index is a slice, check for integer or null bounds
             Expr::Slice(ExprSlice { lower, upper, .. }) => {
-                for boxed_slice_bound in [lower, upper] {
-                    if let Some(slice_bound) = boxed_slice_bound {
-                        if let Expr::Constant(ExprConstant {
-                            value: index_value, ..
-                        }) = slice_bound.as_ref()
-                        {
-                            if !(index_value.is_int() || index_value.is_none()) {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    InvalidIndexType {
-                                        var_type: expression_type_name(value).expect(
-                                            "Failed to cast parent expression to type name",
-                                        ),
-                                        idx_type: constant_type_name(&index_value),
-                                        slice_bound: true,
-                                    },
-                                    slice_bound.range(),
-                                ));
-                            }
+                for slice_bound in [lower, upper].into_iter().flatten() {
+                    if let Expr::Constant(ExprConstant {
+                        value: index_value, ..
+                    }) = slice_bound.as_ref()
+                    {
+                        if !(index_value.is_int() || index_value.is_none()) {
+                            checker.diagnostics.push(Diagnostic::new(
+                                InvalidIndexType {
+                                    var_type: expression_type_name(value)
+                                        .expect("Failed to cast parent expression to type name"),
+                                    idx_type: constant_type_name(index_value),
+                                    slice_bound: true,
+                                },
+                                slice_bound.range(),
+                            ));
                         }
                     };
                 }
