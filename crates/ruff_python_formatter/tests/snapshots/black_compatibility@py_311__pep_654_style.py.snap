@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 86
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_311/pep_654_style.py
 ---
 ## Input
@@ -67,60 +68,14 @@ except ExceptionGroup as e:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,5 +1,5 @@
- try:
--    raise OSError("blah")
-+    NOT_YET_IMPLEMENTED_StmtRaise
- except* ExceptionGroup as e:
-     pass
- 
-@@ -14,10 +14,10 @@
- 
+@@ -39,7 +39,7 @@
  try:
      try:
--        raise ValueError(42)
-+        NOT_YET_IMPLEMENTED_StmtRaise
-     except:
-         try:
--            raise TypeError(int)
-+            NOT_YET_IMPLEMENTED_StmtRaise
-         except* Exception:
-             pass
-         1 / 0
-@@ -26,10 +26,10 @@
- 
- try:
-     try:
--        raise FalsyEG("eg", [TypeError(1), ValueError(2)])
-+        NOT_YET_IMPLEMENTED_StmtRaise
-     except* TypeError as e:
-         tes = e
--        raise
-+        NOT_YET_IMPLEMENTED_StmtRaise
-     except* ValueError as e:
-         ves = e
-         pass
-@@ -38,16 +38,16 @@
- 
- try:
-     try:
--        raise orig
+         raise orig
 -    except* (TypeError, ValueError, *OTHER_EXCEPTIONS) as e:
--        raise SyntaxError(3) from e
-+        NOT_YET_IMPLEMENTED_StmtRaise
 +    except* (TypeError, ValueError, *NOT_YET_IMPLEMENTED_ExprStarred) as e:
-+        NOT_YET_IMPLEMENTED_StmtRaise
+         raise SyntaxError(3) from e
  except BaseException as e:
-     exc = e
- 
- try:
-     try:
--        raise orig
-+        NOT_YET_IMPLEMENTED_StmtRaise
-     except* OSError as e:
--        raise TypeError(3) from e
-+        NOT_YET_IMPLEMENTED_StmtRaise
- except ExceptionGroup as e:
      exc = e
 ```
 
@@ -128,7 +83,7 @@ except ExceptionGroup as e:
 
 ```py
 try:
-    NOT_YET_IMPLEMENTED_StmtRaise
+    raise OSError("blah")
 except* ExceptionGroup as e:
     pass
 
@@ -143,10 +98,10 @@ except* ValueError:
 
 try:
     try:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise ValueError(42)
     except:
         try:
-            NOT_YET_IMPLEMENTED_StmtRaise
+            raise TypeError(int)
         except* Exception:
             pass
         1 / 0
@@ -155,10 +110,10 @@ except Exception as e:
 
 try:
     try:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise FalsyEG("eg", [TypeError(1), ValueError(2)])
     except* TypeError as e:
         tes = e
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise
     except* ValueError as e:
         ves = e
         pass
@@ -167,17 +122,17 @@ except Exception as e:
 
 try:
     try:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise orig
     except* (TypeError, ValueError, *NOT_YET_IMPLEMENTED_ExprStarred) as e:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise SyntaxError(3) from e
 except BaseException as e:
     exc = e
 
 try:
     try:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise orig
     except* OSError as e:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise TypeError(3) from e
 except ExceptionGroup as e:
     exc = e
 ```

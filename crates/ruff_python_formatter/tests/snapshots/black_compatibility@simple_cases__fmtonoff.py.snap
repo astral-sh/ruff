@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 86
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtonoff.py
 ---
 ## Input
@@ -227,7 +228,7 @@ d={'a':1,
 +    b
 +    c
 +    if True:
-+        NOT_YET_IMPLEMENTED_StmtRaise
++        raise RuntimeError
 +    if False:
 +        ...
 +    for i in range(10):
@@ -425,7 +426,7 @@ def func_no_args():
     b
     c
     if True:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise RuntimeError
     if False:
         ...
     for i in range(10):
