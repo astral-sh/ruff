@@ -14,12 +14,15 @@ license = { workspace = true }
 ruff = { path = "../ruff", features = ["schemars"] }
 ruff_cli = { path = "../ruff_cli" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_formatter = { path = "../ruff_formatter" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_textwrap = { path = "../ruff_textwrap" }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
+ignore = { workspace = true }
+indicatif = "0.17.5"
 itertools = { workspace = true }
 libcst = { workspace = true }
 log = { workspace = true }
@@ -34,3 +37,4 @@ serde_json = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
+tempfile = "3.6.0"

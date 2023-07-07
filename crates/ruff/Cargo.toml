@@ -74,7 +74,7 @@ shellexpand = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-thiserror = { version = "1.0.38" }
+thiserror = { version = "1.0.43" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }

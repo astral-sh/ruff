@@ -74,7 +74,8 @@ pub enum Command {
     },
 }
 
-#[derive(Clone, Debug, clap::Args)]
+// The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
+#[derive(Clone, Debug, clap::Parser)]
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
 pub struct CheckArgs {
     /// List of files or directories to check.
