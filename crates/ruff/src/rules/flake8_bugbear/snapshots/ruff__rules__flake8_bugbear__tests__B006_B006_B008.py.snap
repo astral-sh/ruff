@@ -39,279 +39,306 @@ B006_B008.py:67:30: B006 [*] Do not use mutable data structures for argument def
    69 |+        value = {}
 68 70 |     ...
 69 71 | 
-70 72 | class Foo:
+70 72 | 
 
-B006_B008.py:72:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:73:52: B006 [*] Do not use mutable data structures for argument defaults
    |
-70 | class Foo:
-71 |     @staticmethod
-72 |     def this_is_also_wrong_and_more_indented(value={}):
+71 | class Foo:
+72 |     @staticmethod
+73 |     def this_is_also_wrong_and_more_indented(value={}):
    |                                                    ^^ B006
-73 |         pass
+74 |         pass
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-69 69 | 
-70 70 | class Foo:
-71 71 |     @staticmethod
-72    |-    def this_is_also_wrong_and_more_indented(value={}):
-   72 |+    def this_is_also_wrong_and_more_indented(value=None):
-   73 |+        if value is None:
-   74 |+            value = {}
-73 75 |         pass
-74 76 | 
+70 70 | 
+71 71 | class Foo:
+72 72 |     @staticmethod
+73    |-    def this_is_also_wrong_and_more_indented(value={}):
+   73 |+    def this_is_also_wrong_and_more_indented(value=None):
+   74 |+        if value is None:
+   75 |+            value = {}
+74 76 |         pass
 75 77 | 
+76 78 | 
 
-B006_B008.py:76:20: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument defaults
    |
-76 | def and_this(value=set()):
-   |                    ^^^^^ B006
-77 |     ...
+77 |   def multiline_arg_wrong(value={
+   |  _______________________________^
+78 | | 
+79 | | }):
+   | |_^ B006
+80 |       ...
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-73 73 |         pass
-74 74 | 
+74 74 |         pass
 75 75 | 
-76    |-def and_this(value=set()):
-   76 |+def and_this(value=None):
-   77 |+    if value is None:
-   78 |+        value = set()
-77 79 |     ...
-78 80 | 
-79 81 | 
+76 76 | 
+77    |-def multiline_arg_wrong(value={
+78    |-
+79    |-}):
+   77 |+def multiline_arg_wrong(value=None):
+   78 |+    if value is None:
+   79 |+        value = {}
+80 80 |     ...
+81 81 | 
+82 82 | def and_this(value=set()):
 
-B006_B008.py:80:20: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:82:20: B006 [*] Do not use mutable data structures for argument defaults
    |
-80 | def this_too(value=collections.OrderedDict()):
+80 |     ...
+81 | 
+82 | def and_this(value=set()):
+   |                    ^^^^^ B006
+83 |     ...
+   |
+   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+
+ℹ Possible fix
+79 79 | }):
+80 80 |     ...
+81 81 | 
+82    |-def and_this(value=set()):
+   82 |+def and_this(value=None):
+   83 |+    if value is None:
+   84 |+        value = set()
+83 85 |     ...
+84 86 | 
+85 87 | 
+
+B006_B008.py:86:20: B006 [*] Do not use mutable data structures for argument defaults
+   |
+86 | def this_too(value=collections.OrderedDict()):
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^ B006
-81 |     ...
+87 |     ...
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-77 77 |     ...
-78 78 | 
-79 79 | 
-80    |-def this_too(value=collections.OrderedDict()):
-   80 |+def this_too(value=None):
-   81 |+    if value is None:
-   82 |+        value = collections.OrderedDict()
-81 83 |     ...
-82 84 | 
-83 85 | 
+83 83 |     ...
+84 84 | 
+85 85 | 
+86    |-def this_too(value=collections.OrderedDict()):
+   86 |+def this_too(value=None):
+   87 |+    if value is None:
+   88 |+        value = collections.OrderedDict()
+87 89 |     ...
+88 90 | 
+89 91 | 
 
-B006_B008.py:84:32: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:90:32: B006 [*] Do not use mutable data structures for argument defaults
    |
-84 | async def async_this_too(value=collections.defaultdict()):
+90 | async def async_this_too(value=collections.defaultdict()):
    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^ B006
-85 |     ...
+91 |     ...
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-81 81 |     ...
-82 82 | 
-83 83 | 
-84    |-async def async_this_too(value=collections.defaultdict()):
-   84 |+async def async_this_too(value=None):
-   85 |+    if value is None:
-   86 |+        value = collections.defaultdict()
-85 87 |     ...
-86 88 | 
-87 89 | 
+87 87 |     ...
+88 88 | 
+89 89 | 
+90    |-async def async_this_too(value=collections.defaultdict()):
+   90 |+async def async_this_too(value=None):
+   91 |+    if value is None:
+   92 |+        value = collections.defaultdict()
+91 93 |     ...
+92 94 | 
+93 95 | 
 
-B006_B008.py:88:26: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:94:26: B006 [*] Do not use mutable data structures for argument defaults
    |
-88 | def dont_forget_me(value=collections.deque()):
+94 | def dont_forget_me(value=collections.deque()):
    |                          ^^^^^^^^^^^^^^^^^^^ B006
-89 |     ...
+95 |     ...
    |
    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-85 85 |     ...
-86 86 | 
-87 87 | 
-88    |-def dont_forget_me(value=collections.deque()):
-   88 |+def dont_forget_me(value=None):
-   89 |+    if value is None:
-   90 |+        value = collections.deque()
-89 91 |     ...
-90 92 | 
-91 93 | 
-
-B006_B008.py:93:46: B006 [*] Do not use mutable data structures for argument defaults
-   |
-92 | # N.B. we're also flagging the function call in the comprehension
-93 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
-   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^ B006
-94 |     pass
-   |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
-
-ℹ Possible fix
-90 90 | 
-91 91 | 
-92 92 | # N.B. we're also flagging the function call in the comprehension
-93    |-def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
-   93 |+def list_comprehension_also_not_okay(default=None):
-   94 |+    if default is None:
-   95 |+        default = [(i ** 2) for i in range(3)]
-94 96 |     pass
-95 97 | 
+91 91 |     ...
+92 92 | 
+93 93 | 
+94    |-def dont_forget_me(value=collections.deque()):
+   94 |+def dont_forget_me(value=None):
+   95 |+    if value is None:
+   96 |+        value = collections.deque()
+95 97 |     ...
 96 98 | 
+97 99 | 
 
-B006_B008.py:97:46: B006 [*] Do not use mutable data structures for argument defaults
-   |
-97 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
-   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
-98 |     pass
-   |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+B006_B008.py:99:46: B006 [*] Do not use mutable data structures for argument defaults
+    |
+ 98 | # N.B. we're also flagging the function call in the comprehension
+ 99 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^ B006
+100 |     pass
+    |
+    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-94  94  |     pass
-95  95  | 
 96  96  | 
-97      |-def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
-    97  |+def dict_comprehension_also_not_okay(default=None):
-    98  |+    if default is None:
-    99  |+        default = {i: (i ** 2) for i in range(3)}
-98  100 |     pass
-99  101 | 
-100 102 | 
+97  97  | 
+98  98  | # N.B. we're also flagging the function call in the comprehension
+99      |-def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
+    99  |+def list_comprehension_also_not_okay(default=None):
+    100 |+    if default is None:
+    101 |+        default = [(i ** 2) for i in range(3)]
+100 102 |     pass
+101 103 | 
+102 104 | 
 
-B006_B008.py:101:45: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:103:46: B006 [*] Do not use mutable data structures for argument defaults
     |
-101 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
+103 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
+104 |     pass
+    |
+    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+
+ℹ Possible fix
+100 100 |     pass
+101 101 | 
+102 102 | 
+103     |-def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
+    103 |+def dict_comprehension_also_not_okay(default=None):
+    104 |+    if default is None:
+    105 |+        default = {i: (i ** 2) for i in range(3)}
+104 106 |     pass
+105 107 | 
+106 108 | 
+
+B006_B008.py:107:45: B006 [*] Do not use mutable data structures for argument defaults
+    |
+107 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^ B006
-102 |     pass
+108 |     pass
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-98  98  |     pass
-99  99  | 
-100 100 | 
-101     |-def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
-    101 |+def set_comprehension_also_not_okay(default=None):
-    102 |+    if default is None:
-    103 |+        default = {(i ** 2) for i in range(3)}
-102 104 |     pass
-103 105 | 
-104 106 | 
+104 104 |     pass
+105 105 | 
+106 106 | 
+107     |-def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
+    107 |+def set_comprehension_also_not_okay(default=None):
+    108 |+    if default is None:
+    109 |+        default = {(i ** 2) for i in range(3)}
+108 110 |     pass
+109 111 | 
+110 112 | 
 
-B006_B008.py:105:33: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:111:33: B006 [*] Do not use mutable data structures for argument defaults
     |
-105 | def kwonlyargs_mutable(*, value=[]):
+111 | def kwonlyargs_mutable(*, value=[]):
     |                                 ^^ B006
-106 |     ...
+112 |     ...
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-102 102 |     pass
-103 103 | 
-104 104 | 
-105     |-def kwonlyargs_mutable(*, value=[]):
-    105 |+def kwonlyargs_mutable(*, value=None):
-    106 |+    if value is None:
-    107 |+        value = []
-106 108 |     ...
-107 109 | 
-108 110 | 
+108 108 |     pass
+109 109 | 
+110 110 | 
+111     |-def kwonlyargs_mutable(*, value=[]):
+    111 |+def kwonlyargs_mutable(*, value=None):
+    112 |+    if value is None:
+    113 |+        value = []
+112 114 |     ...
+113 115 | 
+114 116 | 
 
-B006_B008.py:223:20: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:229:20: B006 [*] Do not use mutable data structures for argument defaults
     |
-221 | # B006 and B008
-222 | # We should handle arbitrary nesting of these B008.
-223 | def nested_combo(a=[float(3), dt.datetime.now()]):
+227 | # B006 and B008
+228 | # We should handle arbitrary nesting of these B008.
+229 | def nested_combo(a=[float(3), dt.datetime.now()]):
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
-224 |     pass
+230 |     pass
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-220 220 | 
-221 221 | # B006 and B008
-222 222 | # We should handle arbitrary nesting of these B008.
-223     |-def nested_combo(a=[float(3), dt.datetime.now()]):
-    223 |+def nested_combo(a=None):
-    224 |+    if a is None:
-    225 |+        a = [float(3), dt.datetime.now()]
-224 226 |     pass
-225 227 | 
-226 228 | 
+226 226 | 
+227 227 | # B006 and B008
+228 228 | # We should handle arbitrary nesting of these B008.
+229     |-def nested_combo(a=[float(3), dt.datetime.now()]):
+    229 |+def nested_combo(a=None):
+    230 |+    if a is None:
+    231 |+        a = [float(3), dt.datetime.now()]
+230 232 |     pass
+231 233 | 
+232 234 | 
 
-B006_B008.py:256:27: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:262:27: B006 [*] Do not use mutable data structures for argument defaults
     |
-255 | def mutable_annotations(
-256 |     a: list[int] | None = [],
+261 | def mutable_annotations(
+262 |     a: list[int] | None = [],
     |                           ^^ B006
-257 |     b: Optional[Dict[int, int]] = {},
-258 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+263 |     b: Optional[Dict[int, int]] = {},
+264 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-253 253 | 
-254 254 | 
-255 255 | def mutable_annotations(
-256     |-    a: list[int] | None = [],
-    256 |+    a: list[int] | None = None,
-257 257 |     b: Optional[Dict[int, int]] = {},
-258 258 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-259 259 | ):
-    260 |+    if a is None:
-    261 |+        a = []
-260 262 |     pass
+259 259 | 
+260 260 | 
+261 261 | def mutable_annotations(
+262     |-    a: list[int] | None = [],
+    262 |+    a: list[int] | None = None,
+263 263 |     b: Optional[Dict[int, int]] = {},
+264 264 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+265 265 | ):
+    266 |+    if a is None:
+    267 |+        a = []
+266 268 |     pass
 
-B006_B008.py:257:35: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:263:35: B006 [*] Do not use mutable data structures for argument defaults
     |
-255 | def mutable_annotations(
-256 |     a: list[int] | None = [],
-257 |     b: Optional[Dict[int, int]] = {},
+261 | def mutable_annotations(
+262 |     a: list[int] | None = [],
+263 |     b: Optional[Dict[int, int]] = {},
     |                                   ^^ B006
-258 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-259 | ):
+264 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+265 | ):
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-254 254 | 
-255 255 | def mutable_annotations(
-256 256 |     a: list[int] | None = [],
-257     |-    b: Optional[Dict[int, int]] = {},
-    257 |+    b: Optional[Dict[int, int]] = None,
-258 258 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-259 259 | ):
-    260 |+    if b is None:
-    261 |+        b = {}
-260 262 |     pass
+260 260 | 
+261 261 | def mutable_annotations(
+262 262 |     a: list[int] | None = [],
+263     |-    b: Optional[Dict[int, int]] = {},
+    263 |+    b: Optional[Dict[int, int]] = None,
+264 264 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+265 265 | ):
+    266 |+    if b is None:
+    267 |+        b = {}
+266 268 |     pass
 
-B006_B008.py:258:62: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:264:62: B006 [*] Do not use mutable data structures for argument defaults
     |
-256 |     a: list[int] | None = [],
-257 |     b: Optional[Dict[int, int]] = {},
-258 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+262 |     a: list[int] | None = [],
+263 |     b: Optional[Dict[int, int]] = {},
+264 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |                                                              ^^^^^ B006
-259 | ):
-260 |     pass
+265 | ):
+266 |     pass
     |
     = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
 
 ℹ Possible fix
-255 255 | def mutable_annotations(
-256 256 |     a: list[int] | None = [],
-257 257 |     b: Optional[Dict[int, int]] = {},
-258     |-    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-    258 |+    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
-259 259 | ):
-    260 |+    if c is None:
-    261 |+        c = set()
-260 262 |     pass
+261 261 | def mutable_annotations(
+262 262 |     a: list[int] | None = [],
+263 263 |     b: Optional[Dict[int, int]] = {},
+264     |-    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    264 |+    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
+265 265 | ):
+    266 |+    if c is None:
+    267 |+        c = set()
+266 268 |     pass
 
 

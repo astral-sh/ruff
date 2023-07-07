@@ -1,83 +1,83 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-B006_B008.py:93:61: B008 Do not perform function call `range` in argument defaults
-   |
-92 | # N.B. we're also flagging the function call in the comprehension
-93 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
-   |                                                             ^^^^^^^^ B008
-94 |     pass
-   |
-
-B006_B008.py:97:64: B008 Do not perform function call `range` in argument defaults
-   |
-97 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
-   |                                                                ^^^^^^^^ B008
-98 |     pass
-   |
-
-B006_B008.py:101:60: B008 Do not perform function call `range` in argument defaults
+B006_B008.py:99:61: B008 Do not perform function call `range` in argument defaults
     |
-101 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
+ 98 | # N.B. we're also flagging the function call in the comprehension
+ 99 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
+    |                                                             ^^^^^^^^ B008
+100 |     pass
+    |
+
+B006_B008.py:103:64: B008 Do not perform function call `range` in argument defaults
+    |
+103 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
+    |                                                                ^^^^^^^^ B008
+104 |     pass
+    |
+
+B006_B008.py:107:60: B008 Do not perform function call `range` in argument defaults
+    |
+107 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
     |                                                            ^^^^^^^^ B008
-102 |     pass
+108 |     pass
     |
 
-B006_B008.py:117:39: B008 Do not perform function call `time.time` in argument defaults
+B006_B008.py:123:39: B008 Do not perform function call `time.time` in argument defaults
     |
-115 | # B008
-116 | # Flag function calls as default args (including if they are part of a sub-expression)
-117 | def in_fact_all_calls_are_wrong(value=time.time()):
+121 | # B008
+122 | # Flag function calls as default args (including if they are part of a sub-expression)
+123 | def in_fact_all_calls_are_wrong(value=time.time()):
     |                                       ^^^^^^^^^^^ B008
-118 |     ...
+124 |     ...
     |
 
-B006_B008.py:121:12: B008 Do not perform function call `dt.datetime.now` in argument defaults
+B006_B008.py:127:12: B008 Do not perform function call `dt.datetime.now` in argument defaults
     |
-121 | def f(when=dt.datetime.now() + dt.timedelta(days=7)):
+127 | def f(when=dt.datetime.now() + dt.timedelta(days=7)):
     |            ^^^^^^^^^^^^^^^^^ B008
-122 |     pass
+128 |     pass
     |
 
-B006_B008.py:125:30: B008 Do not perform function call in argument defaults
+B006_B008.py:131:30: B008 Do not perform function call in argument defaults
     |
-125 | def can_even_catch_lambdas(a=(lambda x: x)()):
+131 | def can_even_catch_lambdas(a=(lambda x: x)()):
     |                              ^^^^^^^^^^^^^^^ B008
-126 |     ...
+132 |     ...
     |
 
-B006_B008.py:223:31: B008 Do not perform function call `dt.datetime.now` in argument defaults
+B006_B008.py:229:31: B008 Do not perform function call `dt.datetime.now` in argument defaults
     |
-221 | # B006 and B008
-222 | # We should handle arbitrary nesting of these B008.
-223 | def nested_combo(a=[float(3), dt.datetime.now()]):
+227 | # B006 and B008
+228 | # We should handle arbitrary nesting of these B008.
+229 | def nested_combo(a=[float(3), dt.datetime.now()]):
     |                               ^^^^^^^^^^^^^^^^^ B008
-224 |     pass
-    |
-
-B006_B008.py:229:22: B008 Do not perform function call `map` in argument defaults
-    |
-227 | # Don't flag nested B006 since we can't guarantee that
-228 | # it isn't made mutable by the outer operation.
-229 | def no_nested_b006(a=map(lambda s: s.upper(), ["a", "b", "c"])):
-    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B008
 230 |     pass
     |
 
-B006_B008.py:234:19: B008 Do not perform function call `random.randint` in argument defaults
+B006_B008.py:235:22: B008 Do not perform function call `map` in argument defaults
     |
-233 | # B008-ception.
-234 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
-    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B008
-235 |     pass
+233 | # Don't flag nested B006 since we can't guarantee that
+234 | # it isn't made mutable by the outer operation.
+235 | def no_nested_b006(a=map(lambda s: s.upper(), ["a", "b", "c"])):
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B008
+236 |     pass
     |
 
-B006_B008.py:234:37: B008 Do not perform function call `dt.datetime.now` in argument defaults
+B006_B008.py:240:19: B008 Do not perform function call `random.randint` in argument defaults
     |
-233 | # B008-ception.
-234 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
+239 | # B008-ception.
+240 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B008
+241 |     pass
+    |
+
+B006_B008.py:240:37: B008 Do not perform function call `dt.datetime.now` in argument defaults
+    |
+239 | # B008-ception.
+240 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
     |                                     ^^^^^^^^^^^^^^^^^ B008
-235 |     pass
+241 |     pass
     |
 
 
