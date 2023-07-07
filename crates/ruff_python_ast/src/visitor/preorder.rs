@@ -476,8 +476,9 @@ where
             orelse,
             range: _range,
         }) => {
-            visitor.visit_expr(test);
+            // `body if test else orelse`
             visitor.visit_expr(body);
+            visitor.visit_expr(test);
             visitor.visit_expr(orelse);
         }
 

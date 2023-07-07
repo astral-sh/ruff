@@ -79,7 +79,7 @@ def something():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,90 +1,50 @@
+@@ -1,20 +1,16 @@
  long_kwargs_single_line = my_function(
      foo="test, this is a sample value",
 -    bar=(
@@ -87,7 +87,9 @@ def something():
 -        if some_boolean_variable
 -        else some_fallback_value_foo_bar_baz
 -    ),
-+    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++    bar=some_long_value_name_foo_bar_baz
++    if some_boolean_variable
++    else some_fallback_value_foo_bar_baz,
      baz="hello, this is a another value",
  )
  
@@ -98,33 +100,13 @@ def something():
 -        if some_boolean_variable
 -        else some_fallback_value_foo_bar_baz
 -    ),
-+    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++    bar=some_long_value_name_foo_bar_baz
++    if some_boolean_variable
++    else some_fallback_value_foo_bar_baz,
      baz="hello, this is a another value",
  )
  
- imploding_kwargs = my_function(
-     foo="test, this is a sample value",
--    bar=a if foo else b,
-+    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-     baz="hello, this is a another value",
- )
- 
--imploding_line = 1 if 1 + 1 == 2 else 0
-+imploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
- 
--exploding_line = (
--    "hello this is a slightly long string"
--    if some_long_value_name_foo_bar_baz
--    else "this one is a little shorter"
--)
-+exploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
- 
- positional_argument_test(
--    some_long_value_name_foo_bar_baz
--    if some_boolean_variable
--    else some_fallback_value_foo_bar_baz
-+    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
- )
+@@ -40,11 +36,9 @@
  
  
  def weird_default_argument(
@@ -133,21 +115,15 @@ def something():
 -        if SOME_CONSTANT
 -        else some_fallback_value_foo_bar_baz
 -    ),
-+    x=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++    x=some_long_value_name_foo_bar_baz
++    if SOME_CONSTANT
++    else some_fallback_value_foo_bar_baz,
  ):
      pass
  
- 
--nested = (
--    "hello this is a slightly long string"
--    if (
--        some_long_value_name_foo_bar_baz
--        if nesting_test_expressions
--        else some_fallback_value_foo_bar_baz
--    )
--    else "this one is a little shorter"
--)
-+nested = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+@@ -59,26 +53,14 @@
+     else "this one is a little shorter"
+ )
  
 -generator_expression = (
 -    (
@@ -174,13 +150,6 @@ def something():
      )
  
  
- def something():
-     clone._iterable_class = (
--        NamedValuesListIterable
--        if named
--        else FlatValuesListIterable if flat else ValuesListIterable
-+        NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-     )
 ```
 
 ## Ruff Output
@@ -188,38 +157,58 @@ def something():
 ```py
 long_kwargs_single_line = my_function(
     foo="test, this is a sample value",
-    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    bar=some_long_value_name_foo_bar_baz
+    if some_boolean_variable
+    else some_fallback_value_foo_bar_baz,
     baz="hello, this is a another value",
 )
 
 multiline_kwargs_indented = my_function(
     foo="test, this is a sample value",
-    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    bar=some_long_value_name_foo_bar_baz
+    if some_boolean_variable
+    else some_fallback_value_foo_bar_baz,
     baz="hello, this is a another value",
 )
 
 imploding_kwargs = my_function(
     foo="test, this is a sample value",
-    bar=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    bar=a if foo else b,
     baz="hello, this is a another value",
 )
 
-imploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+imploding_line = 1 if 1 + 1 == 2 else 0
 
-exploding_line = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+exploding_line = (
+    "hello this is a slightly long string"
+    if some_long_value_name_foo_bar_baz
+    else "this one is a little shorter"
+)
 
 positional_argument_test(
-    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+    some_long_value_name_foo_bar_baz
+    if some_boolean_variable
+    else some_fallback_value_foo_bar_baz
 )
 
 
 def weird_default_argument(
-    x=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+    x=some_long_value_name_foo_bar_baz
+    if SOME_CONSTANT
+    else some_fallback_value_foo_bar_baz,
 ):
     pass
 
 
-nested = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+nested = (
+    "hello this is a slightly long string"
+    if (
+        some_long_value_name_foo_bar_baz
+        if nesting_test_expressions
+        else some_fallback_value_foo_bar_baz
+    )
+    else "this one is a little shorter"
+)
 
 generator_expression = (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 
@@ -234,7 +223,9 @@ def limit_offset_sql(self, low_mark, high_mark):
 
 def something():
     clone._iterable_class = (
-        NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable if flat else ValuesListIterable
     )
 ```
 

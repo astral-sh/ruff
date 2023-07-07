@@ -211,7 +211,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -17,30 +16,54 @@
+@@ -17,30 +16,44 @@
  
  # fmt: off
  def func_no_args():
@@ -268,35 +268,15 @@ d={'a':1,
 +
 +
  # fmt: on
--def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
+ def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
-+def spaces(
-+    a=1,
-+    b=(),
-+    c=[],
-+    d={},
-+    e=True,
-+    f=-1,
-+    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h="",
-+    i=r"",
-+):
 +    offset = attr.ib(default=attr.Factory(lambda x: True))
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-@@ -50,7 +73,7 @@
-     d: dict = {},
-     e: bool = True,
-     f: int = -1,
--    g: int = 1 if False else 2,
-+    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-     h: str = "",
-     i: str = r"",
- ):
-@@ -63,55 +86,54 @@
+@@ -63,55 +76,54 @@
  
  something = {
      # fmt: off
@@ -371,7 +351,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -132,10 +154,10 @@
+@@ -132,10 +144,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -386,7 +366,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -153,9 +175,7 @@
+@@ -153,9 +165,7 @@
              )
          )
          # fmt: off
@@ -397,7 +377,7 @@ d={'a':1,
          # fmt: on
      _type_comment_re = re.compile(
          r"""
-@@ -178,7 +198,7 @@
+@@ -178,7 +188,7 @@
          $
          """,
          # fmt: off
@@ -406,7 +386,7 @@ d={'a':1,
          # fmt: on
      )
  
-@@ -216,8 +236,7 @@
+@@ -216,8 +226,7 @@
      xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
  )
  # fmt: off
@@ -476,17 +456,7 @@ def function_signature_stress_test(
 
 
 # fmt: on
-def spaces(
-    a=1,
-    b=(),
-    c=[],
-    d={},
-    e=True,
-    f=-1,
-    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h="",
-    i=r"",
-):
+def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda x: True))
     NOT_YET_IMPLEMENTED_StmtAssert
 
@@ -498,7 +468,7 @@ def spaces_types(
     d: dict = {},
     e: bool = True,
     f: int = -1,
-    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
 ):
