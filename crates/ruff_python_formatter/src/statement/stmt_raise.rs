@@ -21,7 +21,7 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
         if let Some(value) = exc {
             write!(
                 f,
-                [space(), value.format().with_options(Parenthesize::IfBreaks)]
+                [space(), value.format().with_options(Parenthesize::Optional)]
             )?;
         }
 
@@ -32,7 +32,7 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
                     space(),
                     text("from"),
                     space(),
-                    value.format().with_options(Parenthesize::IfBreaks)
+                    value.format().with_options(Parenthesize::Optional)
                 ]
             )?;
         }
