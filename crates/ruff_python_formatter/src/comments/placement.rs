@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, ExprSlice, Ranged};
+use rustpython_parser::ast::{Expr, ExprIfExp, ExprSlice, Ranged};
 
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::source_code::Locator;
@@ -14,7 +14,9 @@ use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSec
 use crate::other::arguments::{
     assign_argument_separator_comment_placement, find_argument_separators,
 };
-use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
+use crate::trivia::{
+    first_non_trivia_token, first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind,
+};
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
@@ -37,6 +39,7 @@ pub(super) fn place_comment<'a>(
         handle_dict_unpacking_comment,
         handle_slice_comments,
         handle_attribute_comment,
+        handle_expr_if_comment,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -1152,6 +1155,80 @@ fn handle_attribute_comment<'a>(
     } else {
         CommentPlacement::Default(comment)
     }
+}
+
+/// Assign comments between `if` and `test` and `else` and `orelse` as leading to the respective
+/// node.
+///
+/// ```python
+/// x = (
+///     "a"
+///     if # leading comment of `True`
+///     True
+///     else # leading comment of `"b"`
+///     "b"
+/// )
+/// ```
+///
+/// This placement ensures comments remain in their previous order. This an edge case that only
+/// happens if the comments are in a weird position but it also doesn't hurt handling it.
+fn handle_expr_if_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let Some(expr_if) = comment.enclosing_node().expr_if_exp() else {
+        return CommentPlacement::Default(comment);
+    };
+    let ExprIfExp {
+        range: _,
+        test,
+        body,
+        orelse,
+    } = expr_if;
+
+    // Find the if and the else
+    let if_token =
+        find_only_token_str_in_range(TextRange::new(body.end(), test.start()), locator, "if");
+    let else_token =
+        find_only_token_str_in_range(TextRange::new(test.end(), orelse.start()), locator, "else");
+
+    if if_token.range.start() < comment.slice().start()
+        && comment.slice().start() < test.start()
+        && comment.line_position().is_end_of_line()
+    {
+        return CommentPlacement::leading(test.as_ref().into(), comment);
+    }
+
+    if else_token.range.start() < comment.slice().start()
+        && comment.slice().start() < orelse.start()
+        && comment.line_position().is_end_of_line()
+    {
+        return CommentPlacement::leading(orelse.as_ref().into(), comment);
+    }
+
+    CommentPlacement::Default(comment)
+}
+
+/// Looks for a multi char token in the range that contains no other tokens. `SimpleTokenizer` only
+/// works with single char tokens so we check that we have the right token by string comparison.
+fn find_only_token_str_in_range(range: TextRange, locator: &Locator, token_str: &str) -> Token {
+    let token =
+        first_non_trivia_token(range.start(), locator.contents()).expect("Expected a token");
+    debug_assert!(
+        locator.after(token.start()).starts_with(token_str),
+        "expected a `{token_str}` token",
+    );
+    debug_assert!(
+        SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(token.start() + token_str.text_len(), range.end())
+        )
+        .skip_trivia()
+        .next()
+        .is_none(),
+        "Didn't expect any other token"
+    );
+    token
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.

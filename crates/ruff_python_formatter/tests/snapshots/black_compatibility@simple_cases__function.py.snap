@@ -126,7 +126,7 @@ def __await__(): return (yield)
      if False:
          ...
      for i in range(10):
-@@ -41,12 +40,22 @@
+@@ -41,12 +40,12 @@
      debug: bool = False,
      **kwargs,
  ) -> str:
@@ -134,35 +134,15 @@ def __await__(): return (yield)
 +    return text[number : -1]
  
  
--def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
+ def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
-+def spaces(
-+    a=1,
-+    b=(),
-+    c=[],
-+    d={},
-+    e=True,
-+    f=-1,
-+    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h="",
-+    i=r"",
-+):
 +    offset = attr.ib(default=attr.Factory(lambda x: True))
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-@@ -56,7 +65,7 @@
-     d: dict = {},
-     e: bool = True,
-     f: int = -1,
--    g: int = 1 if False else 2,
-+    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-     h: str = "",
-     i: str = r"",
- ):
-@@ -64,19 +73,17 @@
+@@ -64,19 +63,17 @@
  
  
  def spaces2(result=_core.Value(None)):
@@ -190,7 +170,7 @@ def __await__(): return (yield)
  
  
  def long_lines():
-@@ -135,14 +142,8 @@
+@@ -135,14 +132,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -257,17 +237,7 @@ def function_signature_stress_test(
     return text[number : -1]
 
 
-def spaces(
-    a=1,
-    b=(),
-    c=[],
-    d={},
-    e=True,
-    f=-1,
-    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h="",
-    i=r"",
-):
+def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda x: True))
     NOT_YET_IMPLEMENTED_StmtAssert
 
@@ -279,7 +249,7 @@ def spaces_types(
     d: dict = {},
     e: bool = True,
     f: int = -1,
-    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
 ):
