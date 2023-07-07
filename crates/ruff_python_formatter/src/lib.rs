@@ -7,10 +7,9 @@ use ruff_formatter::format_element::tag;
 use ruff_formatter::prelude::{
     dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
 };
-// `write!` aliased for https://github.com/dtolnay/thiserror/issues/239
 use ruff_formatter::{
-    format, normalize_newlines, write as ruff_write, Buffer, Format, FormatElement, FormatError,
-    FormatResult, PrintError,
+    format, normalize_newlines, write, Buffer, Format, FormatElement, FormatError, FormatResult,
+    PrintError,
 };
 use ruff_formatter::{Formatted, Printed, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
@@ -55,9 +54,9 @@ where
 
     /// Formats the node without comments. Ignores any suppression comments.
     fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        ruff_write!(f, [source_position(node.start())])?;
+        write!(f, [source_position(node.start())])?;
         self.fmt_fields(node, f)?;
-        ruff_write!(f, [source_position(node.end())])
+        write!(f, [source_position(node.end())])
     }
 
     /// Formats the node's fields.
@@ -228,10 +227,10 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
         match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
             Cow::Borrowed(_) => {
-                ruff_write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
+                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
             }
             Cow::Owned(cleaned) => {
-                ruff_write!(
+                write!(
                     f,
                     [
                         dynamic_text(&cleaned, Some(self.0.start())),
