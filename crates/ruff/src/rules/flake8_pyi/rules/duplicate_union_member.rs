@@ -1,13 +1,12 @@
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Expr, Ranged};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::ComparableExpr;
-
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_pyi::helpers::traverse_union;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
 
 #[violation]
 pub struct DuplicateUnionMember {
@@ -28,6 +27,7 @@ impl AlwaysAutofixableViolation for DuplicateUnionMember {
 /// PYI016
 pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) {
     let mut seen_nodes: std::collections::HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut check_for_duplicate_members = |expr: &'a Expr, parent: Option<&'a Expr>| {
@@ -59,7 +59,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                     parent.range(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            diagnostics.push(diagnostic);
         }
     };
 
@@ -70,4 +70,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
         expr,
         None,
     );
+
+    // Add all diagnostics to the checker
+    checker.diagnostics.append(&mut diagnostics);
 }
