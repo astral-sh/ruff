@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ArgWithDefault, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, ArgWithDefault, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -6,12 +6,14 @@ use ruff_python_ast::cast;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_stdlib::typing::simple_magic_return_type;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
+use crate::rules::ruff::typing::type_hint_resolves_to_any;
 
 use super::super::fixes;
 use super::super::helpers::match_function_def;
@@ -432,20 +434,46 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 
 /// ANN401
 fn check_dynamically_typed<F>(
+    checker: &Checker,
     annotation: &Expr,
     func: F,
     diagnostics: &mut Vec<Diagnostic>,
-    is_overridden: bool,
-    semantic: &SemanticModel,
 ) where
     F: FnOnce() -> String,
 {
-    if !is_overridden && semantic.match_typing_expr(annotation, "Any") {
-        diagnostics.push(Diagnostic::new(
-            AnyType { name: func() },
-            annotation.range(),
-        ));
-    };
+    if let Expr::Constant(ast::ExprConstant {
+        range,
+        value: Constant::Str(string),
+        ..
+    }) = annotation
+    {
+        // Quoted annotations
+        if let Ok((annotation, _)) = parse_type_annotation(string, *range, checker.locator) {
+            if type_hint_resolves_to_any(
+                &annotation,
+                checker.semantic(),
+                checker.locator,
+                checker.settings.target_version.minor(),
+            ) {
+                diagnostics.push(Diagnostic::new(
+                    AnyType { name: func() },
+                    annotation.range(),
+                ));
+            }
+        }
+    } else {
+        if type_hint_resolves_to_any(
+            annotation,
+            checker.semantic(),
+            checker.locator,
+            checker.settings.target_version.minor(),
+        ) {
+            diagnostics.push(Diagnostic::new(
+                AnyType { name: func() },
+                annotation.range(),
+            ));
+        }
+    }
 }
 
 /// Generate flake8-annotation checks for a given `Definition`.
@@ -500,13 +528,12 @@ pub(crate) fn definition(
         // ANN401 for dynamically typed arguments
         if let Some(annotation) = &def.annotation {
             has_any_typed_arg = true;
-            if checker.enabled(Rule::AnyType) {
+            if checker.enabled(Rule::AnyType) && !is_overridden {
                 check_dynamically_typed(
+                    checker,
                     annotation,
                     || def.arg.to_string(),
                     &mut diagnostics,
-                    is_overridden,
-                    checker.semantic(),
                 );
             }
         } else {
@@ -530,15 +557,9 @@ pub(crate) fn definition(
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
-                if checker.enabled(Rule::AnyType) {
+                if checker.enabled(Rule::AnyType) && !is_overridden {
                     let name = &arg.arg;
-                    check_dynamically_typed(
-                        expr,
-                        || format!("*{name}"),
-                        &mut diagnostics,
-                        is_overridden,
-                        checker.semantic(),
-                    );
+                    check_dynamically_typed(checker, expr, || format!("*{name}"), &mut diagnostics);
                 }
             }
         } else {
@@ -562,14 +583,13 @@ pub(crate) fn definition(
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
-                if checker.enabled(Rule::AnyType) {
+                if checker.enabled(Rule::AnyType) && !is_overridden {
                     let name = &arg.arg;
                     check_dynamically_typed(
+                        checker,
                         expr,
                         || format!("**{name}"),
                         &mut diagnostics,
-                        is_overridden,
-                        checker.semantic(),
                     );
                 }
             }
@@ -629,14 +649,8 @@ pub(crate) fn definition(
     // ANN201, ANN202, ANN401
     if let Some(expr) = &returns {
         has_typed_return = true;
-        if checker.enabled(Rule::AnyType) {
-            check_dynamically_typed(
-                expr,
-                || name.to_string(),
-                &mut diagnostics,
-                is_overridden,
-                checker.semantic(),
-            );
+        if checker.enabled(Rule::AnyType) && !is_overridden {
+            check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
         }
     } else if !(
         // Allow omission of return annotation if the function only returns `None`

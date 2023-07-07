@@ -192,6 +192,44 @@ impl<'a> TypingTarget<'a> {
             }
         }
     }
+
+    /// Check if the [`TypingTarget`] explicitly allows `Any`.
+    fn contains_any(
+        &self,
+        semantic: &SemanticModel,
+        locator: &Locator,
+        minor_version: u32,
+    ) -> bool {
+        match self {
+            TypingTarget::Any => true,
+            // `Literal` cannot contain `Any` as it's a dynamic value.
+            TypingTarget::Literal(_) | TypingTarget::None | TypingTarget::Object => false,
+            TypingTarget::Union(elements) => elements.iter().any(|element| {
+                let Some(new_target) =
+                    TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                else {
+                    return false;
+                };
+                new_target.contains_any(semantic, locator, minor_version)
+            }),
+            TypingTarget::Annotated(element) | TypingTarget::Optional(element) => {
+                let Some(new_target) =
+                    TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                else {
+                    return false;
+                };
+                new_target.contains_any(semantic, locator, minor_version)
+            }
+            TypingTarget::ForwardReference(expr) => {
+                let Some(new_target) =
+                    TypingTarget::try_from_expr(expr, semantic, locator, minor_version)
+                else {
+                    return false;
+                };
+                new_target.contains_any(semantic, locator, minor_version)
+            }
+        }
+    }
 }
 
 /// Check if the given annotation [`Expr`] explicitly allows `None`.
@@ -228,6 +266,31 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
                 Some(annotation)
             }
         }
+    }
+}
+
+/// Check if the given annotation [`Expr`] resolves to `Any`.
+///
+/// This function assumes that the annotation is a valid typing annotation expression.
+pub(crate) fn type_hint_resolves_to_any(
+    annotation: &Expr,
+    semantic: &SemanticModel,
+    locator: &Locator,
+    minor_version: u32,
+) -> bool {
+    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator, minor_version)
+    else {
+        return false;
+    };
+    match target {
+        // Short circuit on top level `Any`
+        TypingTarget::Any => true,
+        // Top-level `Annotated` node should check if the inner type resolves
+        // to `Any`.
+        TypingTarget::Annotated(expr) => {
+            type_hint_resolves_to_any(expr, semantic, locator, minor_version)
+        }
+        _ => target.contains_any(semantic, locator, minor_version),
     }
 }
 
