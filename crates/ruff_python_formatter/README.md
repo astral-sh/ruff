@@ -254,7 +254,7 @@ This will format all files that `ruff check` would lint and computes the [Jaccar
 There are tree common problems with the formatter: The second formatting pass looks different than
 the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
 parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
-of these using the `check-formatter-stability` subcommand in `ruff_dev`
+of these using the `--stability-check` option in the `format-dev` subcommand:
 
 The easiest is to check CPython:
 
