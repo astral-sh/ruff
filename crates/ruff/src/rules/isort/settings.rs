@@ -1,6 +1,8 @@
 //! Settings for the `isort` plugin.
 
 use std::collections::BTreeSet;
+use std::error::Error;
+use std::fmt;
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -11,6 +13,7 @@ use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
+use crate::settings::types::IdentifierPattern;
 use crate::warn_user_once;
 
 use super::categorize::ImportSection;
@@ -154,6 +157,9 @@ pub struct Options {
     )]
     /// A list of modules to consider first-party, regardless of whether they
     /// can be identified as such via introspection of the local filesystem.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub known_first_party: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -164,6 +170,9 @@ pub struct Options {
     )]
     /// A list of modules to consider third-party, regardless of whether they
     /// can be identified as such via introspection of the local filesystem.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub known_third_party: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -174,6 +183,9 @@ pub struct Options {
     )]
     /// A list of modules to consider being a local folder.
     /// Generally, this is reserved for relative imports (`from . import module`).
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub known_local_folder: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -184,6 +196,9 @@ pub struct Options {
     )]
     /// A list of modules to consider standard-library, in addition to those
     /// known to Ruff in advance.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub extra_standard_library: Option<Vec<String>>,
     #[option(
         default = r#"furthest-to-closest"#,
@@ -357,21 +372,63 @@ impl Default for Settings {
     }
 }
 
-impl From<Options> for Settings {
-    fn from(options: Options) -> Self {
+impl TryFrom<Options> for Settings {
+    type Error = SettingsError;
+
+    fn try_from(options: Options) -> Result<Self, Self::Error> {
         // Extract any configuration options that deal with user-defined sections.
         let mut section_order: Vec<_> = options
             .section_order
             .unwrap_or_else(|| ImportType::iter().map(ImportSection::Known).collect());
-        let known_first_party = options.known_first_party.unwrap_or_default();
-        let known_third_party = options.known_third_party.unwrap_or_default();
-        let known_local_folder = options.known_local_folder.unwrap_or_default();
-        let extra_standard_library = options.extra_standard_library.unwrap_or_default();
+        let known_first_party = options
+            .known_first_party
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
+            })
+            .transpose()
+            .map_err(SettingsError::InvalidKnownFirstParty)?
+            .unwrap_or_default();
+        let known_third_party = options
+            .known_third_party
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
+            })
+            .transpose()
+            .map_err(SettingsError::InvalidKnownThirdParty)?
+            .unwrap_or_default();
+        let known_local_folder = options
+            .known_local_folder
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
+            })
+            .transpose()
+            .map_err(SettingsError::InvalidKnownLocalFolder)?
+            .unwrap_or_default();
+        let extra_standard_library = options
+            .extra_standard_library
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(&name))
+                    .collect()
+            })
+            .transpose()
+            .map_err(SettingsError::InvalidExtraStandardLibrary)?
+            .unwrap_or_default();
         let no_lines_before = options.no_lines_before.unwrap_or_default();
         let sections = options.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<String>> = sections
+        let sections: FxHashMap<String, Vec<glob::Pattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
@@ -380,7 +437,17 @@ impl From<Options> for Settings {
                 }
                 ImportSection::UserDefined(section) => Some((section, modules)),
             })
-            .collect();
+            .map(|(section, modules)| {
+                let modules = modules
+                    .into_iter()
+                    .map(|module| {
+                        IdentifierPattern::new(&module)
+                            .map_err(SettingsError::InvalidUserDefinedSection)
+                    })
+                    .collect::<Result<Vec<_>, Self::Error>>()?;
+                Ok((section, modules))
+            })
+            .collect::<Result<_, _>>()?;
 
         // Verify that `section_order` doesn't contain any duplicates.
         let mut seen =
@@ -435,7 +502,7 @@ impl From<Options> for Settings {
             }
         }
 
-        Self {
+        Ok(Self {
             required_imports: BTreeSet::from_iter(options.required_imports.unwrap_or_default()),
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
             force_single_line: options.force_single_line.unwrap_or(false),
@@ -464,6 +531,50 @@ impl From<Options> for Settings {
             lines_between_types: options.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(options.forced_separate.unwrap_or_default()),
             section_order,
+        })
+    }
+}
+
+/// Error returned by the [`TryFrom`] implementation of [`Settings`].
+#[derive(Debug)]
+pub enum SettingsError {
+    InvalidKnownFirstParty(glob::PatternError),
+    InvalidKnownThirdParty(glob::PatternError),
+    InvalidKnownLocalFolder(glob::PatternError),
+    InvalidExtraStandardLibrary(glob::PatternError),
+    InvalidUserDefinedSection(glob::PatternError),
+}
+
+impl fmt::Display for SettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingsError::InvalidKnownThirdParty(err) => {
+                write!(f, "invalid known third-party pattern: {err}")
+            }
+            SettingsError::InvalidKnownFirstParty(err) => {
+                write!(f, "invalid known first-party pattern: {err}")
+            }
+            SettingsError::InvalidKnownLocalFolder(err) => {
+                write!(f, "invalid known local folder pattern: {err}")
+            }
+            SettingsError::InvalidExtraStandardLibrary(err) => {
+                write!(f, "invalid extra standard library pattern: {err}")
+            }
+            SettingsError::InvalidUserDefinedSection(err) => {
+                write!(f, "invalid user-defined section pattern: {err}")
+            }
+        }
+    }
+}
+
+impl Error for SettingsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SettingsError::InvalidKnownThirdParty(err) => Some(err),
+            SettingsError::InvalidKnownFirstParty(err) => Some(err),
+            SettingsError::InvalidKnownLocalFolder(err) => Some(err),
+            SettingsError::InvalidExtraStandardLibrary(err) => Some(err),
+            SettingsError::InvalidUserDefinedSection(err) => Some(err),
         }
     }
 }
@@ -476,7 +587,9 @@ impl From<Settings> for Options {
             extra_standard_library: Some(
                 settings
                     .known_modules
-                    .modules_for_known_type(ImportType::StandardLibrary),
+                    .modules_for_known_type(ImportType::StandardLibrary)
+                    .map(ToString::to_string)
+                    .collect(),
             ),
             force_single_line: Some(settings.force_single_line),
             force_sort_within_sections: Some(settings.force_sort_within_sections),
@@ -486,17 +599,23 @@ impl From<Settings> for Options {
             known_first_party: Some(
                 settings
                     .known_modules
-                    .modules_for_known_type(ImportType::FirstParty),
+                    .modules_for_known_type(ImportType::FirstParty)
+                    .map(ToString::to_string)
+                    .collect(),
             ),
             known_third_party: Some(
                 settings
                     .known_modules
-                    .modules_for_known_type(ImportType::ThirdParty),
+                    .modules_for_known_type(ImportType::ThirdParty)
+                    .map(ToString::to_string)
+                    .collect(),
             ),
             known_local_folder: Some(
                 settings
                     .known_modules
-                    .modules_for_known_type(ImportType::LocalFolder),
+                    .modules_for_known_type(ImportType::LocalFolder)
+                    .map(ToString::to_string)
+                    .collect(),
             ),
             order_by_type: Some(settings.order_by_type),
             relative_imports_order: Some(settings.relative_imports_order),
@@ -515,7 +634,12 @@ impl From<Settings> for Options {
                     .known_modules
                     .user_defined()
                     .into_iter()
-                    .map(|(section, modules)| (ImportSection::UserDefined(section), modules))
+                    .map(|(section, modules)| {
+                        (
+                            ImportSection::UserDefined(section.to_string()),
+                            modules.into_iter().map(ToString::to_string).collect(),
+                        )
+                    })
                     .collect(),
             ),
         }

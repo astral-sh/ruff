@@ -1,5 +1,11 @@
 ---
 source: crates/ruff/src/noqa.rs
-expression: "Directive::extract(range, &locator)"
+expression: "Directive::try_extract(source, TextSize::default())"
 ---
-None
+Some(
+    All(
+        All {
+            range: 0..7,
+        },
+    ),
+)

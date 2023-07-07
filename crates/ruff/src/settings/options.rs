@@ -498,7 +498,7 @@ pub struct Options {
     /// Options for the `flake8-comprehensions` plugin.
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     #[option_group]
-    /// Options for the `copyright` plugin.
+    /// Options for the `flake8-copyright` plugin.
     pub flake8_copyright: Option<flake8_copyright::settings::Options>,
     #[option_group]
     /// Options for the `flake8-errmsg` plugin.

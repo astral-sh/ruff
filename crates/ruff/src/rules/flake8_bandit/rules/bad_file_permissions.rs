@@ -9,6 +9,31 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for files with overly permissive permissions.
+///
+/// ## Why is this bad?
+/// Overly permissive file permissions may allow unintended access and
+/// arbitrary code execution.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+/// os.chmod("/etc/secrets.txt", 0o666)  # rw-rw-rw-
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+/// os.chmod("/etc/secrets.txt", 0o600)  # rw-------
+/// ```
+///
+/// ## References
+/// - [Python documentation: `os.chmod`](https://docs.python.org/3/library/os.html#os.chmod)
+/// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
+/// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[violation]
 pub struct BadFilePermissions {
     mask: u16,
@@ -18,7 +43,7 @@ impl Violation for BadFilePermissions {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadFilePermissions { mask } = self;
-        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory",)
+        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")
     }
 }
 

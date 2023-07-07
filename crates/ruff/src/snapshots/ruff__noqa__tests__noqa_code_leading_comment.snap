@@ -5,10 +5,9 @@ expression: "Directive::try_extract(source, TextSize::default())"
 Some(
     Codes(
         Codes {
-            range: 0..15,
+            range: 35..47,
             codes: [
                 "F401",
-                "F841",
             ],
         },
     ),

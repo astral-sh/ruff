@@ -6,6 +6,40 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 
+/// ## What it does
+/// Checks for uses of the `try`-`except`-`continue` pattern.
+///
+/// ## Why is this bad?
+/// The `try`-`except`-`continue` pattern suppresses all exceptions.
+/// Suppressing exceptions may hide errors that could otherwise reveal
+/// unexpected behavior, security vulnerabilities, or malicious activity.
+/// Instead, consider logging the exception.
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+/// while predicate:
+///     try:
+///         ...
+///     except Exception:
+///         continue
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+/// while predicate:
+///     try:
+///         ...
+///     except Exception as exc:
+///         logging.exception("Error occurred")
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-703](https://cwe.mitre.org/data/definitions/703.html)
+/// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 #[violation]
 pub struct TryExceptContinue;
 
