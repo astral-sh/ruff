@@ -102,6 +102,8 @@ pub(crate) fn mutable_argument_default(
                     body[0].start(),
                 ));
                 let indentation = leading_space(indentation);
+                // body[0].start() starts at correct indentation so we do need to add indentation
+                // before pushing the if statement
                 check_lines.push_str(format!("if {} is None:\n", parameter.name.as_str()).as_str());
                 check_lines.push_str(indentation);
                 check_lines.push_str(checker.stylist().indentation());
