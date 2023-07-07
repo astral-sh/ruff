@@ -358,5 +358,17 @@ UP006_0.py:77:10: UP006 [*] Use `collections.abc.Sequence` instead of `typing.Se
 77    |-def f(x: typing.Sequence[str]) -> None:
    78 |+def f(x: Sequence[str]) -> None:
 78 79 |     ...
+79 80 | 
+80 81 | 
+
+UP006_0.py:83:10: UP006 Use `collections.abc.Collection` instead of `typing.Collection` for type annotation
+   |
+81 | from typing import Collection
+82 | 
+83 | def f(x: typing.Collection[str]) -> None:
+   |          ^^^^^^^^^^^^^^^^^ UP006
+84 |     ...
+   |
+   = help: Replace with `collections.abc.Collection`
 
 
