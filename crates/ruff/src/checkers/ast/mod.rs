@@ -2197,7 +2197,7 @@ where
                     if let Some(Expr::Subscript(ast::ExprSubscript { value, .. })) =
                         self.semantic.expr_grandparent()
                     {
-                        check = !self.semantic.match_typing_expr(value, "Union")
+                        check = !self.semantic.match_typing_expr(value, "Union");
                     }
 
                     if check {
