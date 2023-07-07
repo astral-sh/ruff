@@ -38,6 +38,7 @@ mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+pub mod upstream_categories;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;
