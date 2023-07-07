@@ -10,6 +10,7 @@ use crate::comments::{
     CommentLinePosition, SourceComment,
 };
 use crate::context::NodeLevel;
+use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
 use crate::FormatNodeRule;
@@ -179,14 +180,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 ]
             )?;
         } else {
-            write!(
-                f,
-                [group(&format_args!(
-                    text("("),
-                    soft_block_indent(&group(&format_inner)),
-                    text(")")
-                ))]
-            )?;
+            parenthesized("(", &group(&format_inner), ")").fmt(f)?;
         }
 
         f.context_mut().set_node_level(saved_level);
