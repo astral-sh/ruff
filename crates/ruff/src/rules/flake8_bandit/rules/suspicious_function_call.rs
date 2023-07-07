@@ -271,6 +271,23 @@ impl Violation for SuspiciousMktempUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of the bulitin `eval()` function.
+///
+/// ## Why is this bad?
+/// TODO: Add explanation.
+///
+/// ## Example
+/// ```python
+/// ```
+///
+/// Use instead:
+/// ```python
+/// ```
+///
+/// ## References
+/// - [Python documentation: `marshal` — Internal Python object serialization](https://docs.python.org/3/library/marshal.html)
+/// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
 #[violation]
 pub struct SuspiciousEvalUsage;
 
@@ -281,6 +298,35 @@ impl Violation for SuspiciousEvalUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of calls to `django.utils.safestring.mark_safe`.
+///
+/// ## Why is this bad?
+/// Cross-site scripting (XSS) vulnerabilities allow attackers to execute
+/// arbitrary JavaScript. To guard against XSS attacks, Django templates
+/// assumes that data is unsafe and automatically escapes malicious strings
+/// before rending them.
+///
+/// `django.utils.safestring.mark_safe` marks a string as safe for use in HTML
+/// templates, bypassing XSS protection. This is dangerous because it may allow
+/// cross-site scripting attacks if the string is not properly escaped.
+///
+/// ## Example
+/// ```python
+/// from django.utils.safestring import mark_safe
+///
+/// content = mark_safe("<script>alert('Hello, world!')</script>")  # XSS.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// content = "<script>alert('Hello, world!')</script>"  # Safe if rendered.
+/// ```
+///
+/// ## References
+/// - [Django documentation: `mark_safe`](https://docs.djangoproject.com/en/dev/ref/utils/#django.utils.safestring.mark_safe)
+/// - [Django documentation: Cross Site Scripting (XSS) protection](https://docs.djangoproject.com/en/dev/topics/security/#cross-site-scripting-xss-protection)
+/// - [Common Weakness Enumeration: CWE-80](https://cwe.mitre.org/data/definitions/80.html)
 #[violation]
 pub struct SuspiciousMarkSafeUsage;
 
@@ -291,6 +337,44 @@ impl Violation for SuspiciousMarkSafeUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of URL open functions that unexpected schemes.
+///
+/// ## Why is this bad?
+/// Some URL open functions allow the use of `file:` or custom schemes (for use
+/// instead of `http:` or `https:`). An attacker may be able to use these
+/// schemes to access or modify unauthorized resources, and cause unexpected
+/// behavior.
+///
+/// To mitigate this risk, audit all uses of URL open functions and ensure that
+/// only permitted schemes are used (e.g., allowing `http:` and `https:` and
+/// disallowing `file:` and `ftp:`).
+///
+/// ## Example
+/// ```python
+/// from urllib.request import urlopen
+///
+/// url = input("Enter a URL: ")
+///
+/// with urlopen(url) as response:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from urllib.request import urlopen
+///
+/// url = input("Enter a URL: ")
+///
+/// if not url.startswith(("http:", "https:")):
+///     raise ValueError("URL must start with 'http:' or 'https:'")
+///
+/// with urlopen(url) as response:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `urlopen`](https://docs.python.org/3/library/urllib.request.html#urllib.request.urlopen)
 #[violation]
 pub struct SuspiciousURLOpenUsage;
 
@@ -301,6 +385,34 @@ impl Violation for SuspiciousURLOpenUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of cryptographically weak pseudo-random number generators.
+///
+/// ## Why is this bad?
+/// Cryptographically weak pseudo-random number generators are insecure as they
+/// are easily predictable. This can allow an attacker to guess the generated
+/// numbers and compromise the security of the system.
+///
+/// Instead, use a cryptographically secure pseudo-random number generator
+/// (such as using the [`secrets` module](https://docs.python.org/3/library/secrets.html))
+/// when generating random numbers for security purposes.
+///
+/// ## Example
+/// ```python
+/// import random
+///
+/// random.randrange(10)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import secrets
+///
+/// secrets.randbelow(10)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `random` — Generate pseudo-random numbers](https://docs.python.org/3/library/random.html)
 #[violation]
 pub struct SuspiciousNonCryptographicRandomUsage;
 
@@ -311,6 +423,37 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
+/// which protects against XML attacks.
+///
+/// ## Example
+/// ```python
+/// from xml.etree.cElementTree import parse
+///
+/// tree = parse("untrusted.xml")  # Vulnerable to XML attacks.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from defusedxml.cElementTree import parse
+///
+/// tree = parse("untrusted.xml")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml` — XML processing modules](https://docs.python.org/3/library/xml.html)
+/// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLCElementTreeUsage;
 
@@ -321,6 +464,37 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
+/// which protects against XML attacks.
+///
+/// ## Example
+/// ```python
+/// from xml.etree.ElementTree import parse
+///
+/// tree = parse("untrusted.xml")  # Vulnerable to XML attacks.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from defusedxml.ElementTree import parse
+///
+/// tree = parse("untrusted.xml")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml` — XML processing modules](https://docs.python.org/3/library/xml.html)
+/// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLElementTreeUsage;
 
@@ -331,6 +505,37 @@ impl Violation for SuspiciousXMLElementTreeUsage {
     }
 }
 
+/// ## What it does
+/// Checks for uses of insecure XML parsers.
+///
+/// ## Why is this bad?
+/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
+/// which cause excessive memory and CPU usage by exploiting recursion. In some
+/// situations, it may be possible for an attacker to access unauthorized
+/// resources.
+///
+/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
+/// which protects against XML attacks.
+///
+/// ## Example
+/// ```python
+/// from xml.sax.expatreader import create_parser
+///
+/// parser = create_parser()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from defusedxml.sax import create_parser
+///
+/// parser = create_parser()
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml` — XML processing modules](https://docs.python.org/3/library/xml.html)
+/// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
+/// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+/// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 #[violation]
 pub struct SuspiciousXMLExpatReaderUsage;
 
