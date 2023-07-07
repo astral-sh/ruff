@@ -199,7 +199,7 @@
       ]
     },
     "flake8-copyright": {
-      "description": "Options for the `copyright` plugin.",
+      "description": "Options for the `flake8-copyright` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8CopyrightOptions"
