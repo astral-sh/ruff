@@ -41,7 +41,7 @@ field13: int | int | int | int  # Error
 field14: int | int | str | int  # Error
 
 # Should emit for duplicate literal types; also covered by PYI030
-field15: typing.Literal[1] | typing.Literal[1]  # OK
+field15: typing.Literal[1] | typing.Literal[1]  # Error
 
 # Shouldn't emit if in new parent type
 field16: int | dict[int, str]  # OK
