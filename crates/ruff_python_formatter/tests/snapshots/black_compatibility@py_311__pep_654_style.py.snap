@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-assertion_line: 86
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_311/pep_654_style.py
 ---
 ## Input

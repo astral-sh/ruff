@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-assertion_line: 86
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtonoff.py
 ---
 ## Input
