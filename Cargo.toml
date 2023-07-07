@@ -48,8 +48,8 @@ test-case = { version = "3.0.0" }
 thiserror = { version = "1.0.43" }
 toml = { version = "0.7.2" }
 
-# v0.0.1
-libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e5beb532fdd1e209ad2dbb470438" }
+# v1.0.1
+libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "3cacca1a1029f05707e50703b49fe3dd860aa839", default-features = false }
 
 # Please tag the RustPython version everytime you update its revision here and in fuzz/Cargo.toml
 # Tagging the version ensures that older ruff versions continue to build from source even when we rebase our RustPython fork.
