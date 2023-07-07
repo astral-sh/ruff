@@ -241,7 +241,15 @@ The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/t
 e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
 The Rome repository can be a helpful reference when implementing something in the Ruff formatter
 
-### Checking formatter stability and panics
+### Checking entire projects
+
+It's possible to format an entire project:
+
+```shell
+cargo run --bin ruff_dev -- format-dev --write my_project
+```
+
+This will format all files that `ruff check` would lint and computes the [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index), a measure for how close the original and formatted versions are. The Jaccard index is 1 if there were no changes at all, while 0 means every line was changed. If you run this on a black formatted projects, this tells you how similar the ruff formatter is to black for the given project, with our goal being as close to 1 as possible.
 
 There are tree common problems with the formatter: The second formatting pass looks different than
 the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
@@ -252,7 +260,7 @@ The easiest is to check CPython:
 
 ```shell
 git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
-cargo run --bin ruff_dev -- check-formatter-stability crates/ruff/resources/test/cpython
+cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
 ```
 
 It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we
@@ -261,7 +269,7 @@ only do this occasionally:
 ```shell
 curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
 python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
-cargo run --bin ruff_dev -- check-formatter-stability --multi-project target/checkouts
+cargo run --bin ruff_dev -- format-dev --stability-check --multi-project target/checkouts
 ```
 
 ## The orphan rules and trait structure
