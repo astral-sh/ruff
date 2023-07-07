@@ -65,7 +65,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
             Expr::Constant(ExprConstant {
                 value: index_value, ..
             }) => {
-                if !(index_value.is_int()) {
+                if !index_value.is_int() {
                     checker.diagnostics.push(Diagnostic::new(
                         InvalidIndexType {
                             var_type: expression_type_name(value)
@@ -77,7 +77,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                     ));
                 }
             }
-            // If the index is a slice, check for integer bounds
+            // If the index is a slice, check for integer or null bounds
             Expr::Slice(ExprSlice { lower, upper, .. }) => {
                 for boxed_slice_bound in [lower, upper] {
                     if let Some(slice_bound) = boxed_slice_bound {
@@ -85,7 +85,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                             value: index_value, ..
                         }) = slice_bound.as_ref()
                         {
-                            if !(index_value.is_int()) {
+                            if !(index_value.is_int() || index_value.is_none()) {
                                 checker.diagnostics.push(Diagnostic::new(
                                     InvalidIndexType {
                                         var_type: expression_type_name(value).expect(
