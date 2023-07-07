@@ -69,7 +69,7 @@ enum Command {
     /// * Check formatter stability: Format a repository twice and ensure that it looks that the
     ///   first and second formatting look the same.
     /// * Format: Format the files in a repository to be able to check them with `git diff`
-    /// * Statistics: This computes the Jaccard index between the (assumed to be black formatted)
+    /// * Statistics: The subcommand the Jaccard index between the (assumed to be black formatted)
     ///   input and the ruff formatted output
     FormatDev(format_dev::Args),
 }
