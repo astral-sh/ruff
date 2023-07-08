@@ -76,7 +76,7 @@ where
     /// default implementation formats the dangling comments at the end of the node, which isn't ideal but ensures that
     /// no comments are dropped.
     ///
-    /// A node can have dangling comments if all its children are tokens or if all node childrens are optional.
+    /// A node can have dangling comments if all its children are tokens or if all node children are optional.
     fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
         dangling_node_comments(node).fmt(f)
     }
