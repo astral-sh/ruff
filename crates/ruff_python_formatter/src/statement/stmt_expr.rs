@@ -2,6 +2,7 @@ use crate::expression::parentheses::{is_expression_parenthesized, Parenthesize};
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
 use crate::FormatNodeRule;
+use ruff_python_ast::expression::ExpressionRef;
 use rustpython_parser::ast::StmtExpr;
 
 #[derive(Default)]
@@ -13,7 +14,10 @@ impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
 
         if let Some(constant) = value.as_constant_expr() {
             if constant.value.is_str()
-                && !is_expression_parenthesized(value.as_ref().into(), f.context().source())
+                && !is_expression_parenthesized(
+                    ExpressionRef::from(value.as_ref()),
+                    f.context().source(),
+                )
             {
                 return constant.format().with_options(StringLayout::Flat).fmt(f);
             }

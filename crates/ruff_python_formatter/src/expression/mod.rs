@@ -6,7 +6,7 @@ use crate::builders::optional_parentheses;
 use ruff_formatter::{
     format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::expression::ExpressionRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::context::NodeLevel;
@@ -392,7 +392,7 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
 impl<'input> PreorderVisitor<'input> for MaxOperatorPriorityVisitor<'input> {
     fn visit_expr(&mut self, expr: &'input Expr) {
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(AnyNodeRef::from(expr), self.source) {
+        if is_expression_parenthesized(ExpressionRef::from(expr), self.source) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -412,7 +412,7 @@ fn has_parentheses(expr: &Expr, source: &str) -> bool {
             | Expr::DictComp(_)
             | Expr::Call(_)
             | Expr::Subscript(_)
-    ) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
+    ) || is_expression_parenthesized(ExpressionRef::from(expr), source)
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
