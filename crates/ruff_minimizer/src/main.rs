@@ -37,8 +37,8 @@ use rustpython_ast::text_size::TextRange;
 use rustpython_ast::{Expr, Ranged, Stmt, Suite};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::str;
 use std::time::Instant;
-use std::{ptr, str};
 use tracing::debug;
 
 trait Strategy {
@@ -77,12 +77,12 @@ impl Strategy for StrategyRemoveModuleMember {
         input: &'a str,
         ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
-        let iter = ast.into_iter().map(|stmt| {
+        let iter = ast.iter().map(|stmt| {
             // trim the newlines the range misses
             input[..stmt.range().start().to_usize()]
                 .trim_end()
                 .to_string()
-                + &input[stmt.range().end().to_usize()..].trim_start()
+                + input[stmt.range().end().to_usize()..].trim_start()
         });
         Ok(Box::new(iter))
     }
@@ -101,14 +101,14 @@ impl StatementVisitor<'_> for StatementCollector {
                 self.ranges.push(TextRange::new(first.start(), last.end()));
             }
         }
-        walk_body(self, &body);
+        walk_body(self, body);
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if !matches!(stmt, Stmt::Pass(_)) {
             self.ranges.push(stmt.range());
         }
-        walk_stmt(self, &stmt);
+        walk_stmt(self, stmt);
     }
 }
 
@@ -117,9 +117,9 @@ fn strategy_statement<'a>(
     input: &'a str,
     ast: &'a Suite,
     pass_dummy: bool,
-) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+) -> Box<dyn ExactSizeStringIter + 'a> {
     let mut visitor = StatementCollector::default();
-    visitor.visit_body(&ast);
+    visitor.visit_body(ast);
 
     // Remove the largest statements first
     let mut ranges = visitor.ranges;
@@ -129,14 +129,14 @@ fn strategy_statement<'a>(
     let iter = ranges.into_iter().map(move |range| {
         let mut without_stmt = String::new();
         // trim the newlines the range misses
-        without_stmt.push_str(&input[..range.start().to_usize()].trim_end());
+        without_stmt.push_str(input[..range.start().to_usize()].trim_end());
         if pass_dummy {
             without_stmt.push_str("pass");
         }
         without_stmt.push_str(&input[range.end().to_usize()..]);
         without_stmt
     });
-    Ok(Box::new(iter))
+    Box::new(iter)
 }
 
 struct StrategyRemoveStatement;
@@ -150,7 +150,7 @@ impl Strategy for StrategyRemoveStatement {
         input: &'a str,
         ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
-        strategy_statement(input, ast, false)
+        Ok(strategy_statement(input, ast, false))
     }
 }
 
@@ -165,7 +165,7 @@ impl Strategy for StrategyReplaceStatementWithPass {
         input: &'a str,
         ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
-        strategy_statement(input, ast, true)
+        Ok(strategy_statement(input, ast, true))
     }
 }
 
@@ -178,7 +178,7 @@ struct ExpressionCollector {
 impl Visitor<'_> for ExpressionCollector {
     fn visit_expr(&mut self, expr: &Expr) {
         self.ranges.push(expr.range());
-        walk_expr(self, &expr);
+        walk_expr(self, expr);
     }
 }
 
@@ -196,7 +196,7 @@ impl Strategy for StrategyRemoveExpression {
         ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
         let mut visitor = ExpressionCollector::default();
-        visitor.visit_body(&ast);
+        visitor.visit_body(ast);
         let iter = visitor.ranges.into_iter().map(move |range| {
             input[..range.start().to_usize()].to_string() + &input[range.end().to_usize()..]
         });
@@ -222,7 +222,7 @@ impl Strategy for StrategyRemoveLine {
             let mut result = String::new();
             result.push_str(&lines[..removed_line].join("\n"));
             if removed_line > 0 {
-                result.push_str("\n");
+                result.push('\n');
             }
             result.push_str(&lines[removed_line + 1..].join("\n"));
             result
@@ -259,7 +259,7 @@ impl Strategy for StrategyRemoveNewline {
             .collect();
         let iter = newline_positions.into_iter().map(move |newline_position| {
             // trim to remove the indentation
-            input[..newline_position].to_string() + &input[newline_position + 1..].trim_start()
+            input[..newline_position].to_string() + input[newline_position + 1..].trim_start()
         });
         Ok(Box::new(iter))
     }
@@ -296,7 +296,8 @@ fn minimization_step(
     // Try all strategies in order
     for strategy in STRATEGIES {
         if last_strategy_and_idx.map_or(false, |(last_strategy, _)| {
-            ptr::eq(last_strategy, *strategy)
+            // It's not sound to ptr::eq trait objects and Eq isn't object safe
+            last_strategy.name() == strategy.name()
         }) {
             continue;
         }
@@ -365,7 +366,7 @@ fn run() -> Result<()> {
 
     let mut num_iterations = 0;
     // normalize line endings for the remove newlines rule
-    let mut input = fs::read_to_string(args.file)?.replace("\r", "");
+    let mut input = fs::read_to_string(args.file)?.replace('\r', "");
     let mut last_strategy_and_idx = None;
     loop {
         let start = Instant::now();
