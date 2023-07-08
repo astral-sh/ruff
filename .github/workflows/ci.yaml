@@ -54,21 +54,19 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-insta
+      # cargo insta 1.30.0 fails for some reason (https://github.com/mitsuhiko/insta/issues/392)
+      - run: cargo install cargo-insta@=1.29.0
       - run: pip install black[d]==23.1.0
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          cargo insta test --all --all-features --delete-unreferenced-snapshots
-          git diff --exit-code
+        run: cargo insta test --all --all-features --unreferenced reject
       - name: "Run tests (Windows)"
         if: ${{ matrix.os == 'windows-latest' }}
         shell: bash
-        run: |
-          cargo insta test --all --all-features
-          git diff --exit-code
+        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
+        run: cargo insta test --all --all-features
       - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
-        # Skipped as it's currently broken. The resource were moved from the
+        # TODO: Skipped as it's currently broken. The resource were moved from the
         # ruff_cli to ruff crate, but this test was not updated.
         if: false
       # Check for broken links in the documentation.
