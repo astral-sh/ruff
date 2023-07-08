@@ -60,6 +60,7 @@ phf = { version = "0.11", features = ["macros"] }
 pyproject-toml = { version = "0.6.0" }
 quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
+regex-syntax = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
 rustpython-format = { workspace = true }

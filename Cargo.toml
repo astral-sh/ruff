@@ -34,6 +34,7 @@ path-absolutize = { version = "3.0.14" }
 proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
+regex-syntax = {version = "0.7.3"}
 rustc-hash = { version = "1.1.0" }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }

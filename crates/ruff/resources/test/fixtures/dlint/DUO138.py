@@ -37,10 +37,6 @@ re.search("(a+){10}b")  # DUO138
 
 re.search("(a+){10}?b")  # DUO138
 
-re.search("(a+){,10}b")  # DUO138
-
-re.search("(a+){,10}?b")  # DUO138
-
 re.search("(a+){10,}b")  # DUO138
 
 re.search("(a+){10,}?b")  # DUO138
@@ -58,10 +54,6 @@ re.search("(a+?){1,10}?b")  # DUO138
 re.search("(a+?){10}b")  # DUO138
 
 re.search("(a+?){10}?b")  # DUO138
-
-re.search("(a+?){,10}b")  # DUO138
-
-re.search("(a+?){,10}?b")  # DUO138
 
 re.search("(a+?){10,}b")  # DUO138
 
@@ -81,10 +73,6 @@ re.search("(a*){10}b")  # DUO138
 
 re.search("(a*){10}?b")  # DUO138
 
-re.search("(a*){,10}b")  # DUO138
-
-re.search("(a*){,10}?b")  # DUO138
-
 re.search("(a*){10,}b")  # DUO138
 
 re.search("(a*){10,}?b")  # DUO138
@@ -102,10 +90,6 @@ re.search("(a*?){1,10}?b")  # DUO138
 re.search("(a*?){10}b")  # DUO138
 
 re.search("(a*?){10}?b")  # DUO138
-
-re.search("(a*?){,10}b")  # DUO138
-
-re.search("(a*?){,10}?b")  # DUO138
 
 re.search("(a*?){10,}b")  # DUO138
 
@@ -125,10 +109,6 @@ re.search("(a{1,10}){10}b")  # DUO138
 
 re.search("(a{1,10}){10}?b")  # DUO138
 
-re.search("(a{1,10}){,10}b")  # DUO138
-
-re.search("(a{1,10}){,10}?b")  # DUO138
-
 re.search("(a{1,10}){10,}b")  # DUO138
 
 re.search("(a{1,10}){10,}?b")  # DUO138
@@ -146,10 +126,6 @@ re.search("(a{1,10}?){1,10}b")  # DUO138
 re.search("(a{1,10}?){10}b")  # DUO138
 
 re.search("(a{1,10}?){10}?b")  # DUO138
-
-re.search("(a{1,10}?){,10}b")  # DUO138
-
-re.search("(a{1,10}?){,10}?b")  # DUO138
 
 re.search("(a{1,10}?){10,}b")  # DUO138
 
@@ -169,10 +145,6 @@ re.search("(a{10}){1,10}?b")  # DUO138
 
 re.search("(a{10}){10}?b")  # DUO138
 
-re.search("(a{10}){,10}b")  # DUO138
-
-re.search("(a{10}){,10}?b")  # DUO138
-
 re.search("(a{10}){10,}b")  # DUO138
 
 re.search("(a{10}){10,}?b")  # DUO138
@@ -191,57 +163,9 @@ re.search("(a{10}?){1,10}?b")  # DUO138
 
 re.search("(a{10}?){10}b")  # DUO138
 
-re.search("(a{10}?){,10}b")  # DUO138
-
-re.search("(a{10}?){,10}?b")  # DUO138
-
 re.search("(a{10}?){10,}b")  # DUO138
 
 re.search("(a{10}?){10,}?b")  # DUO138
-
-re.search("(a{,10})+b")  # DUO138
-
-re.search("(a{,10})+?b")  # DUO138
-
-re.search("(a{,10})*b")  # DUO138
-
-re.search("(a{,10})*?b")  # DUO138
-
-re.search("(a{,10}){1,10}b")  # DUO138
-
-re.search("(a{,10}){1,10}?b")  # DUO138
-
-re.search("(a{,10}){10}b")  # DUO138
-
-re.search("(a{,10}){10}?b")  # DUO138
-
-re.search("(a{,10}){,10}?b")  # DUO138
-
-re.search("(a{,10}){10,}b")  # DUO138
-
-re.search("(a{,10}){10,}?b")  # DUO138
-
-re.search("(a{,10}?)+b")  # DUO138
-
-re.search("(a{,10}?)+?b")  # DUO138
-
-re.search("(a{,10}?)*b")  # DUO138
-
-re.search("(a{,10}?)*?b")  # DUO138
-
-re.search("(a{,10}?){1,10}b")  # DUO138
-
-re.search("(a{,10}?){1,10}?b")  # DUO138
-
-re.search("(a{,10}?){10}b")  # DUO138
-
-re.search("(a{,10}?){10}?b")  # DUO138
-
-re.search("(a{,10}?){,10}b")  # DUO138
-
-re.search("(a{,10}?){10,}b")  # DUO138
-
-re.search("(a{,10}?){10,}?b")  # DUO138
 
 re.search("(a{10,})+b")  # DUO138
 
@@ -258,10 +182,6 @@ re.search("(a{10,}){1,10}?b")  # DUO138
 re.search("(a{10,}){10}b")  # DUO138
 
 re.search("(a{10,}){10}?b")  # DUO138
-
-re.search("(a{10,}){,10}b")  # DUO138
-
-re.search("(a{10,}){,10}?b")  # DUO138
 
 re.search("(a{10,}){10,}?b")  # DUO138
 
@@ -280,10 +200,6 @@ re.search("(a{10,}?){1,10}?b")  # DUO138
 re.search("(a{10,}?){10}b")  # DUO138
 
 re.search("(a{10,}?){10}?b")  # DUO138
-
-re.search("(a{10,}?){,10}b")  # DUO138
-
-re.search("(a{10,}?){,10}?b")  # DUO138
 
 re.search("(a{10,}?){10,}b")  # DUO138
 

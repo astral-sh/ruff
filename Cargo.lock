@@ -1843,6 +1843,7 @@ dependencies = [
  "pyproject-toml",
  "quick-junit",
  "regex",
+ "regex-syntax",
  "result-like",
  "ruff_cache",
  "ruff_diagnostics",

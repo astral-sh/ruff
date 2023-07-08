@@ -1,7 +1,12 @@
-use ruff_diagnostics::Violation;
-use rustpython_parser::ast::ExprCall;
+use regex_syntax::hir::{Hir, HirKind, Literal};
+use regex_syntax::ParserBuilder;
+use ruff_diagnostics::{Diagnostic, Violation};
+use rustpython_parser::ast;
+use rustpython_parser::ast::{Constant, Expr, ExprCall, Ranged};
+use std::collections::HashSet;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
 
@@ -43,4 +48,53 @@ impl Violation for CatastrophicReUse {
 }
 
 /// DUO138
-pub(crate) fn catastrophic_re_use(checker: &mut Checker, call: &ExprCall) {}
+pub(crate) fn catastrophic_re_use(checker: &mut Checker, call: &ExprCall) {
+    if let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) {
+        if !is_regex_func(&call_path) {
+            return;
+        }
+    }
+
+    // Regex string should always be the first argument
+    let Expr::Constant(ast::ExprConstant {value: Constant::Str(regex_string), .. }) = &call.args[0] else {
+        return;
+    };
+
+    // Create HIR from regex string
+    let mut parser = ParserBuilder::new().build();
+    let hir = parser.parse(regex_string).unwrap();
+
+    if detect_redos(&hir) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(CatastrophicReUse, call.func.range()));
+    }
+}
+
+fn is_regex_func(call_path: &CallPath) -> bool {
+    matches!(
+        call_path.as_slice(),
+        [
+            "re",
+            "compile"
+                | "search"
+                | "match"
+                | "fullmatch"
+                | "split"
+                | "findall"
+                | "finditer"
+                | "sub"
+                | "subn"
+        ]
+    )
+}
+
+fn detect_redos(hir: &Hir) -> bool {
+    match hir.kind() {
+        HirKind::Concat(hirs) | HirKind::Alternation(hirs) => {
+            hirs.iter().any(|sub_hir| detect_redos(sub_hir))
+        }
+        HirKind::Repetition(repetition) => repetition.greedy,
+        _ => false,
+    }
+}

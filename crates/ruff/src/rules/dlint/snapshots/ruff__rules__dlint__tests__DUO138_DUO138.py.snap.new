@@ -1,0 +1,749 @@
+---
+source: crates/ruff/src/rules/dlint/mod.rs
+assertion_line: 23
+---
+DUO138.py:5:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+  |
+3 | from re import compile, search, match, fullmatch, split, findall, finditer, sub, subn
+4 | 
+5 | re.compile("(a+)+b")  # DUO138
+  | ^^^^^^^^^^ DUO138
+6 | re.search("(a+)+b")  # DUO138
+7 | re.match("(a+)+b")  # DUO138
+  |
+
+DUO138.py:6:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+  |
+5 | re.compile("(a+)+b")  # DUO138
+6 | re.search("(a+)+b")  # DUO138
+  | ^^^^^^^^^ DUO138
+7 | re.match("(a+)+b")  # DUO138
+8 | re.fullmatch("(a+)+b")  # DUO138
+  |
+
+DUO138.py:7:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+  |
+5 | re.compile("(a+)+b")  # DUO138
+6 | re.search("(a+)+b")  # DUO138
+7 | re.match("(a+)+b")  # DUO138
+  | ^^^^^^^^ DUO138
+8 | re.fullmatch("(a+)+b")  # DUO138
+9 | re.split("(a+)+b")  # DUO138
+  |
+
+DUO138.py:8:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+ 6 | re.search("(a+)+b")  # DUO138
+ 7 | re.match("(a+)+b")  # DUO138
+ 8 | re.fullmatch("(a+)+b")  # DUO138
+   | ^^^^^^^^^^^^ DUO138
+ 9 | re.split("(a+)+b")  # DUO138
+10 | re.findall("(a+)+b")  # DUO138
+   |
+
+DUO138.py:9:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+ 7 | re.match("(a+)+b")  # DUO138
+ 8 | re.fullmatch("(a+)+b")  # DUO138
+ 9 | re.split("(a+)+b")  # DUO138
+   | ^^^^^^^^ DUO138
+10 | re.findall("(a+)+b")  # DUO138
+11 | re.finditer("(a+)+b")  # DUO138
+   |
+
+DUO138.py:10:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+ 8 | re.fullmatch("(a+)+b")  # DUO138
+ 9 | re.split("(a+)+b")  # DUO138
+10 | re.findall("(a+)+b")  # DUO138
+   | ^^^^^^^^^^ DUO138
+11 | re.finditer("(a+)+b")  # DUO138
+12 | re.sub("(a+)+b")  # DUO138
+   |
+
+DUO138.py:11:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+ 9 | re.split("(a+)+b")  # DUO138
+10 | re.findall("(a+)+b")  # DUO138
+11 | re.finditer("(a+)+b")  # DUO138
+   | ^^^^^^^^^^^ DUO138
+12 | re.sub("(a+)+b")  # DUO138
+13 | re.subn("(a+)+b")  # DUO138
+   |
+
+DUO138.py:12:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+10 | re.findall("(a+)+b")  # DUO138
+11 | re.finditer("(a+)+b")  # DUO138
+12 | re.sub("(a+)+b")  # DUO138
+   | ^^^^^^ DUO138
+13 | re.subn("(a+)+b")  # DUO138
+   |
+
+DUO138.py:13:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+11 | re.finditer("(a+)+b")  # DUO138
+12 | re.sub("(a+)+b")  # DUO138
+13 | re.subn("(a+)+b")  # DUO138
+   | ^^^^^^^ DUO138
+14 | 
+15 | compile("(a+)+b")  # DUO138
+   |
+
+DUO138.py:15:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+13 | re.subn("(a+)+b")  # DUO138
+14 | 
+15 | compile("(a+)+b")  # DUO138
+   | ^^^^^^^ DUO138
+16 | search("(a+)+b")  # DUO138
+17 | match("(a+)+b")  # DUO138
+   |
+
+DUO138.py:16:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+15 | compile("(a+)+b")  # DUO138
+16 | search("(a+)+b")  # DUO138
+   | ^^^^^^ DUO138
+17 | match("(a+)+b")  # DUO138
+18 | fullmatch("(a+)+b")  # DUO138
+   |
+
+DUO138.py:17:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+15 | compile("(a+)+b")  # DUO138
+16 | search("(a+)+b")  # DUO138
+17 | match("(a+)+b")  # DUO138
+   | ^^^^^ DUO138
+18 | fullmatch("(a+)+b")  # DUO138
+19 | split("(a+)+b")  # DUO138
+   |
+
+DUO138.py:18:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+16 | search("(a+)+b")  # DUO138
+17 | match("(a+)+b")  # DUO138
+18 | fullmatch("(a+)+b")  # DUO138
+   | ^^^^^^^^^ DUO138
+19 | split("(a+)+b")  # DUO138
+20 | findall("(a+)+b")  # DUO138
+   |
+
+DUO138.py:19:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+17 | match("(a+)+b")  # DUO138
+18 | fullmatch("(a+)+b")  # DUO138
+19 | split("(a+)+b")  # DUO138
+   | ^^^^^ DUO138
+20 | findall("(a+)+b")  # DUO138
+21 | finditer("(a+)+b")  # DUO138
+   |
+
+DUO138.py:20:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+18 | fullmatch("(a+)+b")  # DUO138
+19 | split("(a+)+b")  # DUO138
+20 | findall("(a+)+b")  # DUO138
+   | ^^^^^^^ DUO138
+21 | finditer("(a+)+b")  # DUO138
+22 | sub("(a+)+b")  # DUO138
+   |
+
+DUO138.py:21:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+19 | split("(a+)+b")  # DUO138
+20 | findall("(a+)+b")  # DUO138
+21 | finditer("(a+)+b")  # DUO138
+   | ^^^^^^^^ DUO138
+22 | sub("(a+)+b")  # DUO138
+23 | subn("(a+)+b")  # DUO138
+   |
+
+DUO138.py:22:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+20 | findall("(a+)+b")  # DUO138
+21 | finditer("(a+)+b")  # DUO138
+22 | sub("(a+)+b")  # DUO138
+   | ^^^ DUO138
+23 | subn("(a+)+b")  # DUO138
+   |
+
+DUO138.py:23:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+21 | finditer("(a+)+b")  # DUO138
+22 | sub("(a+)+b")  # DUO138
+23 | subn("(a+)+b")  # DUO138
+   | ^^^^ DUO138
+   |
+
+DUO138.py:28:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+26 | re.search("(a+)+?b")  # DUO138
+27 | 
+28 | re.search("(a+)*b")  # DUO138
+   | ^^^^^^^^^ DUO138
+29 | 
+30 | re.search("(a+)*?b")  # DUO138
+   |
+
+DUO138.py:32:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+30 | re.search("(a+)*?b")  # DUO138
+31 | 
+32 | re.search("(a+){1,10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+33 | 
+34 | re.search("(a+){1,10}?b")  # DUO138
+   |
+
+DUO138.py:36:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+34 | re.search("(a+){1,10}?b")  # DUO138
+35 | 
+36 | re.search("(a+){10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+37 | 
+38 | re.search("(a+){10}?b")  # DUO138
+   |
+
+DUO138.py:40:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+38 | re.search("(a+){10}?b")  # DUO138
+39 | 
+40 | re.search("(a+){10,}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+41 | 
+42 | re.search("(a+){10,}?b")  # DUO138
+   |
+
+DUO138.py:44:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+42 | re.search("(a+){10,}?b")  # DUO138
+43 | 
+44 | re.search("(a+?)+b")  # DUO138
+   | ^^^^^^^^^ DUO138
+45 | 
+46 | re.search("(a+?)*b")  # DUO138
+   |
+
+DUO138.py:46:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+44 | re.search("(a+?)+b")  # DUO138
+45 | 
+46 | re.search("(a+?)*b")  # DUO138
+   | ^^^^^^^^^ DUO138
+47 | 
+48 | re.search("(a+?)*?b")  # DUO138
+   |
+
+DUO138.py:50:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+48 | re.search("(a+?)*?b")  # DUO138
+49 | 
+50 | re.search("(a+?){1,10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+51 | 
+52 | re.search("(a+?){1,10}?b")  # DUO138
+   |
+
+DUO138.py:54:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+52 | re.search("(a+?){1,10}?b")  # DUO138
+53 | 
+54 | re.search("(a+?){10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+55 | 
+56 | re.search("(a+?){10}?b")  # DUO138
+   |
+
+DUO138.py:58:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+56 | re.search("(a+?){10}?b")  # DUO138
+57 | 
+58 | re.search("(a+?){10,}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+59 | 
+60 | re.search("(a+?){10,}?b")  # DUO138
+   |
+
+DUO138.py:62:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+60 | re.search("(a+?){10,}?b")  # DUO138
+61 | 
+62 | re.search("(a*)+b")  # DUO138
+   | ^^^^^^^^^ DUO138
+63 | 
+64 | re.search("(a*)+?b")  # DUO138
+   |
+
+DUO138.py:68:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+66 | re.search("(a*)*?b")  # DUO138
+67 | 
+68 | re.search("(a*){1,10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+69 | 
+70 | re.search("(a*){1,10}?b")  # DUO138
+   |
+
+DUO138.py:72:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+70 | re.search("(a*){1,10}?b")  # DUO138
+71 | 
+72 | re.search("(a*){10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+73 | 
+74 | re.search("(a*){10}?b")  # DUO138
+   |
+
+DUO138.py:76:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+74 | re.search("(a*){10}?b")  # DUO138
+75 | 
+76 | re.search("(a*){10,}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+77 | 
+78 | re.search("(a*){10,}?b")  # DUO138
+   |
+
+DUO138.py:80:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+78 | re.search("(a*){10,}?b")  # DUO138
+79 | 
+80 | re.search("(a*?)+b")  # DUO138
+   | ^^^^^^^^^ DUO138
+81 | 
+82 | re.search("(a*?)+?b")  # DUO138
+   |
+
+DUO138.py:84:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+82 | re.search("(a*?)+?b")  # DUO138
+83 | 
+84 | re.search("(a*?)*b")  # DUO138
+   | ^^^^^^^^^ DUO138
+85 | 
+86 | re.search("(a*?){1,10}b")  # DUO138
+   |
+
+DUO138.py:86:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+84 | re.search("(a*?)*b")  # DUO138
+85 | 
+86 | re.search("(a*?){1,10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+87 | 
+88 | re.search("(a*?){1,10}?b")  # DUO138
+   |
+
+DUO138.py:90:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+88 | re.search("(a*?){1,10}?b")  # DUO138
+89 | 
+90 | re.search("(a*?){10}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+91 | 
+92 | re.search("(a*?){10}?b")  # DUO138
+   |
+
+DUO138.py:94:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+   |
+92 | re.search("(a*?){10}?b")  # DUO138
+93 | 
+94 | re.search("(a*?){10,}b")  # DUO138
+   | ^^^^^^^^^ DUO138
+95 | 
+96 | re.search("(a*?){10,}?b")  # DUO138
+   |
+
+DUO138.py:98:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+ 96 | re.search("(a*?){10,}?b")  # DUO138
+ 97 | 
+ 98 | re.search("(a{1,10})+b")  # DUO138
+    | ^^^^^^^^^ DUO138
+ 99 | 
+100 | re.search("(a{1,10})+?b")  # DUO138
+    |
+
+DUO138.py:102:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+100 | re.search("(a{1,10})+?b")  # DUO138
+101 | 
+102 | re.search("(a{1,10})*b")  # DUO138
+    | ^^^^^^^^^ DUO138
+103 | 
+104 | re.search("(a{1,10})*?b")  # DUO138
+    |
+
+DUO138.py:108:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+106 | re.search("(a{1,10}){1,10}?b")  # DUO138
+107 | 
+108 | re.search("(a{1,10}){10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+109 | 
+110 | re.search("(a{1,10}){10}?b")  # DUO138
+    |
+
+DUO138.py:112:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+110 | re.search("(a{1,10}){10}?b")  # DUO138
+111 | 
+112 | re.search("(a{1,10}){10,}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+113 | 
+114 | re.search("(a{1,10}){10,}?b")  # DUO138
+    |
+
+DUO138.py:116:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+114 | re.search("(a{1,10}){10,}?b")  # DUO138
+115 | 
+116 | re.search("(a{1,10}?)+b")  # DUO138
+    | ^^^^^^^^^ DUO138
+117 | 
+118 | re.search("(a{1,10}?)+?b")  # DUO138
+    |
+
+DUO138.py:120:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+118 | re.search("(a{1,10}?)+?b")  # DUO138
+119 | 
+120 | re.search("(a{1,10}?)*b")  # DUO138
+    | ^^^^^^^^^ DUO138
+121 | 
+122 | re.search("(a{1,10}?)*?b")  # DUO138
+    |
+
+DUO138.py:124:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+122 | re.search("(a{1,10}?)*?b")  # DUO138
+123 | 
+124 | re.search("(a{1,10}?){1,10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+125 | 
+126 | re.search("(a{1,10}?){10}b")  # DUO138
+    |
+
+DUO138.py:126:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+124 | re.search("(a{1,10}?){1,10}b")  # DUO138
+125 | 
+126 | re.search("(a{1,10}?){10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+127 | 
+128 | re.search("(a{1,10}?){10}?b")  # DUO138
+    |
+
+DUO138.py:130:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+128 | re.search("(a{1,10}?){10}?b")  # DUO138
+129 | 
+130 | re.search("(a{1,10}?){10,}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+131 | 
+132 | re.search("(a{1,10}?){10,}?b")  # DUO138
+    |
+
+DUO138.py:134:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+132 | re.search("(a{1,10}?){10,}?b")  # DUO138
+133 | 
+134 | re.search("(a{10})+b")  # DUO138
+    | ^^^^^^^^^ DUO138
+135 | 
+136 | re.search("(a{10})+?b")  # DUO138
+    |
+
+DUO138.py:138:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+136 | re.search("(a{10})+?b")  # DUO138
+137 | 
+138 | re.search("(a{10})*b")  # DUO138
+    | ^^^^^^^^^ DUO138
+139 | 
+140 | re.search("(a{10})*?b")  # DUO138
+    |
+
+DUO138.py:142:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+140 | re.search("(a{10})*?b")  # DUO138
+141 | 
+142 | re.search("(a{10}){1,10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+143 | 
+144 | re.search("(a{10}){1,10}?b")  # DUO138
+    |
+
+DUO138.py:148:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+146 | re.search("(a{10}){10}?b")  # DUO138
+147 | 
+148 | re.search("(a{10}){10,}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+149 | 
+150 | re.search("(a{10}){10,}?b")  # DUO138
+    |
+
+DUO138.py:152:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+150 | re.search("(a{10}){10,}?b")  # DUO138
+151 | 
+152 | re.search("(a{10}?)+b")  # DUO138
+    | ^^^^^^^^^ DUO138
+153 | 
+154 | re.search("(a{10}?)+?b")  # DUO138
+    |
+
+DUO138.py:156:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+154 | re.search("(a{10}?)+?b")  # DUO138
+155 | 
+156 | re.search("(a{10}?)*b")  # DUO138
+    | ^^^^^^^^^ DUO138
+157 | 
+158 | re.search("(a{10}?)*?b")  # DUO138
+    |
+
+DUO138.py:160:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+158 | re.search("(a{10}?)*?b")  # DUO138
+159 | 
+160 | re.search("(a{10}?){1,10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+161 | 
+162 | re.search("(a{10}?){1,10}?b")  # DUO138
+    |
+
+DUO138.py:164:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+162 | re.search("(a{10}?){1,10}?b")  # DUO138
+163 | 
+164 | re.search("(a{10}?){10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+165 | 
+166 | re.search("(a{10}?){10,}b")  # DUO138
+    |
+
+DUO138.py:166:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+164 | re.search("(a{10}?){10}b")  # DUO138
+165 | 
+166 | re.search("(a{10}?){10,}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+167 | 
+168 | re.search("(a{10}?){10,}?b")  # DUO138
+    |
+
+DUO138.py:170:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+168 | re.search("(a{10}?){10,}?b")  # DUO138
+169 | 
+170 | re.search("(a{10,})+b")  # DUO138
+    | ^^^^^^^^^ DUO138
+171 | 
+172 | re.search("(a{10,})+?b")  # DUO138
+    |
+
+DUO138.py:174:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+172 | re.search("(a{10,})+?b")  # DUO138
+173 | 
+174 | re.search("(a{10,})*b")  # DUO138
+    | ^^^^^^^^^ DUO138
+175 | 
+176 | re.search("(a{10,})*?b")  # DUO138
+    |
+
+DUO138.py:178:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+176 | re.search("(a{10,})*?b")  # DUO138
+177 | 
+178 | re.search("(a{10,}){1,10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+179 | 
+180 | re.search("(a{10,}){1,10}?b")  # DUO138
+    |
+
+DUO138.py:182:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+180 | re.search("(a{10,}){1,10}?b")  # DUO138
+181 | 
+182 | re.search("(a{10,}){10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+183 | 
+184 | re.search("(a{10,}){10}?b")  # DUO138
+    |
+
+DUO138.py:188:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+186 | re.search("(a{10,}){10,}?b")  # DUO138
+187 | 
+188 | re.search("(a{10,}?)+b")  # DUO138
+    | ^^^^^^^^^ DUO138
+189 | 
+190 | re.search("(a{10,}?)+?b")  # DUO138
+    |
+
+DUO138.py:192:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+190 | re.search("(a{10,}?)+?b")  # DUO138
+191 | 
+192 | re.search("(a{10,}?)*b")  # DUO138
+    | ^^^^^^^^^ DUO138
+193 | 
+194 | re.search("(a{10,}?)*?b")  # DUO138
+    |
+
+DUO138.py:196:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+194 | re.search("(a{10,}?)*?b")  # DUO138
+195 | 
+196 | re.search("(a{10,}?){1,10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+197 | 
+198 | re.search("(a{10,}?){1,10}?b")  # DUO138
+    |
+
+DUO138.py:200:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+198 | re.search("(a{10,}?){1,10}?b")  # DUO138
+199 | 
+200 | re.search("(a{10,}?){10}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+201 | 
+202 | re.search("(a{10,}?){10}?b")  # DUO138
+    |
+
+DUO138.py:204:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+202 | re.search("(a{10,}?){10}?b")  # DUO138
+203 | 
+204 | re.search("(a{10,}?){10,}b")  # DUO138
+    | ^^^^^^^^^ DUO138
+205 | 
+206 | re.search("[abc]+[def]*")  # OK
+    |
+
+DUO138.py:206:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+204 | re.search("(a{10,}?){10,}b")  # DUO138
+205 | 
+206 | re.search("[abc]+[def]*")  # OK
+    | ^^^^^^^^^ DUO138
+207 | 
+208 | re.search("[abc]+([def]*)")  # OK
+    |
+
+DUO138.py:208:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+206 | re.search("[abc]+[def]*")  # OK
+207 | 
+208 | re.search("[abc]+([def]*)")  # OK
+    | ^^^^^^^^^ DUO138
+209 | 
+210 | re.search("(.|[a-c])+")  # DUO138
+    |
+
+DUO138.py:210:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+208 | re.search("[abc]+([def]*)")  # OK
+209 | 
+210 | re.search("(.|[a-c])+")  # DUO138
+    | ^^^^^^^^^ DUO138
+211 | 
+212 | re.search("(a|[a-c])+")  # DUO138
+    |
+
+DUO138.py:212:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+210 | re.search("(.|[a-c])+")  # DUO138
+211 | 
+212 | re.search("(a|[a-c])+")  # DUO138
+    | ^^^^^^^^^ DUO138
+213 | 
+214 | re.search("(d|[a-c])+")  # OK
+    |
+
+DUO138.py:214:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+212 | re.search("(a|[a-c])+")  # DUO138
+213 | 
+214 | re.search("(d|[a-c])+")  # OK
+    | ^^^^^^^^^ DUO138
+215 | 
+216 | re.search("([^d]|[a-c])+")  # DUO138
+    |
+
+DUO138.py:216:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+214 | re.search("(d|[a-c])+")  # OK
+215 | 
+216 | re.search("([^d]|[a-c])+")  # DUO138
+    | ^^^^^^^^^ DUO138
+217 | 
+218 | re.search("([^b]|[a-c])+")  # DUO138
+    |
+
+DUO138.py:218:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+216 | re.search("([^d]|[a-c])+")  # DUO138
+217 | 
+218 | re.search("([^b]|[a-c])+")  # DUO138
+    | ^^^^^^^^^ DUO138
+219 | 
+220 | re.search("([^a]|a)+")  # OK
+    |
+
+DUO138.py:220:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+218 | re.search("([^b]|[a-c])+")  # DUO138
+219 | 
+220 | re.search("([^a]|a)+")  # OK
+    | ^^^^^^^^^ DUO138
+221 | 
+222 | re.search("([^d]|[^b]|[a-c])+")  # DUO138
+    |
+
+DUO138.py:222:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+220 | re.search("([^a]|a)+")  # OK
+221 | 
+222 | re.search("([^d]|[^b]|[a-c])+")  # DUO138
+    | ^^^^^^^^^ DUO138
+    |
+
+DUO138.py:225:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+225 | re.search("([^abcAB]|[a-c]|[A-C])+")  # DUO138
+    | ^^^^^^^^^ DUO138
+226 | 
+227 | re.search("([^abcABC]|[a-c]|[A-C])+")  # OK
+    |
+
+DUO138.py:227:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+225 | re.search("([^abcAB]|[a-c]|[A-C])+")  # DUO138
+226 | 
+227 | re.search("([^abcABC]|[a-c]|[A-C])+")  # OK
+    | ^^^^^^^^^ DUO138
+    |
+
+DUO138.py:230:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+230 | re.search("([a-c]|[c-e])+")  # DUO138
+    | ^^^^^^^^^ DUO138
+231 | 
+232 | re.search("([a-c]|[d-e])+")  # OK
+    |
+
+DUO138.py:232:1: DUO138 Potentially dangerous regex expression can lead to catastrophic backtracking
+    |
+230 | re.search("([a-c]|[c-e])+")  # DUO138
+231 | 
+232 | re.search("([a-c]|[d-e])+")  # OK
+    | ^^^^^^^^^ DUO138
+    |
+
+
