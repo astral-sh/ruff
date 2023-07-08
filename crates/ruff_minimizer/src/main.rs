@@ -21,7 +21,7 @@
 //! ```
 //! This could emit
 //! ```python
-//! class RepresentationQtModel(QtCore.QObject):
+//! class RepresentationQtModel():
 //!             data[
 //!                 :,
 //!             ] = rep.data
@@ -39,41 +39,54 @@ use rustpython_ast::text_size::TextRange;
 use rustpython_ast::{Expr, Ranged, Stmt, Suite};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::str;
 use std::time::Instant;
-use std::{iter, str};
 use tracing::debug;
 
-#[derive(Parser)]
-struct Args {
-    /// The input file
-    file: PathBuf,
-    /// The minimization attempt will be copied to this location
-    location: PathBuf,
-    /// Continue this path of the minimization if either stderr or stdout match this regex
-    error_pattern: String,
-    /// The command to run to test if the smaller version still emits the same error
-    ///
-    /// TODO(konstin): Move this to some form of trailing args so we don't need shlex
-    command: String,
+trait Strategy {
+    fn name(&self) -> &'static str;
+
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>>;
 }
 
-/// Try to remove each module level statement
-fn make_module_candidates<'a>(
-    input: &'a str,
-    ast: &'a Suite,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
-    let num_candidates = ast.len();
-    if num_candidates <= 1 {
-        return Ok((0, Box::new(iter::empty())));
+const STRATEGIES: &[&dyn Strategy] = &[
+    (&StrategyRemoveModuleMember),
+    (&StrategyRemoveStatement),
+    (&StrategyRemoveExpression),
+    (&StrategyReplaceStatementWithPass),
+    (&StrategyLineCandidates),
+];
+
+/// `dyn ExactSizeStringIter + ExactSizeIterator` vtable surrogate trait that rust wants
+trait ExactSizeStringIter: Iterator<Item = String> + ExactSizeIterator {}
+
+impl<T> ExactSizeStringIter for T where T: Iterator<Item = String> + ExactSizeIterator {}
+
+struct StrategyRemoveModuleMember;
+
+impl Strategy for StrategyRemoveModuleMember {
+    fn name(&self) -> &'static str {
+        "remove module member"
     }
-    let iter = ast.into_iter().map(|stmt| {
-        let mut without_stmt = String::new();
-        // trim the newlines the range misses
-        without_stmt.push_str(&input[..stmt.range().start().to_usize()].trim_end());
-        without_stmt.push_str(&input[stmt.range().end().to_usize()..].trim_start());
-        without_stmt
-    });
-    Ok((num_candidates, Box::new(iter)))
+
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let iter = ast.into_iter().map(|stmt| {
+            // trim the newlines the range misses
+            input[..stmt.range().start().to_usize()]
+                .trim_end()
+                .to_string()
+                + &input[stmt.range().end().to_usize()..].trim_start()
+        });
+        Ok(Box::new(iter))
+    }
 }
 
 #[derive(Default)]
@@ -101,11 +114,11 @@ impl StatementVisitor<'_> for StatementCollector {
 }
 
 /// Try to remove each statement or replace it statement with `pass`
-fn make_remove_or_pass_statement<'a>(
+fn strategy_statement<'a>(
     input: &'a str,
     ast: &'a Suite,
     pass_dummy: bool,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
+) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
     let mut visitor = StatementCollector::default();
     visitor.visit_body(&ast);
 
@@ -114,7 +127,6 @@ fn make_remove_or_pass_statement<'a>(
     ranges.sort_by_key(|range| range.len());
     ranges.reverse();
 
-    let num_candidates = ranges.len();
     let iter = ranges.into_iter().map(move |range| {
         let mut without_stmt = String::new();
         // trim the newlines the range misses
@@ -125,21 +137,37 @@ fn make_remove_or_pass_statement<'a>(
         without_stmt.push_str(&input[range.end().to_usize()..]);
         without_stmt
     });
-    Ok((num_candidates, Box::new(iter)))
+    Ok(Box::new(iter))
 }
 
-fn make_remove_statement<'a>(
-    input: &'a str,
-    ast: &'a Suite,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
-    make_remove_or_pass_statement(input, ast, false)
+struct StrategyRemoveStatement;
+
+impl Strategy for StrategyRemoveStatement {
+    fn name(&self) -> &'static str {
+        "remove statement"
+    }
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        strategy_statement(input, ast, false)
+    }
 }
 
-fn make_pass_statement<'a>(
-    input: &'a str,
-    ast: &'a Suite,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
-    make_remove_or_pass_statement(input, ast, true)
+struct StrategyReplaceStatementWithPass;
+
+impl Strategy for StrategyReplaceStatementWithPass {
+    fn name(&self) -> &'static str {
+        "replace statement with pass"
+    }
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        strategy_statement(input, ast, true)
+    }
 }
 
 #[derive(Default)]
@@ -155,78 +183,74 @@ impl Visitor<'_> for ExpressionCollector {
     }
 }
 
-/// Try to remove each expression
-fn make_remove_expression<'a>(
-    input: &'a str,
-    ast: &'a Suite,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
-    let mut visitor = ExpressionCollector::default();
-    visitor.visit_body(&ast);
-    let num_candidates = visitor.ranges.len();
-    let iter = visitor.ranges.into_iter().map(move |range| {
-        input[..range.start().to_usize()].to_string() + &input[range.end().to_usize()..]
-    });
-    Ok((num_candidates, Box::new(iter)))
+struct StrategyRemoveExpression;
+
+impl Strategy for StrategyRemoveExpression {
+    fn name(&self) -> &'static str {
+        "remove expression"
+    }
+
+    /// Try to remove each expression
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let mut visitor = ExpressionCollector::default();
+        visitor.visit_body(&ast);
+        let iter = visitor.ranges.into_iter().map(move |range| {
+            input[..range.start().to_usize()].to_string() + &input[range.end().to_usize()..]
+        });
+        Ok(Box::new(iter))
+    }
 }
 
-/// Returns the number of permutations and each permutation
-fn make_line_candidates<'a>(
-    input: &'a str,
-    _ast: &'a Suite,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
-    let lines: Vec<_> = input.lines().collect();
-    let num_candidates = lines.len();
-    if num_candidates <= 1 {
-        return Ok((0, Box::new(iter::empty())));
+struct StrategyLineCandidates;
+
+impl Strategy for StrategyLineCandidates {
+    fn name(&self) -> &'static str {
+        "remove line"
     }
-    let mut removed_line = 0;
-    let iter = iter::from_fn(move || {
-        if removed_line < lines.len() {
+
+    /// Returns the number of permutations and each permutation
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        _ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let lines: Vec<_> = input.lines().collect();
+        let iter = (0..lines.len()).map(move |removed_line| {
             let mut result = String::new();
             result.push_str(&lines[..removed_line].join("\n"));
             if removed_line > 0 {
                 result.push_str("\n");
             }
             result.push_str(&lines[removed_line + 1..].join("\n"));
-            removed_line += 1;
-            Some(result)
-        } else {
-            None
-        }
-    });
-    Ok((num_candidates, Box::new(iter)))
+            result
+        });
+        Ok(Box::new(iter))
+    }
 }
 
-type Strategy = for<'a> fn(
-    input: &'a str,
-    ast: &'a Suite,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)>;
-
-const STRATEGIES: &[(Strategy, &'static str)] = &[
-    (make_module_candidates, "module member"),
-    (make_remove_statement, "remove statement"),
-    (make_remove_expression, "remove expression"),
-    (make_pass_statement, "statement pass"),
-    (make_line_candidates, "line"),
-];
-
+/// Returns strategy, name, pos in iteration, minimized code
 fn minimization_step(
     input: &str,
     location: &Path,
     command_args: &[String],
     pattern: &Regex,
-    last_strategy_and_idx: Option<(Strategy, usize)>,
-) -> Result<Option<(Strategy, usize, String)>> {
+    last_strategy_and_idx: Option<(&'static dyn Strategy, usize)>,
+) -> Result<Option<(&'static dyn Strategy, usize, String)>> {
     let tokens = ruff_rustpython::tokenize(input);
     let ast =
         ruff_rustpython::parse_program_tokens(tokens, "input.py").context("not valid python")?;
 
     // Try the last succeeding strategy first
     if let Some((last_strategy, last_idx)) = last_strategy_and_idx {
-        let (num_candidates, iter) = last_strategy(input, &ast)?;
+        let iter = last_strategy.candidates(input, &ast)?;
         println!(
-            "{} ({last_idx} skipped) candidates",
-            num_candidates - last_idx
+            "Trying {} ({last_idx} skipped) {} candidates",
+            iter.len() - last_idx,
+            last_strategy.name()
         );
         for (idx, entry) in iter.enumerate().skip(last_idx) {
             if is_failing(&entry, location, command_args, pattern)? {
@@ -237,9 +261,9 @@ fn minimization_step(
     }
 
     // Try all strategies in order
-    for (strategy, name) in STRATEGIES {
-        let (num_candidates, iter) = strategy(input, &ast)?;
-        println!("{num_candidates} {name} candidates");
+    for strategy in STRATEGIES {
+        let iter = strategy.candidates(input, &ast)?;
+        println!("Trying {} {} candidates", iter.len(), strategy.name());
         for (idx, entry) in iter.enumerate() {
             if is_failing(&entry, location, command_args, pattern)? {
                 // This one is still failing in the right way
@@ -278,6 +302,20 @@ fn is_failing(
     }
 }
 
+#[derive(Parser)]
+struct Args {
+    /// The input file
+    file: PathBuf,
+    /// The minimization attempt will be copied to this location
+    location: PathBuf,
+    /// Continue this path of the minimization if either stderr or stdout match this regex
+    error_pattern: String,
+    /// The command to run to test if the smaller version still emits the same error
+    ///
+    /// TODO(konstin): Move this to some form of trailing args so we don't need shlex
+    command: String,
+}
+
 fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
 
@@ -301,10 +339,15 @@ fn run() -> Result<()> {
             last_strategy_and_idx,
         )?;
         let duration = start.elapsed();
-        println!("Iteration took {:.1}s", duration.as_secs_f32());
-        if let Some((strategy_name, idx, smaller_failure)) = smaller_failure {
+        if let Some((strategy, idx, smaller_failure)) = smaller_failure {
+            println!(
+                "Match found with {} {idx} in {:.1}s, {} bytes remaining",
+                strategy.name(),
+                duration.as_secs_f32(),
+                smaller_failure.len()
+            );
             input = smaller_failure;
-            last_strategy_and_idx = Some((strategy_name, idx));
+            last_strategy_and_idx = Some((strategy, idx));
         } else {
             // The last minimization failed, write back the original content
             fs::write(&args.location, input.as_bytes())?;
