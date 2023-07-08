@@ -270,8 +270,9 @@ impl<'a> SimpleTokenizer<'a> {
         Self::new(source, TextRange::up_to(offset))
     }
 
-    fn parse_identifier(&self, text: &str) -> TokenKind {
-        match text {
+    fn parse_identifier(&self, range: TextRange) -> TokenKind {
+        let source = &self.source[range];
+        match source {
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
             "in" => TokenKind::In,
@@ -327,7 +328,7 @@ impl<'a> SimpleTokenizer<'a> {
                     let token_len = self.cursor.token_len();
 
                     let range = TextRange::at(self.offset, token_len);
-                    self.parse_identifier(&self.source[range])
+                    self.parse_identifier(range)
                 } else {
                     TokenKind::from_non_trivia_char(c)
                 };
@@ -440,7 +441,7 @@ impl<'a> SimpleTokenizer<'a> {
                         self.cursor.eat_back_while(is_identifier_continuation);
                         let token_len = self.cursor.token_len();
                         let range = TextRange::at(self.back_offset - token_len, token_len);
-                        self.parse_identifier(&self.source[range])
+                        self.parse_identifier(range)
                     } else {
                         TokenKind::from_non_trivia_char(c)
                     };
