@@ -323,10 +323,8 @@ impl<'a> SimpleTokenizer<'a> {
 
             c => {
                 let kind = if is_identifier_start(c) {
-                    let token_len =
-                        self.cursor.eat_while(is_identifier_continuation) + c.text_len();
-
-                    // TODO: would it be cheaper to use self.cursor.token_len() here?
+                    self.cursor.eat_while(is_identifier_continuation);
+                    let token_len = self.cursor.token_len();
 
                     let range = TextRange::at(self.offset, token_len);
                     self.parse_identifier(&self.source[range])
@@ -439,8 +437,8 @@ impl<'a> SimpleTokenizer<'a> {
                     TokenKind::Continuation
                 } else {
                     let kind = if is_identifier_start(c) {
-                        let token_len =
-                            self.cursor.eat_back_while(is_identifier_continuation) + c.text_len();
+                        self.cursor.eat_back_while(is_identifier_continuation);
+                        let token_len = self.cursor.token_len();
                         let range = TextRange::at(self.back_offset - token_len, token_len);
                         self.parse_identifier(&self.source[range])
                     } else {
@@ -577,28 +575,21 @@ impl<'a> Cursor<'a> {
     }
 
     /// Eats symbols while predicate returns true or until the end of file is reached.
-    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> TextSize {
+    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
         // It was tried making optimized version of this for eg. line comments, but
         // LLVM can inline all of this and compile it down to fast iteration over bytes.
-        // TODO: is this still true if we count?
-        let mut size = TextSize::default();
         while predicate(self.first()) && !self.is_eof() {
-            // Safety: TODO
-            size += self.bump().unwrap().text_len();
+            self.bump();
         }
-        size
     }
 
     /// Eats symbols from the back while predicate returns true or until the beginning of file is reached.
-    fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> TextSize {
+    fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
         // It was tried making optimized version of this for eg. line comments, but
         // LLVM can inline all of this and compile it down to fast iteration over bytes.
-        // TODO: is this still true if we count?
-        let mut size = TextSize::default();
         while predicate(self.last()) && !self.is_eof() {
-            size += self.bump_back().unwrap().text_len();
+            self.bump_back();
         }
-        size
     }
 }
 
