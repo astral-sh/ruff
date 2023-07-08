@@ -23,4 +23,12 @@ expression: test_case.tokens()
         kind: Else,
         range: 6..10,
     },
+    Token {
+        kind: Whitespace,
+        range: 10..11,
+    },
+    Token {
+        kind: Match,
+        range: 11..16,
+    },
 ]

@@ -1,0 +1,10 @@
+---
+source: crates/ruff_python_formatter/src/trivia.rs
+expression: test_case.tokens()
+---
+[
+    Token {
+        kind: Other,
+        range: 0..6,
+    },
+]

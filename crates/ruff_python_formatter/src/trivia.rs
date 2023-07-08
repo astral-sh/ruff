@@ -1,8 +1,8 @@
 use std::str::Chars;
 
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
 use ruff_python_whitespace::is_python_whitespace;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
 /// Searches for the first non-trivia character in `range`.
 ///
@@ -92,6 +92,24 @@ pub(crate) fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
     offset
 }
 
+fn is_identifier_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_' || is_non_ascii_identifier_start(c)
+}
+
+// Checks if the character c is a valid continuation character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_identifier_continuation(c: char) -> bool {
+    if c.is_ascii() {
+        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
+    } else {
+        is_xid_continue(c)
+    }
+}
+
+fn is_non_ascii_identifier_start(c: char) -> bool {
+    is_xid_start(c)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
@@ -176,6 +194,9 @@ pub(crate) enum TokenKind {
     /// `in`
     In,
 
+    /// `match`
+    Match,
+
     /// Any other non trivia token. Always has a length of 1
     Other,
 
@@ -224,6 +245,7 @@ pub(crate) struct SimpleTokenizer<'a> {
     /// `true` when it is known that the current `back` line has no comment for sure.
     back_line_has_no_comment: bool,
     bogus: bool,
+    source: &'a str,
     cursor: Cursor<'a>,
 }
 
@@ -234,6 +256,7 @@ impl<'a> SimpleTokenizer<'a> {
             back_offset: range.end(),
             back_line_has_no_comment: false,
             bogus: false,
+            source,
             cursor: Cursor::new(&source[range]),
         }
     }
@@ -247,22 +270,15 @@ impl<'a> SimpleTokenizer<'a> {
         Self::new(source, TextRange::up_to(offset))
     }
 
-    fn eat_multichar(&mut self, needle: &str, current: char) -> bool {
-        let mut needle_chars = needle.chars();
-        if needle_chars.next() != Some(current) {
-            return false;
+    fn parse_identifier(&self, text: &str) -> TokenKind {
+        match text {
+            "if" => TokenKind::If,
+            "else" => TokenKind::Else,
+            "in" => TokenKind::In,
+            "match" => TokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
+            // ...,
+            _ => TokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
         }
-
-        self.cursor.eat_chars(needle_chars)
-    }
-
-    fn eat_multichar_back(&mut self, needle: &str, current: char) -> bool {
-        let mut needle_chars = needle.chars().rev();
-        if needle_chars.next() != Some(current) {
-            return false;
-        }
-
-        self.cursor.eat_chars_back(needle_chars)
     }
 
     fn next_token(&mut self) -> Token {
@@ -306,12 +322,14 @@ impl<'a> SimpleTokenizer<'a> {
             '\\' => TokenKind::Continuation,
 
             c => {
-                let kind = if self.eat_multichar("if", c) {
-                    TokenKind::If
-                } else if self.eat_multichar("else", c) {
-                    TokenKind::Else
-                } else if self.eat_multichar("in", c) {
-                    TokenKind::In
+                let kind = if is_identifier_start(c) {
+                    let token_len =
+                        self.cursor.eat_while(is_identifier_continuation) + c.text_len();
+
+                    // TODO: would it be cheaper to use self.cursor.token_len() here?
+
+                    let range = TextRange::at(self.offset, token_len);
+                    self.parse_identifier(&self.source[range])
                 } else {
                     TokenKind::from_non_trivia_char(c)
                 };
@@ -319,7 +337,6 @@ impl<'a> SimpleTokenizer<'a> {
                 if kind == TokenKind::Other {
                     self.bogus = true;
                 }
-
                 kind
             }
         };
@@ -421,12 +438,11 @@ impl<'a> SimpleTokenizer<'a> {
                 } else if c == '\\' {
                     TokenKind::Continuation
                 } else {
-                    let kind = if self.eat_multichar_back("if", c) {
-                        TokenKind::If
-                    } else if self.eat_multichar_back("in", c) {
-                        TokenKind::In
-                    } else if self.eat_multichar_back("else", c) {
-                        TokenKind::Else
+                    let kind = if is_identifier_start(c) {
+                        let token_len =
+                            self.cursor.eat_back_while(is_identifier_continuation) + c.text_len();
+                        let range = TextRange::at(self.back_offset - token_len, token_len);
+                        self.parse_identifier(&self.source[range])
                     } else {
                         TokenKind::from_non_trivia_char(c)
                     };
@@ -551,18 +567,6 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    fn eat_chars<T: Iterator<Item = char> + Clone>(&mut self, mut s: T) -> bool {
-        let mut chars = self.chars.clone();
-        let s_copy = s.clone();
-        if !s.all(|c| chars.next() == Some(c)) {
-            return false;
-        }
-        for _ in s_copy {
-            self.bump();
-        }
-        true
-    }
-
     fn eat_char_back(&mut self, c: char) -> bool {
         if self.last() == c {
             self.bump_back();
@@ -572,34 +576,29 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    fn eat_chars_back<T: Iterator<Item = char> + Clone>(&mut self, mut s: T) -> bool {
-        let mut chars = self.chars.clone();
-        let s_copy = s.clone();
-        if !s.all(|c| chars.next_back() == Some(c)) {
-            return false;
-        }
-        for _ in s_copy {
-            self.bump_back();
-        }
-        true
-    }
-
     /// Eats symbols while predicate returns true or until the end of file is reached.
-    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> TextSize {
         // It was tried making optimized version of this for eg. line comments, but
         // LLVM can inline all of this and compile it down to fast iteration over bytes.
+        // TODO: is this still true if we count?
+        let mut size = TextSize::default();
         while predicate(self.first()) && !self.is_eof() {
-            self.bump();
+            // Safety: TODO
+            size += self.bump().unwrap().text_len();
         }
+        size
     }
 
     /// Eats symbols from the back while predicate returns true or until the beginning of file is reached.
-    fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+    fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> TextSize {
         // It was tried making optimized version of this for eg. line comments, but
         // LLVM can inline all of this and compile it down to fast iteration over bytes.
+        // TODO: is this still true if we count?
+        let mut size = TextSize::default();
         while predicate(self.last()) && !self.is_eof() {
-            self.bump_back();
+            size += self.bump_back().unwrap().text_len();
         }
+        size
     }
 }
 
@@ -608,7 +607,7 @@ mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token};
+    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token, TokenKind};
 
     struct TokenizationTestCase {
         source: &'static str,
@@ -692,8 +691,29 @@ mod tests {
     }
 
     #[test]
+    fn tricky_unicode_is_not_reversible_for_now() {
+        let source = "មុ";
+
+        let test_case = tokenize(source);
+        let mut backwards = test_case.tokenize_reverse();
+
+        // Re-reverse to get the tokens in forward order.
+        backwards.reverse();
+
+        assert_ne!(&backwards, &test_case.tokens);
+    }
+
+    #[test]
+    fn tokenize_multichar_keyword_with_extra_chars() {
+        let source = "ify";
+
+        let test_case = tokenize(source);
+        assert_eq!(test_case.tokens[0].kind, TokenKind::Other);
+    }
+
+    #[test]
     fn tokenize_multichar() {
-        let source = "if in else";
+        let source = "if in else match";
 
         let test_case = tokenize(source);
 
