@@ -2,6 +2,13 @@
 source: crates/ruff/src/noqa.rs
 expression: "ParsedFileExemption::try_extract(source)"
 ---
-Err(
-    UnsupportedCodes,
+Ok(
+    Some(
+        Codes(
+            [
+                "F401",
+                "F841",
+            ],
+        ),
+    ),
 )

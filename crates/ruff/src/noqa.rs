@@ -21,6 +21,7 @@ use crate::codes::NoqaCode;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
+// Let's replace this with a character-by-character matcher, I bet it's faster.
 static NOQA_MATCHER: Lazy<AhoCorasick> = Lazy::new(|| {
     AhoCorasick::builder()
         .ascii_case_insensitive(true)
@@ -280,72 +281,52 @@ impl<'a> ParsedFileExemption<'a> {
         };
         let line = Self::lex_whitespace(line);
 
-        if let Some(line) = Self::lex_flake8(line) {
-            // Ex) `# flake8: noqa`
-            let line = Self::lex_whitespace(line);
-            let Some(line) = Self::lex_char(line, ':') else {
-                return Ok(None);
-            };
-            let line = Self::lex_whitespace(line);
-            let Some(line) = Self::lex_noqa(line) else {
-                return Ok(None);
-            };
+        let Some(line) = Self::lex_flake8(line).or_else(|| Self::lex_ruff(line)) else {
+            return Ok(None);
+        };
 
-            // Guard against, e.g., `# flake8: noqa: F401`, which isn't supported by Flake8.
-            // Flake8 treats this as a blanket exemption, which is almost never the intent.
-            // Warn, but treat as a blanket exemption.
+        let line = Self::lex_whitespace(line);
+        let Some(line) = Self::lex_char(line, ':') else {
+            return Ok(None);
+        };
+        let line = Self::lex_whitespace(line);
+        let Some(line) = Self::lex_noqa(line) else {
+            return Ok(None);
+        };
+        let line = Self::lex_whitespace(line);
+
+        Ok(Some(if line.is_empty() {
+            // Ex) `# ruff: noqa`
+            Self::All
+        } else {
+            // Ex) `# ruff: noqa: F401, F841`
+            let Some(line) = Self::lex_char(line, ':') else {
+                return Err(ParseError::InvalidSuffix);
+            };
             let line = Self::lex_whitespace(line);
-            if Self::lex_char(line, ':').is_some() {
-                return Err(ParseError::UnsupportedCodes);
+
+            // Extract the codes from the line (e.g., `F401, F841`).
+            let mut codes = vec![];
+            let mut line = line;
+            while let Some(code) = Self::lex_code(line) {
+                codes.push(code);
+                line = &line[code.len()..];
+
+                // Codes can be comma- or whitespace-delimited.
+                if let Some(rest) = Self::lex_delimiter(line).map(Self::lex_whitespace) {
+                    line = rest;
+                } else {
+                    break;
+                }
             }
 
-            Ok(Some(Self::All))
-        } else if let Some(line) = Self::lex_ruff(line) {
-            let line = Self::lex_whitespace(line);
-            let Some(line) = Self::lex_char(line, ':') else {
-                return Ok(None);
-            };
-            let line = Self::lex_whitespace(line);
-            let Some(line) = Self::lex_noqa(line) else {
-                return Ok(None);
-            };
-            let line = Self::lex_whitespace(line);
+            // If we didn't identify any codes, warn.
+            if codes.is_empty() {
+                return Err(ParseError::MissingCodes);
+            }
 
-            Ok(Some(if line.is_empty() {
-                // Ex) `# ruff: noqa`
-                Self::All
-            } else {
-                // Ex) `# ruff: noqa: F401, F841`
-                let Some(line) = Self::lex_char(line, ':') else {
-                    return Err(ParseError::InvalidSuffix);
-                };
-                let line = Self::lex_whitespace(line);
-
-                // Extract the codes from the line (e.g., `F401, F841`).
-                let mut codes = vec![];
-                let mut line = line;
-                while let Some(code) = Self::lex_code(line) {
-                    codes.push(code);
-                    line = &line[code.len()..];
-
-                    // Codes can be comma- or whitespace-delimited.
-                    if let Some(rest) = Self::lex_delimiter(line).map(Self::lex_whitespace) {
-                        line = rest;
-                    } else {
-                        break;
-                    }
-                }
-
-                // If we didn't identify any codes, warn.
-                if codes.is_empty() {
-                    return Err(ParseError::MissingCodes);
-                }
-
-                Self::Codes(codes)
-            }))
-        } else {
-            Ok(None)
-        }
+            Self::Codes(codes)
+        }))
     }
 
     /// Lex optional leading whitespace.
@@ -427,9 +408,6 @@ pub(crate) enum ParseError {
     MissingCodes,
     /// The `noqa` directive used an invalid suffix (e.g., `# noqa; F401` instead of `# noqa: F401`).
     InvalidSuffix,
-    /// The `noqa` directive attempted to exempt specific codes in an unsupported location (e.g.,
-    /// `# flake8: noqa: F401, F841` instead of `# ruff: noqa: F401, F841`).
-    UnsupportedCodes,
 }
 
 impl Display for ParseError {
@@ -439,9 +417,7 @@ impl Display for ParseError {
             ParseError::InvalidSuffix => {
                 fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
             }
-            ParseError::UnsupportedCodes => {
-                fmt.write_str("Flake8's blanket exemption does not support exempting specific codes. To exempt specific codes, use, e.g., `# ruff: noqa: F401, F841` instead.")
-            }
+
         }
     }
 }
