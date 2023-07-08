@@ -25,7 +25,7 @@ use fs_err as fs;
 use regex::Regex;
 use ruff_python_ast::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use rustpython_ast::text_size::TextRange;
-use rustpython_ast::{Ranged, Stmt};
+use rustpython_ast::{Ranged, Stmt, Suite};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::Instant;
@@ -47,10 +47,10 @@ struct Args {
 }
 
 /// Try to remove each module level statement
-fn make_module_candidates(input: &str) -> Result<(usize, Box<dyn Iterator<Item = String> + '_>)> {
-    let tokens = ruff_rustpython::tokenize(input);
-    let ast =
-        ruff_rustpython::parse_program_tokens(tokens, "input.py").context("not valid python")?;
+fn make_module_candidates<'a>(
+    input: &'a str,
+    ast: &'a Suite,
+) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
     let num_candidates = ast.len();
     if num_candidates <= 1 {
         return Ok((0, Box::new(iter::empty())));
@@ -89,13 +89,11 @@ impl StatementVisitor<'_> for StatementCollector {
 }
 
 /// Try to remove each statement or replace it statement with `pass`
-fn make_remove_or_pass_statement(
-    input: &str,
+fn make_remove_or_pass_statement<'a>(
+    input: &'a str,
+    ast: &'a Suite,
     pass_dummy: bool,
-) -> Result<(usize, Box<dyn Iterator<Item = String> + '_>)> {
-    let tokens = ruff_rustpython::tokenize(input);
-    let ast =
-        ruff_rustpython::parse_program_tokens(tokens, "input.py").context("not valid python")?;
+) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
     let mut visitor = StatementCollector::default();
     visitor.visit_body(&ast);
 
@@ -118,16 +116,25 @@ fn make_remove_or_pass_statement(
     Ok((num_candidates, Box::new(iter)))
 }
 
-fn make_remove_statement(input: &str) -> Result<(usize, Box<dyn Iterator<Item = String> + '_>)> {
-    make_remove_or_pass_statement(input, false)
+fn make_remove_statement<'a>(
+    input: &'a str,
+    ast: &'a Suite,
+) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
+    make_remove_or_pass_statement(input, ast, false)
 }
 
-fn make_pass_statement(input: &str) -> Result<(usize, Box<dyn Iterator<Item = String> + '_>)> {
-    make_remove_or_pass_statement(input, true)
+fn make_pass_statement<'a>(
+    input: &'a str,
+    ast: &'a Suite,
+) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
+    make_remove_or_pass_statement(input, ast, true)
 }
 
 /// Returns the number of permutations and each permutation
-fn make_line_candidates(input: &str) -> Result<(usize, Box<dyn Iterator<Item = String> + '_>)> {
+fn make_line_candidates<'a>(
+    input: &'a str,
+    _ast: &'a Suite,
+) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
     let lines: Vec<_> = input.lines().collect();
     let num_candidates = lines.len();
     if num_candidates <= 1 {
@@ -151,7 +158,8 @@ fn make_line_candidates(input: &str) -> Result<(usize, Box<dyn Iterator<Item = S
     Ok((num_candidates, Box::new(iter)))
 }
 
-type Strategy = fn(input: &str) -> Result<(usize, Box<dyn Iterator<Item = String> + '_>)>;
+type Strategy<'a> =
+    fn(input: &'a str, ast: &'a Suite) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)>;
 
 fn find_smaller_failure(
     input: &str,
@@ -167,6 +175,10 @@ fn find_smaller_failure(
         (make_line_candidates, "line"),
     ];
 
+    let tokens = ruff_rustpython::tokenize(input);
+    let ast =
+        ruff_rustpython::parse_program_tokens(tokens, "input.py").context("not valid python")?;
+
     // Try the last succeeding strategy first
     if let Some((last_strategy_name, last_idx)) = last_strategy_and_idx {
         let (strategy, _) = strategies
@@ -174,7 +186,7 @@ fn find_smaller_failure(
             .find(|(_, name)| name == &last_strategy_name)
             .unwrap();
 
-        let (num_candidates, iter) = strategy(input)?;
+        let (num_candidates, iter) = strategy(input, &ast)?;
         println!(
             "{} ({last_idx} skipped) {last_strategy_name} candidates",
             num_candidates - last_idx
@@ -187,8 +199,9 @@ fn find_smaller_failure(
         }
     }
 
+    // Try all strategies in order
     for (strategy, name) in strategies {
-        let (num_candidates, iter) = strategy(input)?;
+        let (num_candidates, iter) = strategy(input, &ast)?;
         println!("{num_candidates} {name} candidates");
         for (idx, entry) in iter.enumerate() {
             if is_failing(&entry, location, command_args, pattern)? {
