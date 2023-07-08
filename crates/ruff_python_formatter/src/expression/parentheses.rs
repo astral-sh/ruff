@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, first_non_trivia_token_rev, Token, TokenKind};
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, Argument, Arguments};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::expression::ExpressionRef;
 use rustpython_parser::ast::Ranged;
 
 pub(crate) trait NeedsParentheses {
@@ -15,15 +15,10 @@ pub(crate) trait NeedsParentheses {
 }
 
 pub(super) fn default_expression_needs_parentheses(
-    node: AnyNodeRef,
+    node: ExpressionRef,
     parenthesize: Parenthesize,
     context: &PyFormatContext,
 ) -> Parentheses {
-    debug_assert!(
-        node.is_expression(),
-        "Should only be called for expressions"
-    );
-
     #[allow(clippy::if_same_then_else)]
     if parenthesize.is_always() {
         Parentheses::Always
@@ -48,13 +43,15 @@ pub(super) fn default_expression_needs_parentheses(
     }
 }
 
-fn can_omit_optional_parentheses(expr: AnyNodeRef, context: &PyFormatContext) -> bool {
+fn can_omit_optional_parentheses(expr: ExpressionRef, context: &PyFormatContext) -> bool {
     if context.comments().has_leading_comments(expr) {
         false
     } else {
         true
     }
 }
+
+// fn has_magic_comma(expr: AnyNodeRef)
 
 /// Configures if the expression should be parenthesized.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -113,7 +110,7 @@ pub enum Parentheses {
     Never,
 }
 
-pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(expr: ExpressionRef, contents: &str) -> bool {
     matches!(
         first_non_trivia_token(expr.end(), contents),
         Some(Token {

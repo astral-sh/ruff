@@ -7,7 +7,7 @@ use crate::expression::Parentheses;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::expression::ExpressionRef;
 use rustpython_parser::ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
 };
@@ -36,7 +36,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
             let source = f.context().source();
             let binary_chain: SmallVec<[&ExprBinOp; 4]> = iter::successors(Some(item), |parent| {
                 parent.left.as_bin_op_expr().and_then(|bin_expression| {
-                    if is_expression_parenthesized(bin_expression.as_any_node_ref(), source) {
+                    if is_expression_parenthesized(ExpressionRef::from(bin_expression), source) {
                         None
                     } else {
                         Some(bin_expression)
