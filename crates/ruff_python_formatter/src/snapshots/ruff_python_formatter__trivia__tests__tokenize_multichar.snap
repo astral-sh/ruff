@@ -15,4 +15,12 @@ expression: test_case.tokens()
         kind: In,
         range: 3..5,
     },
+    Token {
+        kind: Whitespace,
+        range: 5..6,
+    },
+    Token {
+        kind: Else,
+        range: 6..10,
+    },
 ]

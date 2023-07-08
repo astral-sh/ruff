@@ -167,6 +167,9 @@ pub(crate) enum TokenKind {
     /// `.`.
     Dot,
 
+    /// `else`
+    Else,
+
     /// `if`
     If,
 
@@ -283,6 +286,14 @@ impl<'a> SimpleTokenizer<'a> {
             }
 
             '\\' => TokenKind::Continuation,
+
+            'e' => {
+                if self.cursor.eat_chars("lse") {
+                    TokenKind::Else
+                } else {
+                    TokenKind::Other
+                }
+            }
 
             'i' => {
                 if self.cursor.eat_char('f') {
@@ -406,6 +417,8 @@ impl<'a> SimpleTokenizer<'a> {
                         TokenKind::If
                     } else if c == 'n' && self.cursor.eat_char_back('i') {
                         TokenKind::In
+                    } else if c == 'e' && self.cursor.eat_chars_back("sle") {
+                        TokenKind::Else
                     } else {
                         TokenKind::from_non_trivia_char(c)
                     };
@@ -530,6 +543,17 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    fn eat_chars(&mut self, s: &str) -> bool {
+        let mut chars = self.chars.clone();
+        if !s.chars().all(|c| chars.next() == Some(c)) {
+            return false;
+        }
+        for _ in s.chars() {
+            self.bump();
+        }
+        true
+    }
+
     fn eat_char_back(&mut self, c: char) -> bool {
         if self.last() == c {
             self.bump_back();
@@ -537,6 +561,17 @@ impl<'a> Cursor<'a> {
         } else {
             false
         }
+    }
+
+    fn eat_chars_back(&mut self, s: &str) -> bool {
+        let mut chars = self.chars.clone();
+        if !s.chars().all(|c| chars.next_back() == Some(c)) {
+            return false;
+        }
+        for _ in s.chars() {
+            self.bump_back();
+        }
+        true
     }
 
     /// Eats symbols while predicate returns true or until the end of file is reached.
@@ -647,8 +682,8 @@ mod tests {
     }
 
     #[test]
-    fn tokenize_if_in() {
-        let source = "if in";
+    fn tokenize_multichar() {
+        let source = "if in else";
 
         let test_case = tokenize(source);
 
