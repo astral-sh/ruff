@@ -62,6 +62,14 @@ enum TypingTarget<'a> {
     Literal(Vec<&'a Expr>),
     Optional(&'a Expr),
     Annotated(&'a Expr),
+
+    /// Special type used to represent an unknown type (and not a typing target).
+    /// This could be a type alias. It's also used when parsing a forward
+    /// reference fails.
+    ///
+    /// Note that this is not the same as returning `None` in `try_from_expr` as
+    /// `None` means that it's a known type but we don't know which one.
+    Unknown,
 }
 
 impl<'a> TypingTarget<'a> {
@@ -88,15 +96,13 @@ impl<'a> TypingTarget<'a> {
                 } else {
                     semantic.resolve_call_path(value).map_or(
                         // If we can't resolve the call path, it must be defined
-                        // in the same file, so we assume it's `Any` as it could
-                        // be a type alias.
-                        Some(TypingTarget::Any),
+                        // in the same file and could be a type alias.
+                        Some(TypingTarget::Unknown),
                         |call_path| {
                             if is_known_type(&call_path, minor_version) {
                                 None
                             } else {
-                                // If it's not a known type, we assume it's `Any`.
-                                Some(TypingTarget::Any)
+                                Some(TypingTarget::Unknown)
                             }
                         },
                     )
@@ -115,13 +121,13 @@ impl<'a> TypingTarget<'a> {
                 ..
             }) => parse_type_annotation(string, *range, locator)
                 // In case of a parse error, we return `Any` to avoid false positives.
-                .map_or(Some(TypingTarget::Any), |(expr, _)| {
+                .map_or(Some(TypingTarget::Unknown), |(expr, _)| {
                     Some(TypingTarget::ForwardReference(expr))
                 }),
             _ => semantic.resolve_call_path(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the
                 // same file, so we assume it's `Any` as it could be a type alias.
-                Some(TypingTarget::Any),
+                Some(TypingTarget::Unknown),
                 |call_path| {
                     if semantic.match_typing_call_path(&call_path, "Any") {
                         Some(TypingTarget::Any)
@@ -129,7 +135,7 @@ impl<'a> TypingTarget<'a> {
                         Some(TypingTarget::Object)
                     } else if !is_known_type(&call_path, minor_version) {
                         // If it's not a known type, we assume it's `Any`.
-                        Some(TypingTarget::Any)
+                        Some(TypingTarget::Unknown)
                     } else {
                         None
                     }
@@ -149,7 +155,8 @@ impl<'a> TypingTarget<'a> {
             TypingTarget::None
             | TypingTarget::Optional(_)
             | TypingTarget::Any
-            | TypingTarget::Object => true,
+            | TypingTarget::Object
+            | TypingTarget::Unknown => true,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
                 let Some(new_target) =
                     TypingTarget::try_from_expr(element, semantic, locator, minor_version)
@@ -203,7 +210,10 @@ impl<'a> TypingTarget<'a> {
         match self {
             TypingTarget::Any => true,
             // `Literal` cannot contain `Any` as it's a dynamic value.
-            TypingTarget::Literal(_) | TypingTarget::None | TypingTarget::Object => false,
+            TypingTarget::Literal(_)
+            | TypingTarget::None
+            | TypingTarget::Object
+            | TypingTarget::Unknown => false,
             TypingTarget::Union(elements) => elements.iter().any(|element| {
                 let Some(new_target) =
                     TypingTarget::try_from_expr(element, semantic, locator, minor_version)
