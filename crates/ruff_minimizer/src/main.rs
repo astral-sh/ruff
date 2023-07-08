@@ -22,9 +22,7 @@
 //! This could emit
 //! ```python
 //! class RepresentationQtModel():
-//!             data[
-//!                 :,
-//!             ] = rep.data
+//!             data[:,] = rep.data
 //! ```
 
 #![allow(clippy::print_stdout, clippy::print_stderr)]
@@ -39,8 +37,8 @@ use rustpython_ast::text_size::TextRange;
 use rustpython_ast::{Expr, Ranged, Stmt, Suite};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
-use std::str;
 use std::time::Instant;
+use std::{ptr, str};
 use tracing::debug;
 
 trait Strategy {
@@ -58,7 +56,8 @@ const STRATEGIES: &[&dyn Strategy] = &[
     (&StrategyRemoveStatement),
     (&StrategyRemoveExpression),
     (&StrategyReplaceStatementWithPass),
-    (&StrategyLineCandidates),
+    (&StrategyRemoveLine),
+    (&StrategyRemoveNewline),
 ];
 
 /// `dyn ExactSizeStringIter + ExactSizeIterator` vtable surrogate trait that rust wants
@@ -205,9 +204,9 @@ impl Strategy for StrategyRemoveExpression {
     }
 }
 
-struct StrategyLineCandidates;
+struct StrategyRemoveLine;
 
-impl Strategy for StrategyLineCandidates {
+impl Strategy for StrategyRemoveLine {
     fn name(&self) -> &'static str {
         "remove line"
     }
@@ -227,6 +226,40 @@ impl Strategy for StrategyLineCandidates {
             }
             result.push_str(&lines[removed_line + 1..].join("\n"));
             result
+        });
+        Ok(Box::new(iter))
+    }
+}
+
+struct StrategyRemoveNewline;
+
+impl Strategy for StrategyRemoveNewline {
+    fn name(&self) -> &'static str {
+        "remove newline"
+    }
+
+    /// Returns the number of permutations and each permutation
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        _ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let newline_positions: Vec<_> = input
+            .char_indices()
+            .filter_map(|(pos, char)| {
+                // Don't remove newlines after `:`. Indexing is save because pos > 0 is checked and
+                // pos - 1 is behind a position we know exists and we're indexing into bytes instead
+                // of chars
+                if char == '\n' && pos > 0 && input.as_bytes()[pos - 1] != b':' {
+                    Some(pos)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let iter = newline_positions.into_iter().map(move |newline_position| {
+            // trim to remove the indentation
+            input[..newline_position].to_string() + &input[newline_position + 1..].trim_start()
         });
         Ok(Box::new(iter))
     }
@@ -262,6 +295,11 @@ fn minimization_step(
 
     // Try all strategies in order
     for strategy in STRATEGIES {
+        if last_strategy_and_idx.map_or(false, |(last_strategy, _)| {
+            ptr::eq(last_strategy, *strategy)
+        }) {
+            continue;
+        }
         let iter = strategy.candidates(input, &ast)?;
         println!("Trying {} {} candidates", iter.len(), strategy.name());
         for (idx, entry) in iter.enumerate() {
@@ -326,7 +364,8 @@ fn run() -> Result<()> {
     let loop_start = Instant::now();
 
     let mut num_iterations = 0;
-    let mut input = fs::read_to_string(args.file)?;
+    // normalize line endings for the remove newlines rule
+    let mut input = fs::read_to_string(args.file)?.replace("\r", "");
     let mut last_strategy_and_idx = None;
     loop {
         let start = Instant::now();
