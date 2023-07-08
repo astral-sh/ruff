@@ -36,7 +36,8 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/
 [i for i in []]
 
 [
-    i for
+    i
+    for
     i
     in
     [
@@ -45,7 +46,8 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/
 ]
 
 [
-    a for  # a  # for
+    a  # a
+    for  # for
     c  # c
     in  # in
     e  # e
@@ -53,7 +55,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/
 
 [
     # before a
-    a   # a
+    a  # a
     # before for
     for  # for
     # before c

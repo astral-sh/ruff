@@ -30,7 +30,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         leading_comments(leading_item_comments).fmt(f)?;
 
         if *is_async {
-            write!(f, [text("async"), soft_line_break_or_space()])?;
+            write!(f, [text("async"), space()])?;
         }
 
         let dangling_item_comments = comments.dangling_comments(item);

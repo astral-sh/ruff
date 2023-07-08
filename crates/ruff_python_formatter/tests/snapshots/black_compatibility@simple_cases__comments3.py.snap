@@ -60,12 +60,7 @@ def func():
 ```diff
 --- Black
 +++ Ruff
-@@ -8,11 +8,13 @@
-     """
-     lcomp3 = [
-         # This one is actually too long to fit in a single line.
--        element.split("\n", 1)[0]
-+        element.split("\n", 1)[0] 
+@@ -12,7 +12,9 @@
          # yup
          for element in collection.select_elements()
          # right
@@ -91,7 +86,7 @@ def func():
     """
     lcomp3 = [
         # This one is actually too long to fit in a single line.
-        element.split("\n", 1)[0] 
+        element.split("\n", 1)[0]
         # yup
         for element in collection.select_elements()
         # right

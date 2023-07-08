@@ -42,7 +42,7 @@ def make_arange(n):
 ```diff
 --- Black
 +++ Ruff
-@@ -2,29 +2,24 @@
+@@ -2,29 +2,27 @@
  
  
  def f():
@@ -61,12 +61,14 @@ def make_arange(n):
  async def func():
      if test:
          out_batched = [
--            i
+             i
 -            async for i in aitertools._async_map(
 -                self.async_inc, arange(8), batch_size=3
 -            )
-+            i async
-+            for i in aitertools._async_map(self.async_inc, arange(8), batch_size=3)
++            async for
++            i
++            in
++            aitertools._async_map(self.async_inc, arange(8), batch_size=3)
          ]
  
  
@@ -97,8 +99,11 @@ def g():
 async def func():
     if test:
         out_batched = [
-            i async
-            for i in aitertools._async_map(self.async_inc, arange(8), batch_size=3)
+            i
+            async for
+            i
+            in
+            aitertools._async_map(self.async_inc, arange(8), batch_size=3)
         ]
 
 
