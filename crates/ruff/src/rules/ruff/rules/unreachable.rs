@@ -693,7 +693,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         }
     }
 
-    /// Select the next block from `blocks` unconditonally.
+    /// Select the next block from `blocks` unconditionally.
     fn unconditional_next_block(&self, after: Option<BlockIndex>) -> NextBlock<'static> {
         if let Some(after) = after {
             return NextBlock::Always(after);

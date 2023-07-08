@@ -92,7 +92,7 @@ if "Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am co
 
 (
     # leading
-    "a" # trailing part commen
+    "a" # trailing part comment
 
     # leading part comment
 

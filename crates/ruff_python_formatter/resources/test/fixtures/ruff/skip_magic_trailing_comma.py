@@ -18,5 +18,5 @@
     "fifth entry",
     "sixt entry",
     "seventh entry",
-    "eigth entry",
+    "eighth entry",
 )

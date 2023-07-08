@@ -26,7 +26,7 @@ b
 }
 
 {
-    **a # comment before preceeding node's comma
+    **a # comment before preceding node's comma
  ,
     # before
     ** # between

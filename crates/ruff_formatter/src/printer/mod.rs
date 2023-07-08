@@ -701,7 +701,7 @@ struct PrinterState<'a> {
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
     // Re-used queue to measure if a group fits. Optimisation to avoid re-allocating a new
-    // vec everytime a group gets measured
+    // vec every time a group gets measured
     fits_stack: Vec<StackFrame>,
     fits_queue: Vec<&'a [FormatElement]>,
 }

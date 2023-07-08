@@ -24,7 +24,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/skip_magic
     "fifth entry",
     "sixt entry",
     "seventh entry",
-    "eigth entry",
+    "eighth entry",
 )
 ```
 
@@ -54,7 +54,7 @@ magic-trailing-comma    = Respect
     "fifth entry",
     "sixt entry",
     "seventh entry",
-    "eigth entry",
+    "eighth entry",
 )
 ```
 
@@ -80,7 +80,7 @@ magic-trailing-comma    = Ignore
     "fifth entry",
     "sixt entry",
     "seventh entry",
-    "eigth entry",
+    "eighth entry",
 )
 ```
 
