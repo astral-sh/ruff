@@ -63,7 +63,9 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         //     if z:
         //         filtered.append(x)
         // ```
-        [Stmt::If(ast::StmtIf { body, orelse, test, .. })] => {
+        [Stmt::If(ast::StmtIf {
+            body, orelse, test, ..
+        })] => {
             if !orelse.is_empty() {
                 return;
             }
@@ -138,9 +140,12 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     // filtered = [x for x in y if x in filtered]
     // ```
     if let Some(value_name) = value.as_name_expr() {
-        if if_test.map_or(false, |test| any_over_expr(test, &|expr| {
-            expr.as_name_expr().map_or(false, |expr| expr.id == value_name.id)
-        })) {
+        if if_test.map_or(false, |test| {
+            any_over_expr(test, &|expr| {
+                expr.as_name_expr()
+                    .map_or(false, |expr| expr.id == value_name.id)
+            })
+        }) {
             return;
         }
     }
