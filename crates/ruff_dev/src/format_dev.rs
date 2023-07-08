@@ -288,7 +288,9 @@ fn format_dev_multi_project(args: &Args) -> bool {
                         bar.suspend(|| print!("{}", result.display(args.format)));
                         if let Some(error_file) = &mut error_file {
                             write!(error_file, "{}", result.display(args.format)).unwrap();
+                            error_file.flush().unwrap();
                         }
+                        bar.println(result.display(args.format).to_string().trim_end());
                         bar.inc(1);
                     }
                     Message::Failed { path, error } => {
