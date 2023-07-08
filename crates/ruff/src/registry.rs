@@ -252,6 +252,7 @@ pub enum LintSource {
     Imports,
     Noqa,
     Filesystem,
+    PyprojectToml,
 }
 
 impl Rule {
@@ -259,6 +260,7 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
+            Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
             Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
