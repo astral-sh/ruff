@@ -448,9 +448,9 @@ fn check_dynamically_typed<F>(
     }) = annotation
     {
         // Quoted annotations
-        if let Ok((annotation, _)) = parse_type_annotation(string, *range, checker.locator) {
+        if let Ok((parsed_annotation, _)) = parse_type_annotation(string, *range, checker.locator) {
             if type_hint_resolves_to_any(
-                &annotation,
+                &parsed_annotation,
                 checker.semantic(),
                 checker.locator,
                 checker.settings.target_version.minor(),
