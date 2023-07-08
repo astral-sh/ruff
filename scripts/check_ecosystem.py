@@ -20,7 +20,7 @@ from asyncio.subprocess import PIPE, create_subprocess_exec
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -69,7 +69,10 @@ class Repository(NamedTuple):
             ],
         )
 
-        process = await create_subprocess_exec(*git_command)
+        process = await create_subprocess_exec(
+            *git_command,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+        )
 
         status_code = await process.wait()
 
@@ -86,6 +89,7 @@ REPOSITORIES: list[Repository] = [
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
     Repository("pypa", "setuptools", "main"),
+    Repository("pypa", "pip", "main"),
     Repository("python", "mypy", "master"),
     Repository("DisnakeDev", "disnake", "master"),
     Repository("scikit-build", "scikit-build", "main"),
@@ -268,6 +272,9 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[tuple[str, str], Repositor
     return repositories
 
 
+T = TypeVar("T")
+
+
 async def main(
     *,
     ruff1: Path,
@@ -287,7 +294,7 @@ async def main(
     # Otherwise doing 3k repositories can take >8GB RAM
     semaphore = asyncio.Semaphore(50)
 
-    async def limited_parallelism(coroutine):  # noqa: ANN
+    async def limited_parallelism(coroutine: T) -> T:
         async with semaphore:
             return await coroutine
 

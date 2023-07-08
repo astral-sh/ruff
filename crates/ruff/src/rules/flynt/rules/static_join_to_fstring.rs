@@ -88,11 +88,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
 }
 
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
-    let Expr::Call(ast::ExprCall {
-        args,
-        keywords,
-        ..
-    }) = expr else {
+    let Expr::Call(ast::ExprCall { args, keywords, .. }) = expr else {
         return;
     };
 
@@ -111,7 +107,9 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
 
     // Try to build the fstring (internally checks whether e.g. the elements are
     // convertible to f-string parts).
-    let Some(new_expr) = build_fstring(joiner, joinees) else { return };
+    let Some(new_expr) = build_fstring(joiner, joinees) else {
+        return;
+    };
 
     let contents = checker.generator().expr(&new_expr);
 

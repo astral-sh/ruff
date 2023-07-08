@@ -282,7 +282,7 @@ mod tests {
             import os
 
             # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
-            # import. (This is a false negative.)
+            # import.
             del os
     "#,
         "del_shadowed_global_import_in_local_scope"
@@ -323,7 +323,7 @@ mod tests {
             del os
 
             def g():
-                # `import os` should still be flagged as shadowing an import.
+                # `import os` doesn't need to be flagged as shadowing an import.
                 os = 1
                 print(os)
         "#,
@@ -490,7 +490,7 @@ mod tests {
         "load_after_unbind_from_class_scope"
     )]
     fn contents(contents: &str, snapshot: &str) {
-        let diagnostics = test_snippet(contents, &Settings::for_rules(&Linter::Pyflakes));
+        let diagnostics = test_snippet(contents, &Settings::for_rules(Linter::Pyflakes.rules()));
         assert_messages!(snapshot, diagnostics);
     }
 
@@ -498,7 +498,7 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
-        let settings = Settings::for_rules(&Linter::Pyflakes);
+        let settings = Settings::for_rules(Linter::Pyflakes.rules());
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -2114,7 +2114,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
+            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
         );
     }
 

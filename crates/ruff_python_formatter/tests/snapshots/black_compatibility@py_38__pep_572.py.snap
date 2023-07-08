@@ -1,0 +1,247 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_38/pep_572.py
+---
+## Input
+
+```py
+(a := 1)
+(a := a)
+if (match := pattern.search(data)) is None:
+    pass
+if match := pattern.search(data):
+    pass
+[y := f(x), y**2, y**3]
+filtered_data = [y for x in data if (y := f(x)) is None]
+(y := f(x))
+y0 = (y1 := f(x))
+foo(x=(y := f(x)))
+
+
+def foo(answer=(p := 42)):
+    pass
+
+
+def foo(answer: (p := 42) = 5):
+    pass
+
+
+lambda: (x := 1)
+(x := lambda: 1)
+(x := lambda: (y := 1))
+lambda line: (m := re.match(pattern, line)) and m.group(1)
+x = (y := 0)
+(z := (y := (x := 0)))
+(info := (name, phone, *rest))
+(x := 1, 2)
+(total := total + tax)
+len(lines := f.readlines())
+foo(x := 3, cat="vector")
+foo(cat=(category := "vector"))
+if any(len(longline := l) >= 100 for l in lines):
+    print(longline)
+if env_base := os.environ.get("PYTHONUSERBASE", None):
+    return env_base
+if self._is_special and (ans := self._check_nans(context=context)):
+    return ans
+foo(b := 2, a=1)
+foo((b := 2), a=1)
+foo(c=(b := 2), a=1)
+
+while x := f(x):
+    pass
+while x := f(x):
+    pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,47 +1,47 @@
+-(a := 1)
+-(a := a)
+-if (match := pattern.search(data)) is None:
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++if (NOT_YET_IMPLEMENTED_ExprNamedExpr) is None:
+     pass
+-if match := pattern.search(data):
++if NOT_YET_IMPLEMENTED_ExprNamedExpr:
+     pass
+-[y := f(x), y**2, y**3]
+-filtered_data = [y for x in data if (y := f(x)) is None]
+-(y := f(x))
+-y0 = (y1 := f(x))
+-foo(x=(y := f(x)))
++[NOT_YET_IMPLEMENTED_ExprNamedExpr, y**2, y**3]
++filtered_data = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++y0 = NOT_YET_IMPLEMENTED_ExprNamedExpr
++foo(x=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
+ 
+ 
+-def foo(answer=(p := 42)):
++def foo(answer=(NOT_YET_IMPLEMENTED_ExprNamedExpr)):
+     pass
+ 
+ 
+-def foo(answer: (p := 42) = 5):
++def foo(answer: (NOT_YET_IMPLEMENTED_ExprNamedExpr) = 5):
+     pass
+ 
+ 
+-lambda: (x := 1)
+-(x := lambda: 1)
+-(x := lambda: (y := 1))
+-lambda line: (m := re.match(pattern, line)) and m.group(1)
+-x = (y := 0)
+-(z := (y := (x := 0)))
+-(info := (name, phone, *rest))
+-(x := 1, 2)
+-(total := total + tax)
+-len(lines := f.readlines())
+-foo(x := 3, cat="vector")
+-foo(cat=(category := "vector"))
+-if any(len(longline := l) >= 100 for l in lines):
++lambda x: True
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++lambda x: True
++x = NOT_YET_IMPLEMENTED_ExprNamedExpr
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++(NOT_YET_IMPLEMENTED_ExprNamedExpr, 2)
++(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++len(NOT_YET_IMPLEMENTED_ExprNamedExpr)
++foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, cat="vector")
++foo(cat=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
++if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
+     print(longline)
+-if env_base := os.environ.get("PYTHONUSERBASE", None):
++if NOT_YET_IMPLEMENTED_ExprNamedExpr:
+     return env_base
+-if self._is_special and (ans := self._check_nans(context=context)):
++if self._is_special and (NOT_YET_IMPLEMENTED_ExprNamedExpr):
+     return ans
+-foo(b := 2, a=1)
+-foo((b := 2), a=1)
+-foo(c=(b := 2), a=1)
++foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, a=1)
++foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, a=1)
++foo(c=(NOT_YET_IMPLEMENTED_ExprNamedExpr), a=1)
+ 
+-while x := f(x):
++while NOT_YET_IMPLEMENTED_ExprNamedExpr:
+     pass
+-while x := f(x):
++while NOT_YET_IMPLEMENTED_ExprNamedExpr:
+     pass
+```
+
+## Ruff Output
+
+```py
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+if (NOT_YET_IMPLEMENTED_ExprNamedExpr) is None:
+    pass
+if NOT_YET_IMPLEMENTED_ExprNamedExpr:
+    pass
+[NOT_YET_IMPLEMENTED_ExprNamedExpr, y**2, y**3]
+filtered_data = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+y0 = NOT_YET_IMPLEMENTED_ExprNamedExpr
+foo(x=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
+
+
+def foo(answer=(NOT_YET_IMPLEMENTED_ExprNamedExpr)):
+    pass
+
+
+def foo(answer: (NOT_YET_IMPLEMENTED_ExprNamedExpr) = 5):
+    pass
+
+
+lambda x: True
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+lambda x: True
+x = NOT_YET_IMPLEMENTED_ExprNamedExpr
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+(NOT_YET_IMPLEMENTED_ExprNamedExpr, 2)
+(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+len(NOT_YET_IMPLEMENTED_ExprNamedExpr)
+foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, cat="vector")
+foo(cat=(NOT_YET_IMPLEMENTED_ExprNamedExpr))
+if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
+    print(longline)
+if NOT_YET_IMPLEMENTED_ExprNamedExpr:
+    return env_base
+if self._is_special and (NOT_YET_IMPLEMENTED_ExprNamedExpr):
+    return ans
+foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, a=1)
+foo(NOT_YET_IMPLEMENTED_ExprNamedExpr, a=1)
+foo(c=(NOT_YET_IMPLEMENTED_ExprNamedExpr), a=1)
+
+while NOT_YET_IMPLEMENTED_ExprNamedExpr:
+    pass
+while NOT_YET_IMPLEMENTED_ExprNamedExpr:
+    pass
+```
+
+## Black Output
+
+```py
+(a := 1)
+(a := a)
+if (match := pattern.search(data)) is None:
+    pass
+if match := pattern.search(data):
+    pass
+[y := f(x), y**2, y**3]
+filtered_data = [y for x in data if (y := f(x)) is None]
+(y := f(x))
+y0 = (y1 := f(x))
+foo(x=(y := f(x)))
+
+
+def foo(answer=(p := 42)):
+    pass
+
+
+def foo(answer: (p := 42) = 5):
+    pass
+
+
+lambda: (x := 1)
+(x := lambda: 1)
+(x := lambda: (y := 1))
+lambda line: (m := re.match(pattern, line)) and m.group(1)
+x = (y := 0)
+(z := (y := (x := 0)))
+(info := (name, phone, *rest))
+(x := 1, 2)
+(total := total + tax)
+len(lines := f.readlines())
+foo(x := 3, cat="vector")
+foo(cat=(category := "vector"))
+if any(len(longline := l) >= 100 for l in lines):
+    print(longline)
+if env_base := os.environ.get("PYTHONUSERBASE", None):
+    return env_base
+if self._is_special and (ans := self._check_nans(context=context)):
+    return ans
+foo(b := 2, a=1)
+foo((b := 2), a=1)
+foo(c=(b := 2), a=1)
+
+while x := f(x):
+    pass
+while x := f(x):
+    pass
+```
+
+

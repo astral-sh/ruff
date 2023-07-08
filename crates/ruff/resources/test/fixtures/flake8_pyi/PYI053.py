@@ -36,3 +36,11 @@ bar: str = "51 character stringgggggggggggggggggggggggggggggggg"
 baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"
 
 qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"
+
+
+class Demo:
+    """Docstrings are excluded from this rule. Some padding."""
+
+
+def func() -> None:
+    """Docstrings are excluded from this rule. Some padding."""

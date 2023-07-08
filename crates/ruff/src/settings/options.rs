@@ -12,7 +12,7 @@ use crate::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -498,7 +498,7 @@ pub struct Options {
     /// Options for the `flake8-comprehensions` plugin.
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     #[option_group]
-    /// Options for the `copyright` plugin.
+    /// Options for the `flake8-copyright` plugin.
     pub flake8_copyright: Option<flake8_copyright::settings::Options>,
     #[option_group]
     /// Options for the `flake8-errmsg` plugin.
@@ -551,6 +551,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pylint` plugin.
     pub pylint: Option<pylint::settings::Options>,
+    #[option_group]
+    /// Options for the `pyupgrade` plugin.
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     #[option(
         default = "{}",

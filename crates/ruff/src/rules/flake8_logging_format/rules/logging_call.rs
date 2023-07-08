@@ -13,30 +13,35 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 
-const RESERVED_ATTRS: &[&str; 22] = &[
-    "args",
-    "asctime",
-    "created",
-    "exc_info",
-    "exc_text",
-    "filename",
-    "funcName",
-    "levelname",
-    "levelno",
-    "lineno",
-    "module",
-    "msecs",
-    "message",
-    "msg",
-    "name",
-    "pathname",
-    "process",
-    "processName",
-    "relativeCreated",
-    "stack_info",
-    "thread",
-    "threadName",
-];
+/// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
+/// class.
+fn is_reserved_attr(attr: &str) -> bool {
+    matches!(
+        attr,
+        "args"
+            | "asctime"
+            | "created"
+            | "exc_info"
+            | "exc_text"
+            | "filename"
+            | "funcName"
+            | "levelname"
+            | "levelno"
+            | "lineno"
+            | "module"
+            | "msecs"
+            | "message"
+            | "msg"
+            | "name"
+            | "pathname"
+            | "process"
+            | "processName"
+            | "relativeCreated"
+            | "stack_info"
+            | "thread"
+            | "threadName"
+    )
+}
 
 /// Check logging messages for violations.
 fn check_msg(checker: &mut Checker, msg: &Expr) {
@@ -90,13 +95,13 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             for key in keys {
                 if let Some(key) = &key {
                     if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(string),
+                        value: Constant::Str(attr),
                         ..
                     }) = key
                     {
-                        if RESERVED_ATTRS.contains(&string.as_str()) {
+                        if is_reserved_attr(attr) {
                             checker.diagnostics.push(Diagnostic::new(
-                                LoggingExtraAttrClash(string.to_string()),
+                                LoggingExtraAttrClash(attr.to_string()),
                                 key.range(),
                             ));
                         }
@@ -113,10 +118,10 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                 })
             {
                 for keyword in keywords {
-                    if let Some(key) = &keyword.arg {
-                        if RESERVED_ATTRS.contains(&key.as_str()) {
+                    if let Some(attr) = &keyword.arg {
+                        if is_reserved_attr(attr) {
                             checker.diagnostics.push(Diagnostic::new(
-                                LoggingExtraAttrClash(key.to_string()),
+                                LoggingExtraAttrClash(attr.to_string()),
                                 keyword.range(),
                             ));
                         }

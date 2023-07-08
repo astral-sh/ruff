@@ -94,15 +94,13 @@ impl Violation for DeprecatedImport {
     }
 }
 
-// A list of modules that may involve import rewrites.
-const RELEVANT_MODULES: &[&str] = &[
-    "collections",
-    "pipes",
-    "mypy_extensions",
-    "typing_extensions",
-    "typing",
-    "typing.re",
-];
+/// Returns `true` if the module may contain deprecated imports.
+fn is_relevant_module(module: &str) -> bool {
+    matches!(
+        module,
+        "collections" | "pipes" | "mypy_extensions" | "typing_extensions" | "typing" | "typing.re"
+    )
+}
 
 // Members of `collections` that were moved to `collections.abc`.
 const COLLECTIONS_TO_ABC: &[&str] = &[
@@ -473,7 +471,7 @@ impl<'a> ImportReplacer<'a> {
             // line, we can't add a statement after it. For example, if we have
             // `if True: import foo`, we can't add a statement to the next line.
             let Some(indentation) = indentation else {
-                 let operation = WithoutRename {
+                let operation = WithoutRename {
                     target: target.to_string(),
                     members: matched_names
                         .iter()
@@ -560,7 +558,7 @@ pub(crate) fn deprecated_import(
         return;
     };
 
-    if !RELEVANT_MODULES.contains(&module) {
+    if !is_relevant_module(module) {
         return;
     }
 

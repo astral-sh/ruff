@@ -29,31 +29,3 @@ ham[lower:upper], ham[lower:upper:], ham[lower::step]
 # ham[lower+offset : upper+offset]
 ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
 ham[lower + offset : upper + offset]
-
-slice[::, ::]
-slice[
-    # A
-    :
-    # B
-    :
-    # C
-]
-slice[
-    # A
-    1:
-    # B
-    2:
-    # C
-    3
-]
-
-slice[
-    # A
-    1
-    + 2 :
-    # B
-    3 :
-    # C
-    4
-]
-x[1:2:3]  # A  # B  # C

@@ -296,7 +296,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         FormatElement::Line(LineMode::Hard),
                     ])?;
 
-                    if *mode != BestFittingMode::AllLines {
+                    if *mode != BestFittingMode::FirstLine {
                         write!(
                             f,
                             [

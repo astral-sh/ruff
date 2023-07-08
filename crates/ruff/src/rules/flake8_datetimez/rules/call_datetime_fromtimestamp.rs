@@ -7,6 +7,8 @@ use ruff_python_ast::helpers::{has_non_none_keyword, is_const_none};
 
 use crate::checkers::ast::Checker;
 
+use super::helpers;
+
 #[violation]
 pub struct CallDatetimeFromtimestamp;
 
@@ -37,6 +39,10 @@ pub(crate) fn call_datetime_fromtimestamp(
             )
         })
     {
+        return;
+    }
+
+    if helpers::parent_expr_is_astimezone(checker) {
         return;
     }
 

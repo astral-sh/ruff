@@ -1,16 +1,22 @@
+use std::cmp::Ordering;
+
+use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast;
+use rustpython_parser::ast::{Expr, ExprIfExp, ExprSlice, Ranged};
+
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::whitespace;
+use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
+
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
 use crate::other::arguments::{
     assign_argument_separator_comment_placement, find_argument_separators,
 };
-use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::whitespace;
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, ExprSlice, Ranged};
-use std::cmp::Ordering;
+use crate::trivia::{
+    first_non_trivia_token, first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind,
+};
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
@@ -25,6 +31,7 @@ pub(super) fn place_comment<'a>(
         handle_trailing_body_comment,
         handle_trailing_end_of_line_body_comment,
         handle_trailing_end_of_line_condition_comment,
+        handle_trailing_end_of_line_except_comment,
         handle_module_level_own_line_comment_before_class_or_function_comment,
         handle_arguments_separator_comment,
         handle_trailing_binary_expression_left_or_operator_comment,
@@ -32,6 +39,7 @@ pub(super) fn place_comment<'a>(
         handle_dict_unpacking_comment,
         handle_slice_comments,
         handle_attribute_comment,
+        handle_expr_if_comment,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -62,14 +70,12 @@ fn handle_match_comment<'a>(
 
     // Get the enclosing match case
     let Some(match_case) = comment.enclosing_node().match_case() else {
-        return CommentPlacement::Default(comment)
+        return CommentPlacement::Default(comment);
     };
 
     // And its parent match statement.
-    let Some(match_stmt) = comment
-        .enclosing_parent()
-        .and_then(AnyNodeRef::stmt_match) else {
-        return CommentPlacement::Default(comment)
+    let Some(match_stmt) = comment.enclosing_parent().and_then(AnyNodeRef::stmt_match) else {
+        return CommentPlacement::Default(comment);
     };
 
     // Get the next sibling (sibling traversal would be really nice)
@@ -154,44 +160,54 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.line_position().is_end_of_line() || comment.following_node().is_none() {
+    if comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
     }
 
-    if let Some(AnyNodeRef::ExceptHandlerExceptHandler(except_handler)) = comment.preceding_node() {
-        // it now depends on the indentation level of the comment if it is a leading comment for e.g.
-        // the following `elif` or indeed a trailing comment of the previous body's last statement.
-        let comment_indentation =
-            whitespace::indentation_at_offset(locator, comment.slice().range().start())
-                .map(str::len)
-                .unwrap_or_default();
+    let (Some(AnyNodeRef::ExceptHandlerExceptHandler(preceding_except_handler)), Some(following)) =
+        (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
 
-        if let Some(except_indentation) =
-            whitespace::indentation(locator, except_handler).map(str::len)
-        {
-            return if comment_indentation <= except_indentation {
-                // It has equal, or less indent than the `except` handler. It must be a comment
-                // of the following `finally` or `else` block
-                //
-                // ```python
-                // try:
-                //     pass
-                // except Exception:
-                //     print("noop")
-                // # leading
-                // finally:
-                //     pass
-                // ```
-                // Attach it to the `try` statement.
-                CommentPlacement::dangling(comment.enclosing_node(), comment)
-            } else {
-                // Delegate to `handle_trailing_body_comment`
-                CommentPlacement::Default(comment)
-            };
-        }
+    // it now depends on the indentation level of the comment if it is a leading comment for e.g.
+    // the following `finally` or indeed a trailing comment of the previous body's last statement.
+    let comment_indentation =
+        whitespace::indentation_at_offset(locator, comment.slice().range().start())
+            .map(str::len)
+            .unwrap_or_default();
+
+    let Some(except_indentation) =
+        whitespace::indentation(locator, preceding_except_handler).map(str::len)
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    if comment_indentation > except_indentation {
+        // Delegate to `handle_trailing_body_comment`
+        return CommentPlacement::Default(comment);
     }
 
-    CommentPlacement::Default(comment)
+    // It has equal, or less indent than the `except` handler. It must be a comment of a subsequent
+    // except handler or of the following `finally` or `else` block
+    //
+    // ```python
+    // try:
+    //     pass
+    // except Exception:
+    //     print("noop")
+    // # leading
+    // finally:
+    //     pass
+    // ```
+
+    if following.is_except_handler() {
+        // Attach it to the following except handler (which has a node) as leading
+        CommentPlacement::leading(following, comment)
+    } else {
+        // No following except handler; attach it to the `try` statement.as dangling
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    }
 }
 
 /// Handles own line comments between the last statement and the first statement of two bodies.
@@ -322,89 +338,89 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     }
 
     // The comment must be between two statements...
-    if let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
-    {
-        // ...and the following statement must be the first statement in an alternate body of the parent...
-        if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
-            // ```python
-            // if test:
-            //     a
-            //     # comment
-            //     b
-            // ```
-            return CommentPlacement::Default(comment);
-        }
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
 
-        if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
-            // The `elif` or except handlers have their own body to which we can attach the trailing comment
+    // ...and the following statement must be the first statement in an alternate body of the parent...
+    if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
+        // ```python
+        // if test:
+        //     a
+        //     # comment
+        //     b
+        // ```
+        return CommentPlacement::Default(comment);
+    }
+
+    if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
+        // The `elif` or except handlers have their own body to which we can attach the trailing comment
+        // ```python
+        // if test:
+        //     a
+        // elif c: # comment
+        //     b
+        // ```
+        if following.is_except_handler() {
+            return CommentPlacement::trailing(following, comment);
+        } else if following.is_stmt_if() {
+            // We have to exclude for following if statements that are not elif by checking the
+            // indentation
             // ```python
-            // if test:
-            //     a
-            // elif c: # comment
-            //     b
-            // ```
-            if following.is_except_handler() {
-                return CommentPlacement::trailing(following, comment);
-            } else if following.is_stmt_if() {
-                // We have to exclude for following if statements that are not elif by checking the
-                // indentation
-                // ```python
-                // if True:
-                //     pass
-                // else:  # Comment
-                //     if False:
-                //         pass
-                //     pass
-                // ```
-                let base_if_indent =
-                    whitespace::indentation_at_offset(locator, following.range().start());
-                let maybe_elif_indent = whitespace::indentation_at_offset(
-                    locator,
-                    comment.enclosing_node().range().start(),
-                );
-                if base_if_indent == maybe_elif_indent {
-                    return CommentPlacement::trailing(following, comment);
-                }
-            }
-            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
-            // This means, there's no good place to attach the comments to.
-            // Make this a dangling comments and manually format the comment in
-            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
-            // to correctly identify the comments for the `finally` and `orelse` block by looking
-            // at the comment's range.
-            //
-            // ```python
-            // while x == y:
+            // if True:
             //     pass
-            // else: # trailing
-            //     print("nooop")
+            // else:  # Comment
+            //     if False:
+            //         pass
+            //     pass
             // ```
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
-        } else {
-            // Trailing comment of the preceding statement
-            // ```python
-            // while test:
-            //     a # comment
-            // else:
-            //     b
-            // ```
-            if preceding.is_node_with_body() {
-                // We can't set this as a trailing comment of the function declaration because it
-                // will then move behind the function block instead of sticking with the pass
-                // ```python
-                // if True:
-                //     def f():
-                //         pass  # a
-                // else:
-                //     pass
-                // ```
-                CommentPlacement::Default(comment)
-            } else {
-                CommentPlacement::trailing(preceding, comment)
+            let base_if_indent =
+                whitespace::indentation_at_offset(locator, following.range().start());
+            let maybe_elif_indent = whitespace::indentation_at_offset(
+                locator,
+                comment.enclosing_node().range().start(),
+            );
+            if base_if_indent == maybe_elif_indent {
+                return CommentPlacement::trailing(following, comment);
             }
         }
+        // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
+        // This means, there's no good place to attach the comments to.
+        // Make this a dangling comments and manually format the comment in
+        // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
+        // to correctly identify the comments for the `finally` and `orelse` block by looking
+        // at the comment's range.
+        //
+        // ```python
+        // while x == y:
+        //     pass
+        // else: # trailing
+        //     print("nooop")
+        // ```
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::Default(comment)
+        // Trailing comment of the preceding statement
+        // ```python
+        // while test:
+        //     a # comment
+        // else:
+        //     b
+        // ```
+        if preceding.is_node_with_body() {
+            // We can't set this as a trailing comment of the function declaration because it
+            // will then move behind the function block instead of sticking with the pass
+            // ```python
+            // if True:
+            //     def f():
+            //         pass  # a
+            // else:
+            //     pass
+            // ```
+            CommentPlacement::Default(comment)
+        } else {
+            CommentPlacement::trailing(preceding, comment)
+        }
     }
 }
 
@@ -434,7 +450,9 @@ fn handle_trailing_body_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    let Some(comment_indentation) = whitespace::indentation_at_offset(locator, comment.slice().range().start()) else {
+    let Some(comment_indentation) =
+        whitespace::indentation_at_offset(locator, comment.slice().range().start())
+    else {
         // The comment can't be a comment for the previous block if it isn't indented..
         return CommentPlacement::Default(comment);
     };
@@ -452,7 +470,9 @@ fn handle_trailing_body_comment<'a>(
     // # Trailing if comment
     // ```
     // Here we keep the comment a trailing comment of the `if`
-    let Some(preceding_node_indentation) = whitespace::indentation_at_offset(locator, preceding_node.start()) else {
+    let Some(preceding_node_indentation) =
+        whitespace::indentation_at_offset(locator, preceding_node.start())
+    else {
         return CommentPlacement::Default(comment);
     };
     if comment_indentation_len == preceding_node_indentation.len() {
@@ -574,36 +594,37 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    use ruff_python_ast::prelude::*;
-
     // Must be an end of line comment
     if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
     }
 
     // Must be between the condition expression and the first body element
-    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
         return CommentPlacement::Default(comment);
     };
 
     let expression_before_colon = match comment.enclosing_node() {
-        AnyNodeRef::StmtIf(StmtIf { test: expr, .. })
-        | AnyNodeRef::StmtWhile(StmtWhile { test: expr, .. })
-        | AnyNodeRef::StmtFor(StmtFor { iter: expr, .. })
-        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { iter: expr, .. }) => {
+        AnyNodeRef::StmtIf(ast::StmtIf { test: expr, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { test: expr, .. })
+        | AnyNodeRef::StmtFor(ast::StmtFor { iter: expr, .. })
+        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { iter: expr, .. }) => {
             Some(AnyNodeRef::from(expr.as_ref()))
         }
 
-        AnyNodeRef::StmtWith(StmtWith { items, .. })
-        | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { items, .. }) => {
+        AnyNodeRef::StmtWith(ast::StmtWith { items, .. })
+        | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { items, .. }) => {
             items.last().map(AnyNodeRef::from)
         }
-        AnyNodeRef::StmtFunctionDef(StmtFunctionDef { returns, args, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(StmtAsyncFunctionDef { returns, args, .. }) => returns
-            .as_deref()
-            .map(AnyNodeRef::from)
-            .or_else(|| Some(AnyNodeRef::from(args.as_ref()))),
-        AnyNodeRef::StmtClassDef(StmtClassDef {
+        AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { returns, args, .. })
+        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { returns, args, .. }) => {
+            returns
+                .as_deref()
+                .map(AnyNodeRef::from)
+                .or_else(|| Some(AnyNodeRef::from(args.as_ref())))
+        }
+        AnyNodeRef::StmtClassDef(ast::StmtClassDef {
             bases, keywords, ..
         }) => keywords
             .last()
@@ -662,6 +683,40 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     }
 
     CommentPlacement::Default(comment)
+}
+
+/// Handles end of line comments after the `:` of an except clause
+///
+/// ```python
+/// try:
+///    ...
+/// except: # comment
+///     pass
+/// ```
+///
+/// It attaches the comment as dangling comment to the enclosing except handler.
+fn handle_trailing_end_of_line_except_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
+    let AnyNodeRef::ExceptHandlerExceptHandler(handler) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Must be an end of line comment
+    if comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let Some(first_body_statement) = handler.body.first() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    if comment.slice().start() < first_body_statement.range().start() {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Attaches comments for the positional only arguments separator `/` or the keywords only arguments
@@ -834,8 +889,9 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     }
 
     // ... for comments with a preceding and following node,
-    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
-        return CommentPlacement::Default(comment)
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
     };
 
     // ... where the following is a function or class statement.
@@ -985,7 +1041,7 @@ fn handle_dict_unpacking_comment<'a>(
     match comment.enclosing_node() {
         // TODO: can maybe also add AnyNodeRef::Arguments here, but tricky to test due to
         // https://github.com/astral-sh/ruff/issues/5176
-        AnyNodeRef::ExprDict(_) => {}
+        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_) => {}
         _ => {
             return CommentPlacement::Default(comment);
         }
@@ -1011,12 +1067,22 @@ fn handle_dict_unpacking_comment<'a>(
     )
     .skip_trivia();
 
+    // if the remaining tokens from the previous node are exactly `**`,
+    // re-assign the comment to the one that follows the stars
+    let mut count = 0;
+
     // we start from the preceding node but we skip its token
     for token in tokens.by_ref() {
         // Skip closing parentheses that are not part of the node range
         if token.kind == TokenKind::RParen {
             continue;
         }
+        // The Keyword case
+        if token.kind == TokenKind::Star {
+            count += 1;
+            break;
+        }
+        // The dict case
         debug_assert!(
             matches!(
                 token,
@@ -1030,9 +1096,6 @@ fn handle_dict_unpacking_comment<'a>(
         break;
     }
 
-    // if the remaining tokens from the previous node is exactly `**`,
-    // re-assign the comment to the one that follows the stars
-    let mut count = 0;
     for token in tokens {
         if token.kind != TokenKind::Star {
             return CommentPlacement::Default(comment);
@@ -1046,19 +1109,19 @@ fn handle_dict_unpacking_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-// Own line comments coming after the node are always dangling comments
-// ```python
-// (
-//      a
-//      # trailing a comment
-//      . # dangling comment
-//      # or this
-//      b
-// )
-// ```
+/// Own line comments coming after the node are always dangling comments
+/// ```python
+/// (
+///      a
+///      # trailing a comment
+///      . # dangling comment
+///      # or this
+///      b
+/// )
+/// ```
 fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
+    _locator: &Locator,
 ) -> CommentPlacement<'a> {
     let Some(attribute) = comment.enclosing_node().expr_attribute() else {
         return CommentPlacement::Default(comment);
@@ -1069,18 +1132,105 @@ fn handle_attribute_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let between_value_and_attr = TextRange::new(attribute.value.end(), attribute.attr.start());
-
-    let dot = SimpleTokenizer::new(locator.contents(), between_value_and_attr)
-        .skip_trivia()
-        .next()
-        .expect("Expected the `.` character after the value");
-
-    if TextRange::new(dot.end(), attribute.attr.start()).contains(comment.slice().start()) {
-        CommentPlacement::dangling(attribute.into(), comment)
+    if TextRange::new(attribute.value.end(), attribute.attr.start())
+        .contains(comment.slice().start())
+    {
+        // ```text
+        // value   .   attr
+        //      ^^^^^^^ the range of dangling comments
+        // ```
+        if comment.line_position().is_end_of_line() {
+            // Attach to node with b
+            // ```python
+            // x322 = (
+            //     a
+            //     . # end-of-line dot comment 2
+            //     b
+            // )
+            // ```
+            CommentPlacement::trailing(comment.enclosing_node(), comment)
+        } else {
+            CommentPlacement::dangling(attribute.into(), comment)
+        }
     } else {
         CommentPlacement::Default(comment)
     }
+}
+
+/// Assign comments between `if` and `test` and `else` and `orelse` as leading to the respective
+/// node.
+///
+/// ```python
+/// x = (
+///     "a"
+///     if # leading comment of `True`
+///     True
+///     else # leading comment of `"b"`
+///     "b"
+/// )
+/// ```
+///
+/// This placement ensures comments remain in their previous order. This an edge case that only
+/// happens if the comments are in a weird position but it also doesn't hurt handling it.
+fn handle_expr_if_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let Some(expr_if) = comment.enclosing_node().expr_if_exp() else {
+        return CommentPlacement::Default(comment);
+    };
+    let ExprIfExp {
+        range: _,
+        test,
+        body,
+        orelse,
+    } = expr_if;
+
+    if comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Find the if and the else
+    let if_token =
+        find_only_token_str_in_range(TextRange::new(body.end(), test.start()), locator, "if");
+    let else_token =
+        find_only_token_str_in_range(TextRange::new(test.end(), orelse.start()), locator, "else");
+
+    // Between `if` and `test`
+    if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
+        return CommentPlacement::leading(test.as_ref().into(), comment);
+    }
+
+    // Between `else` and `orelse`
+    if else_token.range.start() < comment.slice().start()
+        && comment.slice().start() < orelse.start()
+    {
+        return CommentPlacement::leading(orelse.as_ref().into(), comment);
+    }
+
+    CommentPlacement::Default(comment)
+}
+
+/// Looks for a multi char token in the range that contains no other tokens. `SimpleTokenizer` only
+/// works with single char tokens so we check that we have the right token by string comparison.
+fn find_only_token_str_in_range(range: TextRange, locator: &Locator, token_str: &str) -> Token {
+    let token =
+        first_non_trivia_token(range.start(), locator.contents()).expect("Expected a token");
+    debug_assert!(
+        locator.after(token.start()).starts_with(token_str),
+        "expected a `{token_str}` token",
+    );
+    debug_assert!(
+        SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(token.start() + token_str.text_len(), range.end())
+        )
+        .skip_trivia()
+        .next()
+        .is_none(),
+        "Didn't expect any other token"
+    );
+    token
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
@@ -1092,21 +1242,21 @@ where
 }
 
 fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
-    use ruff_python_ast::prelude::*;
-
     let body = match node {
-        AnyNodeRef::StmtFunctionDef(StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(StmtAsyncFunctionDef { body, .. })
-        | AnyNodeRef::StmtClassDef(StmtClassDef { body, .. })
-        | AnyNodeRef::StmtWith(StmtWith { body, .. })
-        | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { body, .. })
-        | AnyNodeRef::MatchCase(MatchCase { body, .. })
-        | AnyNodeRef::ExceptHandlerExceptHandler(ExceptHandlerExceptHandler { body, .. }) => body,
+        AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
+        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
+        | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
+        | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
+        | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { body, .. })
+        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
+        | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+            body, ..
+        }) => body,
 
-        AnyNodeRef::StmtIf(StmtIf { body, orelse, .. })
-        | AnyNodeRef::StmtFor(StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { body, orelse, .. })
-        | AnyNodeRef::StmtWhile(StmtWhile { body, orelse, .. }) => {
+        AnyNodeRef::StmtIf(ast::StmtIf { body, orelse, .. })
+        | AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
             if orelse.is_empty() {
                 body
             } else {
@@ -1114,18 +1264,18 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
             }
         }
 
-        AnyNodeRef::StmtMatch(StmtMatch { cases, .. }) => {
+        AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
             return cases.last().map(AnyNodeRef::from)
         }
 
-        AnyNodeRef::StmtTry(StmtTry {
+        AnyNodeRef::StmtTry(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
             ..
         })
-        | AnyNodeRef::StmtTryStar(StmtTryStar {
+        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
@@ -1159,23 +1309,21 @@ fn is_first_statement_in_enclosing_alternate_body(
     following: AnyNodeRef,
     enclosing: AnyNodeRef,
 ) -> bool {
-    use ruff_python_ast::prelude::*;
-
     match enclosing {
-        AnyNodeRef::StmtIf(StmtIf { orelse, .. })
-        | AnyNodeRef::StmtFor(StmtFor { orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { orelse, .. })
-        | AnyNodeRef::StmtWhile(StmtWhile { orelse, .. }) => {
+        AnyNodeRef::StmtIf(ast::StmtIf { orelse, .. })
+        | AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
+        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { orelse, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
             are_same_optional(following, orelse.first())
         }
 
-        AnyNodeRef::StmtTry(StmtTry {
+        AnyNodeRef::StmtTry(ast::StmtTry {
             handlers,
             orelse,
             finalbody,
             ..
         })
-        | AnyNodeRef::StmtTryStar(StmtTryStar {
+        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
             handlers,
             orelse,
             finalbody,

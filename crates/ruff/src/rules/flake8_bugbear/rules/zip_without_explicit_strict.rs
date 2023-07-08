@@ -68,7 +68,13 @@ pub(crate) fn zip_without_explicit_strict(
 /// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
 /// `itertools.cycle` or similar).
 fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall { func, args, keywords, .. }) = &arg else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        keywords,
+        ..
+    }) = &arg
+    else {
         return false;
     };
 

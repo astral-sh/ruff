@@ -2,6 +2,7 @@
 mod fixes;
 mod helpers;
 pub(crate) mod rules;
+pub mod settings;
 pub(crate) mod types;
 
 #[cfg(test)]
@@ -12,6 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::pyupgrade;
     use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -82,6 +84,38 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations_keep_runtime_typing_p37() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/future_annotations.py"),
+            &settings::Settings {
+                pyupgrade: pyupgrade::settings::Settings {
+                    keep_runtime_typing: true,
+                },
+                target_version: PythonVersion::Py37,
+                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn future_annotations_keep_runtime_typing_p310() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/future_annotations.py"),
+            &settings::Settings {
+                pyupgrade: pyupgrade::settings::Settings {
+                    keep_runtime_typing: true,
+                },
+                target_version: PythonVersion::Py310,
+                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

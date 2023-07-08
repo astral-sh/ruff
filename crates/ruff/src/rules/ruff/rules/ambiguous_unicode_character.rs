@@ -159,18 +159,17 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
 }
 
 pub(crate) fn ambiguous_unicode_character(
+    diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     range: TextRange,
     context: Context,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     let text = locator.slice(range);
 
     // Most of the time, we don't need to check for ambiguous unicode characters at all.
     if text.is_ascii() {
-        return diagnostics;
+        return;
     }
 
     // Iterate over the "words" in the text.
@@ -232,8 +231,6 @@ pub(crate) fn ambiguous_unicode_character(
         }
         word_candidates.clear();
     }
-
-    diagnostics
 }
 
 bitflags! {

@@ -1,12 +1,11 @@
 use crate::comments::Comments;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
-use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
-use ruff_formatter::prelude::{
-    format_with, group, if_group_breaks, soft_block_indent, soft_line_break_or_space, text,
-};
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use crate::prelude::*;
+use crate::FormatNodeRule;
+use ruff_formatter::format_args;
 use rustpython_parser::ast::ExprSet;
 
 #[derive(Default)]
@@ -23,14 +22,8 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
                 .entries(elts.iter().formatted())
                 .finish()
         });
-        write!(
-            f,
-            [group(&format_args![
-                text("{"),
-                soft_block_indent(&format_args![joined, if_group_breaks(&text(",")),]),
-                text("}")
-            ])]
-        )
+
+        parenthesized("{", &format_args![joined, if_group_breaks(&text(","))], "}").fmt(f)
     }
 }
 

@@ -52,7 +52,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
-            return Ok(())
+            return Ok(());
         };
 
         // First entry has never any separator, doesn't matter which one we take;
@@ -188,7 +188,8 @@ mod tests {
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteLevel;
-    use ruff_formatter::{format, IndentStyle, SimpleFormatOptions};
+    use crate::PyFormatOptions;
+    use ruff_formatter::format;
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
@@ -216,14 +217,7 @@ def trailing_func():
 
         let statements = Suite::parse(source, "test.py").unwrap();
 
-        let context = PyFormatContext::new(
-            SimpleFormatOptions {
-                indent_style: IndentStyle::Space(4),
-                ..SimpleFormatOptions::default()
-            },
-            source,
-            Comments::default(),
-        );
+        let context = PyFormatContext::new(PyFormatOptions::default(), source, Comments::default());
 
         let test_formatter =
             format_with(|f: &mut PyFormatter| statements.format().with_options(level).fmt(f));

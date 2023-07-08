@@ -82,7 +82,8 @@ pub(crate) fn setattr_with_constant(
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(name),
         ..
-    } )= name else {
+    }) = name
+    else {
         return;
     };
     if !is_identifier(name) {

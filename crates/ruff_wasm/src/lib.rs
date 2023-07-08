@@ -13,15 +13,12 @@ use ruff::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
-use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceLocation, Stylist};
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -39,7 +36,7 @@ export interface Diagnostic {
     fix: {
         message: string | null;
         edits: {
-            content: string;
+            content: string | null;
             location: {
                 row: number;
                 column: number;
@@ -54,18 +51,25 @@ export interface Diagnostic {
 "#;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
-pub struct ExpandedFix {
-    message: Option<String>,
-    edits: Vec<Edit>,
-}
-
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
     pub location: SourceLocation,
     pub end_location: SourceLocation,
     pub fix: Option<ExpandedFix>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedFix {
+    message: Option<String>,
+    edits: Vec<ExpandedEdit>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+struct ExpandedEdit {
+    location: SourceLocation,
+    end_location: SourceLocation,
+    content: Option<String>,
 }
 
 #[wasm_bindgen(start)]
@@ -87,7 +91,7 @@ pub fn run() {
 #[wasm_bindgen]
 #[allow(non_snake_case)]
 pub fn currentVersion() -> JsValue {
-    JsValue::from(VERSION)
+    JsValue::from(ruff::VERSION)
 }
 
 #[wasm_bindgen]
@@ -162,6 +166,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
         pyflakes: Some(pyflakes::settings::Settings::default().into()),
         pylint: Some(pylint::settings::Settings::default().into()),
+        pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)
 }
 
@@ -222,7 +227,15 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
                 end_location,
                 fix: message.fix.map(|fix| ExpandedFix {
                     message: message.kind.suggestion,
-                    edits: fix.into_edits(),
+                    edits: fix
+                        .into_edits()
+                        .into_iter()
+                        .map(|edit| ExpandedEdit {
+                            location: source_code.source_location(edit.start()),
+                            end_location: source_code.source_location(edit.end()),
+                            content: edit.content().map(ToString::to_string),
+                        })
+                        .collect(),
                 }),
             }
         })

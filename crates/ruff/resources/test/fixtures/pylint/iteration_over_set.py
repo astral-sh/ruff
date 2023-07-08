@@ -36,3 +36,6 @@ for item in set(("apples", "lemons", "water")):  # set constructor is fine
 
 for number in {i for i in range(10)}:  # set comprehensions are fine
     print(number)
+
+for item in {*numbers_set, 4, 5, 6}:  # set unpacking is fine
+    print(f"I like {item}.")

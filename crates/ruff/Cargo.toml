@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.275"
+version = "0.0.277"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -17,6 +17,7 @@ name = "ruff"
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
+ruff_index = { path = "../ruff_index" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_whitespace = { path = "../ruff_python_whitespace" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
@@ -26,6 +27,7 @@ ruff_rustpython = { path = "../ruff_rustpython" }
 ruff_text_size = { workspace = true }
 ruff_textwrap = { path = "../ruff_textwrap" }
 
+aho-corasick = { version = "1.0.2" }
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
@@ -42,6 +44,7 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 log = { workspace = true }
+memchr = { workspace = true }
 natord = { version = "1.0.9" }
 nohash-hasher = { workspace = true }
 num-bigint = { workspace = true }
@@ -71,7 +74,7 @@ shellexpand = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-thiserror = { version = "1.0.38" }
+thiserror = { version = "1.0.43" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }
@@ -87,4 +90,5 @@ colored = { workspace = true, features = ["no-color"] }
 [features]
 default = []
 schemars = ["dep:schemars"]
-jupyter_notebook = []
+# Enables the UnreachableCode rule
+unreachable-code = []

@@ -1,0 +1,227 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/skip_magic_trailing_comma.py
+---
+## Input
+
+```py
+# We should not remove the trailing comma in a single-element subscript.
+a: tuple[int,]
+b = tuple[int,]
+
+# But commas in multiple element subscripts should be removed.
+c: tuple[int, int,]
+d = tuple[int, int,]
+
+# Remove commas for non-subscripts.
+small_list = [1,]
+list_of_types = [tuple[int,],]
+small_set = {1,}
+set_of_types = {tuple[int,],}
+
+# Except single element tuples
+small_tuple = (1,)
+
+# Trailing commas in multiple chained non-nested parens.
+zero(
+    one,
+).two(
+    three,
+).four(
+    five,
+)
+
+func1(arg1).func2(arg2,).func3(arg3).func4(arg4,).func5(arg5)
+
+(
+    a,
+    b,
+    c,
+    d,
+) = func1(
+    arg1
+) and func2(arg2)
+
+func(
+    argument1,
+    (
+        one,
+        two,
+    ),
+    argument4,
+    argument5,
+    argument6,
+)
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,25 +1,58 @@
+ # We should not remove the trailing comma in a single-element subscript.
+-a: tuple[int,]
+-b = tuple[int,]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++b = tuple[(int,)]
+ 
+ # But commas in multiple element subscripts should be removed.
+-c: tuple[int, int]
+-d = tuple[int, int]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++d = tuple[
++    (
++        int,
++        int,
++    )
++]
+ 
+ # Remove commas for non-subscripts.
+-small_list = [1]
+-list_of_types = [tuple[int,]]
++small_list = [
++    1,
++]
++list_of_types = [
++    tuple[(int,)],
++]
+ small_set = {1}
+-set_of_types = {tuple[int,]}
++set_of_types = {tuple[(int,)]}
+ 
+ # Except single element tuples
+ small_tuple = (1,)
+ 
+ # Trailing commas in multiple chained non-nested parens.
+-zero(one).two(three).four(five)
++zero(
++    one,
++).two(
++    three,
++).four(
++    five,
++)
+ 
+-func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
++func1(arg1).func2(
++    arg2,
++).func3(arg3).func4(
++    arg4,
++).func5(arg5)
+ 
+-(a, b, c, d) = func1(arg1) and func2(arg2)
++(
++    a,
++    b,
++    c,
++    d,
++) = func1(arg1) and func2(arg2)
+ 
+-func(argument1, (one, two), argument4, argument5, argument6)
++func(
++    argument1,
++    (
++        one,
++        two,
++    ),
++    argument4,
++    argument5,
++    argument6,
++)
+```
+
+## Ruff Output
+
+```py
+# We should not remove the trailing comma in a single-element subscript.
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+b = tuple[(int,)]
+
+# But commas in multiple element subscripts should be removed.
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+d = tuple[
+    (
+        int,
+        int,
+    )
+]
+
+# Remove commas for non-subscripts.
+small_list = [
+    1,
+]
+list_of_types = [
+    tuple[(int,)],
+]
+small_set = {1}
+set_of_types = {tuple[(int,)]}
+
+# Except single element tuples
+small_tuple = (1,)
+
+# Trailing commas in multiple chained non-nested parens.
+zero(
+    one,
+).two(
+    three,
+).four(
+    five,
+)
+
+func1(arg1).func2(
+    arg2,
+).func3(arg3).func4(
+    arg4,
+).func5(arg5)
+
+(
+    a,
+    b,
+    c,
+    d,
+) = func1(arg1) and func2(arg2)
+
+func(
+    argument1,
+    (
+        one,
+        two,
+    ),
+    argument4,
+    argument5,
+    argument6,
+)
+```
+
+## Black Output
+
+```py
+# We should not remove the trailing comma in a single-element subscript.
+a: tuple[int,]
+b = tuple[int,]
+
+# But commas in multiple element subscripts should be removed.
+c: tuple[int, int]
+d = tuple[int, int]
+
+# Remove commas for non-subscripts.
+small_list = [1]
+list_of_types = [tuple[int,]]
+small_set = {1}
+set_of_types = {tuple[int,]}
+
+# Except single element tuples
+small_tuple = (1,)
+
+# Trailing commas in multiple chained non-nested parens.
+zero(one).two(three).four(five)
+
+func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
+
+(a, b, c, d) = func1(arg1) and func2(arg2)
+
+func(argument1, (one, two), argument4, argument5, argument6)
+```
+
+

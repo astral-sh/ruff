@@ -200,8 +200,7 @@ pub(crate) fn unittest_assertion(
                         && !has_comments_in(expr.range(), checker.locator)
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 checker.generator().stmt(&stmt),
                                 expr.range(),
                             )));
@@ -227,10 +226,10 @@ pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Diagnostic> {
-    handlers
-        .iter()
-        .flat_map(|handler| match handler {
+pub(crate) fn assert_in_exception_handler(checker: &mut Checker, handlers: &[ExceptHandler]) {
+    checker
+        .diagnostics
+        .extend(handlers.iter().flat_map(|handler| match handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 name, body, ..
             }) => {
@@ -240,8 +239,7 @@ pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Dia
                     Vec::new()
                 }
             }
-        })
-        .collect()
+        }));
 }
 
 #[derive(Copy, Clone)]
@@ -393,7 +391,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     let statements = if outer_indent.is_empty() {
         &mut tree.body
     } else {
-        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
+        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body
+        else {
             bail!("Expected statement to be embedded in a function definition")
         };
 

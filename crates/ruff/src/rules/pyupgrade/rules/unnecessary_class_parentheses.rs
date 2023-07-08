@@ -1,11 +1,10 @@
 use std::ops::Add;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Stmt};
+use rustpython_parser::ast::{self, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -44,16 +43,12 @@ impl AlwaysAutofixableViolation for UnnecessaryClassParentheses {
 }
 
 /// UP039
-pub(crate) fn unnecessary_class_parentheses(
-    checker: &mut Checker,
-    class_def: &ast::StmtClassDef,
-    stmt: &Stmt,
-) {
+pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     if !class_def.bases.is_empty() || !class_def.keywords.is_empty() {
         return;
     }
 
-    let offset = stmt.identifier().start();
+    let offset = class_def.name.end();
     let contents = checker.locator.after(offset);
 
     // Find the open and closing parentheses between the class name and the colon, if they exist.

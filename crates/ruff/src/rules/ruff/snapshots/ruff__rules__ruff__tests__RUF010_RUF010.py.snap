@@ -243,5 +243,7 @@ RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
 35    |-    f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
    35 |+    f" that flows {obj!r} of type {type(obj)}.{additional_message}"  # RUF010
 36 36 | )
+37 37 | 
+38 38 | 
 
 

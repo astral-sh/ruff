@@ -9,7 +9,7 @@ use ruff_python_semantic::ScopeKind;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum DeferralKeyword {
+enum DeferralKeyword {
     Yield,
     YieldFrom,
     Await,

@@ -18,8 +18,10 @@ pub trait AsRule {
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
-        let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
-        Ok(prefix.into_iter().next().unwrap())
+        linter
+            .all_rules()
+            .find(|rule| rule.noqa_code().suffix() == code)
+            .ok_or(FromCodeError::Unknown)
     }
 }
 
@@ -80,9 +82,9 @@ pub enum Linter {
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
-    /// Copyright-related rules
+    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
     #[prefix = "CPY"]
-    Copyright,
+    Flake8Copyright,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
@@ -110,7 +112,7 @@ pub enum Linter {
     /// [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
     #[prefix = "ICN"]
     Flake8ImportConventions,
-    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/)
+    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
     #[prefix = "G"]
     Flake8LoggingFormat,
     /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
@@ -179,7 +181,7 @@ pub enum Linter {
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
-    /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
+    /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
     /// [flynt](https://pypi.org/project/flynt/)
@@ -250,6 +252,7 @@ pub enum LintSource {
     Imports,
     Noqa,
     Filesystem,
+    PyprojectToml,
 }
 
 impl Rule {
@@ -257,6 +260,7 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
+            Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
             Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore

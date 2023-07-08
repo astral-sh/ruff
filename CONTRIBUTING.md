@@ -256,7 +256,11 @@ To preview any changes to the documentation locally:
 1. Run the development server with:
 
    ```shell
-   mkdocs serve
+   # For contributors.
+   mkdocs serve -f mkdocs.generated.yml
+
+   # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
+   mkdocs serve -f mkdocs.insiders.yml
    ```
 
 The documentation should then be available locally at

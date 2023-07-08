@@ -19,3 +19,13 @@ if True:
 
     import D
     import B
+
+
+import e
+import f
+
+# isort: split
+# isort: split
+
+import d
+import c

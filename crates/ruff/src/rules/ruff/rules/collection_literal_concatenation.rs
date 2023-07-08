@@ -37,7 +37,7 @@ use crate::registry::AsRule;
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
-/// - [Python docs: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
+/// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 #[violation]
 pub struct CollectionLiteralConcatenation {
     expr: String,
@@ -86,7 +86,13 @@ enum Type {
 
 /// Recursively merge all the tuples and lists in the expression.
 fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
-    let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
+    let Expr::BinOp(ast::ExprBinOp {
+        left,
+        op: Operator::Add,
+        right,
+        range: _,
+    }) = expr
+    else {
         return None;
     };
 
@@ -171,7 +177,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     }
 
     let Some((new_expr, type_)) = concatenate_expressions(expr) else {
-        return
+        return;
     };
 
     let contents = match type_ {

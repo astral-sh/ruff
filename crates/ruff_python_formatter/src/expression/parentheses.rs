@@ -1,5 +1,7 @@
 use crate::comments::Comments;
+use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, first_non_trivia_token_rev, Token, TokenKind};
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::Ranged;
 
@@ -104,7 +106,7 @@ pub enum Parentheses {
     Never,
 }
 
-fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
     matches!(
         first_non_trivia_token(expr.end(), contents),
         Some(Token {
@@ -118,4 +120,38 @@ fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
             ..
         })
     )
+}
+
+pub(crate) fn parenthesized<'content, 'ast, Content>(
+    left: &'static str,
+    content: &'content Content,
+    right: &'static str,
+) -> FormatParenthesized<'content, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatParenthesized {
+        left,
+        content: Argument::new(content),
+        right,
+    }
+}
+
+pub(crate) struct FormatParenthesized<'content, 'ast> {
+    left: &'static str,
+    content: Argument<'content, PyFormatContext<'ast>>,
+    right: &'static str,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        write!(
+            f,
+            [group(&format_args![
+                text(self.left),
+                &soft_block_indent(&Arguments::from(&self.content)),
+                text(self.right)
+            ])]
+        )
+    }
 }

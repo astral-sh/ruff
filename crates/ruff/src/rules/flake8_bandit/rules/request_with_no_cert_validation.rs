@@ -21,21 +21,6 @@ impl Violation for RequestWithNoCertValidation {
     }
 }
 
-const REQUESTS_HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];
-const HTTPX_METHODS: [&str; 11] = [
-    "get",
-    "options",
-    "head",
-    "post",
-    "put",
-    "patch",
-    "delete",
-    "request",
-    "stream",
-    "Client",
-    "AsyncClient",
-];
-
 /// S501
 pub(crate) fn request_with_no_cert_validation(
     checker: &mut Checker,
@@ -46,16 +31,13 @@ pub(crate) fn request_with_no_cert_validation(
     if let Some(target) = checker
         .semantic()
         .resolve_call_path(func)
-        .and_then(|call_path| {
-            if call_path.len() == 2 {
-                if call_path[0] == "requests" && REQUESTS_HTTP_VERBS.contains(&call_path[1]) {
-                    return Some("requests");
-                }
-                if call_path[0] == "httpx" && HTTPX_METHODS.contains(&call_path[1]) {
-                    return Some("httpx");
-                }
+        .and_then(|call_path| match call_path.as_slice() {
+            ["requests", "get" | "options" | "head" | "post" | "put" | "patch" | "delete"] => {
+                Some("requests")
             }
-            None
+            ["httpx", "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request"
+            | "stream" | "Client" | "AsyncClient"] => Some("httpx"),
+            _ => None,
         })
     {
         let call_args = SimpleCallArgs::new(args, keywords);

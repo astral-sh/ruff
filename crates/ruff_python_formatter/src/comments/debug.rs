@@ -1,9 +1,12 @@
+use std::fmt::{Debug, Formatter, Write};
+
+use itertools::Itertools;
+use rustpython_parser::ast::Ranged;
+
+use ruff_formatter::SourceCode;
+
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{CommentsMap, SourceComment};
-use itertools::Itertools;
-use ruff_formatter::SourceCode;
-use ruff_python_ast::prelude::*;
-use std::fmt::{Debug, Formatter, Write};
 
 /// Prints a debug representation of [`SourceComment`] that includes the comment's text
 pub(crate) struct DebugComment<'a> {
@@ -176,13 +179,15 @@ impl Debug for DebugNodeCommentSlice<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::comments::map::MultiMap;
-    use crate::comments::{CommentLinePosition, Comments, CommentsMap, SourceComment};
     use insta::assert_debug_snapshot;
-    use ruff_formatter::SourceCode;
-    use ruff_python_ast::node::AnyNode;
     use ruff_text_size::{TextRange, TextSize};
     use rustpython_parser::ast::{StmtBreak, StmtContinue};
+
+    use ruff_formatter::SourceCode;
+    use ruff_python_ast::node::AnyNode;
+
+    use crate::comments::map::MultiMap;
+    use crate::comments::{CommentLinePosition, Comments, CommentsMap, SourceComment};
 
     #[test]
     fn debug() {

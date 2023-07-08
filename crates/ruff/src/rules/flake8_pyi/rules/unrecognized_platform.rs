@@ -89,19 +89,21 @@ impl Violation for UnrecognizedPlatformName {
 }
 
 /// PYI007, PYI008
-pub(crate) fn unrecognized_platform(
-    checker: &mut Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    let ([op], [right]) = (ops, comparators) else {
+pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
+    let Expr::Compare(ast::ExprCompare {
+        left,
+        ops,
+        comparators,
+        ..
+    }) = test
+    else {
         return;
     };
 
-    let diagnostic_unrecognized_platform_check =
-        Diagnostic::new(UnrecognizedPlatformCheck, expr.range());
+    let ([op], [right]) = (ops.as_slice(), comparators.as_slice()) else {
+        return;
+    };
+
     if !checker
         .semantic()
         .resolve_call_path(left)
@@ -113,23 +115,24 @@ pub(crate) fn unrecognized_platform(
     }
 
     // "in" might also make sense but we don't currently have one.
-    if !matches!(op, CmpOp::Eq | CmpOp::NotEq) && checker.enabled(Rule::UnrecognizedPlatformCheck) {
-        checker
-            .diagnostics
-            .push(diagnostic_unrecognized_platform_check);
+    if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
+        if checker.enabled(Rule::UnrecognizedPlatformCheck) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
+        }
         return;
     }
 
-    match right {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(value),
-            ..
-        }) => {
-            // Other values are possible but we don't need them right now.
-            // This protects against typos.
-            if !["linux", "win32", "cygwin", "darwin"].contains(&value.as_str())
-                && checker.enabled(Rule::UnrecognizedPlatformName)
-            {
+    if let Expr::Constant(ast::ExprConstant {
+        value: Constant::Str(value),
+        ..
+    }) = right
+    {
+        // Other values are possible but we don't need them right now.
+        // This protects against typos.
+        if checker.enabled(Rule::UnrecognizedPlatformName) {
+            if !matches!(value.as_str(), "linux" | "win32" | "cygwin" | "darwin") {
                 checker.diagnostics.push(Diagnostic::new(
                     UnrecognizedPlatformName {
                         platform: value.clone(),
@@ -138,12 +141,11 @@ pub(crate) fn unrecognized_platform(
                 ));
             }
         }
-        _ => {
-            if checker.enabled(Rule::UnrecognizedPlatformCheck) {
-                checker
-                    .diagnostics
-                    .push(diagnostic_unrecognized_platform_check);
-            }
+    } else {
+        if checker.enabled(Rule::UnrecognizedPlatformCheck) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(UnrecognizedPlatformCheck, test.range()));
         }
     }
 }

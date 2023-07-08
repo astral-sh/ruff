@@ -49,11 +49,13 @@ pub(crate) fn call_datetime_strptime_without_zone(
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (checker.semantic().expr_grandparent(), checker.semantic().expr_parent()) else {
-        checker.diagnostics.push(Diagnostic::new(
-            CallDatetimeStrptimeWithoutZone,
-            location,
-        ));
+    let (Some(grandparent), Some(parent)) = (
+        checker.semantic().expr_grandparent(),
+        checker.semantic().expr_parent(),
+    ) else {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(CallDatetimeStrptimeWithoutZone, location));
         return;
     };
 

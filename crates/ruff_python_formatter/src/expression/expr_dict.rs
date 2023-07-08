@@ -1,12 +1,13 @@
 use crate::comments::{dangling_node_comments, leading_comments, Comments};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::prelude::Ranged;
 use ruff_text_size::TextRange;
+use rustpython_parser::ast::Ranged;
 use rustpython_parser::ast::{Expr, ExprDict};
 
 #[derive(Default)]
@@ -86,14 +87,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             joiner.finish()
         });
 
-        write!(
-            f,
-            [group(&format_args![
-                text("{"),
-                soft_block_indent(&format_pairs),
-                text("}")
-            ])]
-        )
+        parenthesized("{", &format_pairs, "}").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {

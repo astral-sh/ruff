@@ -18,10 +18,8 @@ ignore = [
   "G",     # flake8-logging
   "T",     # flake8-print
   "FBT",   # flake8-boolean-trap
+  "PERF",  # perflint
 ]
 
 [tool.ruff.isort]
 required-imports = ["from __future__ import annotations"]
-
-[tool.ruff.pydocstyle]
-convention = "pep257"

@@ -270,7 +270,7 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
 /// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
 /// call.
 fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. } )= expr else {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
     semantic.resolve_call_path(func).map_or(false, |call_path| {
@@ -296,6 +296,16 @@ fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
     } else {
         false
     }
+}
+
+/// Returns `true` if this is an assignment to a simple `Final`-annotated variable.
+fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(value, Expr::Name(_) | Expr::Attribute(_)) {
+        if semantic.match_typing_expr(annotation, "Final") {
+            return true;
+        }
+    }
+    false
 }
 
 /// Returns `true` if the a class is an enum, based on its base classes.
@@ -436,6 +446,9 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
     if is_type_var_like_call(value, checker.semantic()) {
+        return;
+    }
+    if is_final_assignment(annotation, value, checker.semantic()) {
         return;
     }
     if is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {

@@ -1,0 +1,69 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtskip2.py
+---
+## Input
+
+```py
+l1 = ["This list should be broken up", "into multiple lines", "because it is way too long"]
+l2 = ["But this list shouldn't", "even though it also has", "way too many characters in it"]  # fmt: skip
+l3 = ["I have", "trailing comma", "so I should be braked",]
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,7 +3,11 @@
+     "into multiple lines",
+     "because it is way too long",
+ ]
+-l2 = ["But this list shouldn't", "even though it also has", "way too many characters in it"]  # fmt: skip
++l2 = [
++    "But this list shouldn't",
++    "even though it also has",
++    "way too many characters in it",
++]  # fmt: skip
+ l3 = [
+     "I have",
+     "trailing comma",
+```
+
+## Ruff Output
+
+```py
+l1 = [
+    "This list should be broken up",
+    "into multiple lines",
+    "because it is way too long",
+]
+l2 = [
+    "But this list shouldn't",
+    "even though it also has",
+    "way too many characters in it",
+]  # fmt: skip
+l3 = [
+    "I have",
+    "trailing comma",
+    "so I should be braked",
+]
+```
+
+## Black Output
+
+```py
+l1 = [
+    "This list should be broken up",
+    "into multiple lines",
+    "because it is way too long",
+]
+l2 = ["But this list shouldn't", "even though it also has", "way too many characters in it"]  # fmt: skip
+l3 = [
+    "I have",
+    "trailing comma",
+    "so I should be braked",
+]
+```
+
+
