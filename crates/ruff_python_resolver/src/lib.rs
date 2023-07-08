@@ -129,11 +129,13 @@ mod tests {
     }
 
     macro_rules! assert_debug_snapshot_normalize_paths {
-        ($value: ident) => {
+        ($value: ident) => {{
             // The debug representation for the backslash are two backslashes (escaping)
-            let $value = format!("{:#?}", $value).replace("\\\\", "/");
+            let $value = std::format!("{:#?}", $value).replace("\\\\", "/");
+            // `insta::assert_snapshot` uses the debug representation of the string, which would
+            // be a single line containing `\n`
             insta::assert_display_snapshot!($value);
-        };
+        }};
     }
 
     #[test]
