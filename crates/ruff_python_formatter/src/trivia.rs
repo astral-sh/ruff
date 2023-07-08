@@ -167,6 +167,12 @@ pub(crate) enum TokenKind {
     /// `.`.
     Dot,
 
+    /// `if`
+    If,
+
+    /// `in`
+    In,
+
     /// Any other non trivia token. Always has a length of 1
     Other,
 
@@ -278,6 +284,16 @@ impl<'a> SimpleTokenizer<'a> {
 
             '\\' => TokenKind::Continuation,
 
+            'i' => {
+                if self.cursor.eat_char('f') {
+                    TokenKind::If
+                } else if self.cursor.eat_char('n') {
+                    TokenKind::In
+                } else {
+                    TokenKind::Other
+                }
+            }
+
             c => {
                 let kind = TokenKind::from_non_trivia_char(c);
 
@@ -386,7 +402,13 @@ impl<'a> SimpleTokenizer<'a> {
                 } else if c == '\\' {
                     TokenKind::Continuation
                 } else {
-                    let kind = TokenKind::from_non_trivia_char(c);
+                    let kind = if c == 'f' && self.cursor.eat_char_back('i') {
+                        TokenKind::If
+                    } else if c == 'n' && self.cursor.eat_char_back('i') {
+                        TokenKind::In
+                    } else {
+                        TokenKind::from_non_trivia_char(c)
+                    };
 
                     if kind == TokenKind::Other {
                         self.bogus = true;
@@ -617,6 +639,16 @@ mod tests {
     #[test]
     fn tokenize_continuation() {
         let source = "( \\\n )";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_if_in() {
+        let source = "if in";
 
         let test_case = tokenize(source);
 

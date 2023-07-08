@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_formatter/src/trivia.rs
+expression: test_case.tokens()
+---
+[
+    Token {
+        kind: If,
+        range: 0..2,
+    },
+    Token {
+        kind: Whitespace,
+        range: 2..3,
+    },
+    Token {
+        kind: In,
+        range: 3..5,
+    },
+]
