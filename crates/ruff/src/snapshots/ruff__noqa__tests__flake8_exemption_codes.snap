@@ -2,6 +2,6 @@
 source: crates/ruff/src/noqa.rs
 expression: "ParsedFileExemption::try_extract(source)"
 ---
-Some(
-    All,
+Err(
+    UnsupportedCodes,
 )

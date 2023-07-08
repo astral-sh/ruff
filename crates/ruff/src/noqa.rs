@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::fmt::{Display, Write};
 use std::fs;
 use std::ops::Add;
@@ -39,7 +40,7 @@ pub(crate) enum Directive<'a> {
 
 impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
-    pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Option<Self> {
+    pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Result<Option<Self>, ParseError> {
         for mat in NOQA_MATCHER.find_iter(text) {
             let noqa_literal_start = mat.start();
 
@@ -62,7 +63,7 @@ impl<'a> Directive<'a> {
             // If the next character is `:`, then it's a list of codes. Otherwise, it's a directive
             // to ignore all rules.
             let noqa_literal_end = mat.end();
-            return Some(
+            return Ok(Some(
                 if text[noqa_literal_end..]
                     .chars()
                     .next()
@@ -100,6 +101,11 @@ impl<'a> Directive<'a> {
                         }
                     }
 
+                    // If we didn't identify any codes, warn.
+                    if codes.is_empty() {
+                        return Err(ParseError::MissingCodes);
+                    }
+
                     let range = TextRange::new(
                         TextSize::try_from(comment_start).unwrap(),
                         TextSize::try_from(codes_end).unwrap(),
@@ -119,10 +125,10 @@ impl<'a> Directive<'a> {
                         range: range.add(offset),
                     })
                 },
-            );
+            ));
         }
 
-        None
+        Ok(None)
     }
 
     /// Lex an individual rule code (e.g., `F401`).
@@ -194,9 +200,9 @@ pub(crate) fn rule_is_ignored(
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
     match Directive::try_extract(locator.slice(line_range), line_range.start()) {
-        Some(Directive::All(_)) => true,
-        Some(Directive::Codes(Codes { codes, range: _ })) => includes(code, &codes),
-        None => false,
+        Ok(Some(Directive::All(_))) => true,
+        Ok(Some(Directive::Codes(Codes { codes, range: _ }))) => includes(code, &codes),
+        _ => false,
     }
 }
 
@@ -212,26 +218,37 @@ pub(crate) enum FileExemption {
 impl FileExemption {
     /// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
     /// globally ignored within the file.
-    pub(crate) fn try_extract(contents: &str, comment_ranges: &[TextRange]) -> Option<Self> {
+    pub(crate) fn try_extract(
+        contents: &str,
+        comment_ranges: &[TextRange],
+        locator: &Locator,
+    ) -> Option<Self> {
         let mut exempt_codes: Vec<NoqaCode> = vec![];
 
         for range in comment_ranges {
             match ParsedFileExemption::try_extract(&contents[*range]) {
-                Some(ParsedFileExemption::All) => {
+                Err(err) => {
+                    #[allow(deprecated)]
+                    let line = locator.compute_line_index(range.start());
+                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                }
+                Ok(Some(ParsedFileExemption::All)) => {
                     return Some(Self::All);
                 }
-                Some(ParsedFileExemption::Codes(codes)) => {
+                Ok(Some(ParsedFileExemption::Codes(codes))) => {
                     exempt_codes.extend(codes.into_iter().filter_map(|code| {
                         if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
                         {
                             Some(rule.noqa_code())
                         } else {
-                            warn!("Invalid code provided to `# ruff: noqa`: {}", code);
+                            #[allow(deprecated)]
+                            let line = locator.compute_line_index(range.start());
+                            warn!("Invalid code provided to `# ruff: noqa` on line {line}: {code}");
                             None
                         }
                     }));
                 }
-                None => {}
+                Ok(None) => {}
             }
         }
 
@@ -256,33 +273,51 @@ enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(line: &'a str) -> Option<Self> {
+    fn try_extract(line: &'a str) -> Result<Option<Self>, ParseError> {
         let line = Self::lex_whitespace(line);
-        let line = Self::lex_char(line, '#')?;
+        let Some(line) = Self::lex_char(line, '#') else {
+            return Ok(None);
+        };
         let line = Self::lex_whitespace(line);
 
         if let Some(line) = Self::lex_flake8(line) {
             // Ex) `# flake8: noqa`
             let line = Self::lex_whitespace(line);
-            let line = Self::lex_char(line, ':')?;
+            let Some(line) = Self::lex_char(line, ':') else {
+                return Ok(None);
+            };
             let line = Self::lex_whitespace(line);
-            Self::lex_noqa(line)?;
-            Some(Self::All)
+            let Some(line) = Self::lex_noqa(line) else {
+                return Ok(None);
+            };
+
+            // Guard against, e.g., `# flake8: noqa: F401`, which isn't supported by Flake8.
+            // Flake8 treats this as a blanket exemption, which is almost never the intent.
+            // Warn, but treat as a blanket exemption.
+            let line = Self::lex_whitespace(line);
+            if Self::lex_char(line, ':').is_some() {
+                return Err(ParseError::UnsupportedCodes);
+            }
+
+            Ok(Some(Self::All))
         } else if let Some(line) = Self::lex_ruff(line) {
             let line = Self::lex_whitespace(line);
-            let line = Self::lex_char(line, ':')?;
+            let Some(line) = Self::lex_char(line, ':') else {
+                return Ok(None);
+            };
             let line = Self::lex_whitespace(line);
-            let line = Self::lex_noqa(line)?;
+            let Some(line) = Self::lex_noqa(line) else {
+                return Ok(None);
+            };
+            let line = Self::lex_whitespace(line);
 
-            if line.is_empty() {
+            Ok(Some(if line.is_empty() {
                 // Ex) `# ruff: noqa`
-                Some(Self::All)
+                Self::All
             } else {
                 // Ex) `# ruff: noqa: F401, F841`
-                let line = Self::lex_whitespace(line);
                 let Some(line) = Self::lex_char(line, ':') else {
-                    warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
-                    return None;
+                    return Err(ParseError::InvalidSuffix);
                 };
                 let line = Self::lex_whitespace(line);
 
@@ -301,10 +336,15 @@ impl<'a> ParsedFileExemption<'a> {
                     }
                 }
 
-                Some(Self::Codes(codes))
-            }
+                // If we didn't identify any codes, warn.
+                if codes.is_empty() {
+                    return Err(ParseError::MissingCodes);
+                }
+
+                Self::Codes(codes)
+            }))
         } else {
-            None
+            Ok(None)
         }
     }
 
@@ -380,6 +420,34 @@ impl<'a> ParsedFileExemption<'a> {
     }
 }
 
+/// The result of an [`Importer::get_or_import_symbol`] call.
+#[derive(Debug)]
+pub(crate) enum ParseError {
+    /// The `noqa` directive was missing valid codes (e.g., `# noqa: unused-import` instead of `# noqa: F401`).
+    MissingCodes,
+    /// The `noqa` directive used an invalid suffix (e.g., `# noqa; F401` instead of `# noqa: F401`).
+    InvalidSuffix,
+    /// The `noqa` directive attempted to exempt specific codes in an unsupported location (e.g.,
+    /// `# flake8: noqa: F401, F841` instead of `# ruff: noqa: F401, F841`).
+    UnsupportedCodes,
+}
+
+impl Display for ParseError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
+            ParseError::InvalidSuffix => {
+                fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
+            }
+            ParseError::UnsupportedCodes => {
+                fmt.write_str("Flake8's blanket exemption does not support exempting specific codes. To exempt specific codes, use, e.g., `# ruff: noqa: F401, F841` instead.")
+            }
+        }
+    }
+}
+
+impl Error for ParseError {}
+
 /// Adds noqa comments to suppress all diagnostics of a file.
 pub(crate) fn add_noqa(
     path: &Path,
@@ -413,7 +481,7 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges);
+    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges, locator);
     let directives = NoqaDirectives::from_commented_ranges(commented_ranges, locator);
 
     // Mark any non-ignored diagnostics.
@@ -583,14 +651,22 @@ impl<'a> NoqaDirectives<'a> {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            if let Some(directive) = Directive::try_extract(locator.slice(*range), range.start()) {
-                // noqa comments are guaranteed to be single line.
-                directives.push(NoqaDirectiveLine {
-                    range: locator.line_range(range.start()),
-                    directive,
-                    matches: Vec::new(),
-                });
-            };
+            match Directive::try_extract(locator.slice(*range), range.start()) {
+                Err(err) => {
+                    #[allow(deprecated)]
+                    let line = locator.compute_line_index(range.start());
+                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                }
+                Ok(Some(directive)) => {
+                    // noqa comments are guaranteed to be single line.
+                    directives.push(NoqaDirectiveLine {
+                        range: locator.line_range(range.start()),
+                        directive,
+                        matches: Vec::new(),
+                    });
+                }
+                Ok(None) => {}
+            }
         }
 
         // Extend a mapping at the end of the file to also include the EOF token.
@@ -836,7 +912,7 @@ mod tests {
 
     #[test]
     fn noqa_invalid_codes() {
-        let source = "# noqa: F401, unused-import, some other code";
+        let source = "# noqa: unused-import, F401, some other code";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
