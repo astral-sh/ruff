@@ -3,6 +3,7 @@ use regex_syntax::ParserBuilder;
 use ruff_diagnostics::{Diagnostic, Violation};
 use rustpython_parser::ast;
 use rustpython_parser::ast::{Constant, Expr, ExprCall, Ranged};
+use similar::DiffableStr;
 
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
@@ -48,6 +49,26 @@ impl Violation for CatastrophicReUse {
 
 /// DUO138
 pub(crate) fn catastrophic_re_use(checker: &mut Checker, call: &ExprCall) {
+    // Check if function id is a regex function first so we do not do an unnecessary expensive call
+    // to resolve_call_path()
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &call.func.as_ref() {
+        if ![
+            "compile",
+            "search",
+            "match",
+            "fullmatch",
+            "split",
+            "findall",
+            "finditer",
+            "sub",
+            "subn",
+        ]
+        .contains(&attr.as_str())
+        {
+            return;
+        }
+    }
+
     if let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) {
         if !is_regex_func(&call_path) {
             return;
