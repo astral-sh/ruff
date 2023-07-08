@@ -1,7 +1,9 @@
 use crate::comments::Comments;
+use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, first_non_trivia_token_rev, Token, TokenKind};
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::prelude::tag::Condition;
+use ruff_formatter::{format_args, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::Ranged;
 
@@ -145,13 +147,59 @@ pub(crate) struct FormatParenthesized<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        write!(
-            f,
-            [group(&format_args![
+        let inner = format_with(|f| {
+            group(&format_args![
                 text(self.left),
                 &soft_block_indent(&Arguments::from(&self.content)),
                 text(self.right)
-            ])]
-        )
+            ])
+            .fmt(f)
+        });
+
+        let current_level = f.context().node_level();
+
+        f.context_mut()
+            .set_node_level(NodeLevel::ParenthesizedExpression);
+
+        let result = if let NodeLevel::Expression(Some(group_id)) = current_level {
+            fits_expanded(&inner)
+                .with_condition(Some(Condition::if_group_fits_on_line(group_id)))
+                .fmt(f)
+        } else {
+            inner.fmt(f)
+        };
+
+        f.context_mut().set_node_level(current_level);
+
+        result
+    }
+}
+
+pub(crate) fn in_parentheses_only_group<'content, 'ast, Content>(
+    content: &'content Content,
+) -> FormatInParenthesesOnlyGroup<'content, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatInParenthesesOnlyGroup {
+        content: Argument::new(content),
+    }
+}
+
+pub(crate) struct FormatInParenthesesOnlyGroup<'content, 'ast> {
+    content: Argument<'content, PyFormatContext<'ast>>,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
+            conditional_group(
+                &Arguments::from(&self.content),
+                Condition::if_group_breaks(group_id),
+            )
+            .fmt(f)
+        } else {
+            group(&Arguments::from(&self.content)).fmt(f)
+        }
     }
 }

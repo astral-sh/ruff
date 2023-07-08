@@ -1,16 +1,16 @@
-use crate::builders::optional_parentheses;
+use rustpython_parser::ast::Expr;
+
+use ruff_formatter::{
+    format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+};
+
 use crate::comments::Comments;
 use crate::context::NodeLevel;
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::{NeedsParentheses, Parentheses, Parenthesize};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, Parentheses, Parenthesize};
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
-use ruff_formatter::{
-    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
-};
-use rustpython_parser::ast::Expr;
 
-pub(crate) mod binary_like;
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
@@ -99,26 +99,52 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Slice(expr) => expr.format().fmt(f),
         });
 
-        let saved_level = f.context().node_level();
-        f.context_mut().set_node_level(NodeLevel::Expression);
-
         let result = match parentheses {
-            Parentheses::Always => {
-                write!(
-                    f,
-                    [group(&format_args![
-                        text("("),
-                        soft_block_indent(&format_expr),
-                        text(")")
-                    ])]
-                )
-            }
+            Parentheses::Always => parenthesized("(", &format_expr, ")").fmt(f),
             // Add optional parentheses. Ignore if the item renders parentheses itself.
-            Parentheses::Optional => optional_parentheses(&format_expr).fmt(f),
-            Parentheses::Custom | Parentheses::Never => Format::fmt(&format_expr, f),
-        };
+            Parentheses::Optional => {
+                let saved_level = f.context().node_level();
 
-        f.context_mut().set_node_level(saved_level);
+                let parens_id = f.group_id("optional_parentheses");
+
+                f.context_mut()
+                    .set_node_level(NodeLevel::Expression(Some(parens_id)));
+
+                let result = group(&format_args![
+                    if_group_breaks(&text("(")),
+                    indent_if_group_breaks(
+                        &format_args![soft_line_break(), format_expr],
+                        parens_id
+                    ),
+                    soft_line_break(),
+                    if_group_breaks(&text(")"))
+                ])
+                .with_group_id(Some(parens_id))
+                .fmt(f);
+
+                f.context_mut().set_node_level(saved_level);
+
+                result
+            }
+            Parentheses::Custom | Parentheses::Never => {
+                let saved_level = f.context().node_level();
+
+                let new_level = match saved_level {
+                    NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+                        NodeLevel::Expression(None)
+                    }
+                    level @ (NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression) => {
+                        level
+                    }
+                };
+
+                f.context_mut().set_node_level(new_level);
+
+                let result = Format::fmt(&format_expr, f);
+                f.context_mut().set_node_level(saved_level);
+                result
+            }
+        };
 
         result
     }

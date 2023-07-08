@@ -280,12 +280,9 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-if [
-    aaaaaa,
-    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
-] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
-    ...
-"#;
+[
+	AAAAAAAAAAAAA
+] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA + AAAAAAAAAAAAAAAAASAAAAAAAA"#;
         // Tokenize once
         let mut tokens = Vec::new();
         let mut comment_ranges = CommentRangesBuilder::default();
@@ -312,10 +309,10 @@ if [
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
-        // use ruff_formatter::FormatContext;
-        // dbg!(formatted
-        //     .document()
-        //     .display(formatted.context().source_code()));
+        use ruff_formatter::FormatContext;
+        dbg!(formatted
+            .document()
+            .display(formatted.context().source_code()));
         //
         // dbg!(formatted
         //     .context()
