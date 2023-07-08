@@ -1,4 +1,4 @@
-use crate::comments::Comments;
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -34,10 +34,9 @@ impl NeedsParentheses for ExprNamedExpr {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
+        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             // Unlike tuples, named expression parentheses are not part of the range even when
             // mandatory. See [PEP 572](https://peps.python.org/pep-0572/) for details.
             Parentheses::Optional => Parentheses::Always,

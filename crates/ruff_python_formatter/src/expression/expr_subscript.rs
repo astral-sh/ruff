@@ -3,8 +3,9 @@ use rustpython_parser::ast::ExprSubscript;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AstNode;
 
-use crate::comments::{trailing_comments, Comments};
+use crate::comments::trailing_comments;
 use crate::context::NodeLevel;
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -66,10 +67,9 @@ impl NeedsParentheses for ExprSubscript {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
+        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             Parentheses::Optional => Parentheses::Never,
             parentheses => parentheses,
         }

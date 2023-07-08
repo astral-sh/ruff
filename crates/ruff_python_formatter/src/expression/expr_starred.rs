@@ -2,7 +2,7 @@ use rustpython_parser::ast::ExprStarred;
 
 use ruff_formatter::write;
 
-use crate::comments::Comments;
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -34,9 +34,8 @@ impl NeedsParentheses for ExprStarred {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        default_expression_needs_parentheses(self.into(), parenthesize, context)
     }
 }
