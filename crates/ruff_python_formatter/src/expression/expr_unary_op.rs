@@ -1,4 +1,5 @@
-use crate::comments::{trailing_comments, Comments};
+use crate::comments::{trailing_comments};
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -70,13 +71,12 @@ impl NeedsParentheses for ExprUnaryOp {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
+        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             Parentheses::Optional => {
                 // We preserve the parentheses of the operand. It should not be necessary to break this expression.
-                if is_operand_parenthesized(self, source) {
+                if is_operand_parenthesized(self, context.source()) {
                     Parentheses::Never
                 } else {
                     Parentheses::Optional

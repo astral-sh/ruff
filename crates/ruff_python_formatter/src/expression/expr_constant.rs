@@ -1,4 +1,4 @@
-use crate::comments::Comments;
+
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -63,10 +63,9 @@ impl NeedsParentheses for ExprConstant {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
+        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             Parentheses::Optional if self.value.is_str() && parenthesize.is_if_breaks() => {
                 // Custom handling that only adds parentheses for implicit concatenated strings.
                 if parenthesize.is_if_breaks() {

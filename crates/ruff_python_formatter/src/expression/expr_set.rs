@@ -1,4 +1,4 @@
-use crate::comments::Comments;
+
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
     Parenthesize,
@@ -31,10 +31,9 @@ impl NeedsParentheses for ExprSet {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
+        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             Parentheses::Optional => Parentheses::Never,
             parentheses => parentheses,
         }

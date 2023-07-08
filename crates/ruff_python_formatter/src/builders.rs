@@ -94,7 +94,7 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
 
         self.result = self.result.and_then(|_| {
             if let Some(last_end) = self.last_end.replace(node.end()) {
-                let source = self.fmt.context().contents();
+                let source = self.fmt.context().source();
                 let count_lines = |offset| {
                     // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
                     // in the node's range
@@ -262,7 +262,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
             if let Some(last_end) = self.end_of_last_entry.take() {
                 let magic_trailing_comma = self.fmt.options().magic_trailing_comma().is_respect()
                     && matches!(
-                        first_non_trivia_token(last_end, self.fmt.context().contents()),
+                        first_non_trivia_token(last_end, self.fmt.context().source()),
                         Some(Token {
                             kind: TokenKind::Comma,
                             ..

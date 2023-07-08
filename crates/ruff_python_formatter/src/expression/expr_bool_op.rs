@@ -1,4 +1,4 @@
-use crate::comments::{leading_comments, Comments};
+use crate::comments::{leading_comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
     Parenthesize,
@@ -71,10 +71,9 @@ impl NeedsParentheses for ExprBoolOp {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        default_expression_needs_parentheses(self.into(), parenthesize, context)
     }
 }
 

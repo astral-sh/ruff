@@ -22,7 +22,7 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    pub(crate) fn contents(&self) -> &'a str {
+    pub(crate) fn source(&self) -> &'a str {
         self.contents
     }
 
