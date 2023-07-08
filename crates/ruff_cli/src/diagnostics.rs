@@ -9,11 +9,10 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::{debug, error};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
-use ruff::fs;
 use ruff::jupyter::Notebook;
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
@@ -21,6 +20,8 @@ use ruff::message::Message;
 use ruff::pyproject_toml::lint_pyproject_toml;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::source_kind::SourceKind;
+use ruff::{fs, IOError};
+use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
@@ -127,6 +128,21 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
+    // In case of an io error we want to exit early
+    let io_error_diagnostics = |err: io::Error, path: &Path| -> Diagnostics {
+        let io_err = Diagnostic::new(
+            IOError {
+                message: err.to_string(),
+            },
+            TextRange::default(),
+        );
+        let dummy = SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
+        Diagnostics::new(
+            vec![Message::from_diagnostic(io_err, dummy, TextSize::default())],
+            ImportMap::default(),
+        )
+    };
+
     // We have to special case this here since the Python tokenizer doesn't work with TOML.
     if is_project_toml(path) {
         let messages = if settings
@@ -135,9 +151,14 @@ pub(crate) fn lint_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
         {
-            let contents = std::fs::read_to_string(path)?;
+            let contents = match std::fs::read_to_string(path) {
+                Ok(contents) => contents,
+                Err(err) => {
+                    return Ok(io_error_diagnostics(err, path));
+                }
+            };
             let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-            lint_pyproject_toml(source_file, &settings.lib)?
+            lint_pyproject_toml(source_file, &settings.lib)
         } else {
             vec![]
         };
@@ -154,7 +175,14 @@ pub(crate) fn lint_path(
             Err(diagnostic) => return Ok(*diagnostic),
         }
     } else {
-        SourceKind::Python(std::fs::read_to_string(path)?)
+        // This is tested by ruff_cli integration test `unreadable_file`
+        let contents = match std::fs::read_to_string(path) {
+            Ok(contents) => contents,
+            Err(err) => {
+                return Ok(io_error_diagnostics(err, path));
+            }
+        };
+        SourceKind::Python(contents)
     };
 
     let contents = source_kind.content().to_string();

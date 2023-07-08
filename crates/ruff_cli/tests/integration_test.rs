@@ -1,13 +1,26 @@
 #![cfg(not(target_family = "wasm"))]
 
 #[cfg(unix)]
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+#[cfg(unix)]
 use std::path::Path;
 use std::str;
 
+#[cfg(unix)]
+use anyhow::Context;
 use anyhow::Result;
 use assert_cmd::Command;
 #[cfg(unix)]
+use clap::Parser;
+#[cfg(unix)]
 use path_absolutize::path_dedot;
+#[cfg(unix)]
+use tempfile::TempDir;
+
+use ruff_cli::args::Args;
+use ruff_cli::run;
 
 const BIN_NAME: &str = "ruff";
 
@@ -276,5 +289,31 @@ Found 1 error.
 "#
     );
 
+    Ok(())
+}
+
+/// An unreadable pyproject.toml in non-isolated mode causes ruff to hard-error trying to build up
+/// configuration globs
+#[cfg(unix)]
+#[test]
+fn unreadable_pyproject_toml() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    // Create an empty file with 000 permissions
+    fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .mode(0o000)
+        .open(pyproject_toml)?;
+
+    // Don't `--isolated` since the configuration discovery is where the error happens
+    let args = Args::parse_from(["", "check", "--no-cache", tempdir.path().to_str().unwrap()]);
+    let err = run(args).err().context("Unexpected success")?;
+    assert_eq!(
+        err.chain()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>(),
+        vec!["Permission denied (os error 13)".to_string()],
+    );
     Ok(())
 }
