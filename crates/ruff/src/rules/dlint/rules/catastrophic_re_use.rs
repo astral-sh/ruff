@@ -1,9 +1,8 @@
-use regex_syntax::hir::{Hir, HirKind, Literal};
+use regex_syntax::hir::{Hir, HirKind};
 use regex_syntax::ParserBuilder;
 use ruff_diagnostics::{Diagnostic, Violation};
 use rustpython_parser::ast;
 use rustpython_parser::ast::{Constant, Expr, ExprCall, Ranged};
-use std::collections::HashSet;
 
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
