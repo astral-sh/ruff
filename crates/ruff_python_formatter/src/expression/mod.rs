@@ -1,14 +1,15 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, Operator};
 use std::cmp::Ordering;
 
-use crate::builders::optional_parentheses;
+use rustpython_parser::ast;
+use rustpython_parser::ast::{Expr, Operator};
+
 use ruff_formatter::{
     format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::expression::ExpressionRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
+use crate::builders::optional_parentheses;
 use crate::context::NodeLevel;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
@@ -218,19 +219,24 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 ///     `(a * b) * c` or `a * b + c` are okay, because the subexpression is parenthesized, or the expression uses operands with a lower priority
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
-    let mut visitor = MaxOperatorPriorityVisitor::new(context.source());
-
-    visitor.visit_subexpression(expr);
-
-    let (max_operator_priority, operation_count, any_parenthesized_expression) = visitor.finish();
-
-    if operation_count > 1 {
+    if context.comments().has_leading_comments(expr) {
         false
-    } else if max_operator_priority == OperatorPriority::Attribute {
-        true
     } else {
-        // Only use the more complex IR when there is any expression that we can possibly split by
-        any_parenthesized_expression
+        let mut visitor = MaxOperatorPriorityVisitor::new(context.source());
+
+        visitor.visit_subexpression(expr);
+
+        let (max_operator_priority, operation_count, any_parenthesized_expression) =
+            visitor.finish();
+
+        if operation_count > 1 {
+            false
+        } else if max_operator_priority == OperatorPriority::Attribute {
+            true
+        } else {
+            // Only use the more complex IR when there is any expression that we can possibly split by
+            any_parenthesized_expression
+        }
     }
 }
 
@@ -377,7 +383,7 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
 impl<'input> PreorderVisitor<'input> for MaxOperatorPriorityVisitor<'input> {
     fn visit_expr(&mut self, expr: &'input Expr) {
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(AnyNodeRef::from(expr), self.source) {
+        if is_expression_parenthesized(ExpressionRef::from(expr), self.source) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -397,7 +403,7 @@ fn has_parentheses(expr: &Expr, source: &str) -> bool {
             | Expr::DictComp(_)
             | Expr::Call(_)
             | Expr::Subscript(_)
-    ) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
+    ) || is_expression_parenthesized(ExpressionRef::from(expr), source)
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]

@@ -32,26 +32,16 @@ pub(super) fn default_expression_needs_parentheses(
     // `Optional` or `IfBreaks`: Add parentheses if the expression doesn't fit on a line but enforce
     // parentheses if the expression has leading comments
     else if !parenthesize.is_preserve() {
-        if can_omit_optional_parentheses(node, context) {
-            Parentheses::Optional
-        } else {
+        if context.comments().has_leading_comments(node) {
             Parentheses::Always
+        } else {
+            Parentheses::Optional
         }
     } else {
         //`Preserve` and expression has no parentheses in the source code
         Parentheses::Never
     }
 }
-
-fn can_omit_optional_parentheses(expr: ExpressionRef, context: &PyFormatContext) -> bool {
-    if context.comments().has_leading_comments(expr) {
-        false
-    } else {
-        true
-    }
-}
-
-// fn has_magic_comma(expr: AnyNodeRef)
 
 /// Configures if the expression should be parenthesized.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
