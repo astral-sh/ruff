@@ -247,6 +247,24 @@ impl<'a> SimpleTokenizer<'a> {
         Self::new(source, TextRange::up_to(offset))
     }
 
+    fn eat_multichar(&mut self, needle: &str, current: char) -> bool {
+        let mut needle_chars = needle.chars();
+        if needle_chars.next() != Some(current) {
+            return false;
+        }
+
+        self.cursor.eat_chars(needle_chars)
+    }
+
+    fn eat_multichar_back(&mut self, needle: &str, current: char) -> bool {
+        let mut needle_chars = needle.chars().rev();
+        if needle_chars.next() != Some(current) {
+            return false;
+        }
+
+        self.cursor.eat_chars_back(needle_chars)
+    }
+
     fn next_token(&mut self) -> Token {
         self.cursor.start_token();
 
@@ -287,26 +305,16 @@ impl<'a> SimpleTokenizer<'a> {
 
             '\\' => TokenKind::Continuation,
 
-            'e' => {
-                if self.cursor.eat_chars("lse") {
-                    TokenKind::Else
-                } else {
-                    TokenKind::Other
-                }
-            }
-
-            'i' => {
-                if self.cursor.eat_char('f') {
+            c => {
+                let kind = if self.eat_multichar("if", c) {
                     TokenKind::If
-                } else if self.cursor.eat_char('n') {
+                } else if self.eat_multichar("else", c) {
+                    TokenKind::Else
+                } else if self.eat_multichar("in", c) {
                     TokenKind::In
                 } else {
-                    TokenKind::Other
-                }
-            }
-
-            c => {
-                let kind = TokenKind::from_non_trivia_char(c);
+                    TokenKind::from_non_trivia_char(c)
+                };
 
                 if kind == TokenKind::Other {
                     self.bogus = true;
@@ -413,11 +421,11 @@ impl<'a> SimpleTokenizer<'a> {
                 } else if c == '\\' {
                     TokenKind::Continuation
                 } else {
-                    let kind = if c == 'f' && self.cursor.eat_char_back('i') {
+                    let kind = if self.eat_multichar_back("if", c) {
                         TokenKind::If
-                    } else if c == 'n' && self.cursor.eat_char_back('i') {
+                    } else if self.eat_multichar_back("in", c) {
                         TokenKind::In
-                    } else if c == 'e' && self.cursor.eat_chars_back("sle") {
+                    } else if self.eat_multichar_back("else", c) {
                         TokenKind::Else
                     } else {
                         TokenKind::from_non_trivia_char(c)
@@ -543,12 +551,13 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    fn eat_chars(&mut self, s: &str) -> bool {
+    fn eat_chars<T: Iterator<Item = char> + Clone>(&mut self, mut s: T) -> bool {
         let mut chars = self.chars.clone();
-        if !s.chars().all(|c| chars.next() == Some(c)) {
+        let s_copy = s.clone();
+        if !s.all(|c| chars.next() == Some(c)) {
             return false;
         }
-        for _ in s.chars() {
+        for _ in s_copy {
             self.bump();
         }
         true
@@ -563,12 +572,13 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    fn eat_chars_back(&mut self, s: &str) -> bool {
+    fn eat_chars_back<T: Iterator<Item = char> + Clone>(&mut self, mut s: T) -> bool {
         let mut chars = self.chars.clone();
-        if !s.chars().all(|c| chars.next_back() == Some(c)) {
+        let s_copy = s.clone();
+        if !s.all(|c| chars.next_back() == Some(c)) {
             return false;
         }
-        for _ in s.chars() {
+        for _ in s_copy {
             self.bump_back();
         }
         true
