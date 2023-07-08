@@ -318,7 +318,9 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
             },
 
             // Remove all whitespace in parenthesized expressions
-            NodeLevel::Expression => write!(f, [hard_line_break()]),
+            NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
+                write!(f, [hard_line_break()])
+            }
         }
     }
 }

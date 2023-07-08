@@ -24,7 +24,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
         group(&format_args![
             if_group_breaks(&text("(")),
             soft_block_indent(&Arguments::from(&self.inner)),
-            if_group_breaks(&text(")"))
+            if_group_breaks(&text(")")),
         ])
         .fmt(f)
     }
@@ -113,7 +113,9 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
                         0 | 1 => hard_line_break().fmt(self.fmt),
                         _ => empty_line().fmt(self.fmt),
                     },
-                    NodeLevel::Expression => hard_line_break().fmt(self.fmt),
+                    NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
+                        hard_line_break().fmt(self.fmt)
+                    }
                 }?;
             }
 
@@ -353,7 +355,7 @@ no_leading_newline = 30"#
     // Removes all empty lines
     #[test]
     fn ranged_builder_parenthesized_level() {
-        let printed = format_ranged(NodeLevel::Expression);
+        let printed = format_ranged(NodeLevel::Expression(None));
 
         assert_eq!(
             &printed,
