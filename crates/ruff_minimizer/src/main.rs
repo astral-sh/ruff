@@ -4,9 +4,9 @@
 //!
 //! Minimize a file with unstable formatting
 //! ```shell
-//! cargo run --bin ruff-minimizer -- target/cpython/Lib/test/inspect_fodder.py target/minirepo/a.py "Unstable formatting" "target/debug/ruff_dev check-formatter-stability target/minirepo"
+//! cargo run --bin ruff-minimizer -- target/cpython/Lib/test/inspect_fodder.py target/minirepo/a.py "Unstable formatting" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
 //! ```
-//! This will emit
+//! This could emit
 //! ```python
 //! class WhichComments:    # before f        return 1        # end f    # after f    # before asyncf - line 108
 //!     async def asyncf(self):        return 2
@@ -14,8 +14,18 @@
 //! (
 //! );
 //! ```
-//! which only has only the two involved top level statements and the one relevant comment line
-//! remaining
+//!
+//! Minimize a file with a syntax error
+//! ```shell
+//! run --bin ruff_minimizer -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/a.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
+//! ```
+//! This could emit
+//! ```python
+//! class RepresentationQtModel(QtCore.QObject):
+//!             data[
+//!                 :,
+//!             ] = rep.data
+//! ```
 
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
@@ -158,55 +168,52 @@ fn make_line_candidates<'a>(
     Ok((num_candidates, Box::new(iter)))
 }
 
-type Strategy<'a> =
-    fn(input: &'a str, ast: &'a Suite) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)>;
+type Strategy = for<'a> fn(
+    input: &'a str,
+    ast: &'a Suite,
+) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)>;
 
-fn find_smaller_failure(
+const STRATEGIES: [(Strategy, &'static str); 4] = [
+    (make_module_candidates, "module member"),
+    (make_remove_statement, "remove statement"),
+    (make_pass_statement, "statement pass"),
+    (make_line_candidates, "line"),
+];
+
+fn minimization_step(
     input: &str,
     location: &Path,
     command_args: &[String],
     pattern: &Regex,
-    last_strategy_and_idx: Option<(&'static str, usize)>,
-) -> Result<Option<(&'static str, usize, String)>> {
-    let strategies: &[(Strategy, _)] = &[
-        (make_module_candidates, "module member"),
-        (make_remove_statement, "remove statement"),
-        (make_pass_statement, "statement pass"),
-        (make_line_candidates, "line"),
-    ];
-
+    last_strategy_and_idx: Option<(Strategy, usize)>,
+) -> Result<Option<(Strategy, usize, String)>> {
     let tokens = ruff_rustpython::tokenize(input);
     let ast =
         ruff_rustpython::parse_program_tokens(tokens, "input.py").context("not valid python")?;
 
     // Try the last succeeding strategy first
-    if let Some((last_strategy_name, last_idx)) = last_strategy_and_idx {
-        let (strategy, _) = strategies
-            .iter()
-            .find(|(_, name)| name == &last_strategy_name)
-            .unwrap();
-
-        let (num_candidates, iter) = strategy(input, &ast)?;
+    if let Some((last_strategy, last_idx)) = last_strategy_and_idx {
+        let (num_candidates, iter) = last_strategy(input, &ast)?;
         println!(
-            "{} ({last_idx} skipped) {last_strategy_name} candidates",
+            "{} ({last_idx} skipped) candidates",
             num_candidates - last_idx
         );
         for (idx, entry) in iter.enumerate().skip(last_idx) {
             if is_failing(&entry, location, command_args, pattern)? {
                 // This one is still failing in the right way
-                return Ok(Some((last_strategy_name, idx, entry)));
+                return Ok(Some((last_strategy, idx, entry)));
             }
         }
     }
 
     // Try all strategies in order
-    for (strategy, name) in strategies {
+    for (strategy, name) in STRATEGIES {
         let (num_candidates, iter) = strategy(input, &ast)?;
         println!("{num_candidates} {name} candidates");
         for (idx, entry) in iter.enumerate() {
             if is_failing(&entry, location, command_args, pattern)? {
                 // This one is still failing in the right way
-                return Ok(Some((name, idx, entry)));
+                return Ok(Some((strategy, idx, entry)));
             }
         }
     }
@@ -256,7 +263,7 @@ fn run() -> Result<()> {
     loop {
         let start = Instant::now();
         num_iterations += 1;
-        let smaller_failure = find_smaller_failure(
+        let smaller_failure = minimization_step(
             &input,
             &args.location,
             &command_args,
