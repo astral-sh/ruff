@@ -1,7 +1,7 @@
 use rustpython_parser::ast::{ArgWithDefault, Arguments, Ranged, Stmt};
 
 use crate::registry::AsRule;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::leading_space;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -52,13 +52,15 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct MutableArgumentDefault;
 
-impl AlwaysAutofixableViolation for MutableArgumentDefault {
+impl Violation for MutableArgumentDefault {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use mutable data structures for argument defaults")
     }
-    fn autofix_title(&self) -> String {
-        format!("Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`")
+    fn autofix_title(&self) -> Option<String> {
+        Some(format!("Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`"))
     }
 }
 
@@ -90,7 +92,12 @@ pub(crate) fn mutable_argument_default(
         {
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch(diagnostic.kind.rule())
+                // Do not try to fix if the function is only one line.
+                && checker
+                    .locator
+                    .contains_line_break(TextRange::new(arguments.range().end(), body[0].start()))
+            {
                 // Set the default arg value to None
                 let arg_edit = Edit::range_replacement("None".to_string(), default.range());
 
