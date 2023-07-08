@@ -34,8 +34,9 @@ use clap::Parser;
 use fs_err as fs;
 use regex::Regex;
 use ruff_python_ast::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use ruff_python_ast::visitor::{walk_expr, Visitor};
 use rustpython_ast::text_size::TextRange;
-use rustpython_ast::{Ranged, Stmt, Suite};
+use rustpython_ast::{Expr, Ranged, Stmt, Suite};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::Instant;
@@ -77,6 +78,7 @@ fn make_module_candidates<'a>(
 
 #[derive(Default)]
 struct StatementCollector {
+    /// The ranges of all statements
     ranges: Vec<TextRange>,
 }
 
@@ -140,6 +142,33 @@ fn make_pass_statement<'a>(
     make_remove_or_pass_statement(input, ast, true)
 }
 
+#[derive(Default)]
+struct ExpressionCollector {
+    /// The ranges of all expressions
+    ranges: Vec<TextRange>,
+}
+
+impl Visitor<'_> for ExpressionCollector {
+    fn visit_expr(&mut self, expr: &Expr) {
+        self.ranges.push(expr.range());
+        walk_expr(self, &expr);
+    }
+}
+
+/// Try to remove each expression
+fn make_remove_expression<'a>(
+    input: &'a str,
+    ast: &'a Suite,
+) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)> {
+    let mut visitor = ExpressionCollector::default();
+    visitor.visit_body(&ast);
+    let num_candidates = visitor.ranges.len();
+    let iter = visitor.ranges.into_iter().map(move |range| {
+        input[..range.start().to_usize()].to_string() + &input[range.end().to_usize()..]
+    });
+    Ok((num_candidates, Box::new(iter)))
+}
+
 /// Returns the number of permutations and each permutation
 fn make_line_candidates<'a>(
     input: &'a str,
@@ -173,9 +202,10 @@ type Strategy = for<'a> fn(
     ast: &'a Suite,
 ) -> Result<(usize, Box<dyn Iterator<Item = String> + 'a>)>;
 
-const STRATEGIES: [(Strategy, &'static str); 4] = [
+const STRATEGIES: &[(Strategy, &'static str)] = &[
     (make_module_candidates, "module member"),
     (make_remove_statement, "remove statement"),
+    (make_remove_expression, "remove expression"),
     (make_pass_statement, "statement pass"),
     (make_line_candidates, "line"),
 ];
@@ -213,7 +243,7 @@ fn minimization_step(
         for (idx, entry) in iter.enumerate() {
             if is_failing(&entry, location, command_args, pattern)? {
                 // This one is still failing in the right way
-                return Ok(Some((strategy, idx, entry)));
+                return Ok(Some((*strategy, idx, entry)));
             }
         }
     }
