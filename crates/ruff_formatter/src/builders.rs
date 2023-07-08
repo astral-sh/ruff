@@ -2357,7 +2357,6 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
 #[derive(Copy, Clone)]
 pub struct BestFitting<'a, Context> {
     variants: Arguments<'a, Context>,
-    mode: BestFittingMode,
 }
 
 impl<'a, Context> BestFitting<'a, Context> {
@@ -2375,115 +2374,7 @@ impl<'a, Context> BestFitting<'a, Context> {
             "Requires at least the least expanded and most expanded variants"
         );
 
-        Self {
-            variants,
-            mode: BestFittingMode::default(),
-        }
-    }
-
-    /// Changes the mode used by this best fitting element to determine whether a variant fits.
-    ///
-    /// ## Examples
-    ///
-    /// ### All Lines
-    ///
-    /// ```
-    /// use ruff_formatter::{Formatted, LineWidth, format, format_args, SimpleFormatOptions};
-    /// use ruff_formatter::prelude::*;
-    ///
-    /// # fn main() -> FormatResult<()> {
-    /// let formatted = format!(
-    ///     SimpleFormatContext::default(),
-    ///     [
-    ///         best_fitting!(
-    ///             // Everything fits on a single line
-    ///             format_args!(
-    ///                 group(&format_args![
-    ///                     text("["),
-    ///                         soft_block_indent(&format_args![
-    ///                         text("1,"),
-    ///                         soft_line_break_or_space(),
-    ///                         text("2,"),
-    ///                         soft_line_break_or_space(),
-    ///                         text("3"),
-    ///                     ]),
-    ///                     text("]")
-    ///                 ]),
-    ///                 space(),
-    ///                 text("+"),
-    ///                 space(),
-    ///                 text("aVeryLongIdentifier")
-    ///             ),
-    ///
-    ///             // Breaks after `[` and prints each elements on a single line
-    ///             // The group is necessary because the variant, by default is printed in flat mode and a
-    ///             // hard line break indicates that the content doesn't fit.
-    ///             format_args!(
-    ///                 text("["),
-    ///                 group(&block_indent(&format_args![text("1,"), hard_line_break(), text("2,"), hard_line_break(), text("3")])).should_expand(true),
-    ///                 text("]"),
-    ///                 space(),
-    ///                 text("+"),
-    ///                 space(),
-    ///                 text("aVeryLongIdentifier")
-    ///             ),
-    ///
-    ///             // Adds parentheses and indents the body, breaks after the operator
-    ///             format_args!(
-    ///                 text("("),
-    ///                 block_indent(&format_args![
-    ///                     text("["),
-    ///                     block_indent(&format_args![
-    ///                         text("1,"),
-    ///                         hard_line_break(),
-    ///                         text("2,"),
-    ///                         hard_line_break(),
-    ///                         text("3"),
-    ///                     ]),
-    ///                     text("]"),
-    ///                     hard_line_break(),
-    ///                     text("+"),
-    ///                     space(),
-    ///                     text("aVeryLongIdentifier")
-    ///                 ]),
-    ///                 text(")")
-    ///             )
-    ///         ).with_mode(BestFittingMode::AllLines)
-    ///     ]
-    /// )?;
-    ///
-    /// let document = formatted.into_document();
-    ///
-    /// // Takes the first variant if everything fits on a single line
-    /// assert_eq!(
-    ///     "[1, 2, 3] + aVeryLongIdentifier",
-    ///     Formatted::new(document.clone(), SimpleFormatContext::default())
-    ///         .print()?
-    ///         .as_code()
-    /// );
-    ///
-    /// // It takes the second if the first variant doesn't fit on a single line. The second variant
-    /// // has some additional line breaks to make sure inner groups don't break
-    /// assert_eq!(
-    ///     "[\n\t1,\n\t2,\n\t3\n] + aVeryLongIdentifier",
-    ///     Formatted::new(document.clone(), SimpleFormatContext::new(SimpleFormatOptions { line_width: 23.try_into().unwrap(), ..SimpleFormatOptions::default() }))
-    ///         .print()?
-    ///         .as_code()
-    /// );
-    ///
-    /// // Prints the last option as last resort
-    /// assert_eq!(
-    ///     "(\n\t[\n\t\t1,\n\t\t2,\n\t\t3\n\t]\n\t+ aVeryLongIdentifier\n)",
-    ///     Formatted::new(document.clone(), SimpleFormatContext::new(SimpleFormatOptions { line_width: 22.try_into().unwrap(), ..SimpleFormatOptions::default() }))
-    ///         .print()?
-    ///         .as_code()
-    /// );
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_mode(mut self, mode: BestFittingMode) -> Self {
-        self.mode = mode;
-        self
+        Self { variants }
     }
 }
 
@@ -2509,7 +2400,6 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
                 variants: format_element::BestFittingVariants::from_vec_unchecked(
                     formatted_variants,
                 ),
-                mode: self.mode,
             }
         };
 
