@@ -79,6 +79,9 @@ def multiline_arg_wrong(value={
 }):
     ...
 
+def single_line_func_wrong(value = {}): ...
+
+
 def and_this(value=set()):
     ...
 
