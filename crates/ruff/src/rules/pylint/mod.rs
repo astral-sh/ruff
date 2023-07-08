@@ -18,6 +18,10 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
+    #[test_case(
+        Rule::AbstractClassInstantiated,
+        Path::new("abstract_class_instantiated.py")
+    )]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]

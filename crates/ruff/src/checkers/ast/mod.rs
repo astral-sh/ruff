@@ -2859,6 +2859,11 @@ where
                 if self.enabled(Rule::DeprecatedLogWarn) {
                     pygrep_hooks::rules::deprecated_log_warn(self, func);
                 }
+
+                // pylint
+                if self.enabled(Rule::AbstractClassInstantiated) {
+                    pylint::rules::abstract_class_instantiated(self, expr, func);
+                }
                 if self.enabled(Rule::UnnecessaryDirectLambdaCall) {
                     pylint::rules::unnecessary_direct_lambda_call(self, expr, func);
                 }

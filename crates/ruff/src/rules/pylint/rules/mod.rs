@@ -1,3 +1,4 @@
+pub(crate) use abstract_class_instantiated::*;
 pub(crate) use assert_on_string_literal::*;
 pub(crate) use await_outside_async::*;
 pub(crate) use bad_str_strip_call::*;
@@ -48,6 +49,7 @@ pub(crate) use useless_return::*;
 pub(crate) use yield_from_in_async_function::*;
 pub(crate) use yield_in_init::*;
 
+mod abstract_class_instantiated;
 mod assert_on_string_literal;
 mod await_outside_async;
 mod bad_str_strip_call;

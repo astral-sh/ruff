@@ -178,6 +178,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0208") => (RuleGroup::Unspecified, rules::pylint::rules::IterationOverSet),
         (Pylint, "E0100") => (RuleGroup::Unspecified, rules::pylint::rules::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Unspecified, rules::pylint::rules::ReturnInInit),
+        (Pylint, "E0110") => (RuleGroup::Unspecified, rules::pylint::rules::AbstractClassInstantiated),
         (Pylint, "E0116") => (RuleGroup::Unspecified, rules::pylint::rules::ContinueInFinally),
         (Pylint, "E0117") => (RuleGroup::Unspecified, rules::pylint::rules::NonlocalWithoutBinding),
         (Pylint, "E0118") => (RuleGroup::Unspecified, rules::pylint::rules::LoadBeforeGlobalDeclaration),
