@@ -32,7 +32,7 @@ use crate::registry::AsRule;
 /// - [Iterators and Iterables in Python: Run Efficient
 /// Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[violation]
-pub struct UnnecessaryListAllocationForFirstElement {
+pub(crate) struct UnnecessaryListAllocationForFirstElement {
     arg: String,
 }
 
