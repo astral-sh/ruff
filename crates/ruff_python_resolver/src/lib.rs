@@ -130,7 +130,8 @@ mod tests {
 
     macro_rules! assert_debug_snapshot_normalize_paths {
         ($value: ident) => {
-            let $value = format!("{:#?}", $value).replace('\\', "/");
+            // The debug representation for the backslash are two backslashes (escaping)
+            let $value = format!("{:#?}", $value).replace("\\\\", "/");
             insta::assert_display_snapshot!($value);
         };
     }
