@@ -239,9 +239,17 @@ pub struct Options {
     pub external: Option<Vec<String>>,
 
     /// Enable autofix behavior by-default when running `ruff` (overridden
-    /// by the `--fix` and `--no-fix` command-line flags).
+    /// by the `--fix` and `--no-fix` command-line flags). Only works on Automatic fixes.
     #[option(default = "false", value_type = "bool", example = "fix = true")]
     pub fix: Option<bool>,
+
+    /// Enable autofix behavior for Automatic and Suggested fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = "fix-suggested = true"
+    )]
+    pub fix_suggested: Option<bool>,
 
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     #[option(default = "false", value_type = "bool", example = "fix-only = true")]

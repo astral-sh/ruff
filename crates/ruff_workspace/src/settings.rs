@@ -17,6 +17,8 @@ pub struct Settings {
     #[cache_key(ignore)]
     pub fix: bool,
     #[cache_key(ignore)]
+    pub fix_suggested: bool,
+    #[cache_key(ignore)]
     pub fix_only: bool,
     #[cache_key(ignore)]
     pub output_format: SerializationFormat,
@@ -36,6 +38,7 @@ impl Default for Settings {
         Self {
             cache_dir: cache_dir(project_root),
             fix: false,
+            fix_suggested: false,
             fix_only: false,
             output_format: SerializationFormat::default(),
             show_fixes: false,

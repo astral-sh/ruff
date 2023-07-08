@@ -574,3 +574,225 @@ fn check_input_from_argfile() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn display_different_safety_levels() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    // `--fix` should only apply safe fixes, but should tell the user about `--fix --unsafe` if
+    // there are remaining unsafe fixes.
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+        ])
+        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        r#"-:1:14: F601 [*] Dictionary key literal `'a'` repeated
+-:2:7: UP034 [*] Avoid extraneous parentheses
+Found 2 errors.
+[*] 1 potentially fixable with the --fix option.
+[*] 2 potentially fixable with the --fix --unsafe options.
+"#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn display_unsafe_fixes_remain() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    let output = cmd
+        .args(["-", "--format", "text", "--isolated", "--select", "F601"])
+        .write_stdin("x = {'a': 1, 'a': 1}\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        r#"-:1:14: F601 [*] Dictionary key literal `'a'` repeated
+Found 1 error.
+[*] 1 potentially fixable with the --fix-suggested option.
+"#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_applies_safe_fixes_only() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    // `--fix` should only apply safe fixes. Since we're runnnig in `stdin` mode, output shouldn't
+    // be printed.
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--fix",
+        ])
+        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "x = {'a': 1, 'a': 1}\nprint('foo')\n"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_applies_all_fixes() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    // `--fix --unsafe` should apply both safe and unsafe fixes.
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--fix",
+            "--fix-suggested",
+        ])
+        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .assert()
+        .success();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "x = {'a': 1}\nprint('foo')\n"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn diff_diffs_all_fixes() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    // `--fix --unsafe` should apply both safe and unsafe fixes.
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--diff",
+            "--fix-suggested",
+        ])
+        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        r#"@@ -1,2 +1,2 @@
+-x = {'a': 1, 'a': 1}
+-print(('foo'))
++x = {'a': 1}
++print('foo')
+
+"#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn diff_diffs_safe_fixes_only() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    // `--fix --unsafe` should apply both safe and unsafe fixes.
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--diff",
+        ])
+        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        r#"@@ -1,2 +1,2 @@
+ x = {'a': 1, 'a': 1}
+-print(('foo'))
++print('foo')
+
+"#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_only_applies_all_fixes() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    // `--fix --unsafe` should apply both safe and unsafe fixes.
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--fix-only",
+            "--fix-suggested",
+        ])
+        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .assert()
+        .success();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "x = {'a': 1}\nprint('foo')\n"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_only_applies_safe_fixes_only() -> Result<()> {
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+
+    // `--fix --unsafe` should apply both safe and unsafe fixes.
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--fix-only",
+        ])
+        .write_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n")
+        .assert()
+        .success();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        "x = {'a': 1, 'a': 1}\nprint('foo')\n"
+    );
+
+    Ok(())
+}

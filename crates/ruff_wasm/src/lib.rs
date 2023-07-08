@@ -143,6 +143,7 @@ impl Workspace {
             extend_per_file_ignores: None,
             fix: None,
             fix_only: None,
+            fix_suggested: None,
             fixable: None,
             force_exclude: None,
             output_format: None,

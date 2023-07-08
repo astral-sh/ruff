@@ -10,7 +10,7 @@ use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
-use ruff_linter::settings::flags;
+use ruff_linter::settings::flags::{FixMode, SuggestedFixes};
 use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
@@ -228,6 +228,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let Settings {
         fix,
         fix_only,
+        fix_suggested,
         output_format,
         show_fixes,
         show_source,
@@ -237,15 +238,26 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     // Autofix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
-    //   print them to stdout, if we're reading from stdin).
+    //   print them to stdout, if we're reading from stdin) for [`Applicability::Automatic`] rules
+    //   only.
     // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   fixes).
-    let autofix = if cli.diff {
-        flags::FixMode::Diff
-    } else if fix || fix_only {
-        flags::FixMode::Apply
+    //   fixes) for [`Applicability::Automatic`] rules only.
+    // - If `--fix--suggested` is set, the above rules will apply to both [`Applicability::Suggested`] and
+    //   [`Applicability::Automatic`] fixes.
+    // TODO: can't fix this until @zanieb changes the CLI
+    let fix_suggested = if fix_suggested {
+        SuggestedFixes::Apply
     } else {
-        flags::FixMode::Generate
+        SuggestedFixes::Disable
+    };
+
+    let autofix = if cli.diff {
+        FixMode::Diff(fix_suggested)
+    } else if fix || fix_only {
+        FixMode::Apply(fix_suggested)
+    } else {
+        // We'll always generate all fixes, regardless of [`Applicability`], in `generate` mode
+        FixMode::Generate(SuggestedFixes::Apply)
     };
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
@@ -382,7 +394,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
+        if !(is_stdin && matches!(autofix, FixMode::Apply(_) | FixMode::Diff(_))) {
             if cli.statistics {
                 printer.write_statistics(&diagnostics, &mut writer)?;
             } else {

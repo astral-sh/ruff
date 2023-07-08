@@ -4,11 +4,12 @@ use std::collections::BTreeSet;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
 use ruff_source_file::Locator;
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
+use crate::settings::flags::SuggestedFixes;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -24,10 +25,25 @@ pub(crate) struct FixResult {
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub(crate) fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<FixResult> {
+pub(crate) fn fix_file(
+    diagnostics: &[Diagnostic],
+    locator: &Locator,
+    fix_suggested: SuggestedFixes,
+) -> Option<FixResult> {
     let mut with_fixes = diagnostics
         .iter()
-        .filter(|diag| diag.fix.is_some())
+        .filter(|diag| {
+            let Some(ref fix) = diag.fix else {
+                return false;
+            };
+
+            // change this
+            if matches!(fix_suggested, SuggestedFixes::Apply) {
+                fix.applicability() >= Applicability::Suggested
+            } else {
+                fix.applicability() == Applicability::Automatic
+            }
+        })
         .peekable();
 
     if with_fixes.peek().is_none() {

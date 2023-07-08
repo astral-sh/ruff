@@ -5,27 +5,30 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::edit::Edit;
 
-/// Indicates confidence in the correctness of a suggested fix.
+/// Indicates confidence in the correctness of a suggested fix. Rust internally allows comparison
+/// of enum values based on their order (see Rust's [enum
+/// documentation](https://doc.rust-lang.org/reference/items/enumerations.html)). This allows us to
+/// apply [`Fix`]es based on their [`Applicability`].
 #[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Applicability {
-    /// The fix is definitely what the user intended, or maintains the exact meaning of the code.
-    /// This fix should be automatically applied.
-    Automatic,
+    /// The fix has a good chance of being incorrect or the code be incomplete.
+    /// The fix may result in invalid code if it is applied.
+    /// The fix should only be manually applied by the user.
+    Manual,
+
+    /// The applicability of the fix is unknown or not relevant.
+    #[default]
+    Unspecified,
 
     /// The fix may be what the user intended, but it is uncertain.
     /// The fix should result in valid code if it is applied.
     /// The fix can be applied with user opt-in.
     Suggested,
 
-    /// The fix has a good chance of being incorrect or the code be incomplete.
-    /// The fix may result in invalid code if it is applied.
-    /// The fix should only be manually applied by the user.
-    Manual,
-
-    /// The applicability of the fix is unknown.
-    #[default]
-    Unspecified,
+    /// The fix is definitely what the user intended, or maintains the exact meaning of the code.
+    /// This fix should be automatically applied.
+    Automatic,
 }
 
 /// Indicates the level of isolation required to apply a fix.
@@ -161,5 +164,10 @@ impl Fix {
     pub fn isolate(mut self, isolation: IsolationLevel) -> Self {
         self.isolation_level = isolation;
         self
+    }
+
+    /// Return [`true`] if this [`Fix`] should be applied with a given [`Applicability`].
+    pub fn is_applied(&self, applicability: Applicability) -> bool {
+        self.applicability >= applicability
     }
 }

@@ -155,8 +155,11 @@ pub(crate) fn test_contents<'a>(
             code: fixed_contents,
             source_map,
             ..
-        }) = fix_file(&diagnostics, &Locator::new(transformed.source_code()))
-        {
+        }) = fix_file(
+            &diagnostics,
+            &Locator::new(transformed.source_code()),
+            flags::SuggestedFixes::Apply,
+        ) {
             if iterations < max_iterations() {
                 iterations += 1;
             } else {

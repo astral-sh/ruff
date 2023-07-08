@@ -73,6 +73,7 @@ pub struct Configuration {
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
+    pub fix_suggested: Option<bool>,
     pub fix_only: Option<bool>,
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
@@ -163,6 +164,7 @@ impl Configuration {
                 .clone()
                 .unwrap_or_else(|| cache_dir(project_root)),
             fix: self.fix.unwrap_or(false),
+            fix_suggested: self.fix_suggested.unwrap_or(false),
             fix_only: self.fix_only.unwrap_or(false),
             output_format: self.output_format.unwrap_or_default(),
             show_fixes: self.show_fixes.unwrap_or(false),
@@ -410,6 +412,7 @@ impl Configuration {
                 .unwrap_or_default(),
             external: options.external,
             fix: options.fix,
+            fix_suggested: options.fix_suggested,
             fix_only: options.fix_only,
             output_format: options.output_format.or_else(|| {
                 options
@@ -753,6 +756,7 @@ impl Configuration {
                 .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
+            fix_suggested: self.fix_suggested.or(config.fix_suggested),
             fix_only: self.fix_only.or(config.fix_only),
             output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
