@@ -451,7 +451,7 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
- )
+-)
 +result = session.query(models.Customer.id).filter(
 +    models.Customer.account_id == account_id, models.Customer.email == email_address
 +).order_by(models.Customer.id.asc()).all()
@@ -531,7 +531,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,19 +335,16 @@
+@@ -342,7 +335,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -541,21 +541,6 @@ last_call()
      ^ aaaaaaaaaaaaaaaa.i
      << aaaaaaaaaaaaaaaa.k
      >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
- ):
-     return True
--(
--    aaaaaaaaaaaaaaaa
--    + aaaaaaaaaaaaaaaa
--    - aaaaaaaaaaaaaaaa
--    * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
--    / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
--)
-+aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa - aaaaaaaaaaaaaaaa * (
-+    aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
-+) / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
- aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
- (
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ```
 
 ## Ruff Output
@@ -905,9 +890,13 @@ if (
     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 ):
     return True
-aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa - aaaaaaaaaaaaaaaa * (
-    aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
-) / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+(
+    aaaaaaaaaaaaaaaa
+    + aaaaaaaaaaaaaaaa
+    - aaaaaaaaaaaaaaaa
+    * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+    / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+)
 aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

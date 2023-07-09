@@ -280,11 +280,7 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-if [
-    aaaaaa,
-    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
-] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
-    ...
+CONFIG_FILES = [CONFIG_FILE, ] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

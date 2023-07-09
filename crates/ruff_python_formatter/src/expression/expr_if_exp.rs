@@ -1,10 +1,11 @@
 use crate::comments::{leading_comments, Comments};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{group, soft_line_break_or_space, space, text};
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use crate::prelude::*;
+use crate::FormatNodeRule;
+use ruff_formatter::{format_args, write};
 use rustpython_parser::ast::ExprIfExp;
 
 #[derive(Default)]
@@ -19,12 +20,13 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
             orelse,
         } = item;
         let comments = f.context().comments().clone();
+
         // We place `if test` and `else orelse` on a single line, so the `test` and `orelse` leading
         // comments go on the line before the `if` or `else` instead of directly ahead `test` or
         // `orelse`
         write!(
             f,
-            [group(&format_args![
+            [in_parentheses_only_group(&format_args![
                 body.format(),
                 soft_line_break_or_space(),
                 leading_comments(comments.leading_comments(test.as_ref())),
