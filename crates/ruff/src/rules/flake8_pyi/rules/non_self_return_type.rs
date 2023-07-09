@@ -148,21 +148,21 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
     }
 
     // In-place methods that are expected to return `Self`.
-    if INPLACE_BINOP_METHODS.contains(&name) {
+    if is_inplace_bin_op(name) {
         if !is_self(returns, checker.semantic()) {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -177,7 +177,7 @@ pub(crate) fn non_self_return_type(
                     class_name: class_def.name.to_string(),
                     method_name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
         return;
@@ -193,7 +193,7 @@ pub(crate) fn non_self_return_type(
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    stmt.identifier(checker.locator),
+                    stmt.identifier(),
                 ));
             }
         }
@@ -206,7 +206,7 @@ pub(crate) fn non_self_return_type(
                         class_name: class_def.name.to_string(),
                         method_name: name.to_string(),
                     },
-                    stmt.identifier(checker.locator),
+                    stmt.identifier(),
                 ));
             }
         }
@@ -214,21 +214,25 @@ pub(crate) fn non_self_return_type(
     }
 }
 
-const INPLACE_BINOP_METHODS: &[&str] = &[
-    "__iadd__",
-    "__isub__",
-    "__imul__",
-    "__imatmul__",
-    "__itruediv__",
-    "__ifloordiv__",
-    "__imod__",
-    "__ipow__",
-    "__ilshift__",
-    "__irshift__",
-    "__iand__",
-    "__ixor__",
-    "__ior__",
-];
+/// Returns `true` if the method is an in-place binary operator.
+fn is_inplace_bin_op(name: &str) -> bool {
+    matches!(
+        name,
+        "__iadd__"
+            | "__isub__"
+            | "__imul__"
+            | "__imatmul__"
+            | "__itruediv__"
+            | "__ifloordiv__"
+            | "__imod__"
+            | "__ipow__"
+            | "__ilshift__"
+            | "__irshift__"
+            | "__iand__"
+            | "__ixor__"
+            | "__ior__"
+    )
+}
 
 /// Return `true` if the given expression resolves to the given name.
 fn is_name(expr: &Expr, name: &str) -> bool {

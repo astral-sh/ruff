@@ -143,7 +143,7 @@ pub(crate) fn nested_min_max(
     }
 
     if args.iter().any(|arg| {
-        let Expr::Call(ast::ExprCall { func, keywords, ..} )= arg else {
+        let Expr::Call(ast::ExprCall { func, keywords, .. }) = arg else {
             return false;
         };
         MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
@@ -157,8 +157,7 @@ pub(crate) fn nested_min_max(
                     keywords: keywords.to_owned(),
                     range: TextRange::default(),
                 });
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().expr(&flattened_expr),
                     expr.range(),
                 )));

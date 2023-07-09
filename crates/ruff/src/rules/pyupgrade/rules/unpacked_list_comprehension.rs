@@ -56,7 +56,8 @@ pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr
         elt,
         generators,
         range: _,
-    }) = value else {
+    }) = value
+    else {
         return;
     };
 

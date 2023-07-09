@@ -39,18 +39,19 @@ impl Violation for LineContainsHack {
     }
 }
 
-pub(crate) fn todos(directive_ranges: &[TodoComment]) -> Vec<Diagnostic> {
-    directive_ranges
-        .iter()
-        .map(|TodoComment { directive, .. }| match directive.kind {
-            // FIX001
-            TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
-            // FIX002
-            TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
-            // FIX003
-            TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
-            // FIX004
-            TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
-        })
-        .collect::<Vec<Diagnostic>>()
+pub(crate) fn todos(diagnostics: &mut Vec<Diagnostic>, directive_ranges: &[TodoComment]) {
+    diagnostics.extend(
+        directive_ranges
+            .iter()
+            .map(|TodoComment { directive, .. }| match directive.kind {
+                // FIX001
+                TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
+                // FIX002
+                TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
+                // FIX003
+                TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
+                // FIX004
+                TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
+            }),
+    );
 }

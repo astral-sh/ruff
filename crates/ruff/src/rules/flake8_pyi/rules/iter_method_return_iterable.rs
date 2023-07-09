@@ -3,8 +3,8 @@ use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::prelude::Expr;
 use ruff_python_semantic::{Definition, Member, MemberKind};
+use rustpython_parser::ast::Expr;
 
 use crate::checkers::ast::Checker;
 
@@ -70,15 +70,12 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
         kind: MemberKind::Method,
         stmt,
         ..
-    }) = definition else {
+    }) = definition
+    else {
         return;
     };
 
-    let Stmt::FunctionDef(ast::StmtFunctionDef {
-        name,
-        returns,
-        ..
-    }) = stmt else {
+    let Stmt::FunctionDef(ast::StmtFunctionDef { name, returns, .. }) = stmt else {
         return;
     };
 

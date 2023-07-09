@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
+use rustpython_parser::ast::{self, CmpOp, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -77,12 +77,12 @@ impl AlwaysAutofixableViolation for NotIsTest {
 pub(crate) fn not_tests(
     checker: &mut Checker,
     expr: &Expr,
-    op: Unaryop,
+    op: UnaryOp,
     operand: &Expr,
     check_not_in: bool,
     check_not_is: bool,
 ) {
-    if matches!(op, Unaryop::Not) {
+    if matches!(op, UnaryOp::Not) {
         if let Expr::Compare(ast::ExprCompare {
             left,
             ops,
@@ -90,19 +90,19 @@ pub(crate) fn not_tests(
             range: _,
         }) = operand
         {
-            if !matches!(&ops[..], [Cmpop::In | Cmpop::Is]) {
+            if !matches!(&ops[..], [CmpOp::In | CmpOp::Is]) {
                 return;
             }
             for op in ops.iter() {
                 match op {
-                    Cmpop::In => {
+                    CmpOp::In => {
                         if check_not_in {
                             let mut diagnostic = Diagnostic::new(NotInTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
                                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                                     compare(
                                         left,
-                                        &[Cmpop::NotIn],
+                                        &[CmpOp::NotIn],
                                         comparators,
                                         checker.generator(),
                                     ),
@@ -112,14 +112,14 @@ pub(crate) fn not_tests(
                             checker.diagnostics.push(diagnostic);
                         }
                     }
-                    Cmpop::Is => {
+                    CmpOp::Is => {
                         if check_not_is {
                             let mut diagnostic = Diagnostic::new(NotIsTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
                                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                                     compare(
                                         left,
-                                        &[Cmpop::IsNot],
+                                        &[CmpOp::IsNot],
                                         comparators,
                                         checker.generator(),
                                     ),

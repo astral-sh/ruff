@@ -22,16 +22,16 @@ impl From<&ast::ExprContext> for ComparableExprContext {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableBoolop {
+pub enum ComparableBoolOp {
     And,
     Or,
 }
 
-impl From<ast::Boolop> for ComparableBoolop {
-    fn from(op: ast::Boolop) -> Self {
+impl From<ast::BoolOp> for ComparableBoolOp {
+    fn from(op: ast::BoolOp) -> Self {
         match op {
-            ast::Boolop::And => Self::And,
-            ast::Boolop::Or => Self::Or,
+            ast::BoolOp::And => Self::And,
+            ast::BoolOp::Or => Self::Or,
         }
     }
 }
@@ -74,26 +74,26 @@ impl From<ast::Operator> for ComparableOperator {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableUnaryop {
+pub enum ComparableUnaryOp {
     Invert,
     Not,
     UAdd,
     USub,
 }
 
-impl From<ast::Unaryop> for ComparableUnaryop {
-    fn from(op: ast::Unaryop) -> Self {
+impl From<ast::UnaryOp> for ComparableUnaryOp {
+    fn from(op: ast::UnaryOp) -> Self {
         match op {
-            ast::Unaryop::Invert => Self::Invert,
-            ast::Unaryop::Not => Self::Not,
-            ast::Unaryop::UAdd => Self::UAdd,
-            ast::Unaryop::USub => Self::USub,
+            ast::UnaryOp::Invert => Self::Invert,
+            ast::UnaryOp::Not => Self::Not,
+            ast::UnaryOp::UAdd => Self::UAdd,
+            ast::UnaryOp::USub => Self::USub,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableCmpop {
+pub enum ComparableCmpOp {
     Eq,
     NotEq,
     Lt,
@@ -106,19 +106,19 @@ pub enum ComparableCmpop {
     NotIn,
 }
 
-impl From<ast::Cmpop> for ComparableCmpop {
-    fn from(op: ast::Cmpop) -> Self {
+impl From<ast::CmpOp> for ComparableCmpOp {
+    fn from(op: ast::CmpOp) -> Self {
         match op {
-            ast::Cmpop::Eq => Self::Eq,
-            ast::Cmpop::NotEq => Self::NotEq,
-            ast::Cmpop::Lt => Self::Lt,
-            ast::Cmpop::LtE => Self::LtE,
-            ast::Cmpop::Gt => Self::Gt,
-            ast::Cmpop::GtE => Self::GtE,
-            ast::Cmpop::Is => Self::Is,
-            ast::Cmpop::IsNot => Self::IsNot,
-            ast::Cmpop::In => Self::In,
-            ast::Cmpop::NotIn => Self::NotIn,
+            ast::CmpOp::Eq => Self::Eq,
+            ast::CmpOp::NotEq => Self::NotEq,
+            ast::CmpOp::Lt => Self::Lt,
+            ast::CmpOp::LtE => Self::LtE,
+            ast::CmpOp::Gt => Self::Gt,
+            ast::CmpOp::GtE => Self::GtE,
+            ast::CmpOp::Is => Self::Is,
+            ast::CmpOp::IsNot => Self::IsNot,
+            ast::CmpOp::In => Self::In,
+            ast::CmpOp::NotIn => Self::NotIn,
         }
     }
 }
@@ -139,16 +139,16 @@ impl<'a> From<&'a ast::Alias> for ComparableAlias<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableWithitem<'a> {
+pub struct ComparableWithItem<'a> {
     context_expr: ComparableExpr<'a>,
     optional_vars: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::Withitem> for ComparableWithitem<'a> {
-    fn from(withitem: &'a ast::Withitem) -> Self {
+impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
+    fn from(with_item: &'a ast::WithItem) -> Self {
         Self {
-            context_expr: (&withitem.context_expr).into(),
-            optional_vars: withitem.optional_vars.as_ref().map(Into::into),
+            context_expr: (&with_item.context_expr).into(),
+            optional_vars: with_item.optional_vars.as_ref().map(Into::into),
         }
     }
 }
@@ -342,13 +342,11 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableArguments<'a> {
-    posonlyargs: Vec<ComparableArg<'a>>,
-    args: Vec<ComparableArg<'a>>,
+    posonlyargs: Vec<ComparableArgWithDefault<'a>>,
+    args: Vec<ComparableArgWithDefault<'a>>,
     vararg: Option<ComparableArg<'a>>,
-    kwonlyargs: Vec<ComparableArg<'a>>,
-    kw_defaults: Vec<ComparableExpr<'a>>,
+    kwonlyargs: Vec<ComparableArgWithDefault<'a>>,
     kwarg: Option<ComparableArg<'a>>,
-    defaults: Vec<ComparableExpr<'a>>,
 }
 
 impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
@@ -358,9 +356,7 @@ impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
             args: arguments.args.iter().map(Into::into).collect(),
             vararg: arguments.vararg.as_ref().map(Into::into),
             kwonlyargs: arguments.kwonlyargs.iter().map(Into::into).collect(),
-            kw_defaults: arguments.kw_defaults.iter().map(Into::into).collect(),
             kwarg: arguments.kwarg.as_ref().map(Into::into),
-            defaults: arguments.defaults.iter().map(Into::into).collect(),
         }
     }
 }
@@ -390,6 +386,21 @@ impl<'a> From<&'a ast::Arg> for ComparableArg<'a> {
             arg: arg.arg.as_str(),
             annotation: arg.annotation.as_ref().map(Into::into),
             type_comment: arg.type_comment.as_deref(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableArgWithDefault<'a> {
+    def: ComparableArg<'a>,
+    default: Option<ComparableExpr<'a>>,
+}
+
+impl<'a> From<&'a ast::ArgWithDefault> for ComparableArgWithDefault<'a> {
+    fn from(arg: &'a ast::ArgWithDefault) -> Self {
+        Self {
+            def: (&arg.def).into(),
+            default: arg.default.as_ref().map(Into::into),
         }
     }
 }
@@ -429,26 +440,26 @@ impl<'a> From<&'a ast::Comprehension> for ComparableComprehension<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExcepthandlerExceptHandler<'a> {
+pub struct ExceptHandlerExceptHandler<'a> {
     type_: Option<Box<ComparableExpr<'a>>>,
     name: Option<&'a str>,
     body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableExcepthandler<'a> {
-    ExceptHandler(ExcepthandlerExceptHandler<'a>),
+pub enum ComparableExceptHandler<'a> {
+    ExceptHandler(ExceptHandlerExceptHandler<'a>),
 }
 
-impl<'a> From<&'a ast::Excepthandler> for ComparableExcepthandler<'a> {
-    fn from(excepthandler: &'a ast::Excepthandler) -> Self {
-        let ast::Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
+    fn from(except_handler: &'a ast::ExceptHandler) -> Self {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_,
             name,
             body,
             ..
-        }) = excepthandler;
-        Self::ExceptHandler(ExcepthandlerExceptHandler {
+        }) = except_handler;
+        Self::ExceptHandler(ExceptHandlerExceptHandler {
             type_: type_.as_ref().map(Into::into),
             name: name.as_deref(),
             body: body.iter().map(Into::into).collect(),
@@ -458,7 +469,7 @@ impl<'a> From<&'a ast::Excepthandler> for ComparableExcepthandler<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprBoolOp<'a> {
-    op: ComparableBoolop,
+    op: ComparableBoolOp,
     values: Vec<ComparableExpr<'a>>,
 }
 
@@ -477,7 +488,7 @@ pub struct ExprBinOp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprUnaryOp<'a> {
-    op: ComparableUnaryop,
+    op: ComparableUnaryOp,
     operand: Box<ComparableExpr<'a>>,
 }
 
@@ -548,7 +559,7 @@ pub struct ExprYieldFrom<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprCompare<'a> {
     left: Box<ComparableExpr<'a>>,
-    ops: Vec<ComparableCmpop>,
+    ops: Vec<ComparableCmpOp>,
     comparators: Vec<ComparableExpr<'a>>,
 }
 
@@ -994,14 +1005,14 @@ pub struct StmtIf<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtWith<'a> {
-    items: Vec<ComparableWithitem<'a>>,
+    items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
     type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAsyncWith<'a> {
-    items: Vec<ComparableWithitem<'a>>,
+    items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
     type_comment: Option<&'a str>,
 }
@@ -1021,7 +1032,7 @@ pub struct StmtRaise<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtTry<'a> {
     body: Vec<ComparableStmt<'a>>,
-    handlers: Vec<ComparableExcepthandler<'a>>,
+    handlers: Vec<ComparableExceptHandler<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
     finalbody: Vec<ComparableStmt<'a>>,
 }
@@ -1029,7 +1040,7 @@ pub struct StmtTry<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtTryStar<'a> {
     body: Vec<ComparableStmt<'a>>,
-    handlers: Vec<ComparableExcepthandler<'a>>,
+    handlers: Vec<ComparableExceptHandler<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
     finalbody: Vec<ComparableStmt<'a>>,
 }

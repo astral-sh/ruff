@@ -92,8 +92,7 @@ pub(crate) fn missing_whitespace(
                     let mut diagnostic = Diagnostic::new(kind, token.range());
 
                     if autofix {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                        diagnostic.set_fix(Fix::automatic(Edit::insertion(
                             " ".to_string(),
                             token.end(),
                         )));

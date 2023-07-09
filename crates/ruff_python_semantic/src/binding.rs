@@ -75,40 +75,40 @@ impl<'a> Binding<'a> {
     pub const fn is_unbound(&self) -> bool {
         matches!(
             self.kind,
-            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException
+            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException(_)
         )
     }
 
     /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Importation(Importation { qualified_name }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
+            BindingKind::Import(Import { qualified_name }) => {
+                if let BindingKind::SubmoduleImport(SubmoduleImport {
                     qualified_name: existing,
                 }) = &existing.kind
                 {
                     return qualified_name == existing;
                 }
             }
-            BindingKind::FromImportation(FromImportation { qualified_name }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
+            BindingKind::FromImport(FromImport { qualified_name }) => {
+                if let BindingKind::SubmoduleImport(SubmoduleImport {
                     qualified_name: existing,
                 }) = &existing.kind
                 {
                     return qualified_name == existing;
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
                 match &existing.kind {
-                    BindingKind::Importation(Importation {
+                    BindingKind::Import(Import {
                         qualified_name: existing,
                     })
-                    | BindingKind::SubmoduleImportation(SubmoduleImportation {
+                    | BindingKind::SubmoduleImport(SubmoduleImport {
                         qualified_name: existing,
                     }) => {
                         return qualified_name == existing;
                     }
-                    BindingKind::FromImportation(FromImportation {
+                    BindingKind::FromImport(FromImport {
                         qualified_name: existing,
                     }) => {
                         return qualified_name == existing;
@@ -118,7 +118,7 @@ impl<'a> Binding<'a> {
             }
             BindingKind::Deletion
             | BindingKind::Annotation
-            | BindingKind::FutureImportation
+            | BindingKind::FutureImport
             | BindingKind::Builtin => {
                 return false;
             }
@@ -126,22 +126,20 @@ impl<'a> Binding<'a> {
         }
         matches!(
             existing.kind,
-            BindingKind::ClassDefinition
-                | BindingKind::FunctionDefinition
-                | BindingKind::Importation(..)
-                | BindingKind::FromImportation(..)
-                | BindingKind::SubmoduleImportation(..)
+            BindingKind::ClassDefinition(_)
+                | BindingKind::FunctionDefinition(_)
+                | BindingKind::Import(_)
+                | BindingKind::FromImport(_)
+                | BindingKind::SubmoduleImport(_)
         )
     }
 
     /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
     pub fn qualified_name(&self) -> Option<&str> {
         match &self.kind {
-            BindingKind::Importation(Importation { qualified_name }) => Some(qualified_name),
-            BindingKind::FromImportation(FromImportation { qualified_name }) => {
-                Some(qualified_name)
-            }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+            BindingKind::Import(Import { qualified_name }) => Some(qualified_name),
+            BindingKind::FromImport(FromImport { qualified_name }) => Some(qualified_name),
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
                 Some(qualified_name)
             }
             _ => None,
@@ -152,11 +150,11 @@ impl<'a> Binding<'a> {
     /// symbol was imported from another module.
     pub fn module_name(&self) -> Option<&str> {
         match &self.kind {
-            BindingKind::Importation(Importation { qualified_name })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+            BindingKind::Import(Import { qualified_name })
+            | BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
                 Some(qualified_name.split('.').next().unwrap_or(qualified_name))
             }
-            BindingKind::FromImportation(FromImportation { qualified_name }) => Some(
+            BindingKind::FromImport(FromImport { qualified_name }) => Some(
                 qualified_name
                     .rsplit_once('.')
                     .map_or(qualified_name, |(module, _)| module),
@@ -275,14 +273,6 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StarImportation<'a> {
-    /// The level of the import. `None` or `Some(0)` indicate an absolute import.
-    pub level: Option<u32>,
-    /// The module being imported. `None` indicates a wildcard import.
-    pub module: Option<&'a str>,
-}
-
-#[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
     pub names: Vec<&'a str>,
@@ -292,7 +282,7 @@ pub struct Export<'a> {
 /// Ex) `import foo` would be keyed on "foo".
 /// Ex) `import foo as bar` would be keyed on "bar".
 #[derive(Debug, Clone)]
-pub struct Importation<'a> {
+pub struct Import<'a> {
     /// The full name of the module being imported.
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
     /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
@@ -303,7 +293,7 @@ pub struct Importation<'a> {
 /// Ex) `from foo import bar` would be keyed on "bar".
 /// Ex) `from foo import bar as baz` would be keyed on "baz".
 #[derive(Debug, Clone)]
-pub struct FromImportation {
+pub struct FromImport {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
     /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
@@ -313,7 +303,7 @@ pub struct FromImportation {
 /// A binding for a submodule imported from a module, keyed on the name of the parent module.
 /// Ex) `import foo.bar` would be keyed on "foo".
 #[derive(Debug, Clone)]
-pub struct SubmoduleImportation<'a> {
+pub struct SubmoduleImport<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
     pub qualified_name: &'a str,
@@ -382,14 +372,14 @@ pub enum BindingKind<'a> {
     /// class Foo:
     ///     ...
     /// ```
-    ClassDefinition,
+    ClassDefinition(ScopeId),
 
     /// A binding for a function, like `foo` in:
     /// ```python
     /// def foo():
     ///     ...
     /// ```
-    FunctionDefinition,
+    FunctionDefinition(ScopeId),
 
     /// A binding for an `__all__` export, like `__all__` in:
     /// ```python
@@ -401,25 +391,25 @@ pub enum BindingKind<'a> {
     /// ```python
     /// from __future__ import annotations
     /// ```
-    FutureImportation,
+    FutureImport,
 
     /// A binding for a straight `import`, like `foo` in:
     /// ```python
     /// import foo
     /// ```
-    Importation(Importation<'a>),
+    Import(Import<'a>),
 
     /// A binding for a member imported from a module, like `bar` in:
     /// ```python
     /// from foo import bar
     /// ```
-    FromImportation(FromImportation),
+    FromImport(FromImport),
 
     /// A binding for a submodule imported from a module, like `bar` in:
     /// ```python
     /// import foo.bar
     /// ```
-    SubmoduleImportation(SubmoduleImportation<'a>),
+    SubmoduleImport(SubmoduleImport<'a>),
 
     /// A binding for a deletion, like `x` in:
     /// ```python
@@ -437,7 +427,11 @@ pub enum BindingKind<'a> {
     ///
     /// After the `except` block, `x` is unbound, despite the lack
     /// of an explicit `del` statement.
-    UnboundException,
+    ///
+    ///
+    /// Stores the ID of the binding that was shadowed in the enclosing
+    /// scope, if any.
+    UnboundException(Option<BindingId>),
 }
 
 bitflags! {

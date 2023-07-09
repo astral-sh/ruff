@@ -7,6 +7,29 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `zip` calls without an explicit `strict` parameter.
+///
+/// ## Why is this bad?
+/// By default, if the iterables passed to `zip` are of different lengths, the
+/// resulting iterator will be silently truncated to the length of the shortest
+/// iterable. This can lead to subtle bugs.
+///
+/// Use the `strict` parameter to raise a `ValueError` if the iterables are of
+/// non-uniform length.
+///
+/// ## Example
+/// ```python
+/// zip(a, b)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// zip(a, b, strict=True)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
 #[violation]
 pub struct ZipWithoutExplicitStrict;
 
@@ -45,7 +68,13 @@ pub(crate) fn zip_without_explicit_strict(
 /// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
 /// `itertools.cycle` or similar).
 fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall { func, args, keywords, .. }) = &arg else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        keywords,
+        ..
+    }) = &arg
+    else {
         return false;
     };
 

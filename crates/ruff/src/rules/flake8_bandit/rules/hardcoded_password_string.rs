@@ -3,8 +3,36 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::Checker;
+
 use super::super::helpers::{matches_password_name, string_literal};
 
+/// ## What it does
+/// Checks for potential uses of hardcoded passwords in strings.
+///
+/// ## Why is this bad?
+/// Including a hardcoded password in source code is a security risk, as an
+/// attacker could discover the password and use it to gain unauthorized
+/// access.
+///
+/// Instead, store passwords and other secrets in configuration files,
+/// environment variables, or other sources that are excluded from version
+/// control.
+///
+/// ## Example
+/// ```python
+/// SECRET_KEY = "hunter2"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+/// SECRET_KEY = os.environ["SECRET_KEY"]
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[violation]
 pub struct HardcodedPasswordString {
     name: String,
@@ -47,12 +75,13 @@ fn password_target(target: &Expr) -> Option<&str> {
 
 /// S105
 pub(crate) fn compare_to_hardcoded_password_string(
+    checker: &mut Checker,
     left: &Expr,
     comparators: &[Expr],
-) -> Vec<Diagnostic> {
-    comparators
-        .iter()
-        .filter_map(|comp| {
+) {
+    checker
+        .diagnostics
+        .extend(comparators.iter().filter_map(|comp| {
             string_literal(comp).filter(|string| !string.is_empty())?;
             let Some(name) = password_target(left) else {
                 return None;
@@ -63,29 +92,29 @@ pub(crate) fn compare_to_hardcoded_password_string(
                 },
                 comp.range(),
             ))
-        })
-        .collect()
+        }));
 }
 
 /// S105
 pub(crate) fn assign_hardcoded_password_string(
+    checker: &mut Checker,
     value: &Expr,
     targets: &[Expr],
-) -> Option<Diagnostic> {
+) {
     if string_literal(value)
         .filter(|string| !string.is_empty())
         .is_some()
     {
         for target in targets {
             if let Some(name) = password_target(target) {
-                return Some(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     HardcodedPasswordString {
                         name: name.to_string(),
                     },
                     value.range(),
                 ));
+                return;
             }
         }
     }
-    None
 }

@@ -1,9 +1,12 @@
+use std::fmt::{Debug, Formatter, Write};
+
+use itertools::Itertools;
+use rustpython_parser::ast::Ranged;
+
+use ruff_formatter::SourceCode;
+
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{CommentsMap, SourceComment};
-use itertools::Itertools;
-use ruff_formatter::SourceCode;
-use ruff_python_ast::prelude::*;
-use std::fmt::{Debug, Formatter, Write};
 
 /// Prints a debug representation of [`SourceComment`] that includes the comment's text
 pub(crate) struct DebugComment<'a> {
@@ -26,7 +29,7 @@ impl Debug for DebugComment<'_> {
 
         strut
             .field("text", &self.comment.slice.text(self.source_code))
-            .field("position", &self.comment.position);
+            .field("position", &self.comment.line_position);
 
         #[cfg(debug_assertions)]
         strut.field("formatted", &self.comment.formatted.get());
@@ -176,13 +179,15 @@ impl Debug for DebugNodeCommentSlice<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::comments::map::MultiMap;
-    use crate::comments::{CommentTextPosition, Comments, CommentsMap, SourceComment};
     use insta::assert_debug_snapshot;
-    use ruff_formatter::SourceCode;
-    use ruff_python_ast::node::AnyNode;
     use ruff_text_size::{TextRange, TextSize};
     use rustpython_parser::ast::{StmtBreak, StmtContinue};
+
+    use ruff_formatter::SourceCode;
+    use ruff_python_ast::node::AnyNode;
+
+    use crate::comments::map::MultiMap;
+    use crate::comments::{CommentLinePosition, Comments, CommentsMap, SourceComment};
 
     #[test]
     fn debug() {
@@ -208,7 +213,7 @@ break;
             continue_statement.as_ref().into(),
             SourceComment::new(
                 source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
-                CommentTextPosition::OwnLine,
+                CommentLinePosition::OwnLine,
             ),
         );
 
@@ -216,7 +221,7 @@ break;
             continue_statement.as_ref().into(),
             SourceComment::new(
                 source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
-                CommentTextPosition::EndOfLine,
+                CommentLinePosition::EndOfLine,
             ),
         );
 
@@ -224,7 +229,7 @@ break;
             break_statement.as_ref().into(),
             SourceComment::new(
                 source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
-                CommentTextPosition::OwnLine,
+                CommentLinePosition::OwnLine,
             ),
         );
 

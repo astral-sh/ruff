@@ -7,6 +7,8 @@ use ruff_python_ast::helpers::{has_non_none_keyword, is_const_none};
 
 use crate::checkers::ast::Checker;
 
+use super::helpers;
+
 #[violation]
 pub struct CallDatetimeWithoutTzinfo;
 
@@ -31,6 +33,10 @@ pub(crate) fn call_datetime_without_tzinfo(
             matches!(call_path.as_slice(), ["datetime", "datetime"])
         })
     {
+        return;
+    }
+
+    if helpers::parent_expr_is_astimezone(checker) {
         return;
     }
 

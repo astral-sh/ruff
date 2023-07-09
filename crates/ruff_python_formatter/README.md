@@ -94,18 +94,32 @@ write!(f, [if_group_breaks(&text(","))])
 If you need avoid second mutable borrows with a builder, you can use `format_with(|f| { ... })` as
 a formattable element similar to `text()` or `group()`.
 
-The generic comment formatting in `FormatNodeRule` handles comments correctly for most nodes, e.g.
-preceding and end-of-line comments depending on the node range. Sometimes however, you may have
-dangling comments that are not before or after a node but inside of it, e.g.
+## Comments
+
+Comments can either be own line or end-of-line and can be marked as `Leading`, `Trailing` and `Dangling`.
+
+```python
+# Leading comment (always own line)
+print("hello world")  # Trailing comment (end-of-line)
+# Trailing comment (own line)
+```
+
+Comments are automatically attached as `Leading` or `Trailing` to a node close to them, or `Dangling`
+if there are only tokens and no nodes surrounding it. Categorization is automatic but sometimes
+needs to be overridden in
+[`place_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L13)
+in `placement.rs`, which this section is about.
 
 ```Python
 [
-    # here we use an empty list
+    # This needs to be handled as a dangling comment
 ]
 ```
 
-Here, you have to call `dangling_comments` manually and stubbing out `fmt_dangling_comments` in list
-formatting.
+Here, the comment is dangling because it is preceded by `[`, which is a non-trivia token but not a
+node, and  followed by `]`, which is also a non-trivia token but not a node. In the `FormatExprList`
+implementation, we have to call `dangling_comments` manually and stub out the
+`fmt_dangling_comments` default from `FormatNodeRule`.
 
 ```rust
 impl FormatNodeRule<ExprList> for FormatExprList {
@@ -116,7 +130,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             f,
             [group(&format_args![
                 text("["),
-                dangling_comments(dangling),
+                dangling_comments(dangling), // Gets all the comments marked as dangling for the node
                 soft_block_indent(&items),
                 text("]")
             ])]
@@ -130,8 +144,82 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 }
 ```
 
-Comments are categorized into `Leading`, `Trailing` and `Dangling`, you can override this in
-`place_comment`.
+A related common challenge is that we want to attach comments to tokens (think keywords and
+syntactically meaningful characters such as `:`) that have no node on their own. A slightly
+simplified version of the `while` node in our AST looks like the following:
+
+```rust
+pub struct StmtWhile {
+    pub range: TextRange,
+    pub test: Box<Expr<TextRange>>,
+    pub body: Vec<Stmt<TextRange>>,
+    pub orelse: Vec<Stmt<TextRange>>,
+}
+```
+
+That means in
+
+```python
+while True:  # Trailing condition comment
+    if f():
+        break
+    # trailing while comment
+# leading else comment
+else:
+    print("while-else")
+```
+
+the `else` has no node, we're just getting the statements in its body.
+
+The preceding token of the leading else comment is the `break`, which has a node, the following
+token is the `else`, which lacks a node, so by default the comment would be marked as trailing
+the `break` and wrongly formatted as such. We can identify these cases by looking for comments
+between two bodies that have the same indentation level as the keyword, e.g. in our case the
+leading else comment is inside the `while` node (which spans the entire snippet) and on the same
+level as the `else`. We identify those case in
+[`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196)
+and mark them as dangling for manual formatting later. Similarly, we find and mark comment after
+the colon(s) in
+[`handle_trailing_end_of_line_condition_comment`](https://github.com/astral-sh/ruff/blob/main/crates/ruff_python_formatter/src/comments/placement.rs#L518)
+.
+
+The comments don't carry any extra information such as why we marked the comment as trailing,
+instead they are sorted into one list of leading, one list of trailing and one list of dangling
+comments per node. In `FormatStmtWhile`, we can have multiple types of dangling comments, so we
+have to split the dangling list into after-colon-comments, before-else-comments, etc. by some
+element separating them (e.g. all comments trailing the colon come before the first statement in
+the body) and manually insert them in the right position.
+
+A simplified implementation with only those two kinds of comments:
+
+```rust
+fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
+
+    // ...
+
+    // See FormatStmtWhile for the real, more complex implementation
+    let first_while_body_stmt = item.body.first().unwrap().end();
+    let trailing_condition_comments_end =
+        dangling_comments.partition_point(|comment| comment.slice().end() < first_while_body_stmt);
+    let (trailing_condition_comments, or_else_comments) =
+        dangling_comments.split_at(trailing_condition_comments_end);
+
+    write!(
+        f,
+        [
+            text("while"),
+            space(),
+            test.format(),
+            text(":"),
+            trailing_comments(trailing_condition_comments),
+            block_indent(&body.format())
+            leading_comments(or_else_comments),
+            text("else:"),
+            block_indent(&orelse.format())
+        ]
+    )?;
+}
+```
 
 ## Development notes
 
@@ -152,6 +240,41 @@ and `--print-comments` options.
 The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter),
 e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
 The Rome repository can be a helpful reference when implementing something in the Ruff formatter
+
+### Checking entire projects
+
+It's possible to format an entire project:
+
+```shell
+cargo run --bin ruff_dev -- format-dev --write my_project
+```
+
+This will format all files that `ruff check` would lint and computes the
+[Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index), a measure for how close the original
+and formatted versions are. The Jaccard index is 1 if there were no changes at all, while 0 means
+every line was changed. If you run this on a black formatted projects, this tells you how similar
+the ruff formatter is to black for the given project, with our goal being as close to 1 as possible.
+
+There are three common problems with the formatter: The second formatting pass looks different than
+the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
+parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
+of these using the `--stability-check` option in the `format-dev` subcommand:
+
+The easiest is to check CPython:
+
+```shell
+git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
+cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
+```
+
+It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we
+only do this occasionally:
+
+```shell
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
+python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
+cargo run --bin ruff_dev -- format-dev --stability-check --multi-project target/checkouts
+```
 
 ## The orphan rules and trait structure
 

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
@@ -71,8 +71,9 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
         func,
         args,
         keywords,
-        range: _
-    }) = &right else {
+        range: _,
+    }) = &right
+    else {
         return;
     };
     if !(args.is_empty() && keywords.is_empty()) {
@@ -128,10 +129,10 @@ pub(crate) fn key_in_dict_compare(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
-    if !matches!(ops[..], [Cmpop::In]) {
+    if !matches!(ops[..], [CmpOp::In]) {
         return;
     }
 

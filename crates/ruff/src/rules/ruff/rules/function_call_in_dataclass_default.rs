@@ -8,7 +8,7 @@ use ruff_python_semantic::analyze::typing::is_immutable_func;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
-    is_class_var_annotation, is_dataclass, is_dataclass_field,
+    is_class_var_annotation, is_dataclass, is_dataclass_field, is_descriptor_class,
 };
 
 /// ## What it does
@@ -55,7 +55,7 @@ use crate::rules::ruff::rules::helpers::{
 /// - `flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDataclassDefaultArgument {
-    pub name: Option<String>,
+    name: Option<String>,
 }
 
 impl Violation for FunctionCallInDataclassDefaultArgument {
@@ -98,6 +98,7 @@ pub(crate) fn function_call_in_dataclass_default(
                 if !is_class_var_annotation(annotation, checker.semantic())
                     && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
                     && !is_dataclass_field(func, checker.semantic())
+                    && !is_descriptor_class(func, checker.semantic())
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {

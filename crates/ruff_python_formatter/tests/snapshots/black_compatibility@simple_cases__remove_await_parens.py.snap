@@ -1,0 +1,420 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/remove_await_parens.py
+---
+## Input
+
+```py
+import asyncio
+
+# Control example
+async def main():
+    await asyncio.sleep(1)
+
+# Remove brackets for short coroutine/task
+async def main():
+    await (asyncio.sleep(1))
+
+async def main():
+    await (
+        asyncio.sleep(1)
+    )
+
+async def main():
+    await (asyncio.sleep(1)
+    )
+
+# Check comments
+async def main():
+    await (  # Hello
+        asyncio.sleep(1)
+    )
+
+async def main():
+    await (
+        asyncio.sleep(1)  # Hello
+    )
+
+async def main():
+    await (
+        asyncio.sleep(1)
+    )  # Hello
+
+# Long lines
+async def main():
+    await asyncio.gather(asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1))
+
+# Same as above but with magic trailing comma in function
+async def main():
+    await asyncio.gather(asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1),)
+
+# Cr@zY Br@ck3Tz
+async def main():
+    await (
+        (((((((((((((
+        (((        (((
+        (((         (((
+        (((         (((
+        (((        (((
+        ((black(1)))
+        )))        )))
+        )))         )))
+        )))         )))
+        )))        )))
+        )))))))))))))
+    )
+
+# Keep brackets around non power operations and nested awaits
+async def main():
+    await (set_of_tasks | other_set)
+
+async def main():
+    await (await asyncio.sleep(1))
+
+# It's awaits all the way down...
+async def main():
+    await (await x)
+
+async def main():
+    await (yield x)
+
+async def main():
+    await (await (asyncio.sleep(1)))
+
+async def main():
+    await (await (await (await (await (asyncio.sleep(1))))))
+
+async def main():
+    await (yield)
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -8,59 +8,70 @@
+ 
+ # Remove brackets for short coroutine/task
+ async def main():
+-    await asyncio.sleep(1)
++    await (asyncio.sleep(1))
+ 
+ 
+ async def main():
+-    await asyncio.sleep(1)
++    await (asyncio.sleep(1))
+ 
+ 
+ async def main():
+-    await asyncio.sleep(1)
++    await (asyncio.sleep(1))
+ 
+ 
+ # Check comments
+ async def main():
+-    await asyncio.sleep(1)  # Hello
++    (
++        await # Hello
++        asyncio.sleep(1)
++    )
+ 
+ 
+ async def main():
+-    await asyncio.sleep(1)  # Hello
++    (
++        await (
++            asyncio.sleep(1)  # Hello
++        )
++    )
+ 
+ 
+ async def main():
+-    await asyncio.sleep(1)  # Hello
++    await (asyncio.sleep(1))  # Hello
+ 
+ 
+ # Long lines
+ async def main():
+-    await asyncio.gather(
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
++    (
++        await asyncio.gather(
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++        )
+     )
+ 
+ 
+ # Same as above but with magic trailing comma in function
+ async def main():
+-    await asyncio.gather(
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
+-        asyncio.sleep(1),
++    (
++        await asyncio.gather(
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++            asyncio.sleep(1),
++        )
+     )
+ 
+ 
+ # Cr@zY Br@ck3Tz
+ async def main():
+-    await black(1)
++    await (black(1))
+ 
+ 
+ # Keep brackets around non power operations and nested awaits
+@@ -78,16 +89,16 @@
+ 
+ 
+ async def main():
+-    await (yield x)
++    await (NOT_YET_IMPLEMENTED_ExprYield)
+ 
+ 
+ async def main():
+-    await (await asyncio.sleep(1))
++    await (await (asyncio.sleep(1)))
+ 
+ 
+ async def main():
+-    await (await (await (await (await asyncio.sleep(1)))))
++    await (await (await (await (await (asyncio.sleep(1))))))
+ 
+ 
+ async def main():
+-    await (yield)
++    await (NOT_YET_IMPLEMENTED_ExprYield)
+```
+
+## Ruff Output
+
+```py
+import asyncio
+
+
+# Control example
+async def main():
+    await asyncio.sleep(1)
+
+
+# Remove brackets for short coroutine/task
+async def main():
+    await (asyncio.sleep(1))
+
+
+async def main():
+    await (asyncio.sleep(1))
+
+
+async def main():
+    await (asyncio.sleep(1))
+
+
+# Check comments
+async def main():
+    (
+        await # Hello
+        asyncio.sleep(1)
+    )
+
+
+async def main():
+    (
+        await (
+            asyncio.sleep(1)  # Hello
+        )
+    )
+
+
+async def main():
+    await (asyncio.sleep(1))  # Hello
+
+
+# Long lines
+async def main():
+    (
+        await asyncio.gather(
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+        )
+    )
+
+
+# Same as above but with magic trailing comma in function
+async def main():
+    (
+        await asyncio.gather(
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+            asyncio.sleep(1),
+        )
+    )
+
+
+# Cr@zY Br@ck3Tz
+async def main():
+    await (black(1))
+
+
+# Keep brackets around non power operations and nested awaits
+async def main():
+    await (set_of_tasks | other_set)
+
+
+async def main():
+    await (await asyncio.sleep(1))
+
+
+# It's awaits all the way down...
+async def main():
+    await (await x)
+
+
+async def main():
+    await (NOT_YET_IMPLEMENTED_ExprYield)
+
+
+async def main():
+    await (await (asyncio.sleep(1)))
+
+
+async def main():
+    await (await (await (await (await (asyncio.sleep(1))))))
+
+
+async def main():
+    await (NOT_YET_IMPLEMENTED_ExprYield)
+```
+
+## Black Output
+
+```py
+import asyncio
+
+
+# Control example
+async def main():
+    await asyncio.sleep(1)
+
+
+# Remove brackets for short coroutine/task
+async def main():
+    await asyncio.sleep(1)
+
+
+async def main():
+    await asyncio.sleep(1)
+
+
+async def main():
+    await asyncio.sleep(1)
+
+
+# Check comments
+async def main():
+    await asyncio.sleep(1)  # Hello
+
+
+async def main():
+    await asyncio.sleep(1)  # Hello
+
+
+async def main():
+    await asyncio.sleep(1)  # Hello
+
+
+# Long lines
+async def main():
+    await asyncio.gather(
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+    )
+
+
+# Same as above but with magic trailing comma in function
+async def main():
+    await asyncio.gather(
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+    )
+
+
+# Cr@zY Br@ck3Tz
+async def main():
+    await black(1)
+
+
+# Keep brackets around non power operations and nested awaits
+async def main():
+    await (set_of_tasks | other_set)
+
+
+async def main():
+    await (await asyncio.sleep(1))
+
+
+# It's awaits all the way down...
+async def main():
+    await (await x)
+
+
+async def main():
+    await (yield x)
+
+
+async def main():
+    await (await asyncio.sleep(1))
+
+
+async def main():
+    await (await (await (await (await asyncio.sleep(1)))))
+
+
+async def main():
+    await (yield)
+```
+
+

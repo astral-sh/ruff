@@ -2,7 +2,7 @@
 name = "scripts"
 version = "0.0.1"
 dependencies = ["sphinx"]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 
 [tool.black]
 line-length = 88
@@ -15,11 +15,11 @@ ignore = [
   "D",     # pydocstyle
   "PL",    # pylint
   "S",     # bandit
-  "CPY",   # copyright
   "G",     # flake8-logging
   "T",     # flake8-print
   "FBT",   # flake8-boolean-trap
+  "PERF",  # perflint
 ]
 
-[tool.ruff.pydocstyle]
-convention = "pep257"
+[tool.ruff.isort]
+required-imports = ["from __future__ import annotations"]

@@ -94,7 +94,12 @@ pub(crate) fn invalid_envvar_default(
         let Some(expr) = args.get(1).or_else(|| {
             keywords
                 .iter()
-                .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg .as_str()== "default"))
+                .find(|keyword| {
+                    keyword
+                        .arg
+                        .as_ref()
+                        .map_or(false, |arg| arg.as_str() == "default")
+                })
                 .map(|keyword| &keyword.value)
         }) else {
             return;

@@ -4,7 +4,7 @@ use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::formatter::Formatter;
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
-use ruff_python_ast::prelude::Expr;
+use rustpython_parser::ast::Expr;
 use rustpython_parser::ast::StmtAssign;
 
 // Note: This currently does wrap but not the black way so the types below likely need to be

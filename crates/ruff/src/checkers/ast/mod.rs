@@ -5,8 +5,8 @@ use log::error;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    self, Arg, Arguments, Comprehension, Constant, Excepthandler, Expr, ExprContext, Keyword,
-    Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
+    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ExceptHandler, Expr,
+    ExprContext, Keyword, Operator, Pattern, Ranged, Stmt, Suite, UnaryOp,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
@@ -17,14 +17,13 @@ use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, identifier, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
-    ExecutionContext, Export, FromImportation, Globals, Importation, Module, ModuleKind,
-    ResolvedRead, Scope, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImportation,
-    SubmoduleImportation,
+    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ResolvedRead, Scope,
+    ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -37,6 +36,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::flake8_builtins::helpers::AnyShadowing;
+
 use crate::rules::{
     airflow, flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -72,7 +72,7 @@ pub(crate) struct Checker<'a> {
     deferred: Deferred<'a>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     // Check-specific state.
-    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
+    pub(crate) flake8_bugbear_seen: Vec<&'a ast::ExprName>,
 }
 
 impl<'a> Checker<'a> {
@@ -359,17 +359,11 @@ where
                 ..
             }) => {
                 if self.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
-                    self.diagnostics
-                        .extend(flake8_django::rules::non_leading_receiver_decorator(
-                            decorator_list,
-                            |expr| self.semantic.resolve_call_path(expr),
-                        ));
+                    flake8_django::rules::non_leading_receiver_decorator(self, decorator_list);
                 }
                 if self.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_function_name(name, || {
-                            stmt.identifier(self.locator)
-                        })
+                        pycodestyle::rules::ambiguous_function_name(name, || stmt.identifier())
                     {
                         self.diagnostics.push(diagnostic);
                     }
@@ -384,7 +378,6 @@ where
                         decorator_list,
                         &self.settings.pep8_naming.ignore_names,
                         &self.semantic,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -453,7 +446,6 @@ where
                         stmt,
                         name,
                         &self.settings.pep8_naming.ignore_names,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -504,14 +496,12 @@ where
                         name,
                         body,
                         self.settings.mccabe.max_complexity,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
                 if self.enabled(Rule::HardcodedPasswordDefault) {
-                    self.diagnostics
-                        .extend(flake8_bandit::rules::hardcoded_password_default(args));
+                    flake8_bandit::rules::hardcoded_password_default(self, args);
                 }
                 if self.enabled(Rule::PropertyWithParameters) {
                     pylint::rules::property_with_parameters(self, stmt, decorator_list, args);
@@ -524,7 +514,6 @@ where
                         stmt,
                         body,
                         self.settings.pylint.max_returns,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -534,7 +523,6 @@ where
                         stmt,
                         body,
                         self.settings.pylint.max_branches,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -544,7 +532,6 @@ where
                         stmt,
                         body,
                         self.settings.pylint.max_statements,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -606,7 +593,6 @@ where
                         name,
                         decorator_list,
                         args,
-                        self.locator,
                     );
                 }
                 if self.enabled(Rule::FStringDocstring) {
@@ -633,6 +619,11 @@ where
                         );
                     }
                 }
+                #[cfg(feature = "unreachable-code")]
+                if self.enabled(Rule::UnreachableCode) {
+                    self.diagnostics
+                        .extend(ruff::rules::unreachable::in_function(name, body));
+                }
             }
             Stmt::Return(_) => {
                 if self.enabled(Rule::ReturnOutsideFunction) {
@@ -653,10 +644,7 @@ where
                 },
             ) => {
                 if self.enabled(Rule::DjangoNullableModelStringField) {
-                    self.diagnostics
-                        .extend(flake8_django::rules::nullable_model_string_field(
-                            self, body,
-                        ));
+                    flake8_django::rules::nullable_model_string_field(self, body);
                 }
                 if self.enabled(Rule::DjangoExcludeWithModelForm) {
                     if let Some(diagnostic) =
@@ -677,26 +665,22 @@ where
                 }
                 if !self.is_stub {
                     if self.enabled(Rule::DjangoModelWithoutDunderStr) {
-                        if let Some(diagnostic) =
-                            flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        flake8_django::rules::model_without_dunder_str(self, class_def);
                     }
                 }
                 if self.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }
                 if self.enabled(Rule::UselessObjectInheritance) {
-                    pyupgrade::rules::useless_object_inheritance(self, class_def, stmt);
+                    pyupgrade::rules::useless_object_inheritance(self, class_def);
                 }
                 if self.enabled(Rule::UnnecessaryClassParentheses) {
-                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def, stmt);
+                    pyupgrade::rules::unnecessary_class_parentheses(self, class_def);
                 }
                 if self.enabled(Rule::AmbiguousClassName) {
-                    if let Some(diagnostic) = pycodestyle::rules::ambiguous_class_name(name, || {
-                        stmt.identifier(self.locator)
-                    }) {
+                    if let Some(diagnostic) =
+                        pycodestyle::rules::ambiguous_class_name(name, || stmt.identifier())
+                    {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -705,7 +689,6 @@ where
                         stmt,
                         name,
                         &self.settings.pep8_naming.ignore_names,
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -715,7 +698,6 @@ where
                         stmt,
                         bases,
                         name,
-                        self.locator,
                         &self.settings.pep8_naming.ignore_names,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -782,6 +764,9 @@ where
                 if self.enabled(Rule::NoSlotsInNamedtupleSubclass) {
                     flake8_slots::rules::no_slots_in_namedtuple_subclass(self, stmt, class_def);
                 }
+                if self.enabled(Rule::SingleStringSlots) {
+                    pylint::rules::single_string_slots(self, class_def);
+                }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 if self.enabled(Rule::MultipleImportsOnOneLine) {
@@ -814,10 +799,8 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
-                            BindingKind::SubmoduleImportation(SubmoduleImportation {
-                                qualified_name,
-                            }),
+                            alias.identifier(),
+                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -828,7 +811,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname == &alias.name)
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -837,8 +820,8 @@ where
                         let qualified_name = &alias.name;
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
-                            BindingKind::Importation(Importation { qualified_name }),
+                            alias.identifier(),
+                            BindingKind::Import(Import { qualified_name }),
                             flags,
                         );
 
@@ -950,18 +933,6 @@ where
                             }
                         }
                     }
-                    if self.enabled(Rule::UnconventionalImportAlias) {
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::conventional_import_alias(
-                                stmt,
-                                &alias.name,
-                                alias.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
                             if let Some(diagnostic) =
@@ -1067,8 +1038,8 @@ where
 
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
-                            BindingKind::FutureImportation,
+                            alias.identifier(),
+                            BindingKind::FutureImport,
                             BindingFlags::empty(),
                         );
 
@@ -1086,7 +1057,7 @@ where
                     } else if &alias.name == "*" {
                         self.semantic
                             .scope_mut()
-                            .add_star_import(StarImportation { level, module });
+                            .add_star_import(StarImport { level, module });
 
                         if self.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
                             let scope = self.semantic.scope();
@@ -1125,7 +1096,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname == &alias.name)
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -1138,8 +1109,8 @@ where
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
-                            alias.identifier(self.locator),
-                            BindingKind::FromImportation(FromImportation { qualified_name }),
+                            alias.identifier(),
+                            BindingKind::FromImport(FromImport { qualified_name }),
                             flags,
                         );
                     }
@@ -1162,20 +1133,6 @@ where
                             self.diagnostics.push(diagnostic);
                         }
                     }
-                    if self.enabled(Rule::UnconventionalImportAlias) {
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::conventional_import_alias(
-                                stmt,
-                                &qualified_name,
-                                alias.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
                             let qualified_name =
@@ -1192,7 +1149,6 @@ where
                             }
                         }
                     }
-
                     if let Some(asname) = &alias.asname {
                         if self.enabled(Rule::ConstantImportedAsNonConstant) {
                             if let Some(diagnostic) =
@@ -1259,8 +1215,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
-                        // pylint
                         if !self.is_stub {
                             if self.enabled(Rule::UselessImportAlias) {
                                 pylint::rules::useless_import_alias(self, alias);
@@ -1410,6 +1364,51 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.is_stub {
+                    if self.any_enabled(&[
+                        Rule::UnrecognizedVersionInfoCheck,
+                        Rule::PatchVersionComparison,
+                        Rule::WrongTupleLengthVersionComparison,
+                    ]) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_version_info(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_version_info(self, test);
+                        }
+                    }
+                    if self.any_enabled(&[
+                        Rule::UnrecognizedPlatformCheck,
+                        Rule::UnrecognizedPlatformName,
+                    ]) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::unrecognized_platform(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::unrecognized_platform(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::BadVersionInfoComparison) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::bad_version_info_comparison(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::bad_version_info_comparison(self, test);
+                        }
+                    }
+                    if self.enabled(Rule::ComplexIfStatementInStub) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                            for value in values {
+                                flake8_pyi::rules::complex_if_statement_in_stub(self, value);
+                            }
+                        } else {
+                            flake8_pyi::rules::complex_if_statement_in_stub(self, test);
+                        }
+                    }
+                }
             }
             Stmt::Assert(ast::StmtAssert {
                 test,
@@ -1449,7 +1448,7 @@ where
             Stmt::With(ast::StmtWith { items, body, .. })
             | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
                 if self.enabled(Rule::AssertRaisesException) {
-                    flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
+                    flake8_bugbear::rules::assert_raises_exception(self, items);
                 }
                 if self.enabled(Rule::PytestRaisesWithMultipleStatements) {
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
@@ -1472,6 +1471,9 @@ where
                 }
                 if self.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
+                }
+                if self.enabled(Rule::TryExceptInLoop) {
+                    perflint::rules::try_except_in_loop(self, body);
                 }
             }
             Stmt::For(ast::StmtFor {
@@ -1520,9 +1522,21 @@ where
                     if self.enabled(Rule::InDictKeys) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
                     }
+                    if self.enabled(Rule::TryExceptInLoop) {
+                        perflint::rules::try_except_in_loop(self, body);
+                    }
                 }
                 if self.enabled(Rule::IncorrectDictIterator) {
                     perflint::rules::incorrect_dict_iterator(self, target, iter);
+                }
+                if self.enabled(Rule::ManualListComprehension) {
+                    perflint::rules::manual_list_comprehension(self, target, body);
+                }
+                if self.enabled(Rule::ManualListCopy) {
+                    perflint::rules::manual_list_copy(self, target, body);
+                }
+                if self.enabled(Rule::UnnecessaryListCast) {
+                    perflint::rules::unnecessary_list_cast(self, iter);
                 }
             }
             Stmt::Try(ast::StmtTry {
@@ -1559,9 +1573,7 @@ where
                     pyupgrade::rules::os_error_alias_handlers(self, handlers);
                 }
                 if self.enabled(Rule::PytestAssertInExcept) {
-                    self.diagnostics.extend(
-                        flake8_pytest_style::rules::assert_in_exception_handler(handlers),
-                    );
+                    flake8_pytest_style::rules::assert_in_exception_handler(self, handlers);
                 }
                 if self.enabled(Rule::SuppressibleException) {
                     flake8_simplify::rules::suppressible_exception(
@@ -1602,11 +1614,7 @@ where
                     flake8_bugbear::rules::assignment_to_os_environ(self, targets);
                 }
                 if self.enabled(Rule::HardcodedPasswordString) {
-                    if let Some(diagnostic) =
-                        flake8_bandit::rules::assign_hardcoded_password_string(value, targets)
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::assign_hardcoded_password_string(self, value, targets);
                 }
                 if self.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
@@ -1646,6 +1654,12 @@ where
                     {
                         self.diagnostics.push(diagnostic);
                     }
+                }
+                if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
+                    pylint::rules::type_param_name_mismatch(self, value, targets);
+                }
+                if self.settings.rules.enabled(Rule::TypeBivariance) {
+                    pylint::rules::type_bivariance(self, value);
                 }
                 if self.is_stub {
                     if self.any_enabled(&[
@@ -1767,7 +1781,6 @@ where
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
-                name,
                 args,
                 decorator_list,
                 returns,
@@ -1775,7 +1788,6 @@ where
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 body,
-                name,
                 args,
                 decorator_list,
                 returns,
@@ -1791,37 +1803,27 @@ where
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
 
-                for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.annotation {
+                for arg_with_default in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &arg_with_default.def.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
                     }
-                }
-                for arg in &args.args {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_type_definition(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
+                    if let Some(expr) = &arg_with_default.default {
+                        self.visit_expr(expr);
                     }
                 }
                 if let Some(arg) = &args.vararg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                for arg in &args.kwonlyargs {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1830,7 +1832,7 @@ where
                 if let Some(arg) = &args.kwarg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1838,24 +1840,11 @@ where
                 }
                 for expr in returns {
                     if runtime_annotation {
-                        self.visit_type_definition(expr);
+                        self.visit_runtime_annotation(expr);
                     } else {
                         self.visit_annotation(expr);
                     };
                 }
-                for expr in &args.kw_defaults {
-                    self.visit_expr(expr);
-                }
-                for expr in &args.defaults {
-                    self.visit_expr(expr);
-                }
-
-                self.add_binding(
-                    name,
-                    stmt.identifier(self.locator),
-                    BindingKind::FunctionDefinition,
-                    BindingFlags::empty(),
-                );
 
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Function,
@@ -1961,8 +1950,8 @@ where
                 self.semantic.handled_exceptions.pop();
 
                 self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
-                for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler);
+                for except_handler in handlers {
+                    self.visit_except_handler(except_handler);
                 }
 
                 self.visit_body(orelse);
@@ -2003,7 +1992,7 @@ where
                 };
 
                 if runtime_annotation {
-                    self.visit_type_definition(annotation);
+                    self.visit_runtime_annotation(annotation);
                 } else {
                     self.visit_annotation(annotation);
                 }
@@ -2066,17 +2055,28 @@ where
 
         // Post-visit.
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
-                self.semantic.pop_scope();
-                self.semantic.pop_definition();
-            }
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
                 self.add_binding(
                     name,
-                    stmt.identifier(self.locator),
-                    BindingKind::ClassDefinition,
+                    stmt.identifier(),
+                    BindingKind::FunctionDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
+            }
+            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
+                self.semantic.pop_scope();
+                self.semantic.pop_definition();
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::ClassDefinition(scope_id),
                     BindingFlags::empty(),
                 );
             }
@@ -2089,7 +2089,7 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let flags_snapshot = self.semantic.flags;
-        self.semantic.flags |= SemanticModelFlags::ANNOTATION;
+        self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
     }
@@ -2130,7 +2130,7 @@ where
             expr,
             Expr::BoolOp(_)
                 | Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: Unaryop::Not,
+                    op: UnaryOp::Not,
                     ..
                 })
         ) {
@@ -2152,6 +2152,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, value,
@@ -2162,7 +2163,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep604_annotation(
                                     self, expr, slice, operator,
@@ -2184,6 +2186,22 @@ where
                             expr,
                             flake8_future_annotations::rules::Reason::PEP585,
                         );
+                    }
+                }
+
+                // Ex) Union[...]
+                if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                    let mut check = true;
+
+                    // Avoid duplicate checks if the parent is an `Union[...]`
+                    if let Some(Expr::Subscript(ast::ExprSubscript { value, .. })) =
+                        self.semantic.expr_grandparent()
+                    {
+                        check = !self.semantic.match_typing_expr(value, "Union");
+                    }
+
+                    if check {
+                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
                     }
                 }
 
@@ -2238,6 +2256,9 @@ where
                         if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
+                        if self.enabled(Rule::NumpyDeprecatedFunction) {
+                            numpy::rules::deprecated_function(self, expr);
+                        }
                         if self.is_stub {
                             if self.enabled(Rule::CollectionsNamedTuple) {
                                 flake8_pyi::rules::collections_named_tuple(self, expr);
@@ -2257,6 +2278,7 @@ where
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
+                                        && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
                                             self, expr,
@@ -2267,7 +2289,8 @@ where
                                     if self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
-                                            && self.semantic.in_annotation())
+                                            && self.semantic.in_annotation()
+                                            && !self.settings.pyupgrade.keep_runtime_typing)
                                     {
                                         pyupgrade::rules::use_pep585_annotation(
                                             self,
@@ -2332,6 +2355,7 @@ where
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
+                                && !self.settings.pyupgrade.keep_runtime_typing
                             {
                                 flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, expr,
@@ -2342,7 +2366,8 @@ where
                             if self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
-                                    && self.semantic.in_annotation())
+                                    && self.semantic.in_annotation()
+                                    && !self.settings.pyupgrade.keep_runtime_typing)
                             {
                                 pyupgrade::rules::use_pep585_annotation(self, expr, &replacement);
                             }
@@ -2359,6 +2384,9 @@ where
                 }
                 if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
+                }
+                if self.enabled(Rule::NumpyDeprecatedFunction) {
+                    numpy::rules::deprecated_function(self, expr);
                 }
                 if self.enabled(Rule::DeprecatedMockImport) {
                     pyupgrade::rules::deprecated_mock_attribute(self, expr);
@@ -2578,9 +2606,7 @@ where
                     flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
                 }
                 if self.enabled(Rule::ExecBuiltin) {
-                    if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::exec_used(self, func);
                 }
                 if self.enabled(Rule::BadFilePermissions) {
                     flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
@@ -2603,8 +2629,7 @@ where
                     flake8_bandit::rules::jinja2_autoescape_false(self, func, args, keywords);
                 }
                 if self.enabled(Rule::HardcodedPasswordFuncArg) {
-                    self.diagnostics
-                        .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
+                    flake8_bandit::rules::hardcoded_password_func_arg(self, keywords);
                 }
                 if self.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
@@ -2737,17 +2762,12 @@ where
                     flake8_debugger::rules::debugger_call(self, expr, func);
                 }
                 if self.enabled(Rule::PandasUseOfInplaceArgument) {
-                    self.diagnostics.extend(
-                        pandas_vet::rules::inplace_argument(self, expr, func, args, keywords)
-                            .into_iter(),
-                    );
+                    pandas_vet::rules::inplace_argument(self, expr, func, args, keywords);
                 }
                 pandas_vet::rules::call(self, func);
 
                 if self.enabled(Rule::PandasUseOfPdMerge) {
-                    if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
-                        self.diagnostics.push(diagnostic);
-                    };
+                    pandas_vet::rules::use_of_pd_merge(self, func);
                 }
                 if self.enabled(Rule::CallDatetimeWithoutTzinfo) {
                     flake8_datetimez::rules::call_datetime_without_tzinfo(
@@ -2864,16 +2884,13 @@ where
                     &self.settings.flake8_gettext.functions_names,
                 ) {
                     if self.enabled(Rule::FStringInGetTextFuncCall) {
-                        self.diagnostics
-                            .extend(flake8_gettext::rules::f_string_in_gettext_func_call(args));
+                        flake8_gettext::rules::f_string_in_gettext_func_call(self, args);
                     }
                     if self.enabled(Rule::FormatInGetTextFuncCall) {
-                        self.diagnostics
-                            .extend(flake8_gettext::rules::format_in_gettext_func_call(args));
+                        flake8_gettext::rules::format_in_gettext_func_call(self, args);
                     }
                     if self.enabled(Rule::PrintfInGetTextFuncCall) {
-                        self.diagnostics
-                            .extend(flake8_gettext::rules::printf_in_gettext_func_call(args));
+                        flake8_gettext::rules::printf_in_gettext_func_call(self, args);
                     }
                 }
                 if self.enabled(Rule::UncapitalizedEnvironmentVariables) {
@@ -2914,7 +2931,7 @@ where
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
                 if self.enabled(Rule::NumpyLegacyRandom) {
-                    numpy::rules::numpy_legacy_random(self, func);
+                    numpy::rules::legacy_random(self, func);
                 }
                 if self.any_enabled(&[
                     Rule::LoggingStringFormat,
@@ -3135,17 +3152,23 @@ where
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic.in_type_definition()
-                        && self.semantic.expr_parent().map_or(true, |parent| {
-                            !matches!(
-                                parent,
-                                Expr::BinOp(ast::ExprBinOp {
-                                    op: Operator::BitOr,
-                                    ..
-                                })
-                            )
-                        })
+                        // Avoid duplicate checks if the parent is an `|`
+                        && !matches!(
+                            self.semantic.expr_parent(),
+                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                        )
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
+                    }
+
+                    if self.enabled(Rule::UnnecessaryLiteralUnion)
+                        // Avoid duplicate checks if the parent is an `|`
+                        && !matches!(
+                            self.semantic.expr_parent(),
+                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                        )
+                    {
+                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
                     }
                 }
             }
@@ -3214,11 +3237,10 @@ where
                     flake8_2020::rules::compare(self, left, ops, comparators);
                 }
                 if self.enabled(Rule::HardcodedPasswordString) {
-                    self.diagnostics.extend(
-                        flake8_bandit::rules::compare_to_hardcoded_password_string(
-                            left,
-                            comparators,
-                        ),
+                    flake8_bandit::rules::compare_to_hardcoded_password_string(
+                        self,
+                        left,
+                        comparators,
                     );
                 }
                 if self.enabled(Rule::ComparisonWithItself) {
@@ -3238,29 +3260,6 @@ where
                 }
                 if self.enabled(Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
-                }
-                if self.is_stub {
-                    if self.any_enabled(&[
-                        Rule::UnrecognizedPlatformCheck,
-                        Rule::UnrecognizedPlatformName,
-                    ]) {
-                        flake8_pyi::rules::unrecognized_platform(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
-                    if self.enabled(Rule::BadVersionInfoComparison) {
-                        flake8_pyi::rules::bad_version_info_comparison(
-                            self,
-                            expr,
-                            left,
-                            ops,
-                            comparators,
-                        );
-                    }
                 }
             }
             Expr::Constant(ast::ExprConstant {
@@ -3331,12 +3330,21 @@ where
                 }
 
                 // Visit the default arguments, but avoid the body, which will be deferred.
-                for expr in &args.kw_defaults {
-                    self.visit_expr(expr);
+                for ArgWithDefault {
+                    default,
+                    def: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &default {
+                        self.visit_expr(expr);
+                    }
                 }
-                for expr in &args.defaults {
-                    self.visit_expr(expr);
-                }
+
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
@@ -3814,6 +3822,7 @@ where
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
             }
             _ => {}
@@ -3823,9 +3832,9 @@ where
         self.semantic.pop_expr();
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
-        match excepthandler {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+    fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
+        match except_handler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
                 name,
                 body,
@@ -3836,7 +3845,7 @@ where
                     if let Some(diagnostic) = pycodestyle::rules::bare_except(
                         type_.as_deref(),
                         body,
-                        excepthandler,
+                        except_handler,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -3851,7 +3860,7 @@ where
                 if self.enabled(Rule::TryExceptPass) {
                     flake8_bandit::rules::try_except_pass(
                         self,
-                        excepthandler,
+                        except_handler,
                         type_.as_deref(),
                         name,
                         body,
@@ -3861,7 +3870,7 @@ where
                 if self.enabled(Rule::TryExceptContinue) {
                     flake8_bandit::rules::try_except_continue(
                         self,
-                        excepthandler,
+                        except_handler,
                         type_.as_deref(),
                         name,
                         body,
@@ -3869,20 +3878,20 @@ where
                     );
                 }
                 if self.enabled(Rule::ExceptWithEmptyTuple) {
-                    flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
+                    flake8_bugbear::rules::except_with_empty_tuple(self, except_handler);
                 }
                 if self.enabled(Rule::ExceptWithNonExceptionClasses) {
-                    flake8_bugbear::rules::except_with_non_exception_classes(self, excepthandler);
+                    flake8_bugbear::rules::except_with_non_exception_classes(self, except_handler);
                 }
                 if self.enabled(Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
                 if self.enabled(Rule::BinaryOpException) {
-                    pylint::rules::binary_op_exception(self, excepthandler);
+                    pylint::rules::binary_op_exception(self, except_handler);
                 }
                 match name {
                     Some(name) => {
-                        let range = excepthandler.try_identifier(self.locator).unwrap();
+                        let range = except_handler.try_identifier().unwrap();
 
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
@@ -3895,9 +3904,12 @@ where
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 self,
                                 name,
-                                AnyShadowing::from(excepthandler),
+                                AnyShadowing::from(except_handler),
                             );
                         }
+
+                        // Store the existing binding, if any.
+                        let existing_id = self.semantic.lookup_symbol(name);
 
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(
@@ -3907,15 +3919,7 @@ where
                             BindingFlags::empty(),
                         );
 
-                        walk_excepthandler(self, excepthandler);
-
-                        // Remove it from the scope immediately after.
-                        self.add_binding(
-                            name,
-                            range,
-                            BindingKind::UnboundException,
-                            BindingFlags::empty(),
-                        );
+                        walk_except_handler(self, except_handler);
 
                         // If the exception name wasn't used in the scope, emit a diagnostic.
                         if !self.semantic.is_used(binding_id) {
@@ -3927,7 +3931,7 @@ where
                                 if self.patch(Rule::UnusedVariable) {
                                     diagnostic.try_set_fix(|| {
                                         pyflakes::fixes::remove_exception_handler_assignment(
-                                            excepthandler,
+                                            except_handler,
                                             self.locator,
                                         )
                                         .map(Fix::automatic)
@@ -3936,8 +3940,15 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
+
+                        self.add_binding(
+                            name,
+                            range,
+                            BindingKind::UnboundException(existing_id),
+                            BindingFlags::empty(),
+                        );
                     }
-                    None => walk_excepthandler(self, excepthandler),
+                    None => walk_except_handler(self, except_handler),
                 }
             }
         }
@@ -3975,17 +3986,17 @@ where
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for arg in &arguments.posonlyargs {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.posonlyargs {
+            self.visit_arg(&arg_with_default.def);
         }
-        for arg in &arguments.args {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.args {
+            self.visit_arg(&arg_with_default.def);
         }
         if let Some(arg) = &arguments.vararg {
             self.visit_arg(arg);
         }
-        for arg in &arguments.kwonlyargs {
-            self.visit_arg(arg);
+        for arg_with_default in &arguments.kwonlyargs {
+            self.visit_arg(&arg_with_default.def);
         }
         if let Some(arg) = &arguments.kwarg {
             self.visit_arg(arg);
@@ -3997,7 +4008,7 @@ where
         // upstream.
         self.add_binding(
             &arg.arg,
-            arg.identifier(self.locator),
+            arg.identifier(),
             BindingKind::Argument,
             BindingFlags::empty(),
         );
@@ -4037,7 +4048,7 @@ where
         {
             self.add_binding(
                 name,
-                pattern.try_identifier(self.locator).unwrap(),
+                pattern.try_identifier().unwrap(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
             );
@@ -4136,6 +4147,14 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
     }
 
+    /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
+    fn visit_runtime_annotation(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::RUNTIME_ANNOTATION;
+        self.visit_type_definition(expr);
+        self.semantic.flags = snapshot;
+    }
+
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
@@ -4186,88 +4205,6 @@ impl<'a> Checker<'a> {
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);
-        let binding = self.semantic.binding(binding_id);
-
-        // Determine whether the binding shadows any existing bindings.
-        if let Some((stack_index, shadowed_id)) = self
-            .semantic
-            .scopes
-            .ancestors(self.semantic.scope_id)
-            .enumerate()
-            .find_map(|(stack_index, scope)| {
-                scope.get(name).and_then(|binding_id| {
-                    let binding = self.semantic.binding(binding_id);
-                    if binding.is_unbound() {
-                        None
-                    } else {
-                        Some((stack_index, binding_id))
-                    }
-                })
-            })
-        {
-            let shadowed = self.semantic.binding(shadowed_id);
-            let in_current_scope = stack_index == 0;
-            if !shadowed.kind.is_builtin()
-                && shadowed.source.map_or(true, |left| {
-                    binding.source.map_or(true, |right| {
-                        !branch_detection::different_forks(left, right, &self.semantic.stmts)
-                    })
-                })
-            {
-                let shadows_import = matches!(
-                    shadowed.kind,
-                    BindingKind::Importation(..)
-                        | BindingKind::FromImportation(..)
-                        | BindingKind::SubmoduleImportation(..)
-                        | BindingKind::FutureImportation
-                );
-                if binding.kind.is_loop_var() && shadows_import {
-                    if self.enabled(Rule::ImportShadowedByLoopVar) {
-                        #[allow(deprecated)]
-                        let line = self.locator.compute_line_index(shadowed.range.start());
-
-                        self.diagnostics.push(Diagnostic::new(
-                            pyflakes::rules::ImportShadowedByLoopVar {
-                                name: name.to_string(),
-                                line,
-                            },
-                            binding.range,
-                        ));
-                    }
-                } else if in_current_scope {
-                    if !shadowed.is_used()
-                        && binding.redefines(shadowed)
-                        && (!self.settings.dummy_variable_rgx.is_match(name) || shadows_import)
-                        && !(shadowed.kind.is_function_definition()
-                            && visibility::is_overload(
-                                cast::decorator_list(self.semantic.stmts[shadowed.source.unwrap()]),
-                                &self.semantic,
-                            ))
-                    {
-                        if self.enabled(Rule::RedefinedWhileUnused) {
-                            #[allow(deprecated)]
-                            let line = self.locator.compute_line_index(shadowed.range.start());
-
-                            let mut diagnostic = Diagnostic::new(
-                                pyflakes::rules::RedefinedWhileUnused {
-                                    name: name.to_string(),
-                                    line,
-                                },
-                                binding.range,
-                            );
-                            if let Some(range) = binding.parent_range(&self.semantic) {
-                                diagnostic.set_parent(range.start());
-                            }
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
-                } else if shadows_import && binding.redefines(shadowed) {
-                    self.semantic
-                        .shadowed_bindings
-                        .insert(binding_id, shadowed_id);
-                }
-            }
-        }
 
         // If there's an existing binding in this scope, copy its references.
         if let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
@@ -4283,7 +4220,7 @@ impl<'a> Checker<'a> {
             let shadowed = &self.semantic.bindings[shadowed_id];
             if !matches!(
                 shadowed.kind,
-                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException,
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_),
             ) {
                 let references = shadowed.references.clone();
                 let is_global = shadowed.is_global();
@@ -4300,6 +4237,21 @@ impl<'a> Checker<'a> {
                 }
 
                 self.semantic.bindings[binding_id].references = references;
+            }
+        } else if let Some(shadowed_id) = self
+            .semantic
+            .scopes
+            .ancestors(scope_id)
+            .skip(1)
+            .find_map(|scope| scope.get(name))
+        {
+            // Otherwise, if there's an existing binding in a parent scope, mark it as shadowed.
+            let binding = self.semantic.binding(binding_id);
+            let shadowed = self.semantic.binding(shadowed_id);
+            if binding.redefines(shadowed) {
+                self.semantic
+                    .shadowed_bindings
+                    .insert(binding_id, shadowed_id);
             }
         }
 
@@ -4319,7 +4271,7 @@ impl<'a> Checker<'a> {
         {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
-            let scope = self.semantic.scope_mut();
+            let scope = self.semantic.global_scope_mut();
             scope.add(builtin, binding_id);
         }
     }
@@ -4340,7 +4292,7 @@ impl<'a> Checker<'a> {
                         .scopes
                         .iter()
                         .flat_map(Scope::star_imports)
-                        .map(|StarImportation { level, module }| {
+                        .map(|StarImport { level, module }| {
                             helpers::format_import_from(*level, *module)
                         })
                         .sorted()
@@ -4522,7 +4474,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
 
@@ -4721,18 +4673,21 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_dead_scopes(&mut self) {
+    fn check_deferred_scopes(&mut self) {
         if !self.any_enabled(&[
-            Rule::UnusedImport,
             Rule::GlobalVariableNotAssigned,
-            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::ImportShadowedByLoopVar,
             Rule::RedefinedWhileUnused,
             Rule::RuntimeImportInTypeCheckingBlock,
             Rule::TypingOnlyFirstPartyImport,
-            Rule::TypingOnlyThirdPartyImport,
             Rule::TypingOnlyStandardLibraryImport,
-            Rule::UndefinedExport,
+            Rule::TypingOnlyThirdPartyImport,
             Rule::UnaliasedCollectionsAbcSetImport,
+            Rule::UnconventionalImportAlias,
+            Rule::UndefinedExport,
+            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::UndefinedLocalWithImportStarUsage,
+            Rule::UnusedImport,
         ]) {
             return;
         }
@@ -4799,8 +4754,8 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope_id in self.semantic.dead_scopes.iter().rev() {
-            let scope = &self.semantic.scopes[*scope_id];
+        for scope_id in self.deferred.scopes.iter().rev().copied() {
+            let scope = &self.semantic.scopes[scope_id];
 
             if scope.kind.is_module() {
                 // F822
@@ -4817,7 +4772,7 @@ impl<'a> Checker<'a> {
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = scope
                         .star_imports()
-                        .map(|StarImportation { level, module }| {
+                        .map(|StarImport { level, module }| {
                             helpers::format_import_from(*level, *module)
                         })
                         .sorted()
@@ -4859,21 +4814,123 @@ impl<'a> Checker<'a> {
                 continue;
             }
 
-            // Look for any bindings that were redefined in another scope, and remain
-            // unused. Note that we only store references in `shadowed_bindings` if
-            // the bindings are in different scopes.
-            if self.enabled(Rule::RedefinedWhileUnused) {
+            // F402
+            if self.enabled(Rule::ImportShadowedByLoopVar) {
                 for (name, binding_id) in scope.bindings() {
-                    if let Some(shadowed_id) = self.semantic.shadowed_binding(binding_id) {
-                        let shadowed = self.semantic.binding(shadowed_id);
-                        if shadowed.is_used() {
+                    for shadow in self.semantic.shadowed_bindings(scope_id, binding_id) {
+                        // If the shadowing binding isn't a loop variable, abort.
+                        let binding = &self.semantic.bindings[shadow.binding_id()];
+                        if !binding.kind.is_loop_var() {
+                            continue;
+                        }
+
+                        // If the shadowed binding isn't an import, abort.
+                        let shadowed = &self.semantic.bindings[shadow.shadowed_id()];
+                        if !matches!(
+                            shadowed.kind,
+                            BindingKind::Import(..)
+                                | BindingKind::FromImport(..)
+                                | BindingKind::SubmoduleImport(..)
+                                | BindingKind::FutureImport
+                        ) {
+                            continue;
+                        }
+
+                        // If the bindings are in different forks, abort.
+                        if shadowed.source.map_or(true, |left| {
+                            binding.source.map_or(true, |right| {
+                                branch_detection::different_forks(left, right, &self.semantic.stmts)
+                            })
+                        }) {
                             continue;
                         }
 
                         #[allow(deprecated)]
                         let line = self.locator.compute_line_index(shadowed.range.start());
 
-                        let binding = self.semantic.binding(binding_id);
+                        self.diagnostics.push(Diagnostic::new(
+                            pyflakes::rules::ImportShadowedByLoopVar {
+                                name: name.to_string(),
+                                line,
+                            },
+                            binding.range,
+                        ));
+                    }
+                }
+            }
+
+            // F811
+            if self.enabled(Rule::RedefinedWhileUnused) {
+                for (name, binding_id) in scope.bindings() {
+                    for shadow in self.semantic.shadowed_bindings(scope_id, binding_id) {
+                        // If the shadowing binding is a loop variable, abort, to avoid overlap
+                        // with F402.
+                        let binding = &self.semantic.bindings[shadow.binding_id()];
+                        if binding.kind.is_loop_var() {
+                            continue;
+                        }
+
+                        // If the shadowed binding is used, abort.
+                        let shadowed = &self.semantic.bindings[shadow.shadowed_id()];
+                        if shadowed.is_used() {
+                            continue;
+                        }
+
+                        // If the shadowing binding isn't considered a "redefinition" of the
+                        // shadowed binding, abort.
+                        if !binding.redefines(shadowed) {
+                            continue;
+                        }
+
+                        if shadow.same_scope() {
+                            // If the symbol is a dummy variable, abort, unless the shadowed
+                            // binding is an import.
+                            if !matches!(
+                                shadowed.kind,
+                                BindingKind::Import(..)
+                                    | BindingKind::FromImport(..)
+                                    | BindingKind::SubmoduleImport(..)
+                                    | BindingKind::FutureImport
+                            ) && self.settings.dummy_variable_rgx.is_match(name)
+                            {
+                                continue;
+                            }
+
+                            // If this is an overloaded function, abort.
+                            if shadowed.kind.is_function_definition()
+                                && visibility::is_overload(
+                                    cast::decorator_list(
+                                        self.semantic.stmts[shadowed.source.unwrap()],
+                                    ),
+                                    &self.semantic,
+                                )
+                            {
+                                continue;
+                            }
+                        } else {
+                            // Only enforce cross-scope shadowing for imports.
+                            if !matches!(
+                                shadowed.kind,
+                                BindingKind::Import(..)
+                                    | BindingKind::FromImport(..)
+                                    | BindingKind::SubmoduleImport(..)
+                                    | BindingKind::FutureImport
+                            ) {
+                                continue;
+                            }
+                        }
+
+                        // If the bindings are in different forks, abort.
+                        if shadowed.source.map_or(true, |left| {
+                            binding.source.map_or(true, |right| {
+                                branch_detection::different_forks(left, right, &self.semantic.stmts)
+                            })
+                        }) {
+                            continue;
+                        }
+
+                        #[allow(deprecated)]
+                        let line = self.locator.compute_line_index(shadowed.range.start());
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::RedefinedWhileUnused {
                                 name: (*name).to_string(),
@@ -4895,7 +4952,7 @@ impl<'a> Checker<'a> {
                 } else {
                     self.semantic
                         .scopes
-                        .ancestor_ids(*scope_id)
+                        .ancestor_ids(scope_id)
                         .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
                         .copied()
                         .collect()
@@ -4918,7 +4975,14 @@ impl<'a> Checker<'a> {
             if self.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(self, scope, &mut diagnostics);
             }
-
+            if self.enabled(Rule::UnconventionalImportAlias) {
+                flake8_import_conventions::rules::unconventional_import_alias(
+                    self,
+                    scope,
+                    &mut diagnostics,
+                    &self.settings.flake8_import_conventions.aliases,
+                );
+            }
             if self.is_stub {
                 if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
                     flake8_pyi::rules::unaliased_collections_abc_set_import(
@@ -5277,8 +5341,8 @@ pub(crate) fn check_ast(
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
-    checker.semantic.dead_scopes.push(ScopeId::global());
-    checker.check_dead_scopes();
+    checker.deferred.scopes.push(ScopeId::global());
+    checker.check_deferred_scopes();
 
     checker.diagnostics
 }

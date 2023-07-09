@@ -69,13 +69,8 @@ pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
 
         let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            let edit = autofix::edits::delete_stmt(
-                stmt,
-                Some(parent),
-                checker.locator,
-                checker.indexer,
-                checker.stylist,
-            );
+            let edit =
+                autofix::edits::delete_stmt(stmt, Some(parent), checker.locator, checker.indexer);
             diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
         }
         checker.diagnostics.push(diagnostic);

@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::Locator;
 
 use crate::settings::types::IdentifierPattern;
 
@@ -48,7 +47,6 @@ pub(crate) fn error_suffix_on_exception_name(
     class_def: &Stmt,
     bases: &[Expr],
     name: &str,
-    locator: &Locator,
     ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
     if ignore_names
@@ -75,6 +73,6 @@ pub(crate) fn error_suffix_on_exception_name(
         ErrorSuffixOnExceptionName {
             name: name.to_string(),
         },
-        class_def.identifier(locator),
+        class_def.identifier(),
     ))
 }

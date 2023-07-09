@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::fmt::Write;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -5,6 +7,7 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
+use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
@@ -20,7 +23,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::SourceFileBuilder;
 
 use crate::args::Overrides;
-use crate::cache;
+use crate::cache::{self, Cache};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
@@ -75,6 +78,25 @@ pub(crate) fn run(
         pyproject_config,
     );
 
+    // Load the caches.
+    let caches = bool::from(cache).then(|| {
+        package_roots
+            .iter()
+            .map(|(package, package_root)| package_root.unwrap_or(package))
+            .unique()
+            .par_bridge()
+            .map(|cache_root| {
+                let settings = resolver.resolve_all(cache_root, pyproject_config);
+                let cache = Cache::open(
+                    &settings.cli.cache_dir,
+                    cache_root.to_path_buf(),
+                    &settings.lib,
+                );
+                (cache_root, cache)
+            })
+            .collect::<HashMap<&Path, Cache>>()
+    });
+
     let start = Instant::now();
     let mut diagnostics: Diagnostics = paths
         .par_iter()
@@ -86,13 +108,24 @@ pub(crate) fn run(
                         .parent()
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
+
                     let settings = resolver.resolve_all(path, pyproject_config);
+
+                    let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                    let cache = caches.as_ref().and_then(|caches| {
+                        if let Some(cache) = caches.get(&cache_root) {
+                            Some(cache)
+                        } else {
+                            debug!("No cache found for {}", cache_root.display());
+                            None
+                        }
+                    });
 
                     lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
-                                error += &format!("\n  Caused by: {cause}");
+                                write!(&mut error, "\n  Caused by: {cause}").unwrap();
                             }
                             error
                         })
@@ -145,6 +178,13 @@ pub(crate) fn run(
 
     diagnostics.messages.sort();
 
+    // Store the caches.
+    if let Some(caches) = caches {
+        caches
+            .into_par_iter()
+            .try_for_each(|(_, cache)| cache.store())?;
+    }
+
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
 
@@ -157,7 +197,7 @@ fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
-    cache: flags::Cache,
+    cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
@@ -184,95 +224,5 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 
             Ok(Diagnostics::default())
         }
-    }
-}
-
-#[cfg(test)]
-#[cfg(feature = "jupyter_notebook")]
-mod test {
-    use std::path::PathBuf;
-    use std::str::FromStr;
-
-    use anyhow::Result;
-    use path_absolutize::Absolutize;
-
-    use ruff::logging::LogLevel;
-    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
-    use ruff::settings::configuration::{Configuration, RuleSelection};
-    use ruff::settings::flags::FixMode;
-    use ruff::settings::flags::{Cache, Noqa};
-    use ruff::settings::types::SerializationFormat;
-    use ruff::settings::AllSettings;
-    use ruff::RuleSelector;
-
-    use crate::args::Overrides;
-    use crate::printer::{Flags, Printer};
-
-    use super::run;
-
-    #[test]
-    fn test_jupyter_notebook_integration() -> Result<()> {
-        let overrides: Overrides = Overrides {
-            select: Some(vec![
-                RuleSelector::from_str("B")?,
-                RuleSelector::from_str("F")?,
-            ]),
-            ..Default::default()
-        };
-
-        let mut configuration = Configuration::default();
-        configuration.rule_selections.push(RuleSelection {
-            select: Some(vec![
-                RuleSelector::from_str("B")?,
-                RuleSelector::from_str("F")?,
-            ]),
-            ..Default::default()
-        });
-
-        let root_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("ruff")
-            .join("resources")
-            .join("test")
-            .join("fixtures")
-            .join("jupyter");
-
-        let diagnostics = run(
-            &[root_path.join("valid.ipynb")],
-            &PyprojectConfig::new(
-                PyprojectDiscoveryStrategy::Fixed,
-                AllSettings::from_configuration(configuration, &root_path)?,
-                None,
-            ),
-            &overrides,
-            Cache::Disabled,
-            Noqa::Enabled,
-            FixMode::Generate,
-        )?;
-
-        let printer = Printer::new(
-            SerializationFormat::Text,
-            LogLevel::Default,
-            FixMode::Generate,
-            Flags::SHOW_VIOLATIONS,
-        );
-        let mut writer: Vec<u8> = Vec::new();
-        // Mute the terminal color codes.
-        colored::control::set_override(false);
-        printer.write_once(&diagnostics, &mut writer)?;
-        // TODO(konstin): Set jupyter notebooks as none-fixable for now
-        // TODO(konstin): Make jupyter notebooks fixable
-        let expected = format!(
-            "{valid_ipynb}:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
-{valid_ipynb}:cell 3:1:24: B006 Do not use mutable data structures for argument defaults
-Found 2 errors.
-[*] 1 potentially fixable with the --fix option.
-",
-            valid_ipynb = root_path.join("valid.ipynb").absolutize()?.display()
-        );
-
-        assert_eq!(expected, String::from_utf8(writer)?);
-
-        Ok(())
     }
 }

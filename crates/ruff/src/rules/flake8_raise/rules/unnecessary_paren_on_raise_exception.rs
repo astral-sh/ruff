@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+
 use ruff_python_ast::helpers::match_parens;
 
 use crate::checkers::ast::Checker;
@@ -53,6 +54,17 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
     }) = expr
     {
         if args.is_empty() && keywords.is_empty() {
+            // `raise func()` still requires parentheses; only `raise Class()` does not.
+            if checker
+                .semantic()
+                .lookup_attribute(func)
+                .map_or(false, |id| {
+                    checker.semantic().binding(id).kind.is_function_definition()
+                })
+            {
+                return;
+            }
+
             let range = match_parens(func.end(), checker.locator)
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);

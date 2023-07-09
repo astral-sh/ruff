@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
-G101_1.py:6:9: G101 Logging statement uses an extra field that clashes with a LogRecord field: `name`
+G101_1.py:6:9: G101 Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
   |
 4 |     "Hello world!",
 5 |     extra={

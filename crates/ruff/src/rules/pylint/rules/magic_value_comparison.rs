@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,7 +55,7 @@ fn as_constant(expr: &Expr) -> Option<&Constant> {
     match expr {
         Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
+            op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
             operand,
             range: _,
         }) => match operand.as_ref() {

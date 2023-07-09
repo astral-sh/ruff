@@ -52,13 +52,13 @@ pub(crate) fn useless_metaclass_type(
         return;
     }
     let Expr::Name(ast::ExprName { id, .. }) = targets.first().unwrap() else {
-        return ;
+        return;
     };
     if id != "__metaclass__" {
         return;
     }
     let Expr::Name(ast::ExprName { id, .. }) = value else {
-        return ;
+        return;
     };
     if id != "type" {
         return;
@@ -68,13 +68,7 @@ pub(crate) fn useless_metaclass_type(
     if checker.patch(diagnostic.kind.rule()) {
         let stmt = checker.semantic().stmt();
         let parent = checker.semantic().stmt_parent();
-        let edit = autofix::edits::delete_stmt(
-            stmt,
-            parent,
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        );
+        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator, checker.indexer);
         diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
     }
     checker.diagnostics.push(diagnostic);

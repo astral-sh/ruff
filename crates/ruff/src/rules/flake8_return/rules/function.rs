@@ -481,7 +481,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         };
 
-        let Expr::Name(ast::ExprName { id: returned_id, .. }) = value.as_ref() else {
+        let Expr::Name(ast::ExprName {
+            id: returned_id, ..
+        }) = value.as_ref()
+        else {
             continue;
         };
 
@@ -494,7 +497,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         };
 
-        let Expr::Name(ast::ExprName { id: assigned_id, .. }) = target else {
+        let Expr::Name(ast::ExprName {
+            id: assigned_id, ..
+        }) = target
+        else {
             continue;
         };
 
@@ -517,13 +523,8 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                 // Delete the `return` statement. There's no need to treat this as an isolated
                 // edit, since we're editing the preceding statement, so no conflicting edit would
                 // be allowed to remove that preceding statement.
-                let delete_return = edits::delete_stmt(
-                    stmt,
-                    None,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                );
+                let delete_return =
+                    edits::delete_stmt(stmt, None, checker.locator, checker.indexer);
 
                 // Replace the `x = 1` statement with `return 1`.
                 let content = checker.locator.slice(assign.range());

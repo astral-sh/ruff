@@ -1,9 +1,34 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::{lines_after, skip_trailing_trivia};
-use ruff_formatter::write;
+use crate::trivia::{first_non_trivia_token, lines_after, skip_trailing_trivia, Token, TokenKind};
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::Ranged;
+
+/// Adds parentheses and indents `content` if it doesn't fit on a line.
+pub(crate) fn optional_parentheses<'ast, T>(content: &T) -> OptionalParentheses<'_, 'ast>
+where
+    T: Format<PyFormatContext<'ast>>,
+{
+    OptionalParentheses {
+        inner: Argument::new(content),
+    }
+}
+
+pub(crate) struct OptionalParentheses<'a, 'ast> {
+    inner: Argument<'a, PyFormatContext<'ast>>,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        group(&format_args![
+            if_group_breaks(&text("(")),
+            soft_block_indent(&Arguments::from(&self.inner)),
+            if_group_breaks(&text(")"))
+        ])
+        .fmt(f)
+    }
+}
 
 /// Provides Python specific extensions to [`Formatter`].
 pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
@@ -15,11 +40,20 @@ pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
     /// * [`NodeLevel::CompoundStatement`]: Up to one empty line
     /// * [`NodeLevel::Expression`]: No empty lines
     fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf>;
+
+    /// A builder that separates each element by a `,` and a [`soft_line_break_or_space`].
+    /// It emits a trailing `,` that is only shown if the enclosing group expands. It forces the enclosing
+    /// group to expand if the last item has a trailing `comma` and the magical comma option is enabled.
+    fn join_comma_separated<'fmt>(&'fmt mut self) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf>;
 }
 
 impl<'buf, 'ast> PyFormatterExtensions<'ast, 'buf> for PyFormatter<'ast, 'buf> {
     fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf> {
         JoinNodesBuilder::new(self, level)
+    }
+
+    fn join_comma_separated<'fmt>(&'fmt mut self) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+        JoinCommaSeparatedBuilder::new(self)
     }
 }
 
@@ -145,13 +179,108 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
     }
 }
 
+pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+    result: FormatResult<()>,
+    fmt: &'fmt mut PyFormatter<'ast, 'buf>,
+    end_of_last_entry: Option<TextSize>,
+    /// We need to track whether we have more than one entry since a sole entry doesn't get a
+    /// magic trailing comma even when expanded
+    len: usize,
+}
+
+impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+    fn new(f: &'fmt mut PyFormatter<'ast, 'buf>) -> Self {
+        Self {
+            fmt: f,
+            result: Ok(()),
+            end_of_last_entry: None,
+            len: 0,
+        }
+    }
+
+    pub(crate) fn entry<T>(
+        &mut self,
+        node: &T,
+        content: &dyn Format<PyFormatContext<'ast>>,
+    ) -> &mut Self
+    where
+        T: Ranged,
+    {
+        self.result = self.result.and_then(|_| {
+            if self.end_of_last_entry.is_some() {
+                write!(self.fmt, [text(","), soft_line_break_or_space()])?;
+            }
+
+            self.end_of_last_entry = Some(node.end());
+            self.len += 1;
+
+            content.fmt(self.fmt)
+        });
+
+        self
+    }
+
+    #[allow(unused)]
+    pub(crate) fn entries<T, I, F>(&mut self, entries: I) -> &mut Self
+    where
+        T: Ranged,
+        F: Format<PyFormatContext<'ast>>,
+        I: Iterator<Item = (T, F)>,
+    {
+        for (node, content) in entries {
+            self.entry(&node, &content);
+        }
+
+        self
+    }
+
+    pub(crate) fn nodes<'a, T, I>(&mut self, entries: I) -> &mut Self
+    where
+        T: Ranged + AsFormat<PyFormatContext<'ast>> + 'a,
+        I: Iterator<Item = &'a T>,
+    {
+        for node in entries {
+            self.entry(node, &node.format());
+        }
+
+        self
+    }
+
+    pub(crate) fn finish(&mut self) -> FormatResult<()> {
+        self.result.and_then(|_| {
+            if let Some(last_end) = self.end_of_last_entry.take() {
+                let magic_trailing_comma = self.fmt.options().magic_trailing_comma().is_respect()
+                    && matches!(
+                        first_non_trivia_token(last_end, self.fmt.context().contents()),
+                        Some(Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        })
+                    );
+
+                // If there is a single entry, only keep the magic trailing comma, don't add it if
+                // it wasn't there. If there is more than one entry, always add it.
+                if magic_trailing_comma || self.len > 1 {
+                    if_group_breaks(&text(",")).fmt(self.fmt)?;
+                }
+
+                if magic_trailing_comma {
+                    expand_parent().fmt(self.fmt)?;
+                }
+            }
+
+            Ok(())
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::comments::Comments;
     use crate::context::{NodeLevel, PyFormatContext};
     use crate::prelude::*;
+    use crate::PyFormatOptions;
     use ruff_formatter::format;
-    use ruff_formatter::SimpleFormatOptions;
     use rustpython_parser::ast::ModModule;
     use rustpython_parser::Parse;
 
@@ -172,8 +301,7 @@ no_leading_newline = 30
 
         let module = ModModule::parse(source, "test.py").unwrap();
 
-        let context =
-            PyFormatContext::new(SimpleFormatOptions::default(), source, Comments::default());
+        let context = PyFormatContext::new(PyFormatOptions::default(), source, Comments::default());
 
         let test_formatter =
             format_with(|f: &mut PyFormatter| f.join_nodes(level).nodes(&module.body).finish());

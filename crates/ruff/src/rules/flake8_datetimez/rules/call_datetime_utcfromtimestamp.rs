@@ -6,6 +6,8 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+use super::helpers;
+
 #[violation]
 pub struct CallDatetimeUtcfromtimestamp;
 
@@ -33,7 +35,7 @@ pub(crate) fn call_datetime_utcfromtimestamp(
     func: &Expr,
     location: TextRange,
 ) {
-    if checker
+    if !checker
         .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
@@ -43,8 +45,14 @@ pub(crate) fn call_datetime_utcfromtimestamp(
             )
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
+        return;
     }
+
+    if helpers::parent_expr_is_astimezone(checker) {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
 }

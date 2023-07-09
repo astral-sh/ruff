@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Boolop, Expr, Ranged};
+use rustpython_parser::ast::{self, BoolOp, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -63,7 +63,7 @@ impl AlwaysAutofixableViolation for RepeatedIsinstanceCalls {
 pub(crate) fn repeated_isinstance_calls(
     checker: &mut Checker,
     expr: &Expr,
-    op: Boolop,
+    op: BoolOp,
     values: &[Expr],
 ) {
     if !op.is_or() {

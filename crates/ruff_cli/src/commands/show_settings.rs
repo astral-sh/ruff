@@ -1,4 +1,4 @@
-use std::io::{self, BufWriter, Write};
+use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};
@@ -14,6 +14,7 @@ pub(crate) fn show_settings(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
+    writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
     let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
@@ -22,18 +23,19 @@ pub(crate) fn show_settings(
     let Some(entry) = paths
         .iter()
         .flatten()
-        .sorted_by(|a, b| a.path().cmp(b.path())).next() else {
+        .sorted_by(|a, b| a.path().cmp(b.path()))
+        .next()
+    else {
         bail!("No files found under the given path");
     };
     let path = entry.path();
     let settings = resolver.resolve(path, pyproject_config);
 
-    let mut stdout = BufWriter::new(io::stdout().lock());
-    writeln!(stdout, "Resolved settings for: {path:?}")?;
+    writeln!(writer, "Resolved settings for: {path:?}")?;
     if let Some(settings_path) = pyproject_config.path.as_ref() {
-        writeln!(stdout, "Settings path: {settings_path:?}")?;
+        writeln!(writer, "Settings path: {settings_path:?}")?;
     }
-    writeln!(stdout, "{settings:#?}")?;
+    writeln!(writer, "{settings:#?}")?;
 
     Ok(())
 }

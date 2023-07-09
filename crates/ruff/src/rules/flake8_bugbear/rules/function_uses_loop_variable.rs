@@ -1,15 +1,47 @@
-use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Comprehension, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::collect_arg_names;
+use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for function definitions that use a loop variable.
+///
+/// ## Why is this bad?
+/// The loop variable is not bound in the function definition, so it will always
+/// have the value it had in the last iteration when the function is called.
+///
+/// Instead, consider using a default argument to bind the loop variable at
+/// function definition time. Or, use `functools.partial`.
+///
+/// ## Example
+/// ```python
+/// adders = [lambda x: x + i for i in range(3)]
+/// values = [adder(1) for adder in adders]  # [3, 3, 3]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// adders = [lambda x, i=i: x + i for i in range(3)]
+/// values = [adder(1) for adder in adders]  # [1, 2, 3]
+/// ```
+///
+/// Or:
+/// ```python
+/// from functools import partial
+///
+/// adders = [partial(lambda x, i: x + i, i) for i in range(3)]
+/// values = [adder(1) for adder in adders]  # [1, 2, 3]
+/// ```
+///
+/// ## References
+/// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
+/// - [Python documentation: functools.partial](https://docs.python.org/3/library/functools.html#functools.partial)
 #[violation]
 pub struct FunctionUsesLoopVariable {
     name: String,
@@ -25,19 +57,17 @@ impl Violation for FunctionUsesLoopVariable {
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
-    // Tuple of: name, defining expression, and defining range.
-    loaded: Vec<(&'a str, &'a Expr)>,
-    // Tuple of: name, defining expression, and defining range.
-    stored: Vec<(&'a str, &'a Expr)>,
+    loaded: Vec<&'a ast::ExprName>,
+    stored: Vec<&'a ast::ExprName>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
-                ExprContext::Load => self.loaded.push((id, expr)),
-                ExprContext::Store => self.stored.push((id, expr)),
+            Expr::Name(name) => match &name.ctx {
+                ExprContext::Load => self.loaded.push(name),
+                ExprContext::Store => self.stored.push(name),
                 ExprContext::Del => {}
             },
             _ => visitor::walk_expr(self, expr),
@@ -47,7 +77,7 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
 
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
-    names: Vec<(&'a str, &'a Expr)>,
+    names: Vec<&'a ast::ExprName>,
     safe_functions: Vec<&'a Expr>,
 }
 
@@ -62,17 +92,20 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
 
-                // Collect all argument names.
-                let mut arg_names = collect_arg_names(args);
-                arg_names.extend(visitor.stored.iter().map(|(id, ..)| id));
-
                 // Treat any non-arguments as "suspicious".
-                self.names.extend(
-                    visitor
-                        .loaded
-                        .into_iter()
-                        .filter(|(id, ..)| !arg_names.contains(id)),
-                );
+                self.names
+                    .extend(visitor.loaded.into_iter().filter(|loaded| {
+                        if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
+                            return false;
+                        }
+
+                        if includes_arg_name(&loaded.id, args) {
+                            return false;
+                        }
+
+                        true
+                    }));
+
                 return;
             }
             Stmt::Return(ast::StmtReturn {
@@ -99,10 +132,9 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             }) => {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
-                        let id = id.as_str();
-                        if id == "filter" || id == "reduce" || id == "map" {
+                        if matches!(id.as_str(), "filter" | "reduce" | "map") {
                             for arg in args {
-                                if matches!(arg, Expr::Lambda(_)) {
+                                if arg.is_lambda_expr() {
                                     self.safe_functions.push(arg);
                                 }
                             }
@@ -126,7 +158,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
 
                 for keyword in keywords {
                     if keyword.arg.as_ref().map_or(false, |arg| arg == "key")
-                        && matches!(keyword.value, Expr::Lambda(_))
+                        && keyword.value.is_lambda_expr()
                     {
                         self.safe_functions.push(&keyword.value);
                     }
@@ -142,17 +174,19 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     let mut visitor = LoadedNamesVisitor::default();
                     visitor.visit_expr(body);
 
-                    // Collect all argument names.
-                    let mut arg_names = collect_arg_names(args);
-                    arg_names.extend(visitor.stored.iter().map(|(id, ..)| id));
-
                     // Treat any non-arguments as "suspicious".
-                    self.names.extend(
-                        visitor
-                            .loaded
-                            .iter()
-                            .filter(|(id, ..)| !arg_names.contains(id)),
-                    );
+                    self.names
+                        .extend(visitor.loaded.into_iter().filter(|loaded| {
+                            if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
+                                return false;
+                            }
+
+                            if includes_arg_name(&loaded.id, args) {
+                                return false;
+                            }
+
+                            true
+                        }));
 
                     return;
                 }
@@ -165,7 +199,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
 
 #[derive(Default)]
 struct NamesFromAssignmentsVisitor<'a> {
-    names: FxHashSet<&'a str>,
+    names: Vec<&'a str>,
 }
 
 /// `Visitor` to collect all names used in an assignment expression.
@@ -173,7 +207,7 @@ impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                self.names.insert(id.as_str());
+                self.names.push(id.as_str());
             }
             Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.visit_expr(value);
@@ -190,7 +224,7 @@ impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
 
 #[derive(Default)]
 struct AssignedNamesVisitor<'a> {
-    names: FxHashSet<&'a str>,
+    names: Vec<&'a str>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -224,7 +258,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if matches!(expr, Expr::Lambda(_)) {
+        if expr.is_lambda_expr() {
             // Don't recurse.
             return;
         }
@@ -267,15 +301,15 @@ pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &
 
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
-        for (name, expr) in suspicious_variables {
-            if reassigned_in_loop.contains(name) {
-                if !checker.flake8_bugbear_seen.contains(&expr) {
-                    checker.flake8_bugbear_seen.push(expr);
+        for name in suspicious_variables {
+            if reassigned_in_loop.contains(&name.id.as_str()) {
+                if !checker.flake8_bugbear_seen.contains(&name) {
+                    checker.flake8_bugbear_seen.push(name);
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionUsesLoopVariable {
-                            name: name.to_string(),
+                            name: name.id.to_string(),
                         },
-                        expr.range(),
+                        name.range(),
                     ));
                 }
             }

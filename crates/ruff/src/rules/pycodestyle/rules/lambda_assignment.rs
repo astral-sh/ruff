@@ -1,5 +1,7 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -61,57 +63,69 @@ pub(crate) fn lambda_assignment(
     annotation: Option<&Expr>,
     stmt: &Stmt,
 ) {
-    if let Expr::Name(ast::ExprName { id, .. }) = target {
-        if let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value {
-            let mut diagnostic = Diagnostic::new(
-                LambdaAssignment {
-                    name: id.to_string(),
-                },
-                stmt.range(),
-            );
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return;
+    };
 
-            // If the assignment is in a class body, it might not be safe
-            // to replace it because the assignment might be
-            // carrying a type annotation that will be used by some
-            // package like dataclasses, which wouldn't consider the
-            // rewritten function definition to be equivalent.
-            // See https://github.com/astral-sh/ruff/issues/3046
-            if checker.patch(diagnostic.kind.rule())
-                && !checker.semantic().scope().kind.is_class()
-                && !has_leading_content(stmt, checker.locator)
-                && !has_trailing_content(stmt, checker.locator)
+    let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value else {
+        return;
+    };
+
+    let mut diagnostic = Diagnostic::new(
+        LambdaAssignment {
+            name: id.to_string(),
+        },
+        stmt.range(),
+    );
+
+    if checker.patch(diagnostic.kind.rule()) {
+        if !has_leading_content(stmt.start(), checker.locator)
+            && !has_trailing_content(stmt.end(), checker.locator)
+        {
+            let first_line = checker.locator.line(stmt.start());
+            let indentation = leading_indentation(first_line);
+            let mut indented = String::new();
+            for (idx, line) in function(
+                id,
+                args,
+                body,
+                annotation,
+                checker.semantic(),
+                checker.generator(),
+            )
+            .universal_newlines()
+            .enumerate()
             {
-                let first_line = checker.locator.line(stmt.start());
-                let indentation = leading_indentation(first_line);
-                let mut indented = String::new();
-                for (idx, line) in function(
-                    id,
-                    args,
-                    body,
-                    annotation,
-                    checker.semantic(),
-                    checker.generator(),
-                )
-                .universal_newlines()
-                .enumerate()
-                {
-                    if idx == 0 {
-                        indented.push_str(&line);
-                    } else {
-                        indented.push_str(checker.stylist.line_ending().as_str());
-                        indented.push_str(indentation);
-                        indented.push_str(&line);
-                    }
+                if idx == 0 {
+                    indented.push_str(&line);
+                } else {
+                    indented.push_str(checker.stylist.line_ending().as_str());
+                    indented.push_str(indentation);
+                    indented.push_str(&line);
                 }
+            }
+
+            // If the assignment is in a class body, it might not be safe to replace it because the
+            // assignment might be carrying a type annotation that will be used by some package like
+            // dataclasses, which wouldn't consider the rewritten function definition to be
+            // equivalent. Similarly, if the lambda is shadowing a variable in the current scope,
+            // rewriting it as a function declaration may break type-checking.
+            // See: https://github.com/astral-sh/ruff/issues/3046
+            // See: https://github.com/astral-sh/ruff/issues/5421
+            if (annotation.is_some() && checker.semantic().scope().kind.is_class())
+                || checker.semantic().scope().has(id)
+            {
+                diagnostic.set_fix(Fix::manual(Edit::range_replacement(indented, stmt.range())));
+            } else {
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     indented,
                     stmt.range(),
                 )));
             }
-
-            checker.diagnostics.push(diagnostic);
         }
     }
+
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Extract the argument types and return type from a `Callable` annotation.
@@ -176,26 +190,32 @@ fn function(
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| Arg {
-                    annotation: arg_types
-                        .get(idx)
-                        .map(|arg_type| Box::new(arg_type.clone())),
-                    ..arg.clone()
+                .map(|(idx, arg_with_default)| ArgWithDefault {
+                    def: Arg {
+                        annotation: arg_types
+                            .get(idx)
+                            .map(|arg_type| Box::new(arg_type.clone())),
+                        ..arg_with_default.def.clone()
+                    },
+                    ..arg_with_default.clone()
                 })
                 .collect::<Vec<_>>();
             let new_args = args
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| Arg {
-                    annotation: arg_types
-                        .get(idx + new_posonlyargs.len())
-                        .map(|arg_type| Box::new(arg_type.clone())),
-                    ..arg.clone()
+                .map(|(idx, arg_with_default)| ArgWithDefault {
+                    def: Arg {
+                        annotation: arg_types
+                            .get(idx + new_posonlyargs.len())
+                            .map(|arg_type| Box::new(arg_type.clone())),
+                        ..arg_with_default.def.clone()
+                    },
+                    ..arg_with_default.clone()
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-                name: name.into(),
+                name: Identifier::new(name.to_string(), TextRange::default()),
                 args: Box::new(Arguments {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
@@ -211,7 +231,7 @@ fn function(
         }
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-        name: name.into(),
+        name: Identifier::new(name.to_string(), TextRange::default()),
         args: Box::new(args.clone()),
         body: vec![body],
         decorator_list: vec![],

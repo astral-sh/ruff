@@ -12,7 +12,7 @@ invalid_characters.py:25:16: PLE2513 [*] Invalid unescaped character ESC, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 22 22 | 
 23 23 | sub_ok = '\x1a'
 24 24 | 

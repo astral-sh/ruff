@@ -1,4 +1,6 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, Stmt, Unaryop};
+use rustpython_parser::ast::{
+    self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
+};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -156,7 +158,7 @@ fn is_valid_default_value_with_annotation(
                 });
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::USub,
+            op: UnaryOp::USub,
             operand,
             range: _,
         }) => {
@@ -199,7 +201,7 @@ fn is_valid_default_value_with_annotation(
                 {
                     return locator.slice(left.range()).len() <= 10;
                 } else if let Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: Unaryop::USub,
+                    op: UnaryOp::USub,
                     operand,
                     range: _,
                 }) = left.as_ref()
@@ -268,7 +270,7 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
 /// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
 /// call.
 fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. } )= expr else {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
     semantic.resolve_call_path(func).map_or(false, |call_path| {
@@ -296,6 +298,16 @@ fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
+/// Returns `true` if this is an assignment to a simple `Final`-annotated variable.
+fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(value, Expr::Name(_) | Expr::Attribute(_)) {
+        if semantic.match_typing_expr(annotation, "Final") {
+            return true;
+        }
+    }
+    false
+}
+
 /// Returns `true` if the a class is an enum, based on its base classes.
 fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
     return bases.iter().any(|expr| {
@@ -312,130 +324,74 @@ fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
 }
 
 /// PYI011
-pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
-    if !args.defaults.is_empty() {
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.defaults.get(i))
-            {
-                if arg.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        if def.annotation.is_some() {
+            if !is_valid_default_value_with_annotation(
+                default,
+                true,
+                checker.locator,
+                checker.semantic(),
+            ) {
+                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                        "...".to_string(),
+                        default.range(),
+                    )));
                 }
-            }
-        }
-    }
 
-    if !args.kw_defaults.is_empty() {
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                if kwarg.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
-
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
 }
 
 /// PYI014
-pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
-    if !args.defaults.is_empty() {
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.defaults.get(i))
-            {
-                if arg.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, default.range());
+pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        if def.annotation.is_none() {
+            if !is_valid_default_value_with_annotation(
+                default,
+                true,
+                checker.locator,
+                checker.semantic(),
+            ) {
+                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
 
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                        "...".to_string(),
+                        default.range(),
+                    )));
                 }
-            }
-        }
-    }
 
-    if !args.kw_defaults.is_empty() {
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                if kwarg.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, default.range());
-
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -490,6 +446,9 @@ pub(crate) fn annotated_assignment_default_in_stub(
         return;
     }
     if is_type_var_like_call(value, checker.semantic()) {
+        return;
+    }
+    if is_final_assignment(annotation, value, checker.semantic()) {
         return;
     }
     if is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {

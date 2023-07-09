@@ -1,0 +1,113 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/one_element_subscript.py
+---
+## Input
+
+```py
+# We should not treat the trailing comma
+# in a single-element subscript.
+a: tuple[int,]
+b = tuple[int,]
+
+# The magic comma still applies to multi-element subscripts.
+c: tuple[int, int,]
+d = tuple[int, int,]
+
+# Magic commas still work as expected for non-subscripts.
+small_list = [1,]
+list_of_types = [tuple[int,],]
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,16 +1,15 @@
+ # We should not treat the trailing comma
+ # in a single-element subscript.
+-a: tuple[int,]
+-b = tuple[int,]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++b = tuple[(int,)]
+ 
+ # The magic comma still applies to multi-element subscripts.
+-c: tuple[
+-    int,
+-    int,
+-]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
+ d = tuple[
+-    int,
+-    int,
++    (
++        int,
++        int,
++    )
+ ]
+ 
+ # Magic commas still work as expected for non-subscripts.
+@@ -18,5 +17,5 @@
+     1,
+ ]
+ list_of_types = [
+-    tuple[int,],
++    tuple[(int,)],
+ ]
+```
+
+## Ruff Output
+
+```py
+# We should not treat the trailing comma
+# in a single-element subscript.
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+b = tuple[(int,)]
+
+# The magic comma still applies to multi-element subscripts.
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+d = tuple[
+    (
+        int,
+        int,
+    )
+]
+
+# Magic commas still work as expected for non-subscripts.
+small_list = [
+    1,
+]
+list_of_types = [
+    tuple[(int,)],
+]
+```
+
+## Black Output
+
+```py
+# We should not treat the trailing comma
+# in a single-element subscript.
+a: tuple[int,]
+b = tuple[int,]
+
+# The magic comma still applies to multi-element subscripts.
+c: tuple[
+    int,
+    int,
+]
+d = tuple[
+    int,
+    int,
+]
+
+# Magic commas still work as expected for non-subscripts.
+small_list = [
+    1,
+]
+list_of_types = [
+    tuple[int,],
+]
+```
+
+

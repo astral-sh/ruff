@@ -1,7 +1,9 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -79,7 +81,8 @@ fn match_named_tuple_assign<'a>(
         args,
         keywords,
         range: _,
-    }) = value else {
+    }) = value
+    else {
         return None;
     };
     if !semantic.match_typing_expr(func, "NamedTuple") {
@@ -134,10 +137,12 @@ fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
 /// Create a list of property assignments from the `NamedTuple` arguments.
 fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
     let Some(fields) = args.get(1) else {
-        let node = Stmt::Pass(ast::StmtPass { range: TextRange::default()});
+        let node = Stmt::Pass(ast::StmtPass {
+            range: TextRange::default(),
+        });
         return Ok(vec![node]);
     };
-    let Expr::List(ast::ExprList { elts, .. } )= &fields else {
+    let Expr::List(ast::ExprList { elts, .. }) = &fields else {
         bail!("Expected argument to be `Expr::List`");
     };
     if elts.is_empty() {
@@ -165,7 +170,8 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
             let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(property),
                 ..
-            }) = &field_name else {
+            }) = &field_name
+            else {
                 bail!("Expected `field_name` to be `Constant::Str`")
             };
             if !is_identifier(property) {
@@ -185,7 +191,7 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
     ast::StmtClassDef {
-        name: typename.into(),
+        name: Identifier::new(typename.to_string(), TextRange::default()),
         bases: vec![base_class.clone()],
         keywords: vec![],
         body,
@@ -217,8 +223,8 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     value: &Expr,
 ) {
     let Some((typename, args, keywords, base_class)) =
-        match_named_tuple_assign(targets, value, checker.semantic()) else
-    {
+        match_named_tuple_assign(targets, value, checker.semantic())
+    else {
         return;
     };
 

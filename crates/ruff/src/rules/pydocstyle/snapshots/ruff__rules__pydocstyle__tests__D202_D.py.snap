@@ -12,7 +12,7 @@ D.py:142:5: D202 [*] No blank lines allowed after function docstring (found 1)
     |
     = help: Remove blank line(s) after function docstring
 
-ℹ Suggested fix
+ℹ Fix
 140 140 | @expect('D202: No blank lines allowed after function docstring (found 1)')
 141 141 | def trailing_space():
 142 142 |     """Leading space."""
@@ -32,7 +32,7 @@ D.py:151:5: D202 [*] No blank lines allowed after function docstring (found 1)
     |
     = help: Remove blank line(s) after function docstring
 
-ℹ Suggested fix
+ℹ Fix
 149 149 | def trailing_and_leading_space():
 150 150 | 
 151 151 |     """Trailing and leading space."""
@@ -56,7 +56,7 @@ D.py:555:5: D202 [*] No blank lines allowed after function docstring (found 1)
     |
     = help: Remove blank line(s) after function docstring
 
-ℹ Suggested fix
+ℹ Fix
 556 556 | 
 557 557 |     More content.
 558 558 |     """
@@ -80,7 +80,7 @@ D.py:568:5: D202 [*] No blank lines allowed after function docstring (found 1)
     |
     = help: Remove blank line(s) after function docstring
 
-ℹ Suggested fix
+ℹ Fix
 569 569 | 
 570 570 |     More content.
 571 571 |     """

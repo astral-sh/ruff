@@ -234,8 +234,8 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         stmt,
         parent,
         checker.locator,
-        checker.indexer,
         checker.stylist,
+        checker.indexer,
     )?;
     Ok(Fix::automatic(edit).isolate(checker.isolation(parent)))
 }

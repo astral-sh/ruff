@@ -3,7 +3,6 @@ use rustpython_parser::ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::settings::types::IdentifierPattern;
@@ -48,7 +47,6 @@ pub(crate) fn dunder_function_name(
     stmt: &Stmt,
     name: &str,
     ignore_names: &[IdentifierPattern],
-    locator: &Locator,
 ) -> Option<Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
@@ -67,8 +65,5 @@ pub(crate) fn dunder_function_name(
         return None;
     }
 
-    Some(Diagnostic::new(
-        DunderFunctionName,
-        stmt.identifier(locator),
-    ))
+    Some(Diagnostic::new(DunderFunctionName, stmt.identifier()))
 }

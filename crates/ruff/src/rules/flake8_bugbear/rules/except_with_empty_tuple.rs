@@ -1,11 +1,37 @@
 use rustpython_parser::ast::{self, Ranged};
-use rustpython_parser::ast::{Excepthandler, Expr};
+use rustpython_parser::ast::{ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for exception handlers that catch an empty tuple.
+///
+/// ## Why is this bad?
+/// An exception handler that catches an empty tuple will not catch anything,
+/// and is indicative of a mistake. Instead, add exceptions to the `except`
+/// clause.
+///
+/// ## Example
+/// ```python
+/// try:
+///     1 / 0
+/// except ():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     1 / 0
+/// except ZeroDivisionError:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[violation]
 pub struct ExceptWithEmptyTuple;
 
@@ -17,8 +43,9 @@ impl Violation for ExceptWithEmptyTuple {
 }
 
 /// B029
-pub(crate) fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Excepthandler) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
+pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &ExceptHandler) {
+    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
+        except_handler;
     let Some(type_) = type_ else {
         return;
     };
@@ -26,8 +53,9 @@ pub(crate) fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Exc
         return;
     };
     if elts.is_empty() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ExceptWithEmptyTuple, excepthandler.range()));
+        checker.diagnostics.push(Diagnostic::new(
+            ExceptWithEmptyTuple,
+            except_handler.range(),
+        ));
     }
 }

@@ -49,10 +49,7 @@ impl Indexer {
                 }
 
                 // Newlines after a newline never form a continuation.
-                if !matches!(
-                    prev_token,
-                    Some(Tok::Newline | Tok::NonLogicalNewline) | None
-                ) {
+                if !matches!(prev_token, Some(Tok::Newline | Tok::NonLogicalNewline)) {
                     continuation_lines.push(line_start);
                 }
 

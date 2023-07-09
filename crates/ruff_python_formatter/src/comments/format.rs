@@ -1,12 +1,13 @@
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
+
+use ruff_formatter::{format_args, write, FormatError, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{lines_after, lines_before, skip_trailing_trivia};
-use ruff_formatter::{format_args, write, FormatError, SourceCode};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::prelude::AstNode;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -69,7 +70,7 @@ where
 {
     FormatLeadingAlternateBranchComments {
         comments,
-        last_node: last_node.map(std::convert::Into::into),
+        last_node: last_node.map(Into::into),
     }
 }
 
@@ -136,7 +137,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
         {
             let slice = trailing.slice();
 
-            has_trailing_own_line_comment |= trailing.position().is_own_line();
+            has_trailing_own_line_comment |= trailing.line_position().is_own_line();
 
             if has_trailing_own_line_comment {
                 let lines_before_comment = lines_before(slice.start(), f.context().contents());
@@ -208,7 +209,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
             .iter()
             .filter(|comment| comment.is_unformatted())
         {
-            if first && comment.position().is_end_of_line() {
+            if first && comment.line_position().is_end_of_line() {
                 write!(f, [space(), space()])?;
             }
 
