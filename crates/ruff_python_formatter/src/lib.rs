@@ -280,9 +280,14 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-[
-	AAAAAAAAAAAAA
-] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA + AAAAAAAAAAAAAAAAASAAAAAAAA"#;
+if True:
+    if True:
+        if True:
+            return _(
+                "qweasdzxcqweasdzxcqweasdzxcqweasdz"
+                + "qweasdzxcqweasdzxcqweasdzxcqweas",
+                "qweasdzxcqweasdzxcqweasdzxcqweasdz",
+            ) % {"reported_username": reported_username, "report_reason": report_reason}"#;
         // Tokenize once
         let mut tokens = Vec::new();
         let mut comment_ranges = CommentRangesBuilder::default();

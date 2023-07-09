@@ -21,12 +21,21 @@ pub(crate) struct OptionalParentheses<'a, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        group(&format_args![
+        let saved_level = f.context().node_level();
+
+        f.context_mut()
+            .set_node_level(NodeLevel::ParenthesizedExpression);
+
+        let result = group(&format_args![
             if_group_breaks(&text("(")),
             soft_block_indent(&Arguments::from(&self.inner)),
             if_group_breaks(&text(")")),
         ])
-        .fmt(f)
+        .fmt(f);
+
+        f.context_mut().set_node_level(saved_level);
+
+        result
     }
 }
 

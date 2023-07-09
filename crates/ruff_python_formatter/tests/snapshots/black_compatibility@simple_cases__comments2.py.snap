@@ -260,7 +260,7 @@ instruction()#comment with bad spacing
      ]
      while True:
          if False:
-@@ -143,7 +160,10 @@
+@@ -143,22 +160,25 @@
      # let's return
      return Node(
          syms.simple_stmt,
@@ -459,13 +459,9 @@ short
     )
 
 
-CONFIG_FILES = (
-    [
-        CONFIG_FILE,
-    ]
-    + SHARED_CONFIG_FILES
-    + USER_CONFIG_FILES
-)  # type: Final
+CONFIG_FILES = [
+    CONFIG_FILE,
+] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
 
 
 class Test:
