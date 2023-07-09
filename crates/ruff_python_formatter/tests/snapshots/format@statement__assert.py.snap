@@ -1,0 +1,63 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assert.py
+---
+## Input
+```py
+assert (
+    # Asserted
+)
+
+# Some assert
+assert (
+    # Let's go inside
+    True  # Go around this
+    # Below that    
+), "Some string"  # Outside this way
+# Passed all that
+
+# Dangle this here
+
+# Some assert
+assert (
+    # Let's go inside
+    True  # Go around this
+    # Below that
+
+    # Dangle that there
+), "Some string"  # Outside this way
+# Passed all that
+```
+
+## Output
+```py
+assert (
+    # Asserted
+)
+
+# Some assert
+assert (
+    # Let's go inside
+    True  # Go around this
+), (
+    # Below that
+    "Some string"
+)  # Outside this way
+# Passed all that
+
+# Dangle this here
+
+# Some assert
+assert (
+    # Let's go inside
+    True  # Go around this
+), (
+    # Below that
+    # Dangle that there
+    "Some string"
+)  # Outside this way
+# Passed all that
+```
+
+
+
