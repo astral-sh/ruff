@@ -57,7 +57,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     };
 
-    let (stmt, conditional, if_test) = match body {
+    let (stmt, if_test) = match body {
         // ```python
         // for x in y:
         //     if z:
@@ -72,13 +72,13 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
             let [stmt] = body.as_slice() else {
                 return;
             };
-            (stmt, true, Some(test))
+            (stmt, Some(test))
         }
         // ```python
         // for x in y:
         //     filtered.append(f(x))
         // ```
-        [stmt] => (stmt, false, None),
+        [stmt] => (stmt, None),
         _ => return,
     };
 
@@ -105,7 +105,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     };
 
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if !conditional {
+    if if_test.is_none() {
         if arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
             return;
         }
@@ -136,6 +136,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     //
     // Converting this to a list comprehension would raise a `NameError` as
     // `filtered` is not defined yet:
+    //
     // ```python
     // filtered = [x for x in y if x in filtered]
     // ```
