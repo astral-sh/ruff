@@ -3,6 +3,31 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for assignments to the variable `df`.
+///
+/// ## Why is this bad?
+/// Although `df` is a common variable name for a Pandas DataFrame in short
+/// code examples, it is not a good variable name in production code. This is
+/// because `df` is not descriptive, and it is easy to forget what `df`
+/// represents. It also causes name conflict problems if you want to use
+/// multiple DataFrames in the same scope.
+///
+/// Instead, use a more descriptive variable name.
+///
+/// ## Example
+/// ```python
+/// import pandas as pd
+///
+/// df = pd.read_csv("animals.csv")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pandas as pd
+///
+/// animals_df = pd.read_csv("animals.csv")
+/// ```
 #[violation]
 pub struct PandasDfVariableName;
 

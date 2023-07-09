@@ -8,6 +8,36 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 
+/// ## What it does
+/// Checks for uses of `.isnull`.
+///
+/// ## Why is this bad?
+/// `.isna` and `.isnull` are equivalent. For consistency, use `.isna`
+/// over `.isnull`.
+///
+/// Further, `.isna` is a more accurate name for the method, as it
+/// checks not only for `None` values, but also for `NaN` and `NaT`
+/// values.
+///
+/// ## Example
+/// ```python
+/// import pandas as pd
+///
+/// animals_df = pd.read_csv("animals.csv")
+/// pd.isnull(animals_df)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pandas as pd
+///
+/// animals_df = pd.read_csv("animals.csv")
+/// pd.isna(animals_df)
+/// ```
+///
+/// ## References
+/// - [Pandas documentation: `isnull`](https://pandas.pydata.org/docs/reference/api/pandas.isnull.html#pandas.isnull)
+/// - [Pandas documentation: `isna`](https://pandas.pydata.org/docs/reference/api/pandas.isna.html#pandas.isna)
 #[violation]
 pub struct PandasUseOfDotIsNull;
 
@@ -18,6 +48,36 @@ impl Violation for PandasUseOfDotIsNull {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `.notnull`.
+///
+/// ## Why is this bad?
+/// `.notna` and `.notnull` are equivalent. For consistency, use `.notna`
+/// over `.notnull`.
+///
+/// Further, `.notna` is a more accurate name for the method, as it
+/// checks not only for `None` values, but also for `NaN` and `NaT`
+/// values.
+///
+/// ## Example
+/// ```python
+/// import pandas as pd
+///
+/// animals_df = pd.read_csv("animals.csv")
+/// pd.notnull(animals_df)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pandas as pd
+///
+/// animals_df = pd.read_csv("animals.csv")
+/// pd.notna(animals_df)
+/// ```
+///
+/// ## References
+/// - [Pandas documentation: `notnull`](https://pandas.pydata.org/docs/reference/api/pandas.notnull.html#pandas.notnull)
+/// - [Pandas documentation: `notna`](https://pandas.pydata.org/docs/reference/api/pandas.notna.html#pandas.notna)
 #[violation]
 pub struct PandasUseOfDotNotNull;
 
@@ -28,6 +88,33 @@ impl Violation for PandasUseOfDotNotNull {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `.pivot` or `.unstack`.
+///
+/// ## Why is this bad?
+/// Prefer `.pivot_table` to `.pivot` or `.unstack`, which is a more general method
+/// that can be used to implement `.pivot` and `.unstack`, and provides the same
+/// functionality.
+///
+/// ## Example
+/// ```python
+/// import pandas as pd
+///
+/// df = pd.read_csv("cities.csv")
+/// df.pivot(index="city", columns="year", values="population")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pandas as pd
+///
+/// df = pd.read_csv("cities.csv")
+/// df.pivot_table(index="city", columns="year", values="population")
+/// ```
+///
+/// ## References
+/// - [Pandas documentation: Reshaping and pivot tables](https://pandas.pydata.org/docs/user_guide/reshaping.html)
+/// - [Pandas documentation: `pivot_table`](https://pandas.pydata.org/docs/reference/api/pandas.pivot_table.html#pandas.pivot_table)
 #[violation]
 pub struct PandasUseOfDotPivotOrUnstack;
 
@@ -40,6 +127,8 @@ impl Violation for PandasUseOfDotPivotOrUnstack {
     }
 }
 
+// TODO(tjkuson): Add documentation for this rule once clarified.
+// https://github.com/astral-sh/ruff/issues/5628
 #[violation]
 pub struct PandasUseOfDotReadTable;
 
@@ -50,6 +139,33 @@ impl Violation for PandasUseOfDotReadTable {
     }
 }
 
+/// ## What it does
+/// Checks for uses of `.stack`.
+///
+/// ## Why is this bad?
+/// Prefer `.melt` to `.stack`, which has the same functionality whilst
+/// supporting direct column renaming and avoiding a `MultiIndex`, which is
+/// generally more difficult to work with.
+///
+/// ## Example
+/// ```python
+/// import pandas as pd
+///
+/// cities_df = pd.read_csv("cities.csv")
+/// cities_df.set_index("city").stack()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pandas as pd
+///
+/// cities_df = pd.read_csv("cities.csv")
+/// cities_df.melt(id_vars="city")
+/// ```
+///
+/// ## References
+/// - [Pandas documentation: `melt`](https://pandas.pydata.org/docs/reference/api/pandas.melt.html)
+/// - [Pandas documentation: `stack`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.stack.html)
 #[violation]
 pub struct PandasUseOfDotStack;
 

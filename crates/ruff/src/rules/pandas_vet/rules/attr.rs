@@ -8,6 +8,30 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 
+/// ## What it does
+/// Checks for uses of `.values` on a Pandas Series or Index.
+///
+/// ## Why is this bad?
+/// `.values` is ambiguous as it is unclear what it returns; thus, it is no
+/// longer recommended by the Pandas documentation. Instead, to return a NumPy
+/// array, use `.to_numpy()`. Or, to return a Pandas array, use `.array`.
+///
+/// ## Example
+/// ```python
+/// import pandas as pd
+///
+/// animals = pd.read_csv("animals.csv").values  # Ambiguous.
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pandas as pd
+///
+/// animals = pd.read_csv("animals.csv").to_numpy()  # Explicit.
+/// ```
+///
+/// ## References
+/// - [Pandas documentation: Accessing the values in a Series or Index](https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.24.0.html#accessing-the-values-in-a-series-or-index)
 #[violation]
 pub struct PandasUseOfDotValues;
 
