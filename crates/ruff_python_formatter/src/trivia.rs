@@ -615,7 +615,7 @@ mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token, TokenKind};
+    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token};
 
     struct TokenizationTestCase {
         source: &'static str,
@@ -707,14 +707,23 @@ mod tests {
         test_case.assert_reverse_tokenization();
     }
 
-    // TODO: find reversible example?
-    // #[test]
-    fn tokenize_multichar_keyword_with_extra_chars() {
+    #[test]
+    fn identifier_ending_in_non_start_char() {
+        let source = "i5";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn ignore_word_with_only_id_continuing_chars() {
         let source = "555";
 
         let test_case = tokenize(source);
-        assert_eq!(test_case.tokens[0].kind, TokenKind::Other);
-        test_case.assert_reverse_tokenization();
+        assert_debug_snapshot!(test_case.tokens());
+
+        // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
     }
 
     #[test]
