@@ -23,7 +23,7 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
                 write!(
                     f,
                     [
-                        // Handle special case of delete statements without elements.
+                        // Handle special case of delete statements without targets.
                         // ```
                         // del (
                         //     # Dangling comment
@@ -62,6 +62,7 @@ impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
     }
 }
 
+// NOTE: `default_expression_needs_parentheses` is reserved for expression nodes.
 impl NeedsParentheses for StmtDelete {
     fn needs_parentheses(
         &self,

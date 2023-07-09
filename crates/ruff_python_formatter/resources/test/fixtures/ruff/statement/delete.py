@@ -9,6 +9,11 @@ del a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a
 del a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a  # Trailing
 
 del (
+    a,
+    a
+)
+
+del (
     # Dangling comment
 )
 
