@@ -366,7 +366,7 @@ async def main(
                 for line in diff_str.splitlines():
                     # Find rule change for current line or construction
                     # + <rule>/<path>:<line>:<column>: <rule_code> <message>
-                    matches = re.search(r": ([A-Z]{1,3}[0-9]{3,4})", line)
+                    matches = re.search(r": ([A-Z]{1,4}[0-9]{3,4})", line)
 
                     if matches is None:
                         # Handle case where there are no regex matches e.g.
