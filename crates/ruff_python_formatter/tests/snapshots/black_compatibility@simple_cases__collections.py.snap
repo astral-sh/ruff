@@ -110,18 +110,6 @@ if True:
  nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
  nested_long_lines = [
      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-@@ -52,10 +41,7 @@
- y = {
-     "oneple": (1,),
- }
--assert False, (
--    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
--    % bar
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
- # looping over a 1-tuple should also not get wrapped
- for x in (1,):
 ```
 
 ## Ruff Output
@@ -170,7 +158,10 @@ x = {"oneple": (1,)}
 y = {
     "oneple": (1,),
 }
-NOT_YET_IMPLEMENTED_StmtAssert
+assert False, (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
+    % bar
+)
 
 # looping over a 1-tuple should also not get wrapped
 for x in (1,):

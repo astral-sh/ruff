@@ -358,37 +358,7 @@ long_unmergable_string_with_pragma = (
  
  comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
  
-@@ -165,25 +163,13 @@
- 
- triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
- 
--assert (
--    some_type_of_boolean_expression
--), "Followed by a really really really long string that is used to provide context to the AssertionError exception."
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
--assert (
--    some_type_of_boolean_expression
--), "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
--    "formatting"
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
--assert some_type_of_boolean_expression, (
--    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
--    % "formatting"
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
--assert some_type_of_boolean_expression, (
--    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
--    % ("string", "formatting")
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
- some_function_call(
-     "With a reallly generic name and with a really really long string that is, at some point down the line, "
-@@ -212,29 +198,25 @@
+@@ -212,29 +210,25 @@
  )
  
  func_with_bad_comma(
@@ -425,7 +395,7 @@ long_unmergable_string_with_pragma = (
      x,
      y,
      z,
-@@ -243,21 +225,13 @@
+@@ -243,21 +237,13 @@
  func_with_bad_parens(
      x,
      y,
@@ -451,7 +421,7 @@ long_unmergable_string_with_pragma = (
  
  backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\"
  backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
-@@ -271,10 +245,10 @@
+@@ -271,10 +257,10 @@
  
  
  def foo():
@@ -634,13 +604,25 @@ pragma_comment_string2 = "Lines which end with an inline pragma comment of the f
 
 triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert (
+    some_type_of_boolean_expression
+), "Followed by a really really really long string that is used to provide context to the AssertionError exception."
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert (
+    some_type_of_boolean_expression
+), "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+    "formatting"
+)
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
+    % "formatting"
+)
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
+    % ("string", "formatting")
+)
 
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "

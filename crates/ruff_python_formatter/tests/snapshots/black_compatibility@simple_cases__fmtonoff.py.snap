@@ -272,7 +272,7 @@ d={'a':1,
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
 +    offset = attr.ib(default=attr.Factory(lambda x: True))
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert task._cancel_stack[ : len(old_stack)] == old_stack
  
  
  def spaces_types(
@@ -458,7 +458,7 @@ def function_signature_stress_test(
 # fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda x: True))
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert task._cancel_stack[ : len(old_stack)] == old_stack
 
 
 def spaces_types(

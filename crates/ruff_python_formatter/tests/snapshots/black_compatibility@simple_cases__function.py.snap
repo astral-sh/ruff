@@ -138,16 +138,14 @@ def __await__(): return (yield)
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
 +    offset = attr.ib(default=attr.Factory(lambda x: True))
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert task._cancel_stack[ : len(old_stack)] == old_stack
  
  
  def spaces_types(
-@@ -64,19 +63,17 @@
- 
+@@ -65,18 +64,16 @@
  
  def spaces2(result=_core.Value(None)):
--    assert fut is self._read_fut, (fut, self._read_fut)
-+    NOT_YET_IMPLEMENTED_StmtAssert
+     assert fut is self._read_fut, (fut, self._read_fut)
 +    # EMPTY LINE WITH WHITESPACE (this comment will be removed)
  
  
@@ -239,7 +237,7 @@ def function_signature_stress_test(
 
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda x: True))
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert task._cancel_stack[ : len(old_stack)] == old_stack
 
 
 def spaces_types(
@@ -257,7 +255,7 @@ def spaces_types(
 
 
 def spaces2(result=_core.Value(None)):
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert fut is self._read_fut, (fut, self._read_fut)
     # EMPTY LINE WITH WHITESPACE (this comment will be removed)
 
 
