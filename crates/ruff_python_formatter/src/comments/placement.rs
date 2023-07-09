@@ -1219,11 +1219,8 @@ fn handle_expr_if_comment<'a>(
 fn find_only_token_in_range(range: TextRange, locator: &Locator, token_kind: TokenKind) -> Token {
     let mut tokens = SimpleTokenizer::new(locator.contents(), range).skip_trivia();
     let token = tokens.next().expect("Expected a token");
-    debug_assert!(
-        token.kind() == token_kind,
-        "expected a `{token_kind:?}` token",
-    );
-    debug_assert!(tokens.next().is_none(), "Didn't expect any other token");
+    debug_assert_eq!(token.kind(), token_kind);
+    debug_assert_eq!(tokens.next(), None);
     token
 }
 
