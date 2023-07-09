@@ -1,6 +1,6 @@
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
-a, b, c, d = (1, 2, 3, 4)
+a, b, c, d = 1, 2, 3, 4
 
 del a, b, c, d
 del a, b, c, d  # Trailing
