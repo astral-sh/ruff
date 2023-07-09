@@ -197,7 +197,7 @@ pub(crate) enum TokenKind {
     /// `match`
     Match,
 
-    /// Any other non trivia token. Always has a length of 1
+    /// Any other non trivia token.
     Other,
 
     /// Returned for each character after [`TokenKind::Other`] has been returned once.
