@@ -3,7 +3,8 @@ use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
-    helpers,
+    comparable::ComparableExpr,
+    helpers::{self, map_callable},
     statement_visitor::{walk_stmt, StatementVisitor},
 };
 
@@ -91,14 +92,12 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
         return;
     }
 
-    // The names of exceptions handled by the `try` Stmt. We can't compare `Expr`'s since they have
-    // different ranges, but by virtue of this function's call path we know that the `raise`
-    // statements will always be within the surrounding `try`.
-    let handler_ids: Vec<&str> = helpers::extract_handled_exceptions(handlers)
-        .into_iter()
+    let handled_exceptions = helpers::extract_handled_exceptions(handlers);
+    let comparables: Vec<ComparableExpr> = handled_exceptions
+        .iter()
         .filter_map(|handler| {
-            if let Expr::Name(ast::ExprName { id, .. }) = handler {
-                Some(id.as_str())
+            if let Expr::Name(ast::ExprName { .. }) = handler {
+                Some(ComparableExpr::from(*handler))
             } else {
                 None
             }
@@ -110,31 +109,21 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
             continue;
         };
 
-        let Some(exc_name) = get_function_name(exception.as_ref()) else {
-            continue;
-        };
-
         // We can't check exception sub-classes without a type-checker implementation, so let's
         // just catch the blanket `Exception` for now.
-        if (handler_ids.contains(&"Exception") && checker.semantic().is_builtin("Exception"))
-            || handler_ids.contains(&exc_name)
+        if comparables.contains(&ComparableExpr::from(map_callable(exception)))
+            || handled_exceptions.iter().any(|expr| {
+                checker
+                    .semantic()
+                    .resolve_call_path(expr)
+                    .map_or(false, |call_path| {
+                        matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
+                    })
+            })
         {
             checker
                 .diagnostics
                 .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
         }
-    }
-}
-
-/// Get the name of an [`Expr::Call`], if applicable. If the passed [`Expr`] isn't a [`Expr::Call`], return an
-/// empty [`Option`].
-fn get_function_name(expr: &Expr) -> Option<&str> {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return None;
-    };
-
-    match func.as_ref() {
-        Expr::Name(ast::ExprName { id, .. }) => Some(id.as_str()),
-        _ => None,
     }
 }
