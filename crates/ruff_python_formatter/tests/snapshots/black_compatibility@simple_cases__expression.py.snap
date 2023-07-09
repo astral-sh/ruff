@@ -476,7 +476,7 @@ last_call()
  )
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -494,7 +494,7 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
--)
+ )
 +result = session.query(models.Customer.id).filter(
 +    models.Customer.account_id == account_id, models.Customer.email == email_address
 +).order_by(models.Customer.id.asc()).all()
@@ -575,7 +575,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +335,8 @@
+@@ -342,19 +335,16 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -585,6 +585,21 @@ last_call()
      ^ aaaaaaaaaaaaaaaa.i
      << aaaaaaaaaaaaaaaa.k
      >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
+ ):
+     return True
+-(
+-    aaaaaaaaaaaaaaaa
+-    + aaaaaaaaaaaaaaaa
+-    - aaaaaaaaaaaaaaaa
+-    * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+-    / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+-)
++aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa - aaaaaaaaaaaaaaaa * (
++    aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
++) / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+ aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
+ (
+     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ```
 
 ## Ruff Output
@@ -934,13 +949,9 @@ if (
     >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 ):
     return True
-(
-    aaaaaaaaaaaaaaaa
-    + aaaaaaaaaaaaaaaa
-    - aaaaaaaaaaaaaaaa
-    * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
-    / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
-)
+aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa - aaaaaaaaaaaaaaaa * (
+    aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
+) / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
 aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
