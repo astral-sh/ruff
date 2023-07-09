@@ -1,12 +1,12 @@
 ---
-source: crates/ruff_python_formatter/src/lib.rs
-expression: snapshot
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/delete.py
 ---
 ## Input
 ```py
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
-a, b, c, d = (1, 2, 3, 4)
+a, b, c, d = 1, 2, 3, 4
 
 del a, b, c, d
 del a, b, c, d  # Trailing
@@ -72,13 +72,11 @@ del (
 # Done
 ```
 
-
-
 ## Output
 ```py
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
-a, b, c, d = (1, 2, 3, 4)
+a, b, c, d = 1, 2, 3, 4
 
 del a, b, c, d
 del a, b, c, d  # Trailing
@@ -161,8 +159,7 @@ del (
     # Deleting something
     x  # Deleted something
     # Finishing deletes
-    # Completed
-)
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -170,8 +167,7 @@ del (
     # Deleting something
     x  # Deleted something
     # Finishing deletes
-    # Completed
-)
+)  # Completed
 # Done deleting
 
 # Delete something
@@ -188,18 +184,11 @@ del (
     x  # Deleted something
     # Finishing deletes
     # Dangling comment
-    # Completed
-)
+)  # Completed
 # Done deleting
 
 # Delete something
-del (
-    x,
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-    b,
-    c,
-    d,
-)  # Delete these
+del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Delete these
 # Ready to delete
 
 # Delete something
@@ -214,5 +203,6 @@ del (
 )  # Completed
 # Done
 ```
+
 
 
