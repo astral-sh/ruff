@@ -1,9 +1,8 @@
-use regex_syntax::hir::{Hir, HirKind};
+use regex_syntax::hir::{Hir, HirKind, Repetition};
 use regex_syntax::ParserBuilder;
 use ruff_diagnostics::{Diagnostic, Violation};
 use rustpython_parser::ast;
 use rustpython_parser::ast::{Constant, Expr, ExprCall, Ranged};
-use similar::DiffableStr;
 
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
@@ -109,12 +108,41 @@ fn is_regex_func(call_path: &CallPath) -> bool {
     )
 }
 
+const MAX_REPETITION_COUNT: u32 = 10;
+
 fn detect_redos(hir: &Hir) -> bool {
     match hir.kind() {
-        HirKind::Concat(hirs) | HirKind::Alternation(hirs) => {
-            hirs.iter().any(|sub_hir| detect_redos(sub_hir))
-        }
-        HirKind::Repetition(repetition) => repetition.greedy,
+        HirKind::Concat(hirs) | HirKind::Alternation(hirs) => hirs.iter().any(detect_redos),
+        // If there is an unbounded repetition inside of a repetition this could lead to
+        // catastrophic backtracking
+        HirKind::Repetition(outer_repetition) => {
+            let inner_repetition = match outer_repetition.sub.kind() {
+                HirKind::Repetition(inner) => Some(inner),
+                HirKind::Capture(capture) => capture.sub.kind().as_repetition(),
+                _ => None,
+            };
+
+            if let Some(inner_repetition) = inner_repetition {
+                if inner_repetition.greedy && (inner_repetition.max.is_none() || inner_repetition.max.unwrap() > MAX_REPETITION_COUNT) {
+                    return true;
+                }
+            }
+
+            false
+        },
         _ => false,
+    }
+}
+
+trait HirKindExt {
+    fn as_repetition(&self) -> Option<&Repetition>;
+}
+
+impl HirKindExt for HirKind {
+    fn as_repetition(&self) -> Option<&Repetition> {
+        match self {
+            HirKind::Repetition(repetition) => Some(repetition),
+            _ => None,
+        }
     }
 }
