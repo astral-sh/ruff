@@ -82,6 +82,19 @@ class Repository(NamedTuple):
 
         yield Path(checkout_dir)
 
+    def url_for(self: Self, path: str, lnum: int | None = None) -> str:
+        """Return the GitHub URL for the given path and line number, if given."""
+        url = f"https://github.com/{self.org}/{self.repo}"
+        if self.ref:
+            url += f"/blob/{self.ref}"
+        else:
+            # Default to main branch
+            url += "/blob/main"
+        url += f"/{path}"
+        if lnum:
+            url += f"#L{lnum}"
+        return url
+
 
 REPOSITORIES: list[Repository] = [
     Repository("apache", "airflow", "main", select="ALL"),
@@ -272,6 +285,11 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[tuple[str, str], Repositor
     return repositories
 
 
+DIFF_LINE_RE = re.compile(
+    r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
+)
+
+
 T = TypeVar("T")
 
 
@@ -352,18 +370,27 @@ async def main(
                 print("<p>")
                 print()
 
-                diff_str = "\n".join(diff)
+                repo = repositories[(org, repo)]
+                diff_lines = list(diff)
 
-                print("```diff")
-                print(diff_str)
-                print("```")
+                print("<pre>")
+                for line in diff_lines:
+                    match = DIFF_LINE_RE.match(line)
+                    if match is None:
+                        print(line)
+                        continue
+
+                    pre, inner, path, lnum, post = match.groups()
+                    url = repo.url_for(path, int(lnum))
+                    print(f"{pre} <a href='{url}'>{inner}</a> {post}")
+                print("</pre>")
 
                 print()
                 print("</p>")
                 print("</details>")
 
                 # Count rule changes
-                for line in diff_str.splitlines():
+                for line in diff_lines:
                     # Find rule change for current line or construction
                     # + <rule>/<path>:<line>:<column>: <rule_code> <message>
                     matches = re.search(r": ([A-Z]{1,3}[0-9]{3,4})", line)
