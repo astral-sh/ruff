@@ -270,7 +270,7 @@ impl<'a> SimpleTokenizer<'a> {
         Self::new(source, TextRange::up_to(offset))
     }
 
-    fn parse_identifier(&self, range: TextRange) -> TokenKind {
+    fn to_keyword_or_other(&self, range: TextRange) -> TokenKind {
         let source = &self.source[range];
         match source {
             "if" => TokenKind::If,
@@ -328,7 +328,7 @@ impl<'a> SimpleTokenizer<'a> {
                     let token_len = self.cursor.token_len();
 
                     let range = TextRange::at(self.offset, token_len);
-                    self.parse_identifier(range)
+                    self.to_keyword_or_other(range)
                 } else {
                     TokenKind::from_non_trivia_char(c)
                 };
@@ -447,13 +447,12 @@ impl<'a> SimpleTokenizer<'a> {
                         let token_len = self.cursor.token_len();
                         let range = TextRange::at(self.back_offset - token_len, token_len);
 
-                        // TODO: reviewer, is there a nicer way to do this?
                         if self.source[range]
                             .chars()
                             .next()
                             .is_some_and(is_identifier_start)
                         {
-                            self.parse_identifier(range)
+                            self.to_keyword_or_other(range)
                         } else {
                             self.cursor = savepoint;
                             TokenKind::Other
