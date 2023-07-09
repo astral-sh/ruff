@@ -188,7 +188,13 @@ del (
 # Done deleting
 
 # Delete something
-del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Delete these
+del (
+    x,
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    b,
+    c,
+    d,
+)  # Delete these
 # Ready to delete
 
 # Delete something
