@@ -161,7 +161,7 @@ if True:
 +["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
 +x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+assert False, "NOT_YET_IMPLEMENTED_STRING" % bar
++NOT_YET_IMPLEMENTED_StmtAssert
  
  # looping over a 1-tuple should also not get wrapped
 -for x in (1,):
@@ -250,7 +250,7 @@ nested_long_lines = [
 ["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
 x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-assert False, "NOT_YET_IMPLEMENTED_STRING" % bar
+NOT_YET_IMPLEMENTED_StmtAssert
 
 # looping over a 1-tuple should also not get wrapped
 NOT_YET_IMPLEMENTED_StmtFor

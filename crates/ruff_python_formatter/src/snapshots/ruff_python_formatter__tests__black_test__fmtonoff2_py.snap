@@ -93,7 +93,7 @@ def test_calculate_fades():
 -    """Hey, ho."""
 -    assert test.passed()
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    assert NOT_IMPLEMENTED_call()
++    NOT_YET_IMPLEMENTED_StmtAssert
 +
  
  def test_calculate_fades():
@@ -138,7 +138,7 @@ def verify_fader(test):
 
 def verify_fader(test):
     "NOT_YET_IMPLEMENTED_STRING"
-    assert NOT_IMPLEMENTED_call()
+    NOT_YET_IMPLEMENTED_StmtAssert
 
 
 def test_calculate_fades():

@@ -61,7 +61,7 @@ assert (
 -        "3b": set(),
 -    }
 -) == ["2a", "2b", "2", "3a", "3b", "3", "1"]
-+assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++NOT_YET_IMPLEMENTED_StmtAssert
  
  importA
  0
@@ -104,7 +104,7 @@ assert (
 -    very_long_arguments_that_surpass_the_limit,
 -    which_is_eighty_eight_in_this_case_plus_a_bit_more,
 -) == {"x": "this need to pass the line limit as well", "b": "but only by a little bit"}
-+assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++NOT_YET_IMPLEMENTED_StmtAssert
 ```
 
 ## Ruff Output
@@ -117,7 +117,7 @@ importA
     **101234234242352525425252352352525234890264906820496920680926538059059209922523523525
 )  #
 
-assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+NOT_YET_IMPLEMENTED_StmtAssert
 
 importA
 0
@@ -131,7 +131,7 @@ def test(self, othr):
     return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 
 
-assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+NOT_YET_IMPLEMENTED_StmtAssert
 ```
 
 ## Black Output

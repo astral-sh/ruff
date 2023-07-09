@@ -276,7 +276,7 @@ last_call()
  Name
  None
  True
-@@ -7,294 +8,238 @@
+@@ -7,294 +8,236 @@
  1
  1.0
  1j
@@ -538,6 +538,9 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
+-]
+-very_long_variable_name_filters: t.List[
+-    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
 +[
 +    1,
 +    2,
@@ -552,9 +555,6 @@ last_call()
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
  ]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
--]
 -xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)
@@ -710,11 +710,9 @@ last_call()
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
 +NOT_IMPLEMENTED_call()
-+assert NOT_YET_IMPLEMENTED_ExprUnaryOp, "NOT_YET_IMPLEMENTED_STRING"
-+assert (
-+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+), "NOT_YET_IMPLEMENTED_STRING"
-+assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++NOT_YET_IMPLEMENTED_StmtAssert
++NOT_YET_IMPLEMENTED_StmtAssert
++NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtFor
 +NOT_YET_IMPLEMENTED_StmtFor
 +NOT_YET_IMPLEMENTED_StmtFor
@@ -760,7 +758,7 @@ last_call()
      return True
  if (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-@@ -327,24 +272,44 @@
+@@ -327,24 +270,44 @@
  ):
      return True
  if (
@@ -817,7 +815,7 @@ last_call()
  ):
      return True
  (
-@@ -363,8 +328,9 @@
+@@ -363,8 +326,9 @@
  bbbb >> bbbb * bbbb
  (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -1058,11 +1056,9 @@ async def f():
 NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
-assert NOT_YET_IMPLEMENTED_ExprUnaryOp, "NOT_YET_IMPLEMENTED_STRING"
-assert (
-    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-), "NOT_YET_IMPLEMENTED_STRING"
-assert NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+NOT_YET_IMPLEMENTED_StmtAssert
+NOT_YET_IMPLEMENTED_StmtAssert
+NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
