@@ -253,7 +253,7 @@ instruction()#comment with bad spacing
      while True:
          if False:
              continue
-@@ -143,22 +135,25 @@
+@@ -143,7 +135,10 @@
      # let's return
      return Node(
          syms.simple_stmt,
@@ -265,17 +265,7 @@ instruction()#comment with bad spacing
      )
  
  
--CONFIG_FILES = (
--    [
--        CONFIG_FILE,
--    ]
--    + SHARED_CONFIG_FILES
--    + USER_CONFIG_FILES
--)  # type: Final
-+CONFIG_FILES = [
-+    CONFIG_FILE,
-+] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
- 
+@@ -158,7 +153,11 @@
  
  class Test:
      def _init_host(self, parsed) -> None:
@@ -437,9 +427,13 @@ short
     )
 
 
-CONFIG_FILES = [
-    CONFIG_FILE,
-] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
+CONFIG_FILES = (
+    [
+        CONFIG_FILE,
+    ]
+    + SHARED_CONFIG_FILES
+    + USER_CONFIG_FILES
+)  # type: Final
 
 
 class Test:

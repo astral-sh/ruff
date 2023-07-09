@@ -1,13 +1,20 @@
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast;
+use rustpython_parser::ast::{Expr, Operator};
+use std::cmp::Ordering;
 
+use crate::builders::optional_parentheses;
 use ruff_formatter::{
     format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::comments::Comments;
 use crate::context::NodeLevel;
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, Parentheses, Parenthesize};
+use crate::expression::parentheses::{
+    is_expression_parenthesized, parenthesized, NeedsParentheses, Parentheses, Parenthesize,
+};
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
 
@@ -103,28 +110,32 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Parentheses::Always => parenthesized("(", &format_expr, ")").fmt(f),
             // Add optional parentheses. Ignore if the item renders parentheses itself.
             Parentheses::Optional => {
-                let saved_level = f.context().node_level();
+                if can_omit_optional_parentheses(item, f.context()) {
+                    let saved_level = f.context().node_level();
 
-                let parens_id = f.group_id("optional_parentheses");
+                    let parens_id = f.group_id("optional_parentheses");
 
-                f.context_mut()
-                    .set_node_level(NodeLevel::Expression(Some(parens_id)));
+                    f.context_mut()
+                        .set_node_level(NodeLevel::Expression(Some(parens_id)));
 
-                let result = group(&format_args![
-                    if_group_breaks(&text("(")),
-                    indent_if_group_breaks(
-                        &format_args![soft_line_break(), format_expr],
-                        parens_id
-                    ),
-                    soft_line_break(),
-                    if_group_breaks(&text(")"))
-                ])
-                .with_group_id(Some(parens_id))
-                .fmt(f);
+                    let result = group(&format_args![
+                        if_group_breaks(&text("(")),
+                        indent_if_group_breaks(
+                            &format_args![soft_line_break(), format_expr],
+                            parens_id
+                        ),
+                        soft_line_break(),
+                        if_group_breaks(&text(")"))
+                    ])
+                    .with_group_id(Some(parens_id))
+                    .fmt(f);
 
-                f.context_mut().set_node_level(saved_level);
+                    f.context_mut().set_node_level(saved_level);
 
-                result
+                    result
+                } else {
+                    optional_parentheses(&format_expr).fmt(f)
+                }
             }
             Parentheses::Custom | Parentheses::Never => {
                 let saved_level = f.context().node_level();
@@ -202,5 +213,229 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatExpr::default())
+    }
+}
+
+/// Tests if it is safe to omit the optional parentheses.
+///
+/// We prefer parentheses at least in the following cases:
+/// * The expression contains more than one unparenthesized expression with the same priority. For example,
+///     the expression `a * b * c` contains two multiply operations. We prefer parentheses in that case.
+///     `(a * b) * c` or `a * b + c` are okay, because the subexpression is parenthesized, or the expression uses operands with a lower priority
+/// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
+fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
+    let mut visitor = MaxOperatorPriorityVisitor::new(context.contents());
+
+    visitor.visit_subexpression(expr);
+
+    let (max_operator_priority, operation_count, any_parenthesized_expression) = visitor.finish();
+
+    if operation_count > 1 {
+        false
+    } else if max_operator_priority == OperatorPriority::Attribute {
+        true
+    } else {
+        // Only use the more complex IR when there is any expression that we can possibly split by
+        any_parenthesized_expression
+    }
+}
+
+#[derive(Clone, Debug)]
+struct MaxOperatorPriorityVisitor<'input> {
+    max_priority: OperatorPriority,
+    max_priority_count: u32,
+    any_parenthesized_expressions: bool,
+    source: &'input str,
+}
+
+impl<'input> MaxOperatorPriorityVisitor<'input> {
+    fn new(source: &'input str) -> Self {
+        Self {
+            source,
+            max_priority: OperatorPriority::None,
+            max_priority_count: 0,
+            any_parenthesized_expressions: false,
+        }
+    }
+
+    fn update_max_priority(&mut self, current_priority: OperatorPriority) {
+        match self.max_priority.cmp(&current_priority) {
+            Ordering::Less => {
+                self.max_priority_count = 1;
+                self.max_priority = current_priority;
+            }
+            Ordering::Equal => {
+                self.max_priority_count += 1;
+            }
+            Ordering::Greater => {}
+        }
+    }
+
+    // Visits a subexpression, ignoring whether it is parenthesized or not
+    fn visit_subexpression(&mut self, expr: &'input Expr) {
+        match expr {
+            Expr::Dict(_) | Expr::List(_) | Expr::Tuple(_) | Expr::Set(_) => {
+                self.any_parenthesized_expressions = true;
+                // The values are always parenthesized, don't visit.
+                return;
+            }
+            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) => {
+                self.any_parenthesized_expressions = true;
+                self.update_max_priority(OperatorPriority::Comprehension);
+                return;
+            }
+            Expr::BoolOp(ast::ExprBoolOp {
+                range: _,
+                op: _,
+                values: _,
+            }) => self.update_max_priority(OperatorPriority::BooleanOperation),
+            Expr::BinOp(ast::ExprBinOp {
+                op,
+                left: _,
+                right: _,
+                range: _,
+            }) => self.update_max_priority(OperatorPriority::from(*op)),
+
+            Expr::IfExp(ast::ExprIfExp {
+                range: _,
+                test,
+                body: _,
+                orelse: _,
+            }) => {
+                self.update_max_priority(OperatorPriority::Conditional);
+
+                // Nested if else expressions are always parenthesized. Ignore parentheses in this case
+                if let Expr::IfExp(_) = test.as_ref() {
+                    self.update_max_priority(OperatorPriority::Conditional);
+                }
+            }
+
+            Expr::Compare(_) => self.update_max_priority(OperatorPriority::Comparator),
+            Expr::Call(ast::ExprCall {
+                range: _,
+                func,
+                args: _,
+                keywords: _,
+            }) => {
+                self.any_parenthesized_expressions = true;
+                // Only walk the function, the arguments are always parenthesized
+                self.visit_expr(func);
+                return;
+            }
+            Expr::Subscript(_) => {
+                // Don't walk the value. Splitting before the value looks weird.
+                // Don't walk the slice, because the slice is always parenthesized.
+                return;
+            }
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                range: _,
+                op,
+                operand: _,
+            }) => {
+                if op.is_invert() {
+                    self.update_max_priority(OperatorPriority::BitwiseInversion);
+                }
+            }
+
+            // `[a, b].test[300].dot`
+            Expr::Attribute(ast::ExprAttribute {
+                range: _,
+                value,
+                attr: _,
+                ctx: _,
+            }) => {
+                if has_parentheses(&value, self.source) {
+                    self.update_max_priority(OperatorPriority::Attribute);
+                }
+            }
+
+            Expr::NamedExpr(_)
+            | Expr::GeneratorExp(_)
+            | Expr::Lambda(_)
+            | Expr::Await(_)
+            | Expr::Yield(_)
+            | Expr::YieldFrom(_)
+            | Expr::FormattedValue(_)
+            | Expr::JoinedStr(_)
+            | Expr::Constant(_)
+            | Expr::Starred(_)
+            | Expr::Name(_)
+            | Expr::Slice(_) => {}
+        };
+
+        walk_expr(self, expr);
+    }
+
+    fn finish(self) -> (OperatorPriority, u32, bool) {
+        (
+            self.max_priority,
+            self.max_priority_count,
+            self.any_parenthesized_expressions,
+        )
+    }
+}
+
+impl<'input> PreorderVisitor<'input> for MaxOperatorPriorityVisitor<'input> {
+    fn visit_expr(&mut self, expr: &'input Expr) {
+        // Rule only applies for non-parenthesized expressions.
+        if is_expression_parenthesized(AnyNodeRef::from(expr), self.source) {
+            self.any_parenthesized_expressions = true;
+        } else {
+            self.visit_subexpression(expr);
+        }
+    }
+}
+
+fn has_parentheses(expr: &Expr, source: &str) -> bool {
+    matches!(
+        expr,
+        Expr::Dict(_)
+            | Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Set(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_)
+            | Expr::Call(_)
+            | Expr::Subscript(_)
+    ) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
+}
+
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+enum OperatorPriority {
+    None,
+    Attribute,
+    Comparator,
+    Exponential,
+    BitwiseInversion,
+    Multiplicative,
+    Additive,
+    Shift,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    // TODO(micha)
+    #[allow(unused)]
+    String,
+    BooleanOperation,
+    Conditional,
+    Comprehension,
+}
+
+impl From<ast::Operator> for OperatorPriority {
+    fn from(value: Operator) -> Self {
+        match value {
+            Operator::Add | Operator::Sub => OperatorPriority::Additive,
+            Operator::Mult
+            | Operator::MatMult
+            | Operator::Div
+            | Operator::Mod
+            | Operator::FloorDiv => OperatorPriority::Multiplicative,
+            Operator::Pow => OperatorPriority::Exponential,
+            Operator::LShift | Operator::RShift => OperatorPriority::Shift,
+            Operator::BitOr => OperatorPriority::BitwiseOr,
+            Operator::BitXor => OperatorPriority::BitwiseXor,
+            Operator::BitAnd => OperatorPriority::BitwiseAnd,
+        }
     }
 }
