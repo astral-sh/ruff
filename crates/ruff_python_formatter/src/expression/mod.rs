@@ -39,6 +39,7 @@ pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
 pub(crate) mod parentheses;
+pub(crate) mod sequence;
 pub(crate) mod string;
 
 #[derive(Default)]

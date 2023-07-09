@@ -10,6 +10,8 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprTuple;
 use rustpython_parser::ast::{Expr, Ranged};
 
+use super::sequence::ExprSequence;
+
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
     /// Effectively `None` in `Option<Parentheses>`
@@ -90,23 +92,6 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_dangling_comments(&self, _node: &ExprTuple, _f: &mut PyFormatter) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
-    }
-}
-
-#[derive(Debug)]
-struct ExprSequence<'a> {
-    elts: &'a [Expr],
-}
-
-impl<'a> ExprSequence<'a> {
-    const fn new(elts: &'a [Expr]) -> Self {
-        Self { elts }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        f.join_comma_separated().nodes(self.elts.iter()).finish()
     }
 }
 
