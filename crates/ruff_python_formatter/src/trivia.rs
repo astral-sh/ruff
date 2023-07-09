@@ -437,11 +437,27 @@ impl<'a> SimpleTokenizer<'a> {
                 } else if c == '\\' {
                     TokenKind::Continuation
                 } else {
-                    let kind = if is_identifier_start(c) {
+                    let kind = if is_identifier_continuation(c) {
+                        // if we only have identifier continuations but no start (e.g. 555) we
+                        // don't want to consume the chars, so in that case, we want to rewind the
+                        // cursor to here
+                        let savepoint = self.cursor.clone();
                         self.cursor.eat_back_while(is_identifier_continuation);
+
                         let token_len = self.cursor.token_len();
                         let range = TextRange::at(self.back_offset - token_len, token_len);
-                        self.parse_identifier(range)
+
+                        // TODO: reviewer, is there a nicer way to do this?
+                        if self.source[range]
+                            .chars()
+                            .next()
+                            .is_some_and(is_identifier_start)
+                        {
+                            self.parse_identifier(range)
+                        } else {
+                            self.cursor = savepoint;
+                            TokenKind::Other
+                        }
                     } else {
                         TokenKind::from_non_trivia_char(c)
                     };
@@ -683,24 +699,22 @@ mod tests {
     }
 
     #[test]
-    fn tricky_unicode_is_not_reversible_for_now() {
+    fn tricky_unicode() {
         let source = "មុ";
 
         let test_case = tokenize(source);
-        let mut backwards = test_case.tokenize_reverse();
-
-        // Re-reverse to get the tokens in forward order.
-        backwards.reverse();
-
-        assert_ne!(&backwards, &test_case.tokens);
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
     }
 
-    #[test]
+    // TODO: find reversible example?
+    // #[test]
     fn tokenize_multichar_keyword_with_extra_chars() {
-        let source = "ify";
+        let source = "555";
 
         let test_case = tokenize(source);
         assert_eq!(test_case.tokens[0].kind, TokenKind::Other);
+        test_case.assert_reverse_tokenization();
     }
 
     #[test]
