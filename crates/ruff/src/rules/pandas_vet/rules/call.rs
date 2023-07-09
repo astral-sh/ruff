@@ -91,8 +91,8 @@ impl Violation for PandasUseOfDotNotNull {
 ///
 /// ## Why is this bad?
 /// Prefer `.pivot_table` to `.pivot` or `.unstack`, which is a more general
-/// method that can be used to implement `.pivot` and `.unstack`, and
-/// provides the same functionality.
+/// method that can be used to implement `.pivot` and `.unstack`, and provides
+/// the same functionality.
 ///
 /// ## Example
 /// ```python
