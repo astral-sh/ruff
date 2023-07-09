@@ -151,7 +151,7 @@ del (
     a,
 )  # Trailing
 
-del a, a
+del (a, a)
 
 del (
     # Dangling comment
