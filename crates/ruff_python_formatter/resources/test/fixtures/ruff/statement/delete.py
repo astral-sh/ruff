@@ -54,6 +54,7 @@ del (
 )  # Completed
 # Done deleting
 
+# NOTE: This shouldn't format. See https://github.com/astral-sh/ruff/issues/5630.
 # Delete something
 del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Delete these
 # Ready to delete
