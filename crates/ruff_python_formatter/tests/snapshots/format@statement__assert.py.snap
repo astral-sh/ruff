@@ -39,10 +39,8 @@ assert (
 assert (
     # Let's go inside
     True  # Go around this
-), (
     # Below that
-    "Some string"
-)  # Outside this way
+), "Some string"  # Outside this way
 # Passed all that
 
 # Dangle this here
@@ -51,11 +49,9 @@ assert (
 assert (
     # Let's go inside
     True  # Go around this
-), (
     # Below that
     # Dangle that there
-    "Some string"
-)  # Outside this way
+), "Some string"  # Outside this way
 # Passed all that
 ```
 
