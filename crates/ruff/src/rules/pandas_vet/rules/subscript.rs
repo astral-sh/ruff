@@ -13,8 +13,8 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 ///
 /// ## Why is this bad?
 /// `.ix` is deprecated as it is ambiguous whether it is meant to index by
-/// label or by position. Instead, use `.loc` for label-based indexing or
-/// `.iloc` for position-based indexing.
+/// label or by ordinal position. Instead, use `.loc` for label-based indexing
+/// or`.iloc` for ordinal indexing.
 ///
 /// ## Example
 /// ```python
@@ -29,7 +29,7 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// import pandas as pd
 ///
 /// students_df = pd.read_csv("students.csv")
-/// students_df.iloc[0]  # 0th row
+/// students_df.iloc[0]  # 0th row.
 /// ```
 ///
 /// ## References
@@ -90,9 +90,9 @@ impl Violation for PandasUseOfDotAt {
 /// Checks for uses of `.iat`.
 ///
 /// ## Why is this bad?
-/// `.iat` selects a single value from a DataFrame or Series based on a label
-/// index, and is slightly faster than using `.iloc`. However, `.iloc` is more
-/// idiomatic and versatile, as it can select multiple values at once.
+/// `.iat` selects a single value from a DataFrame or Series based on an
+/// ordinal index, and is slightly faster than using `.iloc`. However, `.iloc`
+/// is more idiomatic and versatile, as it can select multiple values at once.
 ///
 /// If speed is important, consider converting the data to a NumPy array. This
 /// will provide a much greater performance gain than using `.iat` over

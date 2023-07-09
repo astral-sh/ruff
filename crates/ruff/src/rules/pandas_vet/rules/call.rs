@@ -12,12 +12,11 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// Checks for uses of `.isnull`.
 ///
 /// ## Why is this bad?
-/// `.isna` and `.isnull` are equivalent. For consistency, use `.isna`
-/// over `.isnull`.
+/// `.isna` and `.isnull` are equivalent. For consistency, use `.isna` over
+/// `.isnull`.
 ///
-/// Further, `.isna` is a more accurate name for the method, as it
-/// checks not only for `None` values, but also for `NaN` and `NaT`
-/// values.
+/// Further, `.isna` is a more accurate name for the functionality, as it
+/// checks not only for `None` values, but also for `NaN` and `NaT` values.
 ///
 /// ## Example
 /// ```python
@@ -52,12 +51,11 @@ impl Violation for PandasUseOfDotIsNull {
 /// Checks for uses of `.notnull`.
 ///
 /// ## Why is this bad?
-/// `.notna` and `.notnull` are equivalent. For consistency, use `.notna`
-/// over `.notnull`.
+/// `.notna` and `.notnull` are equivalent. For consistency, use `.notna` over
+/// `.notnull`.
 ///
-/// Further, `.notna` is a more accurate name for the method, as it
-/// checks not only for `None` values, but also for `NaN` and `NaT`
-/// values.
+/// Further, `.notna` is a more accurate name for the functionality, as it
+/// checks not only for `None` values, but also for `NaN` and `NaT` values.
 ///
 /// ## Example
 /// ```python
@@ -92,9 +90,9 @@ impl Violation for PandasUseOfDotNotNull {
 /// Checks for uses of `.pivot` or `.unstack`.
 ///
 /// ## Why is this bad?
-/// Prefer `.pivot_table` to `.pivot` or `.unstack`, which is a more general method
-/// that can be used to implement `.pivot` and `.unstack`, and provides the same
-/// functionality.
+/// Prefer `.pivot_table` to `.pivot` or `.unstack`, which is a more general
+/// method that can be used to implement `.pivot` and `.unstack`, and
+/// provides the same functionality.
 ///
 /// ## Example
 /// ```python
