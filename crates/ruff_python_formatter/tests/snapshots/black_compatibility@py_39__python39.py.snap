@@ -32,14 +32,17 @@ def f():
  @relaxed_decorator[0]
  def f():
      ...
-@@ -13,8 +12,6 @@
+@@ -13,8 +12,10 @@
      ...
  
  
 -@extremely_long_variable_name_that_doesnt_fit := complex.expression(
 -    with_long="arguments_value_that_wont_fit_at_the_end_of_the_line"
--)
-+@NOT_YET_IMPLEMENTED_ExprNamedExpr
++@(
++    extremely_long_variable_name_that_doesnt_fit := complex.expression(
++        with_long="arguments_value_that_wont_fit_at_the_end_of_the_line"
++    )
+ )
  def f():
      ...
 ```
@@ -61,7 +64,11 @@ def f():
     ...
 
 
-@NOT_YET_IMPLEMENTED_ExprNamedExpr
+@(
+    extremely_long_variable_name_that_doesnt_fit := complex.expression(
+        with_long="arguments_value_that_wont_fit_at_the_end_of_the_line"
+    )
+)
 def f():
     ...
 ```

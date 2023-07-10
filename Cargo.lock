@@ -1837,7 +1837,6 @@ dependencies = [
 name = "ruff"
 version = "0.0.277"
 dependencies = [
- "aho-corasick 1.0.2",
  "annotate-snippets 0.9.1",
  "anyhow",
  "bitflags 2.3.3",
@@ -2102,6 +2101,7 @@ dependencies = [
  "similar",
  "smallvec",
  "thiserror",
+ "unic-ucd-ident",
 ]
 
 [[package]]

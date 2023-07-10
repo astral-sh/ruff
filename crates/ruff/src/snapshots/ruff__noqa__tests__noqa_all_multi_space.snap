@@ -2,10 +2,12 @@
 source: crates/ruff/src/noqa.rs
 expression: "Directive::try_extract(source, TextSize::default())"
 ---
-Some(
-    All(
-        All {
-            range: 0..7,
-        },
+Ok(
+    Some(
+        All(
+            All {
+                range: 0..7,
+            },
+        ),
     ),
 )

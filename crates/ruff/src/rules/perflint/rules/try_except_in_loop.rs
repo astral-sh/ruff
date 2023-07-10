@@ -27,20 +27,26 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 /// ```python
-/// for i in range(10):
+/// string_numbers: list[str] = ["1", "2", "three", "4", "5"]
+///
+/// int_numbers: list[int] = []
+/// for num in string_numbers:
 ///     try:
-///         print(i * i)
-///     except:
-///         break
+///         int_numbers.append(int(num))
+///     except ValueError as e:
+///         print(f"Couldn't convert to integer: {e}")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// string_numbers: list[str] = ["1", "2", "three", "4", "5"]
+///
+/// int_numbers: list[int] = []
 /// try:
-///     for i in range(10):
-///         print(i * i)
-/// except:
-///     break
+///     for num in string_numbers:
+///         int_numbers.append(int(num))
+/// except ValueError as e:
+///     print(f"Couldn't convert to integer: {e}")
 /// ```
 ///
 /// ## Options

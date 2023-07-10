@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast;
 use rustpython_parser::ast::{Expr, ExprIfExp, ExprSlice, Ranged};
 
@@ -14,9 +14,7 @@ use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSec
 use crate::other::arguments::{
     assign_argument_separator_comment_placement, find_argument_separators,
 };
-use crate::trivia::{
-    first_non_trivia_token, first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind,
-};
+use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
@@ -1191,10 +1189,16 @@ fn handle_expr_if_comment<'a>(
     }
 
     // Find the if and the else
-    let if_token =
-        find_only_token_str_in_range(TextRange::new(body.end(), test.start()), locator, "if");
-    let else_token =
-        find_only_token_str_in_range(TextRange::new(test.end(), orelse.start()), locator, "else");
+    let if_token = find_only_token_in_range(
+        TextRange::new(body.end(), test.start()),
+        locator,
+        TokenKind::If,
+    );
+    let else_token = find_only_token_in_range(
+        TextRange::new(test.end(), orelse.start()),
+        locator,
+        TokenKind::Else,
+    );
 
     // Between `if` and `test`
     if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
@@ -1211,25 +1215,12 @@ fn handle_expr_if_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Looks for a multi char token in the range that contains no other tokens. `SimpleTokenizer` only
-/// works with single char tokens so we check that we have the right token by string comparison.
-fn find_only_token_str_in_range(range: TextRange, locator: &Locator, token_str: &str) -> Token {
-    let token =
-        first_non_trivia_token(range.start(), locator.contents()).expect("Expected a token");
-    debug_assert!(
-        locator.after(token.start()).starts_with(token_str),
-        "expected a `{token_str}` token",
-    );
-    debug_assert!(
-        SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(token.start() + token_str.text_len(), range.end())
-        )
-        .skip_trivia()
-        .next()
-        .is_none(),
-        "Didn't expect any other token"
-    );
+/// Looks for a token in the range that contains no other tokens.
+fn find_only_token_in_range(range: TextRange, locator: &Locator, token_kind: TokenKind) -> Token {
+    let mut tokens = SimpleTokenizer::new(locator.contents(), range).skip_trivia();
+    let token = tokens.next().expect("Expected a token");
+    debug_assert_eq!(token.kind(), token_kind);
+    debug_assert_eq!(tokens.next(), None);
     token
 }
 

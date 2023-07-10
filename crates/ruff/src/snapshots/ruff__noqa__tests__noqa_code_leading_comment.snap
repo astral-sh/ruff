@@ -2,13 +2,15 @@
 source: crates/ruff/src/noqa.rs
 expression: "Directive::try_extract(source, TextSize::default())"
 ---
-Some(
-    Codes(
-        Codes {
-            range: 35..47,
-            codes: [
-                "F401",
-            ],
-        },
+Ok(
+    Some(
+        Codes(
+            Codes {
+                range: 35..47,
+                codes: [
+                    "F401",
+                ],
+            },
+        ),
     ),
 )
