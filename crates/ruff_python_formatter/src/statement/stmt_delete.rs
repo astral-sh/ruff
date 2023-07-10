@@ -31,8 +31,6 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
                     ]
                 )
             }
-            // TODO(cnpryer): single and multiple targets should be handled the same since
-            //   tuples require special formatting whereas this is just a sequence of expressions (tuple-like).
             [single] => {
                 write!(f, [single.format().with_options(Parenthesize::IfBreaks)])
             }
