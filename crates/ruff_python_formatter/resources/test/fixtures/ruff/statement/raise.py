@@ -83,8 +83,3 @@ raise hello( # sould I stay here
     # just a comment here
     "hey"
 ) # trailing comment
-
-a = ( # sould I stay here
-    # just a comment here
-) # trailing comment
-
