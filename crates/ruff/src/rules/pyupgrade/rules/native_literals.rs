@@ -86,66 +86,15 @@ pub(crate) fn native_literals(
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.semantic().is_builtin(id) {
-        let Some(arg) = args.get(0) else {
-            let mut diagnostic = Diagnostic::new(
-                NativeLiterals {
-                    literal_type: if id == "str" {
-                        LiteralType::Str
-                    } else {
-                        LiteralType::Bytes
-                    },
-                },
-                expr.range(),
-            );
-            if checker.patch(diagnostic.kind.rule()) {
-                let constant = if id == "bytes" {
-                    Constant::Bytes(vec![])
-                } else {
-                    Constant::Str(String::new())
-                };
-                let content = checker.generator().constant(&constant);
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    content,
-                    expr.range(),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
-            return;
-        };
+    if !matches!(id.as_str(), "str" | "bytes") {
+        return;
+    }
 
-        // Look for `str("")`.
-        if id == "str"
-            && !matches!(
-                &arg,
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(_),
-                    ..
-                }),
-            )
-        {
-            return;
-        }
+    if !checker.semantic().is_builtin(id) {
+        return;
+    }
 
-        // Look for `bytes(b"")`
-        if id == "bytes"
-            && !matches!(
-                &arg,
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bytes(_),
-                    ..
-                }),
-            )
-        {
-            return;
-        }
-
-        // Skip implicit string concatenations.
-        let arg_code = checker.locator.slice(arg.range());
-        if is_implicit_concatenation(arg_code) {
-            return;
-        }
-
+    let Some(arg) = args.get(0) else {
         let mut diagnostic = Diagnostic::new(
             NativeLiterals {
                 literal_type: if id == "str" {
@@ -157,11 +106,68 @@ pub(crate) fn native_literals(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
+            let constant = if id == "bytes" {
+                Constant::Bytes(vec![])
+            } else {
+                Constant::Str(String::new())
+            };
+            let content = checker.generator().constant(&constant);
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                arg_code.to_string(),
+                content,
                 expr.range(),
             )));
         }
         checker.diagnostics.push(diagnostic);
+        return;
+    };
+
+    // Look for `str("")`.
+    if id == "str"
+        && !matches!(
+            &arg,
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(_),
+                ..
+            }),
+        )
+    {
+        return;
     }
+
+    // Look for `bytes(b"")`
+    if id == "bytes"
+        && !matches!(
+            &arg,
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Bytes(_),
+                ..
+            }),
+        )
+    {
+        return;
+    }
+
+    // Skip implicit string concatenations.
+    let arg_code = checker.locator.slice(arg.range());
+    if is_implicit_concatenation(arg_code) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        NativeLiterals {
+            literal_type: if id == "str" {
+                LiteralType::Str
+            } else {
+                LiteralType::Bytes
+            },
+        },
+        expr.range(),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            arg_code.to_string(),
+            expr.range(),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
 }
