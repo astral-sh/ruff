@@ -1,5 +1,5 @@
 use crate::builders::optional_parentheses;
-use crate::comments::{dangling_node_comments, Comments};
+use crate::comments::{dangling_comments, CommentLinePosition, Comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
     Parenthesize,
@@ -57,16 +57,33 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         } = item;
 
         // Handle the edge cases of an empty tuple and a tuple with one element
+        //
+        // there can be dangling comments, and they can be in two
+        // positions:
+        // ```python
+        // a3 = (  # end-of-line
+        //     # own line
+        // )
+        // ```
+        // In all other cases comments get assigned to a list element
         match elts.as_slice() {
             [] => {
+                let comments = f.context().comments().clone();
+                let dangling = comments.dangling_comments(item);
+                let end_of_line_split = dangling.partition_point(|comment| {
+                    comment.line_position() == CommentLinePosition::EndOfLine
+                });
+                debug_assert!(dangling[end_of_line_split..]
+                    .iter()
+                    .all(|comment| comment.line_position() == CommentLinePosition::OwnLine));
                 write!(
                     f,
-                    [
-                        // An empty tuple always needs parentheses, but does not have a comma
-                        &text("("),
-                        block_indent(&dangling_node_comments(item)),
-                        &text(")"),
-                    ]
+                    [group(&format_args![
+                        text("("),
+                        dangling_comments(&dangling[..end_of_line_split]),
+                        soft_block_indent(&dangling_comments(&dangling[end_of_line_split..])),
+                        text(")")
+                    ])]
                 )
             }
             [single] => {

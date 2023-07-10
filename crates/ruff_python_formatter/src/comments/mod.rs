@@ -211,7 +211,7 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// The comments of a syntax tree stored by node.
 ///
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct Comments<'a> {
     /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
     /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
@@ -400,7 +400,7 @@ impl<'a> Comments<'a> {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
 }

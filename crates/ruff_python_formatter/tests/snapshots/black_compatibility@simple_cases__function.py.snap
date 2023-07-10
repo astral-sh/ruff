@@ -117,15 +117,6 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -14,7 +13,7 @@
-     b
-     c
-     if True:
--        raise RuntimeError
-+        NOT_YET_IMPLEMENTED_StmtRaise
-     if False:
-         ...
-     for i in range(10):
 @@ -41,12 +40,12 @@
      debug: bool = False,
      **kwargs,
@@ -207,7 +198,7 @@ def func_no_args():
     b
     c
     if True:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise RuntimeError
     if False:
         ...
     for i in range(10):
