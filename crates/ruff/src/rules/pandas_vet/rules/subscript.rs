@@ -9,12 +9,14 @@ use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 
 /// ## What it does
-/// Checks for uses of `.ix`.
+/// Checks for uses of `.ix` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// `.ix` is deprecated as it is ambiguous whether it is meant to index by
-/// label or by ordinal position. Instead, use `.loc` for label-based indexing
-/// or`.iloc` for ordinal indexing.
+/// The `.ix` method is deprecated as its behavior is ambiguous. Specifically,
+/// it's often unclear whether `.ix` is indexing by label or by ordinal position.
+///
+/// Instead, prefer the `.loc` method for label-based indexing, and `.iloc` for
+/// ordinal indexing.
 ///
 /// ## Example
 /// ```python
@@ -47,15 +49,17 @@ impl Violation for PandasUseOfDotIx {
 }
 
 /// ## What it does
-/// Checks for uses of `.at`.
+/// Checks for uses of `.at` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// `.at` selects a single value from a DataFrame or Series based on a label
-/// index, and is slightly faster than using `.loc`. However, `.loc` is more
-/// idiomatic and versatile, as it can select multiple values at once.
+/// The `.at` method selects a single value from a DataFrame or Series based on
+/// a label index, and is slightly faster than using `.loc`. However, `.loc` is
+/// more idiomatic and versatile, as it can be used to select multiple values at
+/// once.
 ///
-/// If speed is important, consider converting the data to a NumPy array. This
-/// will provide a much greater performance gain than using `.at` over `.loc`.
+/// If performance is an important consideration, convert the object to a NumPy
+/// array, which will provide a much greater performance boost than using `.at`
+/// over `.loc`.
 ///
 /// ## Example
 /// ```python
@@ -87,16 +91,17 @@ impl Violation for PandasUseOfDotAt {
 }
 
 /// ## What it does
-/// Checks for uses of `.iat`.
+/// Checks for uses of `.iat` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// `.iat` selects a single value from a DataFrame or Series based on an
-/// ordinal index, and is slightly faster than using `.iloc`. However, `.iloc`
-/// is more idiomatic and versatile, as it can select multiple values at once.
+/// The `.iat` method selects a single value from a DataFrame or Series based
+/// on an ordinal index, and is slightly faster than using `.iloc`. However,
+/// `.iloc` is more idiomatic and versatile, as it can be used to select
+/// multiple values at once.
 ///
-/// If speed is important, consider converting the data to a NumPy array. This
-/// will provide a much greater performance gain than using `.iat` over
-/// `.iloc`.
+/// If performance is an important consideration, convert the object to a NumPy
+/// array, which will provide a much greater performance boost than using `.iat`
+/// over `.iloc`.
 ///
 /// ## Example
 /// ```python
@@ -141,11 +146,12 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, expr: &Expr) {
         return;
     };
 
-    let rules = &checker.settings.rules;
     let violation: DiagnosticKind = match attr.as_str() {
-        "ix" if rules.enabled(Rule::PandasUseOfDotIx) => PandasUseOfDotIx.into(),
-        "at" if rules.enabled(Rule::PandasUseOfDotAt) => PandasUseOfDotAt.into(),
-        "iat" if rules.enabled(Rule::PandasUseOfDotIat) => PandasUseOfDotIat.into(),
+        "ix" if checker.settings.rules.enabled(Rule::PandasUseOfDotIx) => PandasUseOfDotIx.into(),
+        "at" if checker.settings.rules.enabled(Rule::PandasUseOfDotAt) => PandasUseOfDotAt.into(),
+        "iat" if checker.settings.rules.enabled(Rule::PandasUseOfDotIat) => {
+            PandasUseOfDotIat.into()
+        }
         _ => return,
     };
 

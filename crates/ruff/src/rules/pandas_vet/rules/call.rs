@@ -9,14 +9,15 @@ use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 
 /// ## What it does
-/// Checks for uses of `.isnull`.
+/// Checks for uses of `.isnull` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// `.isna` and `.isnull` are equivalent. For consistency, use `.isna` over
-/// `.isnull`.
+/// In the Pandas API, `.isna` and `.isnull` are equivalent. For consistency,
+/// prefer `.isna` over `.isnull`.
 ///
-/// Further, `.isna` is a more accurate name for the functionality, as it
-/// checks not only for `None` values, but also for `NaN` and `NaT` values.
+/// As a name, `.isna` more accurately reflects the behavior of the method,
+/// since these methods check for `NaN` and `NaT` values in addition to `None`
+/// values.
 ///
 /// ## Example
 /// ```python
@@ -48,14 +49,15 @@ impl Violation for PandasUseOfDotIsNull {
 }
 
 /// ## What it does
-/// Checks for uses of `.notnull`.
+/// Checks for uses of `.notnull` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// `.notna` and `.notnull` are equivalent. For consistency, use `.notna` over
-/// `.notnull`.
+/// In the Pandas API, `.notna` and `.notnull` are equivalent. For consistency,
+/// prefer `.notna` over `.notnull`.
 ///
-/// Further, `.notna` is a more accurate name for the functionality, as it
-/// checks not only for `None` values, but also for `NaN` and `NaT` values.
+/// As a name, `.notna` more accurately reflects the behavior of the method,
+/// since these methods check for `NaN` and `NaT` values in addition to `None`
+/// values.
 ///
 /// ## Example
 /// ```python
@@ -87,12 +89,11 @@ impl Violation for PandasUseOfDotNotNull {
 }
 
 /// ## What it does
-/// Checks for uses of `.pivot` or `.unstack`.
+/// Checks for uses of `.pivot` or `.unstack` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// Prefer `.pivot_table` to `.pivot` or `.unstack`, which is a more general
-/// method that can be used to implement `.pivot` and `.unstack`, and provides
-/// the same functionality.
+/// Prefer `.pivot_table` to `.pivot` or `.unstack`. `.pivot_table` is more general
+/// and can be used to implement the same behavior as `.pivot` and `.unstack`.
 ///
 /// ## Example
 /// ```python
@@ -138,12 +139,11 @@ impl Violation for PandasUseOfDotReadTable {
 }
 
 /// ## What it does
-/// Checks for uses of `.stack`.
+/// Checks for uses of `.stack` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// Prefer `.melt` to `.stack`, which has the same functionality whilst
-/// supporting direct column renaming and avoiding a `MultiIndex`, which is
-/// generally more difficult to work with.
+/// Prefer `.melt` to `.stack`, which has the same functionality but with
+/// support for direct column renaming and no dependence on `MultiIndex`.
 ///
 /// ## Example
 /// ```python
@@ -175,20 +175,35 @@ impl Violation for PandasUseOfDotStack {
 }
 
 pub(crate) fn call(checker: &mut Checker, func: &Expr) {
-    let rules = &checker.settings.rules;
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
         return;
     };
     let violation: DiagnosticKind = match attr.as_str() {
-        "isnull" if rules.enabled(Rule::PandasUseOfDotIsNull) => PandasUseOfDotIsNull.into(),
-        "notnull" if rules.enabled(Rule::PandasUseOfDotNotNull) => PandasUseOfDotNotNull.into(),
-        "pivot" | "unstack" if rules.enabled(Rule::PandasUseOfDotPivotOrUnstack) => {
+        "isnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotIsNull) => {
+            PandasUseOfDotIsNull.into()
+        }
+        "notnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotNotNull) => {
+            PandasUseOfDotNotNull.into()
+        }
+        "pivot" | "unstack"
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
+        {
             PandasUseOfDotPivotOrUnstack.into()
         }
-        "read_table" if rules.enabled(Rule::PandasUseOfDotReadTable) => {
+        "read_table"
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::PandasUseOfDotReadTable) =>
+        {
             PandasUseOfDotReadTable.into()
         }
-        "stack" if rules.enabled(Rule::PandasUseOfDotStack) => PandasUseOfDotStack.into(),
+        "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
+            PandasUseOfDotStack.into()
+        }
         _ => return,
     };
 

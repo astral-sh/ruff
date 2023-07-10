@@ -5,14 +5,17 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
-/// Checks for uses of `pd.merge`.
+/// Checks for uses of `pd.merge` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// `.merge` and `pd.merge` are equivalent. For consistency, use `.merge` over
-/// `pd.merge`, which is more idiomatic.
+/// In Pandas, the `.merge` method (exposed on, e.g., DataFrame objects) and
+/// the `pd.merge` function (exposed on the Pandas module) are equivalent.
 ///
-/// Further, `pd.merge` is not a method, but a function. This means that it
-/// cannot be used in method chains, which is a common pattern in Pandas code.
+/// For consistency, prefer calling `.merge` on an object over calling
+/// `pd.merge` on the Pandas module, as the former is more idiomatic.
+///
+/// Further, `pd.merge` is not a method, but a function, which prohibits it
+/// from being used in method chains, a common pattern in Pandas code.
 ///
 /// ## Example
 /// ```python

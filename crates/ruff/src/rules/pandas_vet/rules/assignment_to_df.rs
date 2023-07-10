@@ -7,11 +7,9 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for assignments to the variable `df`.
 ///
 /// ## Why is this bad?
-/// Although `df` is a common variable name for a Pandas DataFrame in short
-/// code examples, it is not a good variable name in production code. This is
-/// because `df` is not descriptive, and it is easy to forget what `df`
-/// represents. It also causes name conflict problems if you want to use
-/// multiple DataFrames in the same scope.
+/// Although `df` is a common variable name for a Pandas DataFrame, it's not a
+/// great variable name for production code, as it's non-descriptive and
+/// prone to name conflicts.
 ///
 /// Instead, use a more descriptive variable name.
 ///
@@ -26,7 +24,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```python
 /// import pandas as pd
 ///
-/// animals_df = pd.read_csv("animals.csv")
+/// animals = pd.read_csv("animals.csv")
 /// ```
 #[violation]
 pub struct PandasDfVariableName;
