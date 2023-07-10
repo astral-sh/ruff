@@ -1,5 +1,5 @@
 //! Rules from [flake8-pyi](https://pypi.org/project/flake8-pyi/).
-pub(crate) mod helpers;
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
