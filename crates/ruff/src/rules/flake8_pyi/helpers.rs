@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Expr, Operator};
 /// Supports traversal of `Union` and `|` union expressions.
 /// The function is called with each expression in the union (excluding declarations of nested unions)
 /// and the parent expression (if any).
-pub(crate) fn traverse_union<'a, F>(
+pub(super) fn traverse_union<'a, F>(
     func: &mut F,
     semantic: &SemanticModel,
     expr: &'a Expr,
