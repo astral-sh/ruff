@@ -1,5 +1,6 @@
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Expr, Ranged};
+use std::collections::HashSet;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -31,7 +32,7 @@ impl Violation for DuplicateUnionMember {
 
 /// PYI016
 pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) {
-    let mut seen_nodes: std::collections::HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
+    let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
