@@ -11,7 +11,15 @@ fn black_compatibility() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let options = PyFormatOptions::default();
+        let options_path = input_path.with_extension("options.json");
+
+        let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(options_path) {
+            let reader = BufReader::new(options_file);
+            serde_json::from_reader(reader).expect("Options to be a valid Json file")
+        } else {
+            PyFormatOptions::default()
+        };
+
         let printed = format_module(&content, options.clone()).unwrap_or_else(|err| {
             panic!(
                 "Formatting of {} to succeed but encountered error {err}",

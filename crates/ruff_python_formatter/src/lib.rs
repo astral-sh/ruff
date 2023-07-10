@@ -280,11 +280,9 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-if [
-    aaaaaa,
-    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
-] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
-    ...
+def foo() -> tuple[int, int, int,]:
+    return 2
+
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

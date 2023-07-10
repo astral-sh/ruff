@@ -178,6 +178,57 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     }
 }
 
+/// Wraps an expression in parentheses only if it still does not fit after expanding all expressions that start or end with
+/// a parentheses (`()`, `[]`, `{}`).
+pub(crate) fn optional_parentheses<'content, 'ast, Content>(
+    content: &'content Content,
+) -> OptionalParentheses<'content, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    OptionalParentheses {
+        content: Argument::new(content),
+    }
+}
+
+pub(crate) struct OptionalParentheses<'content, 'ast> {
+    content: Argument<'content, PyFormatContext<'ast>>,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        let saved_level = f.context().node_level();
+
+        // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
+        // that is only active if the optional parentheses group expands.
+        let parens_id = f.group_id("optional_parentheses");
+
+        f.context_mut()
+            .set_node_level(NodeLevel::Expression(Some(parens_id)));
+
+        // We can't use `soft_block_indent` here because that would always increment the indent,
+        // even if the group does not break (the indent is not soft). This would result in
+        // too deep indentations if a `parenthesized` group expands. Using `indent_if_group_breaks`
+        // gives us the desired *soft* indentation that is only present if the optional parentheses
+        // are shown.
+        let result = group(&format_args![
+            if_group_breaks(&text("(")),
+            indent_if_group_breaks(
+                &format_args![soft_line_break(), Arguments::from(&self.content)],
+                parens_id
+            ),
+            soft_line_break(),
+            if_group_breaks(&text(")"))
+        ])
+        .with_group_id(Some(parens_id))
+        .fmt(f);
+
+        f.context_mut().set_node_level(saved_level);
+
+        result
+    }
+}
+
 /// Makes `content` a group, but only if the outer expression is parenthesized (a list, parenthesized expression, dict, ...)
 /// or if the expression gets parenthesized because it expands over multiple lines.
 pub(crate) fn in_parentheses_only_group<'content, 'ast, Content>(
