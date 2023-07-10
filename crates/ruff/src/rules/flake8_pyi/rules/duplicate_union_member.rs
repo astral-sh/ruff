@@ -49,17 +49,14 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                 // Delete the "|" character as well as the duplicate value by reconstructing the
                 // parent without the duplicate.
 
-                // SAFETY: impossible to have a duplicate without a `parent` node.
-                let parent = parent.expect("Parent node must exist");
-
                 // If the parent node is not a `BinOp` we will not perform a fix
-                if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = parent {
+                if let Some(Expr::BinOp(ast::ExprBinOp { left, right, .. })) = parent {
                     // Replace the parent with its non-duplicate child.
                     diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                         checker
                             .generator()
                             .expr(if expr == left.as_ref() { right } else { left }),
-                        parent.range(),
+                        parent.unwrap().range(),
                     )));
                 }
             }
