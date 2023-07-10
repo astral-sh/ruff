@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -95,13 +95,7 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
     let handled_exceptions = helpers::extract_handled_exceptions(handlers);
     let comparables: Vec<ComparableExpr> = handled_exceptions
         .iter()
-        .filter_map(|handler| {
-            if let Expr::Name(ast::ExprName { .. }) = handler {
-                Some(ComparableExpr::from(*handler))
-            } else {
-                None
-            }
-        })
+        .map(|handler| ComparableExpr::from(*handler))
         .collect();
 
     for stmt in raises {
