@@ -1,6 +1,7 @@
 use num_traits::ToPrimitive;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::SemanticModel;
 use rustpython_parser::ast::{self, Comprehension, Constant, Expr};
 
 use crate::checkers::ast::Checker;
@@ -71,12 +72,12 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
     }
 }
 
-/// Contains information about a [`Expr::Subscript`] to determine if and how it accesses the first element
-/// of an iterable.
+/// Contains information about a [`Expr::Subscript`] to determine if and how it accesses the first
+/// element of an iterable.
 struct ClassifiedSubscript {
-    /// If the subscript accesses the first element of the iterable
+    /// `true` if the subscript accesses the first element of the iterable.
     indexes_first_element: bool,
-    /// If the subscript is a slice (e.g., `[:1]`)
+    /// `true` if the subscript is a slice (e.g., `[:1]`).
     is_slice: bool,
 }
 
@@ -106,7 +107,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         return;
     }
 
-    let Some(iter_name) = get_iterable_name(checker, value) else {
+    let Some(iter_name) = iterable_name(value, checker.semantic()) else {
         return;
     };
 
@@ -134,7 +135,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
 fn classify_subscript(expr: &Expr) -> ClassifiedSubscript {
     match expr {
         Expr::Constant(ast::ExprConstant { .. }) => {
-            let effective_index = get_effective_index(expr);
+            let effective_index = effective_index(expr);
             ClassifiedSubscript::new(matches!(effective_index, None | Some(0)), false)
         }
         Expr::Slice(ast::ExprSlice {
@@ -143,9 +144,9 @@ fn classify_subscript(expr: &Expr) -> ClassifiedSubscript {
             upper: upper_index,
             ..
         }) => {
-            let lower = lower_index.as_ref().and_then(|l| get_effective_index(l));
-            let upper = upper_index.as_ref().and_then(|u| get_effective_index(u));
-            let step = step_value.as_ref().and_then(|s| get_effective_index(s));
+            let lower = lower_index.as_ref().and_then(|l| effective_index(l));
+            let upper = upper_index.as_ref().and_then(|u| effective_index(u));
+            let step = step_value.as_ref().and_then(|s| effective_index(s));
 
             if matches!(lower, None | Some(0)) {
                 if upper.unwrap_or(i64::MAX) > step.unwrap_or(1i64) {
@@ -163,14 +164,13 @@ fn classify_subscript(expr: &Expr) -> ClassifiedSubscript {
 
 /// Fetch the name of the iterable from an expression if the expression returns an unmodified list
 /// which can be sliced into.
-fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a str> {
+fn iterable_name<'a>(expr: &'a Expr, model: &SemanticModel) -> Option<&'a str> {
     match expr {
         Expr::Call(ast::ExprCall { func, args, .. }) => {
-            let Some(id) = get_name_id(func.as_ref()) else {
-                return None;
-            };
-            if !((id == "list" && checker.semantic().is_builtin("list"))
-                || (id == "tuple" && checker.semantic().is_builtin("tuple")))
+            let ast::ExprName { id, .. } = func.as_name_expr()?;
+
+            if !((id == "list" && model.is_builtin("list"))
+                || (id == "tuple" && model.is_builtin("tuple")))
             {
                 return None;
             }
@@ -179,54 +179,40 @@ fn get_iterable_name<'a>(checker: &mut Checker, expr: &'a Expr) -> Option<&'a st
                 Some(Expr::Name(ast::ExprName { id: arg_name, .. })) => Some(arg_name.as_str()),
                 Some(Expr::GeneratorExp(ast::ExprGeneratorExp {
                     elt, generators, ..
-                })) => get_generator_iterable(elt, generators),
+                })) => generator_iterable(elt, generators),
                 _ => None,
             }
         }
         Expr::ListComp(ast::ExprListComp {
             elt, generators, ..
-        }) => get_generator_iterable(elt, generators),
+        }) => generator_iterable(elt, generators),
         _ => None,
     }
 }
 
-fn get_generator_iterable<'a>(
-    elt: &'a Expr,
-    generators: &'a Vec<Comprehension>,
-) -> Option<&'a str> {
+fn generator_iterable<'a>(elt: &'a Expr, generators: &'a Vec<Comprehension>) -> Option<&'a str> {
     // If the `elt` field is anything other than a [`Expr::Name`], we can't be sure that it
-    // doesn't modify the elements of the underlying iterator - for example, `[i + 1 for i in x][0]`.
-    if !matches!(elt, Expr::Name(ast::ExprName { .. })) {
+    // doesn't modify the elements of the underlying iterator (e.g., `[i + 1 for i in x][0]`).
+    if !elt.is_name_expr() {
         return None;
     }
 
-    // If there's more than 1 generator, we can't safely say that it fits the diagnostic conditions -
-    // for example, `[(i, j) for i in x for j in y][0]`.
-    if generators.len() != 1 {
+    // If there's more than 1 generator, we can't safely say that it fits the diagnostic conditions
+    // (e.g., `[(i, j) for i in x for j in y][0]`).
+    let [generator] = generators.as_slice() else {
         return None;
-    }
+    };
 
-    let generator = &generators[0];
     // Ignore if there's an `if` statement in the comprehension, since it filters the list.
     if !generator.ifs.is_empty() {
         return None;
     }
 
-    let Some(arg_name) = get_name_id(&generator.iter) else {
-                return None;
-            };
-
-    Some(arg_name)
+    let ast::ExprName { id, .. } = generator.iter.as_name_expr()?;
+    Some(id.as_str())
 }
 
-fn get_name_id(expr: &Expr) -> Option<&str> {
-    match expr {
-        Expr::Name(ast::ExprName { id, .. }) => Some(id),
-        _ => None,
-    }
-}
-
-fn get_effective_index(expr: &Expr) -> Option<i64> {
+fn effective_index(expr: &Expr) -> Option<i64> {
     match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
