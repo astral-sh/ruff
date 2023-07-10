@@ -2101,6 +2101,7 @@ dependencies = [
  "similar",
  "smallvec",
  "thiserror",
+ "unic-ucd-ident",
 ]
 
 [[package]]
