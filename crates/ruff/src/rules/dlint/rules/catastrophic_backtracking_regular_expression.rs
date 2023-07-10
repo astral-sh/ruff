@@ -42,7 +42,7 @@ pub struct CatastrophicBacktrackingRegularExpression;
 impl Violation for CatastrophicBacktrackingRegularExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Potentially dangerous regex expression can lead to catastrophic backtracking")
+        format!("Regular expression can lead to catastrophic backtracking")
     }
 }
 
