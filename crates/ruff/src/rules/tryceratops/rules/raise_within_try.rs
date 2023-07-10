@@ -99,7 +99,11 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
         .collect();
 
     for stmt in raises {
-        let Stmt::Raise(ast::StmtRaise { exc: Some(exception), .. }) = stmt else {
+        let Stmt::Raise(ast::StmtRaise {
+            exc: Some(exception),
+            ..
+        }) = stmt
+        else {
             continue;
         };
 

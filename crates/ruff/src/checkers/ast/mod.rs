@@ -2148,7 +2148,8 @@ where
                     if let Some(operator) = typing::to_pep604_operator(value, slice, &self.semantic)
                     {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py310
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -2176,7 +2177,8 @@ where
 
                 // Ex) list[...]
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py39
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py39
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                         && typing::is_pep585_generic(value, &self.semantic)
@@ -2274,15 +2276,16 @@ where
                                 typing::to_pep585_generic(expr, &self.semantic)
                             {
                                 if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                    if self.settings.target_version < PythonVersion::Py39
+                                    if !self.is_stub
+                                        && self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
                                         && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                            self, expr,
-                                        );
+                                                self, expr,
+                                            );
                                     }
                                 }
                                 if self.enabled(Rule::NonPEP585Annotation) {
@@ -2351,7 +2354,8 @@ where
                 ]) {
                     if let Some(replacement) = typing::to_pep585_generic(expr, &self.semantic) {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py39
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -3143,7 +3147,8 @@ where
             }) => {
                 // Ex) `str | None`
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py310
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py310
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                     {
@@ -3154,7 +3159,6 @@ where
                         );
                     }
                 }
-
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic.in_type_definition()
@@ -3166,7 +3170,6 @@ where
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
                     }
-
                     if self.enabled(Rule::UnnecessaryLiteralUnion)
                         // Avoid duplicate checks if the parent is an `|`
                         && !matches!(
