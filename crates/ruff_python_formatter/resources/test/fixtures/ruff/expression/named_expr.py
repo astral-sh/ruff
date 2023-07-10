@@ -9,3 +9,5 @@ if (
     pass
 
 y0 = (y1 := f(x))
+
+f(x:=y, z=True)
