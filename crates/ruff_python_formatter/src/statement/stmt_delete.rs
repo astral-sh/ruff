@@ -40,4 +40,9 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
             targets => optional_parentheses(&ExprSequence::new(targets)).fmt(f),
         }
     }
+
+    fn fmt_dangling_comments(&self, _node: &StmtDelete, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Handled in `fmt_fields`
+        Ok(())
+    }
 }
