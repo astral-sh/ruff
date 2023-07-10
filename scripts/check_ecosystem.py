@@ -84,10 +84,11 @@ class Repository(NamedTuple):
 
     def url_for(self: Self, path: str, lnum: int | None = None) -> str:
         """Return the GitHub URL for the given path and line number, if given."""
-        url = f"https://github.com/{self.org}/{self.repo}"
         # Default to main branch
-        url += f"/blob/{self.ref or 'main'}"
-        url += f"/{path}"
+        url = (
+            f"https://github.com/{self.org}/{self.repo}"
+            f"/blob/{self.ref or 'main'}/{path}"
+        )
         if lnum:
             url += f"#L{lnum}"
         return url
