@@ -1,13 +1,18 @@
-use rustpython_parser::ast::{ExceptHandler, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::{
+    comparable::ComparableExpr,
+    helpers::{self, map_callable},
+    statement_visitor::{walk_stmt, StatementVisitor},
+};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `raise` statements within `try` blocks.
+/// Checks for `raise` statements within `try` blocks. The only `raise`s
+/// caught are those that throw exceptions caught by the `try` statement itself.
 ///
 /// ## Why is this bad?
 /// Raising and catching exceptions within the same `try` block is redundant,
@@ -83,9 +88,36 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
         visitor.raises
     };
 
+    if raises.is_empty() {
+        return;
+    }
+
+    let handled_exceptions = helpers::extract_handled_exceptions(handlers);
+    let comparables: Vec<ComparableExpr> = handled_exceptions
+        .iter()
+        .map(|handler| ComparableExpr::from(*handler))
+        .collect();
+
     for stmt in raises {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
+        let Stmt::Raise(ast::StmtRaise { exc: Some(exception), .. }) = stmt else {
+            continue;
+        };
+
+        // We can't check exception sub-classes without a type-checker implementation, so let's
+        // just catch the blanket `Exception` for now.
+        if comparables.contains(&ComparableExpr::from(map_callable(exception)))
+            || handled_exceptions.iter().any(|expr| {
+                checker
+                    .semantic()
+                    .resolve_call_path(expr)
+                    .map_or(false, |call_path| {
+                        matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
+                    })
+            })
+        {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
+        }
     }
 }
