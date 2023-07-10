@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for indexed access to lists, strings, tuples, and comprehensions
+/// Checks for indexed access to lists, strings, tuples, bytes, and comprehensions
 /// using a type other than an integer or slice.
 ///
 /// ## Why is this bad?
