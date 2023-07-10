@@ -27,7 +27,6 @@ ruff_rustpython = { path = "../ruff_rustpython" }
 ruff_text_size = { workspace = true }
 ruff_textwrap = { path = "../ruff_textwrap" }
 
-aho-corasick = { version = "1.0.2" }
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
