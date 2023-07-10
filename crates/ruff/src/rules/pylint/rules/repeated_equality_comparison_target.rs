@@ -3,7 +3,7 @@ use itertools::any;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprCompare, Ranged};
 use std::ops::Deref;
 
@@ -49,6 +49,57 @@ impl Violation for RepeatedEqualityComparisonTarget {
     }
 }
 
+/// PLR1714
+pub(crate) fn repeated_equality_comparison_target(
+    checker: &mut Checker,
+    expr: &Expr,
+    op: BoolOp,
+    values: &[Expr],
+) {
+    if !op.is_or() && !op.is_and() {
+        return;
+    }
+    if any(values.iter(), |v| !is_allowed_value(op, v)) {
+        return;
+    }
+    let mut left_to_comparators: FxHashMap<HashableExpr, (usize, Vec<HashableExpr>)> =
+        FxHashMap::default();
+    for value in values {
+        match value {
+            Expr::Compare(ExprCompare {
+                left, comparators, ..
+            }) => {
+                let (count, matches) = left_to_comparators
+                    .entry(left.deref().into())
+                    .or_insert_with(|| (0, Vec::new()));
+                *count += 1;
+                matches.extend(comparators.iter().map(std::convert::Into::into));
+            }
+            _ => continue,
+        }
+    }
+    for (left, (count, comparators)) in left_to_comparators {
+        if count < 2 {
+            continue;
+        }
+        let membership_expr = merged_membership_test(
+            &checker.generator().expr(left.as_expr()),
+            comparators
+                .iter()
+                .map(|c| checker.generator().expr(c.as_expr()))
+                .collect::<Vec<String>>(),
+            op,
+        );
+        checker.diagnostics.push(Diagnostic::new(
+            RepeatedEqualityComparisonTarget {
+                expr: membership_expr,
+            },
+            expr.range(),
+        ));
+    }
+}
+
+// Eq can be joined with Or; NotEq can be joined with And.
 fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     match value {
         Expr::Compare(ExprCompare {
@@ -77,55 +128,7 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     }
 }
 
-/// PLR0124
-pub(crate) fn repeated_equality_comparison_target(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: BoolOp,
-    values: &[Expr],
-) {
-    if !op.is_or() && !op.is_and() {
-        return;
-    }
-    if any(values.iter(), |v| !is_allowed_value(op, v)) {
-        return;
-    }
-    let mut left_to_comparators: FxHashMap<HashableExpr, (usize, FxHashSet<HashableExpr>)> =
-        FxHashMap::default();
-    for value in values {
-        match value {
-            Expr::Compare(ExprCompare {
-                left, comparators, ..
-            }) => {
-                let (count, matches) = left_to_comparators
-                    .entry(left.deref().into())
-                    .or_insert_with(|| (0, FxHashSet::default()));
-                *count += 1;
-                matches.extend(comparators.iter().map(std::convert::Into::into));
-            }
-            _ => continue,
-        }
-    }
-    for (left, (count, comparators)) in left_to_comparators {
-        if count < 2 {
-            continue;
-        }
-        let membership_expr = merged_membership_test(
-            &checker.generator().expr(left.as_expr()),
-            comparators
-                .iter()
-                .map(|c| checker.generator().expr(c.as_expr()))
-                .collect::<Vec<String>>(),
-            op,
-        );
-        checker.diagnostics.push(Diagnostic::new(
-            RepeatedEqualityComparisonTarget {
-                expr: membership_expr,
-            },
-            expr.range(),
-        ));
-    }
-}
+// Produces a string like `obj in (a, b, c)` or `obj not in (a, b, c)`.
 fn merged_membership_test(
     obj: &str,
     collection_items: impl IntoIterator<Item = String>,
