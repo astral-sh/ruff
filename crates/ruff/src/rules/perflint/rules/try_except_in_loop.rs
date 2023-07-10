@@ -45,7 +45,7 @@ use crate::settings::types::PythonVersion;
 /// try:
 ///     for num in string_numbers:
 ///         int_numbers.append(int(num))
-/// except ValueError as e
+/// except ValueError as e:
 ///     print(f"Couldn't convert to integer: {e}")
 /// ```
 ///
