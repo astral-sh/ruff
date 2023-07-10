@@ -6,7 +6,7 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprListComp;
 
 #[derive(Default)]
@@ -30,7 +30,7 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
             f,
             [parenthesized(
                 "[",
-                &self::format_args!(
+                &format_args!(
                     group(&elt.format()),
                     soft_line_break_or_space(),
                     group(&joined)

@@ -2,7 +2,7 @@ use crate::comments::{leading_comments, trailing_comments};
 use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use rustpython_parser::ast::{Comprehension, Ranged};
 
 #[derive(Default)]
@@ -37,7 +37,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             [
                 text("for"),
                 trailing_comments(before_target_comments),
-                group(&self::format_args!(
+                group(&format_args!(
                     soft_line_break_or_space(),
                     target.format(),
                     soft_line_break_or_space(),
@@ -60,7 +60,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                             dangling_if_comments
                                 .partition_point(|comment| comment.line_position().is_own_line()),
                         );
-                    joiner.entry(&group(&self::format_args!(
+                    joiner.entry(&group(&format_args!(
                         leading_comments(own_line_if_comments),
                         text("if"),
                         trailing_comments(end_of_line_if_comments),
