@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast;
 use rustpython_parser::ast::{Expr, ExprIfExp, ExprSlice, Ranged};
 
@@ -1265,17 +1265,19 @@ fn handle_comprehension_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    fn find_if_token(locator: &Locator, start: TextSize, end: TextSize) -> Option<TextSize> {
-        let mut tokens =
-            SimpleTokenizer::new(locator.contents(), TextRange::new(start, end)).skip_trivia();
-        tokens.next().map(|t| t.start())
-    }
-
     let AnyNodeRef::Comprehension(comprehension) = comment.enclosing_node() else {
         return CommentPlacement::Default(comment);
     };
     let is_own_line = comment.line_position().is_own_line();
 
+    // Comments between the `for` and target
+    // ```python
+    // [
+    //      a
+    //      for  # attache as dangling on the comprehension
+    //      b in c
+    //  ]
+    // ```
     if comment.slice().end() < comprehension.target.range().start() {
         return if is_own_line {
             // own line comments are correctly assigned as leading the target
@@ -1286,20 +1288,24 @@ fn handle_comprehension_comment<'a>(
         };
     }
 
-    let mut tokens = SimpleTokenizer::new(
-        locator.contents(),
+    let in_token = find_only_token_in_range(
         TextRange::new(
             comprehension.target.range().end(),
             comprehension.iter.range().start(),
         ),
-    )
-    .skip_trivia();
-    let Some(in_token) = tokens.next() else {
-        // Should always have an `in`
-        debug_assert!(false);
-        return CommentPlacement::Default(comment);
-    };
+        locator,
+        TokenKind::In,
+    );
 
+    // Comments between the target and the `in`
+    // ```python
+    // [
+    //      a for b
+    //      # attach as dangling on the target
+    //      # (to be rendered as leading on the "in")
+    //      in c
+    //  ]
+    // ```
     if comment.slice().start() < in_token.start() {
         // attach as dangling comments on the target
         // (to be rendered as leading on the "in")
@@ -1311,14 +1317,19 @@ fn handle_comprehension_comment<'a>(
         };
     }
 
+    // Comments between the `in` and the iter
+    // ```python
+    // [
+    //      a for b
+    //      in  #  attach as dangling on the iter
+    //      c
+    //  ]
+    // ```
     if comment.slice().start() < comprehension.iter.range().start() {
-        // attach as dangling comments on the iter
-
         return if is_own_line {
-            // after the `in` and own line: leading on the iter
-            CommentPlacement::leading((&comprehension.iter).into(), comment)
+            CommentPlacement::Default(comment)
         } else {
-            // after the `in` but same line, turn into trailin on the `in` token
+            // after the `in` but same line, turn into trailing on the `in` token
             CommentPlacement::dangling((&comprehension.iter).into(), comment)
         };
     }
@@ -1341,17 +1352,18 @@ fn handle_comprehension_comment<'a>(
         //     # above g
         //     g  # g
         // ]
-        let Some(if_token_start) = find_if_token(locator, last_end, if_node.range().end()) else {
-            // there should always be an `if` here
-            debug_assert!(false);
-            return CommentPlacement::Default(comment);
-        };
+
+        let if_token = find_only_token_in_range(
+            TextRange::new(last_end, if_node.range().start()),
+            locator,
+            TokenKind::If,
+        );
         if is_own_line {
-            if last_end < comment.slice().start() && comment.slice().start() < if_token_start {
+            if last_end < comment.slice().start() && comment.slice().start() < if_token.start() {
                 return CommentPlacement::dangling((if_node).into(), comment);
             }
         } else {
-            if if_token_start < comment.slice().start()
+            if if_token.start() < comment.slice().start()
                 && comment.slice().start() < if_node.range().start()
             {
                 return CommentPlacement::dangling((if_node).into(), comment);
@@ -1360,7 +1372,7 @@ fn handle_comprehension_comment<'a>(
         last_end = if_node.range().end();
     }
 
-    return CommentPlacement::Default(comment);
+    CommentPlacement::Default(comment)
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
