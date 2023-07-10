@@ -39,7 +39,7 @@ impl NeedsParentheses for ExprNamedExpr {
     ) -> Parentheses {
         match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
             // Unlike tuples, named expression parentheses are not part of the range even when
-            // mandatory
+            // mandatory. See [PEP 572](https://peps.python.org/pep-0572/) for details.
             Parentheses::Optional => Parentheses::Always,
             parentheses => parentheses,
         }
