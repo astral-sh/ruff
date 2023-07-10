@@ -5,11 +5,9 @@ use std::fs;
 use std::ops::Add;
 use std::path::Path;
 
-use aho_corasick::AhoCorasick;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
-use once_cell::sync::Lazy;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 
@@ -20,14 +18,6 @@ use ruff_python_whitespace::LineEnding;
 use crate::codes::NoqaCode;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
-
-// Let's replace this with a character-by-character matcher, I bet it's faster.
-static NOQA_MATCHER: Lazy<AhoCorasick> = Lazy::new(|| {
-    AhoCorasick::builder()
-        .ascii_case_insensitive(true)
-        .build(["noqa"])
-        .unwrap()
-});
 
 /// A directive to ignore a set of rules for a given line of Python source code (e.g.,
 /// `# noqa: F401, F841`).
@@ -42,8 +32,22 @@ pub(crate) enum Directive<'a> {
 impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
     pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Result<Option<Self>, ParseError> {
-        for mat in NOQA_MATCHER.find_iter(text) {
-            let noqa_literal_start = mat.start();
+        for (char_index, char) in text.char_indices() {
+            // Only bother checking for the `noqa` literal if the character is `n` or `N`.
+            if !matches!(char, 'n' | 'N') {
+                continue;
+            }
+
+            // Determine the start of the `noqa` literal.
+            if !matches!(
+                text[char_index..].as_bytes(),
+                [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
+            ) {
+                continue;
+            }
+
+            let noqa_literal_start = char_index;
+            let noqa_literal_end = noqa_literal_start + "noqa".len();
 
             // Determine the start of the comment.
             let mut comment_start = noqa_literal_start;
@@ -63,7 +67,6 @@ impl<'a> Directive<'a> {
 
             // If the next character is `:`, then it's a list of codes. Otherwise, it's a directive
             // to ignore all rules.
-            let noqa_literal_end = mat.end();
             return Ok(Some(
                 if text[noqa_literal_end..]
                     .chars()

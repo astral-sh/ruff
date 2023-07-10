@@ -2148,7 +2148,8 @@ where
                     if let Some(operator) = typing::to_pep604_operator(value, slice, &self.semantic)
                     {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py310
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -2160,7 +2161,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP604Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py310
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2176,7 +2178,8 @@ where
 
                 // Ex) list[...]
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py39
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py39
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                         && typing::is_pep585_generic(value, &self.semantic)
@@ -2277,19 +2280,21 @@ where
                                 typing::to_pep585_generic(expr, &self.semantic)
                             {
                                 if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                    if self.settings.target_version < PythonVersion::Py39
+                                    if !self.is_stub
+                                        && self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
                                         && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                            self, expr,
-                                        );
+                                                self, expr,
+                                            );
                                     }
                                 }
                                 if self.enabled(Rule::NonPEP585Annotation) {
-                                    if self.settings.target_version >= PythonVersion::Py39
+                                    if self.is_stub
+                                        || self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
                                             && self.semantic.in_annotation()
@@ -2354,7 +2359,8 @@ where
                 ]) {
                     if let Some(replacement) = typing::to_pep585_generic(expr, &self.semantic) {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py39
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -2366,7 +2372,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP585Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py39
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2439,19 +2446,19 @@ where
                     if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                         let attr = attr.as_str();
                         if let Expr::Constant(ast::ExprConstant {
-                            value: Constant::Str(value),
+                            value: Constant::Str(val),
                             ..
                         }) = value.as_ref()
                         {
                             if attr == "join" {
                                 // "...".join(...) call
                                 if self.enabled(Rule::StaticJoinToFString) {
-                                    flynt::rules::static_join_to_fstring(self, expr, value);
+                                    flynt::rules::static_join_to_fstring(self, expr, val);
                                 }
                             } else if attr == "format" {
                                 // "...".format(...) call
                                 let location = expr.range();
-                                match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
+                                match pyflakes::format::FormatSummary::try_from(val.as_ref()) {
                                     Err(e) => {
                                         if self.enabled(Rule::StringDotFormatInvalidFormat) {
                                             self.diagnostics.push(Diagnostic::new(
@@ -2495,7 +2502,13 @@ where
                                         }
 
                                         if self.enabled(Rule::FString) {
-                                            pyupgrade::rules::f_strings(self, &summary, expr);
+                                            pyupgrade::rules::f_strings(
+                                                self,
+                                                &summary,
+                                                expr,
+                                                value,
+                                                self.settings.line_length,
+                                            );
                                         }
                                     }
                                 }
@@ -2533,10 +2546,10 @@ where
                 if self.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);
                 }
-                if self.enabled(Rule::NonPEP604Isinstance)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                if self.enabled(Rule::NonPEP604Isinstance) {
+                    if self.settings.target_version >= PythonVersion::Py310 {
+                        pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                    }
                 }
                 if self.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                     flake8_async::rules::blocking_http_call(self, expr);
@@ -3140,7 +3153,8 @@ where
             }) => {
                 // Ex) `str | None`
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py310
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py310
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                     {
@@ -3151,7 +3165,6 @@ where
                         );
                     }
                 }
-
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic.in_type_definition()
@@ -3163,7 +3176,6 @@ where
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
                     }
-
                     if self.enabled(Rule::UnnecessaryLiteralUnion)
                         // Avoid duplicate checks if the parent is an `|`
                         && !matches!(

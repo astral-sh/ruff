@@ -13,6 +13,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineLength;
 use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
@@ -313,13 +314,19 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
 }
 
 /// UP032
-pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
+pub(crate) fn f_strings(
+    checker: &mut Checker,
+    summary: &FormatSummary,
+    expr: &Expr,
+    template: &Expr,
+    line_length: LineLength,
+) {
     if summary.has_nested_parts {
         return;
     }
 
     // Avoid refactoring multi-line strings.
-    if checker.locator.contains_line_break(expr.range()) {
+    if checker.locator.contains_line_break(template.range()) {
         return;
     }
 
@@ -329,9 +336,9 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         return;
     };
 
-    // Avoid refactors that increase the resulting string length.
-    let existing = checker.locator.slice(expr.range());
-    if contents.len() > existing.len() {
+    // Avoid refactors that exceed the line length limit.
+    let col_offset = template.start() - checker.locator.line_start(template.start());
+    if col_offset.to_usize() + contents.len() > line_length.get() {
         return;
     }
 
