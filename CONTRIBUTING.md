@@ -680,4 +680,4 @@ Module {
 - `cargo dev round-trip <python file or jupyter notebook>`: Read a Python file or Jupyter Notebook,
   parse it, serialize the parsed representation and write it back. Used to check how good our
   representation is so that fixes don't rewrite irrelevant parts of a file.
-- `cargo dev format_dev`: See [ruff_python_formatter](crates/ruff_python_formatter/README.md)
+- `cargo dev format_dev`: See ruff_python_formatter README.md
