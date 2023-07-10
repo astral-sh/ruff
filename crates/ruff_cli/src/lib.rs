@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -12,7 +13,7 @@ use ruff::logging::{set_up_logging, LogLevel};
 use ruff::settings::types::SerializationFormat;
 use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
-use ruff_python_formatter::format_module;
+use ruff_python_formatter::{format_module, PyFormatOptions};
 
 use crate::args::{Args, CheckArgs, Command};
 use crate::commands::run_stdin::read_from_stdin;
@@ -57,7 +58,7 @@ enum ChangeKind {
 /// Returns `None` if no relevant changes were detected.
 fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
     // If any `.toml` files were modified, return `ChangeKind::Configuration`. Otherwise, return
-    // `ChangeKind::SourceFile` if any `.py`, `.pyi`, or `.pyw` files were modified.
+    // `ChangeKind::SourceFile` if any `.py`, `.pyi`, `.pyw`, or `.ipynb` files were modified.
     let mut source_file = false;
     for path in paths {
         if let Some(suffix) = path.extension() {
@@ -65,7 +66,7 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
                 Some("toml") => {
                     return Some(ChangeKind::Configuration);
                 }
-                Some("py" | "pyi" | "pyw") => source_file = true,
+                Some("py" | "pyi" | "pyw" | "ipynb") => source_file = true,
                 _ => {}
             }
         }
@@ -74,6 +75,27 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
         return Some(ChangeKind::SourceFile);
     }
     None
+}
+
+/// Returns true if the linter should read from standard input.
+fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
+    // If the user provided a `--stdin-filename`, always read from standard input.
+    if stdin_filename.is_some() {
+        if let Some(file) = files.iter().find(|file| file.as_path() != Path::new("-")) {
+            warn_user_once!(
+                "Ignoring file {} in favor of standard input.",
+                file.display()
+            );
+        }
+        return true;
+    }
+
+    // If the user provided exactly `-`, read from standard input.
+    if files.len() == 1 && files[0] == Path::new("-") {
+        return true;
+    }
+
+    false
 }
 
 pub fn run(
@@ -112,7 +134,14 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, format } => commands::rule::rule(rule, format)?,
+        Command::Rule { rule, all, format } => {
+            if all {
+                commands::rule::rules(format)?;
+            }
+            if let Some(rule) = rule {
+                commands::rule::rule(rule, format)?;
+            }
+        }
         Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
         Command::Linter { format } => commands::linter::linter(format)?,
         Command::Clean => commands::clean::clean(log_level)?,
@@ -136,7 +165,7 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
         // dummy, to check that the function was actually called
         let contents = code.replace("# DEL", "");
         // real formatting that is currently a passthrough
-        format_module(&contents)
+        format_module(&contents, PyFormatOptions::default())
     };
 
     match &files {
@@ -171,12 +200,26 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         cli.stdin_filename.as_deref(),
     )?;
 
+    let mut writer: Box<dyn Write> = match cli.output_file {
+        Some(path) if !cli.watch => {
+            colored::control::set_override(false);
+            let file = File::create(path)?;
+            Box::new(BufWriter::new(file))
+        }
+        _ => Box::new(BufWriter::new(io::stdout())),
+    };
+
     if cli.show_settings {
-        commands::show_settings::show_settings(&cli.files, &pyproject_config, &overrides)?;
+        commands::show_settings::show_settings(
+            &cli.files,
+            &pyproject_config,
+            &overrides,
+            &mut writer,
+        )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides)?;
+        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -276,7 +319,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             noqa.into(),
             autofix,
         )?;
-        printer.write_continuously(&messages)?;
+        printer.write_continuously(&mut writer, &messages)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -308,13 +351,13 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                         noqa.into(),
                         autofix,
                     )?;
-                    printer.write_continuously(&messages)?;
+                    printer.write_continuously(&mut writer, &messages)?;
                 }
                 Err(err) => return Err(err.into()),
             }
         }
     } else {
-        let is_stdin = cli.files == vec![PathBuf::from("-")];
+        let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
@@ -341,10 +384,9 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         // source code goes to stdout).
         if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
             if cli.statistics {
-                printer.write_statistics(&diagnostics)?;
+                printer.write_statistics(&diagnostics, &mut writer)?;
             } else {
-                let mut stdout = BufWriter::new(io::stdout().lock());
-                printer.write_once(&diagnostics, &mut stdout)?;
+                printer.write_once(&diagnostics, &mut writer)?;
             }
         }
 

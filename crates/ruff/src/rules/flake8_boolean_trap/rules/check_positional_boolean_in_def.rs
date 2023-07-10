@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_boolean_trap::helpers::FUNC_DEF_NAME_ALLOWLIST;
+use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 
 /// ## What it does
 /// Checks for boolean positional arguments in function definitions.
@@ -82,7 +82,7 @@ pub(crate) fn check_positional_boolean_in_def(
     decorator_list: &[Decorator],
     arguments: &Arguments,
 ) {
-    if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
+    if is_allowed_func_def(name) {
         return;
     }
 

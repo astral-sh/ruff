@@ -75,7 +75,7 @@ impl<'a> Binding<'a> {
     pub const fn is_unbound(&self) -> bool {
         matches!(
             self.kind,
-            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException
+            BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException(_)
         )
     }
 
@@ -126,11 +126,11 @@ impl<'a> Binding<'a> {
         }
         matches!(
             existing.kind,
-            BindingKind::ClassDefinition
-                | BindingKind::FunctionDefinition
-                | BindingKind::Import(..)
-                | BindingKind::FromImport(..)
-                | BindingKind::SubmoduleImport(..)
+            BindingKind::ClassDefinition(_)
+                | BindingKind::FunctionDefinition(_)
+                | BindingKind::Import(_)
+                | BindingKind::FromImport(_)
+                | BindingKind::SubmoduleImport(_)
         )
     }
 
@@ -273,14 +273,6 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StarImport<'a> {
-    /// The level of the import. `None` or `Some(0)` indicate an absolute import.
-    pub level: Option<u32>,
-    /// The module being imported. `None` indicates a wildcard import.
-    pub module: Option<&'a str>,
-}
-
-#[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
     pub names: Vec<&'a str>,
@@ -380,14 +372,14 @@ pub enum BindingKind<'a> {
     /// class Foo:
     ///     ...
     /// ```
-    ClassDefinition,
+    ClassDefinition(ScopeId),
 
     /// A binding for a function, like `foo` in:
     /// ```python
     /// def foo():
     ///     ...
     /// ```
-    FunctionDefinition,
+    FunctionDefinition(ScopeId),
 
     /// A binding for an `__all__` export, like `__all__` in:
     /// ```python
@@ -435,7 +427,11 @@ pub enum BindingKind<'a> {
     ///
     /// After the `except` block, `x` is unbound, despite the lack
     /// of an explicit `del` statement.
-    UnboundException,
+    ///
+    ///
+    /// Stores the ID of the binding that was shadowed in the enclosing
+    /// scope, if any.
+    UnboundException(Option<BindingId>),
 }
 
 bitflags! {

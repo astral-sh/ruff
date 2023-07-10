@@ -30,6 +30,7 @@ pub enum PythonVersion {
     Py39,
     Py310,
     Py311,
+    Py312,
 }
 
 impl From<PythonVersion> for Pep440Version {
@@ -47,7 +48,16 @@ impl PythonVersion {
             Self::Py39 => (3, 9),
             Self::Py310 => (3, 10),
             Self::Py311 => (3, 11),
+            Self::Py312 => (3, 12),
         }
+    }
+
+    pub const fn major(&self) -> u32 {
+        self.as_tuple().0
+    }
+
+    pub const fn minor(&self) -> u32 {
+        self.as_tuple().1
     }
 
     pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
@@ -259,6 +269,6 @@ impl Deref for Version {
 /// luckily this not relevant since identifiers don't contains slashes.
 ///
 /// For reference pep8-naming uses
-/// [`fnmatch`](https://docs.python.org/3.11/library/fnmatch.html) for
+/// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;

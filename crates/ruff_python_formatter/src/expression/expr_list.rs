@@ -1,6 +1,7 @@
-use crate::comments::{dangling_comments, CommentTextPosition, Comments};
+use crate::comments::{dangling_comments, CommentLinePosition, Comments};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -19,7 +20,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item.into());
+        let dangling = comments.dangling_comments(item);
 
         // The empty list is special because there can be dangling comments, and they can be in two
         // positions:
@@ -30,11 +31,12 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         // ```
         // In all other cases comments get assigned to a list element
         if elts.is_empty() {
-            let end_of_line_split = dangling
-                .partition_point(|comment| comment.position() == CommentTextPosition::EndOfLine);
+            let end_of_line_split = dangling.partition_point(|comment| {
+                comment.line_position() == CommentLinePosition::EndOfLine
+            });
             debug_assert!(dangling[end_of_line_split..]
                 .iter()
-                .all(|comment| comment.position() == CommentTextPosition::OwnLine));
+                .all(|comment| comment.line_position() == CommentLinePosition::OwnLine));
             return write!(
                 f,
                 [group(&format_args![
@@ -51,32 +53,9 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             "A non-empty expression list has dangling comments"
         );
 
-        let items = format_with(|f| {
-            let mut iter = elts.iter();
+        let items = format_with(|f| f.join_comma_separated().nodes(elts.iter()).finish());
 
-            if let Some(first) = iter.next() {
-                write!(f, [first.format()])?;
-            }
-
-            for item in iter {
-                write!(f, [text(","), soft_line_break_or_space(), item.format()])?;
-            }
-
-            if !elts.is_empty() {
-                write!(f, [if_group_breaks(&text(","))])?;
-            }
-
-            Ok(())
-        });
-
-        write!(
-            f,
-            [group(&format_args![
-                text("["),
-                soft_block_indent(&items),
-                text("]")
-            ])]
-        )
+        parenthesized("[", &items, "]").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {

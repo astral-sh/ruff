@@ -35,11 +35,17 @@ pub struct Args {
 pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckArgs),
-    /// Explain a rule.
+    /// Explain a rule (or all rules).
     #[clap(alias = "--explain")]
+    #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
-        #[arg(value_parser=Rule::from_code)]
-        rule: Rule,
+        /// Rule to explain
+        #[arg(value_parser=Rule::from_code, group = "selector")]
+        rule: Option<Rule>,
+
+        /// Explain all rules
+        #[arg(long, conflicts_with = "rule", group = "selector")]
+        all: bool,
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
@@ -68,7 +74,8 @@ pub enum Command {
     },
 }
 
-#[derive(Clone, Debug, clap::Args)]
+// The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
+#[derive(Clone, Debug, clap::Parser)]
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
 pub struct CheckArgs {
     /// List of files or directories to check.
@@ -107,6 +114,9 @@ pub struct CheckArgs {
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
+    /// Specify file to write the linter output to (default: stdout).
+    #[arg(short, long)]
+    pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
@@ -399,6 +409,7 @@ impl CheckArgs {
                 ignore_noqa: self.ignore_noqa,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
+                output_file: self.output_file,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
                 statistics: self.statistics,
@@ -465,6 +476,7 @@ pub struct Arguments {
     pub ignore_noqa: bool,
     pub isolated: bool,
     pub no_cache: bool,
+    pub output_file: Option<PathBuf>,
     pub show_files: bool,
     pub show_settings: bool,
     pub statistics: bool,

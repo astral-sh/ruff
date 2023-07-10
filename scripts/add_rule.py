@@ -9,6 +9,7 @@ Example usage:
         --code 807 \
         --linter flake8-pie
 """
+from __future__ import annotations
 
 import argparse
 import subprocess
@@ -97,6 +98,17 @@ use ruff_macros::{{derive_message_formats, violation}};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+///
+/// ## Why is this bad?
+///
+/// ## Example
+/// ```python
+/// ```
+///
+/// Use instead:
+/// ```python
+/// ```
 #[violation]
 pub struct {name};
 

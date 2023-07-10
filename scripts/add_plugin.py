@@ -8,6 +8,7 @@ Example usage:
         --url https://pypi.org/project/flake8-pie/
         --prefix PIE
 """
+from __future__ import annotations
 
 import argparse
 
@@ -44,7 +45,7 @@ mod tests {
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
-        let messages = test_path(
+        let diagnostics = test_path(
             Path::new("%s").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;

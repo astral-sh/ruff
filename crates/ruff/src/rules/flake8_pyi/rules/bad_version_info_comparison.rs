@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{CmpOp, Expr, Ranged};
+use rustpython_parser::ast::{self, CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of comparators other than `<` and `>=` for
+/// Checks for uses of comparators other than `<` and `>=` for
 /// `sys.version_info` checks in `.pyi` files. All other comparators, such
 /// as `>`, `<=`, and `==`, are banned.
 ///
@@ -52,19 +52,23 @@ pub struct BadVersionInfoComparison;
 impl Violation for BadVersionInfoComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `<` or `>=` for version info comparisons")
+        format!("Use `<` or `>=` for `sys.version_info` comparisons")
     }
 }
 
 /// PYI006
-pub(crate) fn bad_version_info_comparison(
-    checker: &mut Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    let ([op], [_right]) = (ops, comparators) else {
+pub(crate) fn bad_version_info_comparison(checker: &mut Checker, test: &Expr) {
+    let Expr::Compare(ast::ExprCompare {
+        left,
+        ops,
+        comparators,
+        ..
+    }) = test
+    else {
+        return;
+    };
+
+    let ([op], [_right]) = (ops.as_slice(), comparators.as_slice()) else {
         return;
     };
 
@@ -78,8 +82,11 @@ pub(crate) fn bad_version_info_comparison(
         return;
     }
 
-    if !matches!(op, CmpOp::Lt | CmpOp::GtE) {
-        let diagnostic = Diagnostic::new(BadVersionInfoComparison, expr.range());
-        checker.diagnostics.push(diagnostic);
+    if matches!(op, CmpOp::Lt | CmpOp::GtE) {
+        return;
     }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(BadVersionInfoComparison, test.range()));
 }

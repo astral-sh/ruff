@@ -53,7 +53,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use anyhow::Result;
     use std::env;
 
@@ -61,7 +61,7 @@ mod test {
 
     use super::{main, Args};
 
-    #[test]
+    #[cfg_attr(not(feature = "unreachable-code"), test)]
     fn test_generate_json_schema() -> Result<()> {
         let mode = if env::var("RUFF_UPDATE_SCHEMA").as_deref() == Ok("1") {
             Mode::Write

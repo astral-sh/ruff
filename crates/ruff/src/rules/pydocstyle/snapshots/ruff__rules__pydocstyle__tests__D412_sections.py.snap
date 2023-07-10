@@ -25,7 +25,7 @@ sections.py:216:5: D412 [*] No blank lines allowed between a section header and 
     |
     = help: Remove blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 217 217 | 
 218 218 |     Short summary
 219 219 |     -------------

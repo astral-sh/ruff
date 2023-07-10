@@ -19,7 +19,7 @@ D214_module.py:1:1: D214 [*] Section is over-indented ("Returns")
    |
    = help: Remove over-indentation from "Returns"
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """A module docstring with D214 violations
 2 2 | 
 3   |-    Returns
@@ -46,7 +46,7 @@ D214_module.py:1:1: D214 [*] Section is over-indented ("Args")
    |
    = help: Remove over-indentation from "Args"
 
-ℹ Suggested fix
+ℹ Fix
 4 4 | -----
 5 5 |     valid returns
 6 6 | 

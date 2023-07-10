@@ -7,3 +7,6 @@ from datetime import datetime
 
 # unqualified
 datetime.utcfromtimestamp(1234)
+
+# uses `astimezone` method
+datetime.utcfromtimestamp(1234).astimezone()

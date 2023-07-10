@@ -481,7 +481,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         };
 
-        let Expr::Name(ast::ExprName { id: returned_id, .. }) = value.as_ref() else {
+        let Expr::Name(ast::ExprName {
+            id: returned_id, ..
+        }) = value.as_ref()
+        else {
             continue;
         };
 
@@ -494,7 +497,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         };
 
-        let Expr::Name(ast::ExprName { id: assigned_id, .. }) = target else {
+        let Expr::Name(ast::ExprName {
+            id: assigned_id, ..
+        }) = target
+        else {
             continue;
         };
 

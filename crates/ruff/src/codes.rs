@@ -14,6 +14,18 @@ use crate::rules;
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
 
+impl NoqaCode {
+    /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`.
+    pub fn prefix(&self) -> &str {
+        self.0
+    }
+
+    /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
+    pub fn suffix(&self) -> &str {
+        self.1
+    }
+}
+
 impl std::fmt::Debug for NoqaCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(self, f)
@@ -156,8 +168,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyflakes, "901") => (RuleGroup::Unspecified, rules::pyflakes::rules::RaiseNotImplemented),
 
         // pylint
+        (Pylint, "C0131") => (RuleGroup::Unspecified, rules::pylint::rules::TypeBivariance),
+        (Pylint, "C0132") => (RuleGroup::Unspecified, rules::pylint::rules::TypeParamNameMismatch),
+        (Pylint, "C0205") => (RuleGroup::Unspecified, rules::pylint::rules::SingleStringSlots),
         (Pylint, "C0414") => (RuleGroup::Unspecified, rules::pylint::rules::UselessImportAlias),
-        (Pylint, "C1901") => (RuleGroup::Unspecified, rules::pylint::rules::CompareToEmptyString),
+        (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Unspecified, rules::pylint::rules::UnnecessaryDirectLambdaCall),
         (Pylint, "C0208") => (RuleGroup::Unspecified, rules::pylint::rules::IterationOverSet),
         (Pylint, "E0100") => (RuleGroup::Unspecified, rules::pylint::rules::YieldInInit),
@@ -375,8 +390,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "401") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictGet),
         (Flake8Simplify, "910") => (RuleGroup::Unspecified, rules::flake8_simplify::rules::DictGetWithNoneDefault),
 
-        // copyright
-        (Copyright, "001") => (RuleGroup::Nursery, rules::copyright::rules::MissingCopyrightNotice),
+        // flake8-copyright
+        (Flake8Copyright, "001") => (RuleGroup::Nursery, rules::flake8_copyright::rules::MissingCopyrightNotice),
 
         // pyupgrade
         (Pyupgrade, "001") => (RuleGroup::Unspecified, rules::pyupgrade::rules::UselessMetaclassType),
@@ -596,6 +611,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // flake8-pyi
         (Flake8Pyi, "001") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnprefixedTypeParam),
+        (Flake8Pyi, "002") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::ComplexIfStatementInStub),
+        (Flake8Pyi, "003") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedVersionInfoCheck),
+        (Flake8Pyi, "004") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::PatchVersionComparison),
+        (Flake8Pyi, "005") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::WrongTupleLengthVersionComparison),
         (Flake8Pyi, "006") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::BadVersionInfoComparison),
         (Flake8Pyi, "007") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedPlatformCheck),
         (Flake8Pyi, "008") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnrecognizedPlatformName),
@@ -612,6 +631,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "024") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::CollectionsNamedTuple),
         (Flake8Pyi, "025") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnaliasedCollectionsAbcSetImport),
         (Flake8Pyi, "029") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StrOrReprDefinedInStub),
+        (Flake8Pyi, "030") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnnecessaryLiteralUnion),
         (Flake8Pyi, "032") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::AnyEqNeAnnotation),
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::TypeCommentInStub),
         (Flake8Pyi, "034") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NonSelfReturnType),
@@ -742,6 +762,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // numpy
         (Numpy, "001") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyDeprecatedTypeAlias),
         (Numpy, "002") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyLegacyRandom),
+        (Numpy, "003") => (RuleGroup::Unspecified, rules::numpy::rules::NumpyDeprecatedFunction),
 
         // ruff
         (Ruff, "001") => (RuleGroup::Unspecified, rules::ruff::rules::AmbiguousUnicodeCharacterString),
@@ -756,6 +777,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "011") => (RuleGroup::Unspecified, rules::ruff::rules::StaticKeyDictComprehension),
         (Ruff, "012") => (RuleGroup::Unspecified, rules::ruff::rules::MutableClassDefault),
         (Ruff, "013") => (RuleGroup::Unspecified, rules::ruff::rules::ImplicitOptional),
+        #[cfg(feature = "unreachable-code")]
+        (Ruff, "014") => (RuleGroup::Nursery, rules::ruff::rules::UnreachableCode),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 
@@ -785,7 +808,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "001") => (RuleGroup::Unspecified, rules::airflow::rules::AirflowVariableNameTaskIdMismatch),
 
         // perflint
+        (Perflint, "101") => (RuleGroup::Unspecified, rules::perflint::rules::UnnecessaryListCast),
         (Perflint, "102") => (RuleGroup::Unspecified, rules::perflint::rules::IncorrectDictIterator),
+        (Perflint, "203") => (RuleGroup::Unspecified, rules::perflint::rules::TryExceptInLoop),
+        (Perflint, "401") => (RuleGroup::Unspecified, rules::perflint::rules::ManualListComprehension),
+        (Perflint, "402") => (RuleGroup::Unspecified, rules::perflint::rules::ManualListCopy),
 
         // flake8-fixme
         (Flake8Fixme, "001") => (RuleGroup::Unspecified, rules::flake8_fixme::rules::LineContainsFixme),

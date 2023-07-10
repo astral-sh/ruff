@@ -9,6 +9,40 @@ use ruff_python_semantic::SemanticModel;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// ## What it does
+/// Checks for abstract classes without abstract methods.
+///
+/// ## Why is this bad?
+/// Abstract base classes are used to define interfaces. If they have no abstract
+/// methods, they are not useful.
+///
+/// If the class is not meant to be used as an interface, it should not be an
+/// abstract base class. Remove the `ABC` base class from the class definition,
+/// or add an abstract method to the class.
+///
+/// ## Example
+/// ```python
+/// from abc import ABC
+///
+///
+/// class Foo(ABC):
+///     def method(self):
+///         bar()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from abc import ABC, abstractmethod
+///
+///
+/// class Foo(ABC):
+///     @abstractmethod
+///     def method(self):
+///         bar()
+/// ```
+///
+/// ## References
+/// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 #[violation]
 pub struct AbstractBaseClassWithoutAbstractMethod {
     name: String,
@@ -21,6 +55,40 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
+/// ## What it does
+/// Checks for empty methods in abstract base classes without an abstract
+/// decorator.
+///
+/// ## Why is this bad?
+/// Empty methods in abstract base classes without an abstract decorator are
+/// indicative of unfinished code or a mistake.
+///
+/// Instead, add an abstract method decorated to indicate that it is abstract,
+/// or implement the method.
+///
+/// ## Example
+/// ```python
+/// from abc import ABC
+///
+///
+/// class Foo(ABC):
+///     def method(self):
+///         ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from abc import ABC, abstractmethod
+///
+///
+/// class Foo(ABC):
+///     @abstractmethod
+///     def method(self):
+///         ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: abc](https://docs.python.org/3/library/abc.html)
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
     name: String,
@@ -93,19 +161,19 @@ pub(crate) fn abstract_base_class(
             continue;
         }
 
-        let (
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                decorator_list,
-                body,
-                name: method_name,
-                ..
-            }) | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                decorator_list,
-                body,
-                name: method_name,
-                ..
-            })
-        ) = stmt else {
+        let (Stmt::FunctionDef(ast::StmtFunctionDef {
+            decorator_list,
+            body,
+            name: method_name,
+            ..
+        })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            decorator_list,
+            body,
+            name: method_name,
+            ..
+        })) = stmt
+        else {
             continue;
         };
 
@@ -134,7 +202,7 @@ pub(crate) fn abstract_base_class(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
-                stmt.identifier(checker.locator),
+                stmt.identifier(),
             ));
         }
     }

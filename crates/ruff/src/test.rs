@@ -15,6 +15,7 @@ use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist}
 
 use crate::autofix::{fix_file, FixResult};
 use crate::directives;
+#[cfg(not(fuzzing))]
 use crate::jupyter::Notebook;
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};

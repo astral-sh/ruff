@@ -71,8 +71,9 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
         func,
         args,
         keywords,
-        range: _
-    }) = &right else {
+        range: _,
+    }) = &right
+    else {
         return;
     };
     if !(args.is_empty() && keywords.is_empty()) {

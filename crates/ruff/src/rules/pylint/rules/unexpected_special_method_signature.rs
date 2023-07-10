@@ -5,7 +5,6 @@ use rustpython_parser::ast::{Arguments, Decorator, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 
 use crate::checkers::ast::Checker;
@@ -143,7 +142,6 @@ pub(crate) fn unexpected_special_method_signature(
     name: &str,
     decorator_list: &[Decorator],
     args: &Arguments,
-    locator: &Locator,
 ) {
     if !checker.semantic().scope().kind.is_class() {
         return;
@@ -162,7 +160,9 @@ pub(crate) fn unexpected_special_method_signature(
     let actual_params = args.args.len();
     let mandatory_params = args.args.iter().filter(|arg| arg.default.is_none()).count();
 
-    let Some(expected_params) = ExpectedParams::from_method(name, is_staticmethod(decorator_list, checker.semantic())) else {
+    let Some(expected_params) =
+        ExpectedParams::from_method(name, is_staticmethod(decorator_list, checker.semantic()))
+    else {
         return;
     };
 
@@ -188,7 +188,7 @@ pub(crate) fn unexpected_special_method_signature(
                 expected_params,
                 actual_params,
             },
-            stmt.identifier(locator),
+            stmt.identifier(),
         ));
     }
 }

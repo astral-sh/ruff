@@ -248,10 +248,10 @@ impl Renamer {
             | BindingKind::LoopVar
             | BindingKind::Global
             | BindingKind::Nonlocal(_)
-            | BindingKind::ClassDefinition
-            | BindingKind::FunctionDefinition
+            | BindingKind::ClassDefinition(_)
+            | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion
-            | BindingKind::UnboundException => {
+            | BindingKind::UnboundException(_) => {
                 Some(Edit::range_replacement(target.to_string(), binding.range))
             }
         }

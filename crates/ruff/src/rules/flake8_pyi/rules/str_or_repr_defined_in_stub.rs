@@ -50,8 +50,9 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         returns,
         args,
         ..
-    }) = stmt else {
-        return
+    }) = stmt
+    else {
+        return;
     };
 
     let Some(returns) = returns else {
@@ -90,7 +91,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         StrOrReprDefinedInStub {
             name: name.to_string(),
         },
-        stmt.identifier(checker.locator),
+        stmt.identifier(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         let stmt = checker.semantic().stmt();

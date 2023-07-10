@@ -1,12 +1,15 @@
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::{BindingKind, Import};
 
+use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::pandas_vet::fixes::convert_inplace_argument_to_assignment;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method
@@ -50,23 +53,17 @@ impl Violation for PandasUseOfInplaceArgument {
 
 /// PD002
 pub(crate) fn inplace_argument(
-    checker: &Checker,
+    checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-) -> Option<Diagnostic> {
-    let mut seen_star = false;
-    let mut is_checkable = false;
-    let mut is_pandas = false;
-
+) {
+    // If the function was imported from another module, and it's _not_ Pandas, abort.
     if let Some(call_path) = checker.semantic().resolve_call_path(func) {
-        is_checkable = true;
-
-        let module = call_path[0];
-        is_pandas = checker
-            .semantic()
-            .find_binding(module)
+        if !call_path
+            .first()
+            .and_then(|module| checker.semantic().find_binding(module))
             .map_or(false, |binding| {
                 matches!(
                     binding.kind,
@@ -74,23 +71,20 @@ pub(crate) fn inplace_argument(
                         qualified_name: "pandas"
                     })
                 )
-            });
+            })
+        {
+            return;
+        }
     }
 
+    let mut seen_star = false;
     for keyword in keywords.iter().rev() {
         let Some(arg) = &keyword.arg else {
             seen_star = true;
             continue;
         };
         if arg == "inplace" {
-            let is_true_literal = match &keyword.value {
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(boolean),
-                    ..
-                }) => *boolean,
-                _ => false,
-            };
-            if is_true_literal {
+            if is_const_true(&keyword.value) {
                 let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     // Avoid applying the fix if:
@@ -110,7 +104,7 @@ pub(crate) fn inplace_argument(
                         if let Some(fix) = convert_inplace_argument_to_assignment(
                             checker.locator,
                             expr,
-                            diagnostic.range(),
+                            keyword.range(),
                             args,
                             keywords,
                         ) {
@@ -119,18 +113,35 @@ pub(crate) fn inplace_argument(
                     }
                 }
 
-                // Without a static type system, only module-level functions could potentially be
-                // non-pandas calls. If they're not, `inplace` should be considered safe.
-                if is_checkable && !is_pandas {
-                    return None;
-                }
-
-                return Some(diagnostic);
+                checker.diagnostics.push(diagnostic);
             }
 
             // Duplicate keywords is a syntax error, so we can stop here.
             break;
         }
     }
-    None
+}
+
+/// Remove the `inplace` argument from a function call and replace it with an
+/// assignment.
+fn convert_inplace_argument_to_assignment(
+    locator: &Locator,
+    expr: &Expr,
+    expr_range: TextRange,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Fix> {
+    // Add the assignment.
+    let call = expr.as_call_expr()?;
+    let attr = call.func.as_attribute_expr()?;
+    let insert_assignment = Edit::insertion(
+        format!("{name} = ", name = locator.slice(attr.value.range())),
+        expr.start(),
+    );
+
+    // Remove the `inplace` argument.
+    let remove_argument =
+        remove_argument(locator, call.func.end(), expr_range, args, keywords, false).ok()?;
+
+    Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
 }

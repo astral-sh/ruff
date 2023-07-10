@@ -48,7 +48,7 @@ pub use buffer::{
     Buffer, BufferExtensions, BufferSnapshot, Inspect, PreambleBuffer, RemoveSoftLinesBuffer,
     VecBuffer,
 };
-pub use builders::FormatBestFitting;
+pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
@@ -59,10 +59,8 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default)]
 pub enum IndentStyle {
     /// Tab
@@ -112,10 +110,8 @@ impl std::fmt::Display for IndentStyle {
 ///
 /// The allowed range of values is 1..=320
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineWidth(u16);
 
 impl LineWidth {
@@ -278,10 +274,8 @@ impl FormatOptions for SimpleFormatOptions {
 
 /// Lightweight sourcemap marker between source and output tokens
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SourceMarker {
     /// Position of the marker in the original source
     pub source: TextSize,
@@ -340,10 +334,8 @@ where
 pub type PrintResult<T> = Result<T, PrintError>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Printed {
     code: String,
     range: Option<TextRange>,

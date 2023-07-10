@@ -95,7 +95,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                 if let Some(exc) = exc {
                     // ...and the raised object is bound to the same name...
                     if let Expr::Name(ast::ExprName { id, .. }) = exc {
-                        if id == exception_name {
+                        if id == exception_name.as_str() {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(VerboseRaise, exc.range()));

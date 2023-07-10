@@ -11,7 +11,7 @@ E21.py:2:5: E211 [*] Whitespace before '('
   |
   = help: Removed whitespace before '('
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | #: E211
 2   |-spam (1)
   2 |+spam(1)
@@ -30,7 +30,7 @@ E21.py:4:5: E211 [*] Whitespace before '['
   |
   = help: Removed whitespace before '['
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | #: E211
 2 2 | spam (1)
 3 3 | #: E211 E211
@@ -51,7 +51,7 @@ E21.py:4:20: E211 [*] Whitespace before '['
   |
   = help: Removed whitespace before '['
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | #: E211
 2 2 | spam (1)
 3 3 | #: E211 E211
@@ -72,7 +72,7 @@ E21.py:6:12: E211 [*] Whitespace before '['
   |
   = help: Removed whitespace before '['
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | #: E211 E211
 4 4 | dict ['key'] = list [index]
 5 5 | #: E211

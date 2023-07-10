@@ -30,6 +30,10 @@ mod tests {
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
+    #[cfg_attr(
+        feature = "unreachable-code",
+        test_case(Rule::UnreachableCode, Path::new("RUF014.py"))
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -90,13 +94,16 @@ mod tests {
     fn ruf100_0() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
-            &settings::Settings::for_rules(vec![
-                Rule::UnusedNOQA,
-                Rule::LineTooLong,
-                Rule::UnusedImport,
-                Rule::UnusedVariable,
-                Rule::TabIndentation,
-            ]),
+            &settings::Settings {
+                external: FxHashSet::from_iter(vec!["V101".to_string()]),
+                ..settings::Settings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::LineTooLong,
+                    Rule::UnusedImport,
+                    Rule::UnusedVariable,
+                    Rule::TabIndentation,
+                ])
+            },
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -196,7 +203,10 @@ mod tests {
             .join("pyproject.toml");
         let contents = fs::read_to_string(path)?;
         let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
-        let messages = lint_pyproject_toml(source_file)?;
+        let messages = lint_pyproject_toml(
+            source_file,
+            &settings::Settings::for_rule(Rule::InvalidPyprojectToml),
+        )?;
         assert_messages!(snapshot, messages);
         Ok(())
     }

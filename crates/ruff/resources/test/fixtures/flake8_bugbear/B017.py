@@ -23,6 +23,10 @@ class Foobar(unittest.TestCase):
         with self.assertRaises(Exception):
             raise Exception("Evil I say!")
 
+    def also_evil_raises(self) -> None:
+        with self.assertRaises(BaseException):
+            raise Exception("Evil I say!")
+
     def context_manager_raises(self) -> None:
         with self.assertRaises(Exception) as ex:
             raise Exception("Context manager is good")
@@ -39,6 +43,9 @@ class Foobar(unittest.TestCase):
 
 def test_pytest_raises():
     with pytest.raises(Exception):
+        raise ValueError("Hello")
+
+    with pytest.raises(Exception), pytest.raises(ValueError):
         raise ValueError("Hello")
 
     with pytest.raises(Exception, "hello"):

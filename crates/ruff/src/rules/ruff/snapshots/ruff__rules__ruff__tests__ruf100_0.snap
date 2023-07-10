@@ -80,7 +80,7 @@ RUF100_0.py:19:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; n
 21 21 |     # Invalid (but external)
 22 22 |     d = 1  # noqa: F841, V101
 
-RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`; unknown: `V101`)
+RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`)
    |
 21 |     # Invalid (but external)
 22 |     d = 1  # noqa: F841, V101
@@ -95,7 +95,7 @@ RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`; unknown: 
 20 20 | 
 21 21 |     # Invalid (but external)
 22    |-    d = 1  # noqa: F841, V101
-   22 |+    d = 1
+   22 |+    d = 1  # noqa: V101
 23 23 | 
 24 24 |     # fmt: off
 25 25 |     # Invalid - no space before #

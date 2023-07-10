@@ -1,4 +1,6 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
+from __future__ import annotations
+
 import argparse
 import re
 import shutil
@@ -30,10 +32,6 @@ SECTIONS: list[Section] = [
     Section("Contributing", "contributing.md", generated=True),
 ]
 
-FATHOM_SCRIPT: str = (
-    '<script src="https://cdn.usefathom.com/script.js" data-site="DUAEBFLB" defer>'
-    "</script>"
-)
 
 LINK_REWRITES: dict[str, str] = {
     "https://beta.ruff.rs/docs/": "index.md",
@@ -43,7 +41,6 @@ LINK_REWRITES: dict[str, str] = {
     ),
     "https://beta.ruff.rs/docs/contributing/": "contributing.md",
     "https://beta.ruff.rs/docs/editor-integrations/": "editor-integrations.md",
-    "https://beta.ruff.rs/docs/faq/": "faq.md",
     "https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8": (
         "faq.md#how-does-ruff-compare-to-flake8"
     ),
@@ -51,7 +48,6 @@ LINK_REWRITES: dict[str, str] = {
     "https://beta.ruff.rs/docs/rules/": "rules.md",
     "https://beta.ruff.rs/docs/rules/#error-e": "rules.md#error-e",
     "https://beta.ruff.rs/docs/settings/": "settings.md",
-    "https://beta.ruff.rs/docs/usage/": "usage.md",
 }
 
 
@@ -90,7 +86,13 @@ def main() -> None:
 
     # Rewrite links to the documentation.
     for src, dst in LINK_REWRITES.items():
-        content = content.replace(f"({src})", f"({dst})")
+        before = content
+        after = content.replace(f"({src})", f"({dst})")
+        if before == after:
+            msg = f"Unexpected link rewrite in README.md: {src}"
+            raise ValueError(msg)
+        content = after
+
     if m := re.search(r"\(https://beta.ruff.rs/docs/.*\)", content):
         msg = f"Unexpected absolute link to documentation: {m.group(0)}"
         raise ValueError(msg)
@@ -138,18 +140,8 @@ def main() -> None:
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
     config["nav"] = [{section.title: section.filename} for section in SECTIONS]
-    config["extra"] = {"analytics": {"provider": "fathom"}}
 
-    Path(".overrides/partials/integrations/analytics").mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-    with Path(".overrides/partials/integrations/analytics/fathom.html").open(
-        "w+",
-    ) as fp:
-        fp.write(FATHOM_SCRIPT)
-
-    with Path("mkdocs.yml").open("w+") as fp:
+    with Path("mkdocs.generated.yml").open("w+") as fp:
         yaml.safe_dump(config, fp)
 
 

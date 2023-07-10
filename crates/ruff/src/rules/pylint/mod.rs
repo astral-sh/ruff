@@ -33,6 +33,7 @@ mod tests {
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_2.py"))]
@@ -84,6 +85,8 @@ mod tests {
         Path::new("too_many_return_statements.py")
     )]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"))]
+    #[test_case(Rule::TypeBivariance, Path::new("type_bivariance.py"))]
+    #[test_case(Rule::TypeParamNameMismatch, Path::new("type_param_name_mismatch.py"))]
     #[test_case(
         Rule::UnexpectedSpecialMethodSignature,
         Path::new("unexpected_special_method_signature.py")

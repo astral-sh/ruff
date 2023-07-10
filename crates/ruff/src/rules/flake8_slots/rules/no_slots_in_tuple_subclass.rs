@@ -38,7 +38,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `__slots__`](https://docs.python.org/3.7/reference/datamodel.html#slots)
+/// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[violation]
 pub struct NoSlotsInTupleSubclass;
 
@@ -63,10 +63,9 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, cla
             })
     }) {
         if !has_slots(&class.body) {
-            checker.diagnostics.push(Diagnostic::new(
-                NoSlotsInTupleSubclass,
-                stmt.identifier(checker.locator),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(NoSlotsInTupleSubclass, stmt.identifier()));
         }
     }
 }

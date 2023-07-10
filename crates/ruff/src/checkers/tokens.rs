@@ -3,6 +3,9 @@
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Indexer, Locator};
+
 use crate::directives::TodoComment;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
@@ -12,8 +15,6 @@ use crate::rules::{
     flake8_todos, pycodestyle, pylint, pyupgrade, ruff,
 };
 use crate::settings::Settings;
-use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::{Indexer, Locator};
 
 pub(crate) fn check_tokens(
     locator: &Locator,
@@ -88,10 +89,11 @@ pub(crate) fn check_tokens(
             };
 
             if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
-                diagnostics.extend(ruff::rules::ambiguous_unicode_character(
+                ruff::rules::ambiguous_unicode_character(
+                    &mut diagnostics,
                     locator,
                     range,
-                    if matches!(tok, Tok::String { .. }) {
+                    if tok.is_string() {
                         if is_docstring {
                             Context::Docstring
                         } else {
@@ -101,93 +103,77 @@ pub(crate) fn check_tokens(
                         Context::Comment
                     },
                     settings,
-                ));
+                );
             }
         }
     }
 
     // ERA001
     if enforce_commented_out_code {
-        diagnostics.extend(eradicate::rules::commented_out_code(
-            locator, indexer, settings,
-        ));
+        eradicate::rules::commented_out_code(&mut diagnostics, locator, indexer, settings);
     }
 
     // W605
     if enforce_invalid_escape_sequence {
         for (tok, range) in tokens.iter().flatten() {
-            if matches!(tok, Tok::String { .. }) {
-                diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
+            if tok.is_string() {
+                pycodestyle::rules::invalid_escape_sequence(
+                    &mut diagnostics,
                     locator,
                     *range,
                     settings.rules.should_fix(Rule::InvalidEscapeSequence),
-                ));
+                );
             }
         }
     }
     // PLE2510, PLE2512, PLE2513
     if enforce_invalid_string_character {
         for (tok, range) in tokens.iter().flatten() {
-            if matches!(tok, Tok::String { .. }) {
-                diagnostics.extend(
-                    pylint::rules::invalid_string_characters(locator, *range)
-                        .into_iter()
-                        .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
-                );
+            if tok.is_string() {
+                pylint::rules::invalid_string_characters(&mut diagnostics, *range, locator);
             }
         }
     }
 
     // E701, E702, E703
     if enforce_compound_statements {
-        diagnostics.extend(
-            pycodestyle::rules::compound_statements(tokens, locator, indexer, settings)
-                .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        pycodestyle::rules::compound_statements(
+            &mut diagnostics,
+            tokens,
+            locator,
+            indexer,
+            settings,
         );
     }
 
     // Q001, Q002, Q003
     if enforce_quotes {
-        diagnostics.extend(
-            flake8_quotes::rules::from_tokens(tokens, locator, settings)
-                .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
-        );
+        flake8_quotes::rules::from_tokens(&mut diagnostics, tokens, locator, settings);
     }
 
     // ISC001, ISC002
     if enforce_implicit_string_concatenation {
-        diagnostics.extend(
-            flake8_implicit_str_concat::rules::implicit(
-                tokens,
-                &settings.flake8_implicit_str_concat,
-                locator,
-            )
-            .into_iter()
-            .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        flake8_implicit_str_concat::rules::implicit(
+            &mut diagnostics,
+            tokens,
+            &settings.flake8_implicit_str_concat,
+            locator,
         );
     }
 
     // COM812, COM818, COM819
     if enforce_trailing_comma {
-        diagnostics.extend(
-            flake8_commas::rules::trailing_commas(tokens, locator, settings)
-                .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
-        );
+        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, settings);
     }
 
     // UP034
     if enforce_extraneous_parenthesis {
-        diagnostics.extend(
-            pyupgrade::rules::extraneous_parentheses(tokens, locator, settings).into_iter(),
-        );
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator, settings);
     }
 
     // PYI033
     if enforce_type_comment_in_stub && is_stub {
-        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(locator, indexer));
+        flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, indexer);
     }
 
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007
@@ -203,18 +189,12 @@ pub(crate) fn check_tokens(
             })
             .collect();
 
-        diagnostics.extend(
-            flake8_todos::rules::todos(&todo_comments, locator, indexer, settings)
-                .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
-        );
+        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer, settings);
 
-        diagnostics.extend(
-            flake8_fixme::rules::todos(&todo_comments)
-                .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
-        );
+        flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
+
+    diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
 
     diagnostics
 }

@@ -5,27 +5,27 @@ use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 #[derive(Default)]
-pub(crate) struct Stack<'a> {
+pub(super) struct Stack<'a> {
     /// The `return` statements in the current function.
-    pub(crate) returns: Vec<&'a ast::StmtReturn>,
+    pub(super) returns: Vec<&'a ast::StmtReturn>,
     /// The `else` statements in the current function.
-    pub(crate) elses: Vec<&'a ast::StmtIf>,
+    pub(super) elses: Vec<&'a ast::StmtIf>,
     /// The `elif` statements in the current function.
-    pub(crate) elifs: Vec<&'a ast::StmtIf>,
+    pub(super) elifs: Vec<&'a ast::StmtIf>,
     /// The non-local variables in the current function.
-    pub(crate) non_locals: FxHashSet<&'a str>,
+    pub(super) non_locals: FxHashSet<&'a str>,
     /// Whether the current function is a generator.
-    pub(crate) is_generator: bool,
+    pub(super) is_generator: bool,
     /// The `assignment`-to-`return` statement pairs in the current function.
     /// TODO(charlie): Remove the extra [`Stmt`] here, which is necessary to support statement
     /// removal for the `return` statement.
-    pub(crate) assignment_return: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn, &'a Stmt)>,
+    pub(super) assignment_return: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn, &'a Stmt)>,
 }
 
 #[derive(Default)]
-pub(crate) struct ReturnVisitor<'a> {
+pub(super) struct ReturnVisitor<'a> {
     /// The current stack of nodes.
-    pub(crate) stack: Stack<'a>,
+    pub(super) stack: Stack<'a>,
     /// The preceding sibling of the current node.
     sibling: Option<&'a Stmt>,
     /// The parent nodes of the current node.

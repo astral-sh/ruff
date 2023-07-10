@@ -37,7 +37,10 @@ f"{{test}}"
 f'{{ 40 }}'
 f"{{a {{x}}"
 f"{{{{x}}}}"
+""f""
+''f""
+(""f""r"")
 
 # To be fixed
 # Error: f-string: single '}' is not allowed at line 41 column 8
-# f"\{{x}}"  
+# f"\{{x}}"

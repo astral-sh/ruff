@@ -163,8 +163,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 format!("({})", checker.generator().expr(&node)),
                                 name_range,
                             )));
@@ -195,8 +194,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 checker.generator().expr(&node),
                                 name_range,
                             )));
@@ -228,8 +226,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 checker.generator().expr(&node),
                                 expr.range(),
                             )));
@@ -245,8 +242,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                     content,
                                     expr.range(),
                                 )));
@@ -278,8 +274,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 ctx: ExprContext::Load,
                                 range: TextRange::default(),
                             });
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 format!("({})", checker.generator().expr(&node)),
                                 expr.range(),
                             )));
@@ -295,8 +290,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                     content,
                                     expr.range(),
                                 )));
@@ -373,8 +367,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
 
     if checker.patch(diagnostic.kind.rule()) {
         let node = value.clone();
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             checker.generator().expr(&node),
             expr.range(),
         )));

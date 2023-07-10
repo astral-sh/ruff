@@ -43,6 +43,12 @@ enum Deprecation {
 /// Deprecated imports may be removed in future versions of Python, and
 /// should be replaced with their new equivalents.
 ///
+/// Note that, in some cases, it may be preferable to continue importing
+/// members from `typing_extensions` even after they're added to the Python
+/// standard library, as `typing_extensions` can backport bugfixes and
+/// optimizations from later Python versions. This rule thus avoids flagging
+/// imports from `typing_extensions` in such cases.
+///
 /// ## Example
 /// ```python
 /// from collections import Sequence
@@ -88,15 +94,13 @@ impl Violation for DeprecatedImport {
     }
 }
 
-// A list of modules that may involve import rewrites.
-const RELEVANT_MODULES: &[&str] = &[
-    "collections",
-    "pipes",
-    "mypy_extensions",
-    "typing_extensions",
-    "typing",
-    "typing.re",
-];
+/// Returns `true` if the module may contain deprecated imports.
+fn is_relevant_module(module: &str) -> bool {
+    matches!(
+        module,
+        "collections" | "pipes" | "mypy_extensions" | "typing_extensions" | "typing" | "typing.re"
+    )
+}
 
 // Members of `collections` that were moved to `collections.abc`.
 const COLLECTIONS_TO_ABC: &[&str] = &[
@@ -139,10 +143,12 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ContextManager",
     "Coroutine",
     "DefaultDict",
-    "NewType",
     "TYPE_CHECKING",
     "Text",
     "Type",
+    // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
+    // optimizations,
+    // "NewType",
 ];
 
 // Python 3.7+
@@ -168,11 +174,13 @@ const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
-    "Literal",
     "OrderedDict",
-    "Protocol",
-    "SupportsIndex",
     "runtime_checkable",
+    // Introduced in Python 3.8, but `typing_extensions` contains backported bugfixes and
+    // optimizations.
+    // "Literal",
+    // "Protocol",
+    // "SupportsIndex",
 ];
 
 // Python 3.9+
@@ -243,6 +251,8 @@ const TYPING_TO_COLLECTIONS_ABC_310: &[&str] = &["Callable"];
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "Concatenate",
+    "Literal",
+    "NewType",
     "ParamSpecArgs",
     "ParamSpecKwargs",
     "TypeAlias",
@@ -258,21 +268,26 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
 const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "Any",
     "LiteralString",
-    "NamedTuple",
     "Never",
     "NotRequired",
     "Required",
     "Self",
-    "TypedDict",
-    "Unpack",
     "assert_never",
     "assert_type",
     "clear_overloads",
-    "dataclass_transform",
     "final",
     "get_overloads",
     "overload",
     "reveal_type",
+];
+
+// Python 3.12+
+
+// Members of `typing_extensions` that were moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
+    // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument,
+    // which was introduced in Python 3.12.
+    "dataclass_transform",
 ];
 
 struct ImportReplacer<'a> {
@@ -358,6 +373,9 @@ impl<'a> ImportReplacer<'a> {
                 }
                 if self.version >= PythonVersion::Py311 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_311);
+                }
+                if self.version >= PythonVersion::Py312 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_312);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
@@ -453,7 +471,7 @@ impl<'a> ImportReplacer<'a> {
             // line, we can't add a statement after it. For example, if we have
             // `if True: import foo`, we can't add a statement to the next line.
             let Some(indentation) = indentation else {
-                 let operation = WithoutRename {
+                let operation = WithoutRename {
                     target: target.to_string(),
                     members: matched_names
                         .iter()
@@ -540,7 +558,7 @@ pub(crate) fn deprecated_import(
         return;
     };
 
-    if !RELEVANT_MODULES.contains(&module) {
+    if !is_relevant_module(module) {
         return;
     }
 

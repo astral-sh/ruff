@@ -109,7 +109,11 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     let Some(arg) = args.get(0) else {
         return;
     };
-    let Expr::Constant(ast::ExprConstant { value: Constant::Str(env_var), .. }) = arg else {
+    let Expr::Constant(ast::ExprConstant {
+        value: Constant::Str(env_var),
+        ..
+    }) = arg
+    else {
         return;
     };
     if !checker
@@ -143,7 +147,12 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
-    let Expr::Attribute(ast::ExprAttribute { value: attr_value, attr, .. }) = value.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute {
+        value: attr_value,
+        attr,
+        ..
+    }) = value.as_ref()
+    else {
         return;
     };
     let Expr::Name(ast::ExprName { id, .. }) = attr_value.as_ref() else {
@@ -152,7 +161,12 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     if id != "os" || attr != "environ" {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value: Constant::Str(env_var), kind, range: _ }) = slice.as_ref() else {
+    let Expr::Constant(ast::ExprConstant {
+        value: Constant::Str(env_var),
+        kind,
+        range: _,
+    }) = slice.as_ref()
+    else {
         return;
     };
     let capital_env_var = env_var.to_ascii_uppercase();
@@ -174,8 +188,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             range: TextRange::default(),
         };
         let new_env_var = node.into();
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&new_env_var),
             slice.range(),
         )));
@@ -185,13 +198,19 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 
 /// SIM910
 pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = expr else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        args,
+        keywords,
+        range: _,
+    }) = expr
+    else {
         return;
     };
     if !keywords.is_empty() {
         return;
     }
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. } )= func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
         return;
     };
     if !value.is_dict_expr() {
@@ -229,8 +248,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             expected,
             expr.range(),
         )));

@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
 use ruff::fs;
-use ruff::jupyter::{is_jupyter_notebook, Notebook};
+use ruff::jupyter::Notebook;
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
 use ruff::message::Message;
@@ -23,9 +23,9 @@ use ruff::settings::{flags, AllSettings, Settings};
 use ruff::source_kind::SourceKind;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
-use ruff_python_stdlib::path::is_project_toml;
+use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
 
-use crate::cache::{FileCache, PackageCache};
+use crate::cache::Cache;
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -100,7 +100,7 @@ pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
-    package_cache: Option<&PackageCache>,
+    cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
@@ -110,28 +110,37 @@ pub(crate) fn lint_path(
     // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
-    let caching = match package_cache {
-        Some(package_cache) if noqa.into() && autofix.is_generate() => {
-            let relative_path = package_cache
+    let caching = match cache {
+        Some(cache) if noqa.into() && autofix.is_generate() => {
+            let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
             let last_modified = path.metadata()?.modified()?;
-            if let Some(cache) = package_cache.get(relative_path, last_modified) {
-                return Ok(cache.into_diagnostics(path));
+            if let Some(cache) = cache.get(relative_path, last_modified) {
+                return Ok(cache.as_diagnostics(path));
             }
 
-            Some((package_cache, relative_path, last_modified))
+            Some((cache, relative_path, last_modified))
         }
         _ => None,
     };
 
     debug!("Checking: {}", path.display());
 
-    // We have to special case this here since the python tokenizer doesn't work with toml
+    // We have to special case this here since the Python tokenizer doesn't work with TOML.
     if is_project_toml(path) {
-        let contents = std::fs::read_to_string(path)?;
-        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-        let messages = lint_pyproject_toml(source_file)?;
+        let messages = if settings
+            .lib
+            .rules
+            .iter_enabled()
+            .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+        {
+            let contents = std::fs::read_to_string(path)?;
+            let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+            lint_pyproject_toml(source_file, &settings.lib)?
+        } else {
+            vec![]
+        };
         return Ok(Diagnostics {
             messages,
             ..Diagnostics::default()
@@ -207,14 +216,15 @@ pub(crate) fn lint_path(
 
     let imports = imports.unwrap_or_default();
 
-    if let Some((package_cache, relative_path, file_last_modified)) = caching {
-        if parse_error.is_some() {
-            // We don't cache parsing error, so we remove the old file cache (if
-            // any).
-            package_cache.remove(relative_path);
-        } else {
-            let file_cache = FileCache::new(file_last_modified, &messages, &imports);
-            package_cache.update(relative_path.to_owned(), file_cache);
+    if let Some((cache, relative_path, file_last_modified)) = caching {
+        // We don't cache parsing errors.
+        if parse_error.is_none() {
+            cache.update(
+                relative_path.to_owned(),
+                file_last_modified,
+                &messages,
+                &imports,
+            );
         }
     }
 
@@ -349,7 +359,7 @@ pub(crate) fn lint_stdin(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::path::Path;
 
     use crate::diagnostics::{load_jupyter_notebook, Diagnostics};

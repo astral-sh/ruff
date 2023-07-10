@@ -18,13 +18,13 @@ N805.py:12:30: N805 First argument of a method should be named `self`
 13 |             pass
    |
 
-N805.py:60:29: N805 First argument of a method should be named `self`
+N805.py:64:29: N805 First argument of a method should be named `self`
    |
-58 |         pass
-59 | 
-60 |     def bad_method_pos_only(this, blah, /, self, something: str):
+62 |         pass
+63 | 
+64 |     def bad_method_pos_only(this, blah, /, self, something: str):
    |                             ^^^^ N805
-61 |         pass
+65 |         pass
    |
 
 

@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Check code snippets in docs are formatted by black."""
+from __future__ import annotations
+
 import argparse
 import os
 import re
 import textwrap
-from collections.abc import Sequence
 from pathlib import Path
 from re import Match
+from typing import TYPE_CHECKING
 
 import black
 from black.mode import Mode, TargetVersion
 from black.parsing import InvalidInput
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 TARGET_VERSIONS = ["py37", "py38", "py39", "py310", "py311"]
 SNIPPED_RE = re.compile(
@@ -28,6 +33,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "bad-quotes-inline-string",
     "bad-quotes-multiline-string",
     "explicit-string-concatenation",
+    "indent-with-spaces",
     "indentation-with-invalid-multiple",
     "line-too-long",
     "missing-trailing-comma",
@@ -39,14 +45,20 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "multiple-spaces-before-operator",
     "multiple-statements-on-one-line-colon",
     "multiple-statements-on-one-line-semicolon",
+    "no-blank-line-before-function",
     "no-indented-block-comment",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
+    "one-blank-line-after-class",
+    "over-indentation",
     "over-indented",
     "prohibited-trailing-comma",
     "shebang-leading-whitespace",
+    "surrounding-whitespace",
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
+    "triple-single-quotes",
+    "under-indentation",
     "unexpected-indentation-comment",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",
@@ -174,10 +186,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         generate_docs()
 
     # Get static docs
-    static_docs = []
-    for file in os.listdir("docs"):
-        if file.endswith(".md"):
-            static_docs.append(Path("docs") / file)
+    static_docs = [Path("docs") / f for f in os.listdir("docs") if f.endswith(".md")]
 
     # Check rules generated
     if not Path("docs/rules").exists():
@@ -185,10 +194,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     # Get generated rules
-    generated_docs = []
-    for file in os.listdir("docs/rules"):
-        if file.endswith(".md"):
-            generated_docs.append(Path("docs/rules") / file)
+    generated_docs = [
+        Path("docs/rules") / f for f in os.listdir("docs/rules") if f.endswith(".md")
+    ]
 
     if len(generated_docs) == 0:
         print("Please generate rules first.")

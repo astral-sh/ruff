@@ -327,14 +327,56 @@ impl<'a> SemanticModel<'a> {
                     // ```
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException => {
+                    //
+                    // Similarly, given:
+                    //
+                    // ```python
+                    // try:
+                    //     pass
+                    // except ValueError as x:
+                    //     pass
+                    //
+                    // print(x)
+                    //
+                    // The `x` in `print(x)` should be treated as unresolved.
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
                         return ResolvedRead::UnboundLocal(binding_id)
                     }
 
-                    // Otherwise, treat it as resolved.
-                    _ => {
+                    // If we hit an unbound exception that shadowed a bound name, resole to the
+                    // bound name. For example, given:
+                    //
+                    // ```python
+                    // x = 1
+                    //
+                    // try:
+                    //     pass
+                    // except ValueError as x:
+                    //     pass
+                    //
+                    // print(x)
+                    // ```
+                    //
+                    // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
+                    BindingKind::UnboundException(Some(binding_id)) => {
+                        // Mark the binding as used.
+                        let context = self.execution_context();
+                        let reference_id = self.references.push(self.scope_id, range, context);
+                        self.bindings[binding_id].references.push(reference_id);
+
+                        // Mark any submodule aliases as used.
+                        if let Some(binding_id) =
+                            self.resolve_submodule(symbol, scope_id, binding_id)
+                        {
+                            let reference_id = self.references.push(self.scope_id, range, context);
+                            self.bindings[binding_id].references.push(reference_id);
+                        }
+
                         return ResolvedRead::Resolved(binding_id);
                     }
+
+                    // Otherwise, treat it as resolved.
+                    _ => return ResolvedRead::Resolved(binding_id),
                 }
             }
 
@@ -368,6 +410,76 @@ impl<'a> SemanticModel<'a> {
         } else {
             ResolvedRead::NotFound
         }
+    }
+
+    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_read`], but
+    /// doesn't add any read references to the resolved symbol.
+    pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
+        if self.in_forward_reference() {
+            if let Some(binding_id) = self.scopes.global().get(symbol) {
+                if !self.bindings[binding_id].is_unbound() {
+                    return Some(binding_id);
+                }
+            }
+        }
+
+        let mut seen_function = false;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+            if scope.kind.is_class() {
+                if seen_function && matches!(symbol, "__class__") {
+                    return None;
+                }
+                if index > 0 {
+                    continue;
+                }
+            }
+
+            if let Some(binding_id) = scope.get(symbol) {
+                match self.bindings[binding_id].kind {
+                    BindingKind::Annotation => continue,
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                    BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
+                    _ => return Some(binding_id),
+                }
+            }
+
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return None;
+                }
+            }
+
+            seen_function |= scope.kind.is_any_function();
+        }
+
+        None
+    }
+
+    /// Lookup a qualified attribute in the current scope.
+    ///
+    /// For example, given `["Class", "method"`], resolve the `BindingKind::ClassDefinition`
+    /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
+    /// `Class#method`.
+    pub fn lookup_attribute(&'a self, value: &'a Expr) -> Option<BindingId> {
+        let call_path = collect_call_path(value)?;
+
+        // Find the symbol in the current scope.
+        let (symbol, attribute) = call_path.split_first()?;
+        let mut binding_id = self.lookup_symbol(symbol)?;
+
+        // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
+        let mut tail = attribute;
+        while let Some((symbol, rest)) = tail.split_first() {
+            // Find the next symbol in the class scope.
+            let BindingKind::ClassDefinition(scope_id) = self.binding(binding_id).kind else {
+                return None;
+            };
+            binding_id = self.scopes[scope_id].get(symbol)?;
+            tail = rest;
+        }
+
+        Some(binding_id)
     }
 
     /// Given a `BindingId`, return the `BindingId` of the submodule import that it aliases.
@@ -817,7 +929,7 @@ impl<'a> SemanticModel<'a> {
     /// Return the [`ExecutionContext`] of the current scope.
     pub const fn execution_context(&self) -> ExecutionContext {
         if self.in_type_checking_block()
-            || self.in_annotation()
+            || self.in_typing_only_annotation()
             || self.in_complex_string_type_definition()
             || self.in_simple_string_type_definition()
         {
@@ -862,7 +974,18 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the context is in a type annotation.
     pub const fn in_annotation(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::ANNOTATION)
+        self.in_typing_only_annotation() || self.in_runtime_annotation()
+    }
+
+    /// Return `true` if the context is in a typing-only type annotation.
+    pub const fn in_typing_only_annotation(&self) -> bool {
+        self.flags
+            .contains(SemanticModelFlags::TYPING_ONLY_ANNOTATION)
+    }
+
+    /// Return `true` if the context is in a runtime-required type annotation.
+    pub const fn in_runtime_annotation(&self) -> bool {
+        self.flags.contains(SemanticModelFlags::RUNTIME_ANNOTATION)
     }
 
     /// Return `true` if the context is in a type definition.
@@ -913,7 +1036,7 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_forward_reference(&self) -> bool {
         self.in_simple_string_type_definition()
             || self.in_complex_string_type_definition()
-            || (self.in_future_type_definition() && self.in_annotation())
+            || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
     /// Return `true` if the context is in an exception handler.
@@ -966,19 +1089,105 @@ impl<'a> SemanticModel<'a> {
     pub const fn future_annotations(&self) -> bool {
         self.flags.contains(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
+
+    /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
+    /// containing scope, and across scopes.
+    pub fn shadowed_bindings(
+        &self,
+        scope_id: ScopeId,
+        binding_id: BindingId,
+    ) -> impl Iterator<Item = ShadowedBinding> + '_ {
+        let mut first = true;
+        let mut binding_id = binding_id;
+        std::iter::from_fn(move || {
+            // First, check whether this binding is shadowing another binding in a different scope.
+            if std::mem::take(&mut first) {
+                if let Some(shadowed_id) = self.shadowed_bindings.get(&binding_id).copied() {
+                    return Some(ShadowedBinding {
+                        binding_id,
+                        shadowed_id,
+                        same_scope: false,
+                    });
+                }
+            }
+
+            // Otherwise, check whether this binding is shadowing another binding in the same scope.
+            if let Some(shadowed_id) = self.scopes[scope_id].shadowed_binding(binding_id) {
+                let next = ShadowedBinding {
+                    binding_id,
+                    shadowed_id,
+                    same_scope: true,
+                };
+
+                // Advance to the next binding in the scope.
+                first = true;
+                binding_id = shadowed_id;
+
+                return Some(next);
+            }
+
+            None
+        })
+    }
+}
+
+pub struct ShadowedBinding {
+    /// The binding that is shadowing another binding.
+    binding_id: BindingId,
+    /// The binding that is being shadowed.
+    shadowed_id: BindingId,
+    /// Whether the shadowing and shadowed bindings are in the same scope.
+    same_scope: bool,
+}
+
+impl ShadowedBinding {
+    pub const fn binding_id(&self) -> BindingId {
+        self.binding_id
+    }
+
+    pub const fn shadowed_id(&self) -> BindingId {
+        self.shadowed_id
+    }
+
+    pub const fn same_scope(&self) -> bool {
+        self.same_scope
+    }
 }
 
 bitflags! {
     /// Flags indicating the current context of the analysis.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
     pub struct SemanticModelFlags: u16 {
-        /// The context is in a type annotation.
+        /// The context is in a typing-time-only type annotation.
         ///
         /// For example, the context could be visiting `int` in:
         /// ```python
-        /// x: int = 1
+        /// def foo() -> int:
+        ///     x: int = 1
         /// ```
-        const ANNOTATION = 1 << 0;
+        ///
+        /// In this case, Python doesn't require that the type annotation be evaluated at runtime.
+        ///
+        /// If `from __future__ import annotations` is used, all annotations are evaluated at
+        /// typing time. Otherwise, all function argument annotations are evaluated at runtime, as
+        /// are any annotated assignments in module or class scopes.
+        const TYPING_ONLY_ANNOTATION = 1 << 0;
+
+        /// The context is in a runtime type annotation.
+        ///
+        /// For example, the context could be visiting `int` in:
+        /// ```python
+        /// def foo(x: int) -> int:
+        ///     ...
+        /// ```
+        ///
+        /// In this case, Python requires that the type annotation be evaluated at runtime,
+        /// as it needs to be available on the function's `__annotations__` attribute.
+        ///
+        /// If `from __future__ import annotations` is used, all annotations are evaluated at
+        /// typing time. Otherwise, all function argument annotations are evaluated at runtime, as
+        /// are any annotated assignments in module or class scopes.
+        const RUNTIME_ANNOTATION = 1 << 1;
 
         /// The context is in a type definition.
         ///
@@ -992,7 +1201,7 @@ bitflags! {
         /// All type annotations are also type definitions, but the converse is not true.
         /// In our example, `int` is a type definition but not a type annotation, as it
         /// doesn't appear in a type annotation context, but rather in a type definition.
-        const TYPE_DEFINITION = 1 << 1;
+        const TYPE_DEFINITION = 1 << 2;
 
         /// The context is in a (deferred) "simple" string type definition.
         ///
@@ -1003,7 +1212,7 @@ bitflags! {
         ///
         /// "Simple" string type definitions are those that consist of a single string literal,
         /// as opposed to an implicitly concatenated string literal.
-        const SIMPLE_STRING_TYPE_DEFINITION =  1 << 2;
+        const SIMPLE_STRING_TYPE_DEFINITION =  1 << 3;
 
         /// The context is in a (deferred) "complex" string type definition.
         ///
@@ -1014,7 +1223,7 @@ bitflags! {
         ///
         /// "Complex" string type definitions are those that consist of a implicitly concatenated
         /// string literals. These are uncommon but valid.
-        const COMPLEX_STRING_TYPE_DEFINITION = 1 << 3;
+        const COMPLEX_STRING_TYPE_DEFINITION = 1 << 4;
 
         /// The context is in a (deferred) `__future__` type definition.
         ///
@@ -1027,7 +1236,7 @@ bitflags! {
         ///
         /// `__future__`-style type annotations are only enabled if the `annotations` feature
         /// is enabled via `from __future__ import annotations`.
-        const FUTURE_TYPE_DEFINITION = 1 << 4;
+        const FUTURE_TYPE_DEFINITION = 1 << 5;
 
         /// The context is in an exception handler.
         ///
@@ -1038,7 +1247,7 @@ bitflags! {
         /// except Exception:
         ///     x: int = 1
         /// ```
-        const EXCEPTION_HANDLER = 1 << 5;
+        const EXCEPTION_HANDLER = 1 << 6;
 
         /// The context is in an f-string.
         ///
@@ -1046,7 +1255,7 @@ bitflags! {
         /// ```python
         /// f'{x}'
         /// ```
-        const F_STRING = 1 << 6;
+        const F_STRING = 1 << 7;
 
         /// The context is in a nested f-string.
         ///
@@ -1054,7 +1263,7 @@ bitflags! {
         /// ```python
         /// f'{f"{x}"}'
         /// ```
-        const NESTED_F_STRING = 1 << 7;
+        const NESTED_F_STRING = 1 << 8;
 
         /// The context is in a boolean test.
         ///
@@ -1066,7 +1275,7 @@ bitflags! {
         ///
         /// The implication is that the actual value returned by the current expression is
         /// not used, only its truthiness.
-        const BOOLEAN_TEST = 1 << 8;
+        const BOOLEAN_TEST = 1 << 9;
 
         /// The context is in a `typing::Literal` annotation.
         ///
@@ -1075,7 +1284,7 @@ bitflags! {
         /// def f(x: Literal["A", "B", "C"]):
         ///     ...
         /// ```
-        const LITERAL = 1 << 9;
+        const LITERAL = 1 << 10;
 
         /// The context is in a subscript expression.
         ///
@@ -1083,7 +1292,7 @@ bitflags! {
         /// ```python
         /// x["a"]["b"]
         /// ```
-        const SUBSCRIPT = 1 << 10;
+        const SUBSCRIPT = 1 << 11;
 
         /// The context is in a type-checking block.
         ///
@@ -1095,8 +1304,7 @@ bitflags! {
         /// if TYPE_CHECKING:
         ///    x: int = 1
         /// ```
-        const TYPE_CHECKING_BLOCK = 1 << 11;
-
+        const TYPE_CHECKING_BLOCK = 1 << 12;
 
         /// The context has traversed past the "top-of-file" import boundary.
         ///
@@ -1109,7 +1317,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const IMPORT_BOUNDARY = 1 << 12;
+        const IMPORT_BOUNDARY = 1 << 13;
 
         /// The context has traversed past the `__future__` import boundary.
         ///
@@ -1124,7 +1332,7 @@ bitflags! {
         ///
         /// Python considers it a syntax error to import from `__future__` after
         /// any other non-`__future__`-importing statements.
-        const FUTURES_BOUNDARY = 1 << 13;
+        const FUTURES_BOUNDARY = 1 << 14;
 
         /// `__future__`-style type annotations are enabled in this context.
         ///
@@ -1136,7 +1344,7 @@ bitflags! {
         /// def f(x: int) -> int:
         ///   ...
         /// ```
-        const FUTURE_ANNOTATIONS = 1 << 14;
+        const FUTURE_ANNOTATIONS = 1 << 15;
     }
 }
 

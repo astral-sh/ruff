@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI006.pyi:8:4: PYI006 Use `<` or `>=` for version info comparisons
+PYI006.pyi:8:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
    |
  6 | if sys.version_info >= (3, 9): ...  # OK
  7 | 
@@ -11,7 +11,7 @@ PYI006.pyi:8:4: PYI006 Use `<` or `>=` for version info comparisons
 10 | if sys.version_info == (3, 9): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |
 
-PYI006.pyi:10:4: PYI006 Use `<` or `>=` for version info comparisons
+PYI006.pyi:10:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
    |
  8 | if sys.version_info == (3, 9): ...  # OK
  9 | 
@@ -21,7 +21,7 @@ PYI006.pyi:10:4: PYI006 Use `<` or `>=` for version info comparisons
 12 | if sys.version_info <= (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |
 
-PYI006.pyi:12:4: PYI006 Use `<` or `>=` for version info comparisons
+PYI006.pyi:12:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
    |
 10 | if sys.version_info == (3, 9): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
 11 | 
@@ -31,7 +31,7 @@ PYI006.pyi:12:4: PYI006 Use `<` or `>=` for version info comparisons
 14 | if sys.version_info <= (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |
 
-PYI006.pyi:14:4: PYI006 Use `<` or `>=` for version info comparisons
+PYI006.pyi:14:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
    |
 12 | if sys.version_info <= (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
 13 | 
@@ -41,7 +41,7 @@ PYI006.pyi:14:4: PYI006 Use `<` or `>=` for version info comparisons
 16 | if sys.version_info > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |
 
-PYI006.pyi:16:4: PYI006 Use `<` or `>=` for version info comparisons
+PYI006.pyi:16:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
    |
 14 | if sys.version_info <= (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
 15 | 
@@ -51,7 +51,7 @@ PYI006.pyi:16:4: PYI006 Use `<` or `>=` for version info comparisons
 18 | if python_version > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |
 
-PYI006.pyi:18:4: PYI006 Use `<` or `>=` for version info comparisons
+PYI006.pyi:18:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
    |
 16 | if sys.version_info > (3, 10): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
 17 | 

@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of the builtin `eval()` function.
+/// Checks for uses of the builtin `eval()` function.
 ///
 /// ## Why is this bad?
 /// The `eval()` function is insecure as it enables arbitrary code execution.

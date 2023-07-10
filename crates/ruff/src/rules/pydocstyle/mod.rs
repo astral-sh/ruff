@@ -51,6 +51,7 @@ mod tests {
     #[test_case(Rule::EmptyDocstring, Path::new("D.py"))]
     #[test_case(Rule::EmptyDocstringSection, Path::new("sections.py"))]
     #[test_case(Rule::NonImperativeMood, Path::new("D401.py"))]
+    #[test_case(Rule::NoBlankLineAfterSection, Path::new("D410.py"))]
     #[test_case(Rule::OneBlankLineAfterClass, Path::new("D.py"))]
     #[test_case(Rule::OneBlankLineBeforeClass, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicClass, Path::new("D.py"))]
@@ -82,6 +83,7 @@ mod tests {
     #[test_case(Rule::SectionUnderlineNotOverIndented, Path::new("sections.py"))]
     #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
+    #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

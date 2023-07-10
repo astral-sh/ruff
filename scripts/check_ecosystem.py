@@ -20,7 +20,7 @@ from asyncio.subprocess import PIPE, create_subprocess_exec
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -44,11 +44,11 @@ class Repository(NamedTuple):
     async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
         """Shallow clone this repository to a temporary directory."""
         if checkout_dir.exists():
-            logger.debug(f"Reusing {self.org}/{self.repo}")
+            logger.debug(f"Reusing {self.org}:{self.repo}")
             yield Path(checkout_dir)
             return
 
-        logger.debug(f"Cloning {self.org}/{self.repo}")
+        logger.debug(f"Cloning {self.org}:{self.repo}")
         git_command = [
             "git",
             "clone",
@@ -69,7 +69,10 @@ class Repository(NamedTuple):
             ],
         )
 
-        process = await create_subprocess_exec(*git_command)
+        process = await create_subprocess_exec(
+            *git_command,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+        )
 
         status_code = await process.wait()
 
@@ -79,12 +82,26 @@ class Repository(NamedTuple):
 
         yield Path(checkout_dir)
 
+    def url_for(self: Self, path: str, lnum: int | None = None) -> str:
+        """Return the GitHub URL for the given path and line number, if given."""
+        # Default to main branch
+        url = (
+            f"https://github.com/{self.org}/{self.repo}"
+            f"/blob/{self.ref or 'main'}/{path}"
+        )
+        if lnum:
+            url += f"#L{lnum}"
+        return url
+
 
 REPOSITORIES: list[Repository] = [
     Repository("apache", "airflow", "main", select="ALL"),
     Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
+    Repository("pypa", "setuptools", "main"),
+    Repository("pypa", "pip", "main"),
+    Repository("python", "mypy", "master"),
     Repository("DisnakeDev", "disnake", "master"),
     Repository("scikit-build", "scikit-build", "main"),
     Repository("scikit-build", "scikit-build-core", "main"),
@@ -175,18 +192,17 @@ async def compare(
     """Check a specific repository against two versions of ruff."""
     removed, added = set(), set()
 
-    # Allows to keep the checkouts locations
+    # By the default, the git clone are transient, but if the user provides a
+    # directory for permanent storage we keep it there
     if checkouts:
-        checkout_parent = checkouts.joinpath(repo.org)
-        # Don't create the repodir itself, we need that for checking for existing
-        # clones
-        checkout_parent.mkdir(exist_ok=True, parents=True)
-        location_context = nullcontext(checkout_parent)
+        location_context = nullcontext(checkouts)
     else:
         location_context = tempfile.TemporaryDirectory()
 
     with location_context as checkout_parent:
-        checkout_dir = Path(checkout_parent).joinpath(repo.repo)
+        assert ":" not in repo.org
+        assert ":" not in repo.repo
+        checkout_dir = Path(checkout_parent).joinpath(f"{repo.org}:{repo.repo}")
         async with repo.clone(checkout_dir) as path:
             try:
                 async with asyncio.TaskGroup() as tg:
@@ -267,6 +283,14 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[tuple[str, str], Repositor
     return repositories
 
 
+DIFF_LINE_RE = re.compile(
+    r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
+)
+
+
+T = TypeVar("T")
+
+
 async def main(
     *,
     ruff1: Path,
@@ -282,8 +306,19 @@ async def main(
 
     logger.debug(f"Checking {len(repositories)} projects")
 
+    # https://stackoverflow.com/a/61478547/3549270
+    # Otherwise doing 3k repositories can take >8GB RAM
+    semaphore = asyncio.Semaphore(50)
+
+    async def limited_parallelism(coroutine: T) -> T:
+        async with semaphore:
+            return await coroutine
+
     results = await asyncio.gather(
-        *[compare(ruff1, ruff2, repo, checkouts) for repo in repositories.values()],
+        *[
+            limited_parallelism(compare(ruff1, ruff2, repo, checkouts))
+            for repo in repositories.values()
+        ],
         return_exceptions=True,
     )
 
@@ -333,21 +368,30 @@ async def main(
                 print("<p>")
                 print()
 
-                diff_str = "\n".join(diff)
+                repo = repositories[(org, repo)]
+                diff_lines = list(diff)
 
-                print("```diff")
-                print(diff_str)
-                print("```")
+                print("<pre>")
+                for line in diff_lines:
+                    match = DIFF_LINE_RE.match(line)
+                    if match is None:
+                        print(line)
+                        continue
+
+                    pre, inner, path, lnum, post = match.groups()
+                    url = repo.url_for(path, int(lnum))
+                    print(f"{pre} <a href='{url}'>{inner}</a> {post}")
+                print("</pre>")
 
                 print()
                 print("</p>")
                 print("</details>")
 
                 # Count rule changes
-                for line in diff_str.splitlines():
+                for line in diff_lines:
                     # Find rule change for current line or construction
                     # + <rule>/<path>:<line>:<column>: <rule_code> <message>
-                    matches = re.search(r": ([A-Z]{1,3}[0-9]{3,4})", line)
+                    matches = re.search(r": ([A-Z]{1,4}[0-9]{3,4})", line)
 
                     if matches is None:
                         # Handle case where there are no regex matches e.g.
@@ -431,6 +475,8 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.INFO)
 
     loop = asyncio.get_event_loop()
+    if args.checkouts:
+        args.checkouts.mkdir(exist_ok=True, parents=True)
     main_task = asyncio.ensure_future(
         main(
             ruff1=args.ruff1,

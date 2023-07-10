@@ -8,8 +8,9 @@ use rustpython_parser::ast;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
-use crate::binding::{BindingId, StarImport};
+use crate::binding::BindingId;
 use crate::globals::GlobalsId;
+use crate::star_import::StarImport;
 
 #[derive(Debug)]
 pub struct Scope<'a> {
@@ -123,6 +124,11 @@ impl<'a> Scope<'a> {
             std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
                 .map(move |id| (name, id))
         })
+    }
+
+    /// Returns the ID of the binding that the given binding shadows, if any.
+    pub fn shadowed_binding(&self, id: BindingId) -> Option<BindingId> {
+        self.shadowed_bindings.get(&id).copied()
     }
 
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.

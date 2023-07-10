@@ -99,22 +99,27 @@ pub(crate) fn super_call_with_parameters(
     // Find the enclosing function definition (if any).
     let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
         args: parent_args, ..
-    })) = parents.find(|stmt| stmt.is_function_def_stmt()) else {
+    })) = parents.find(|stmt| stmt.is_function_def_stmt())
+    else {
         return;
     };
 
     // Extract the name of the first argument to the enclosing function.
     let Some(ArgWithDefault {
-        def: Arg { arg: parent_arg, .. },
+        def: Arg {
+            arg: parent_arg, ..
+        },
         ..
-    }) = parent_args.args.first() else {
+    }) = parent_args.args.first()
+    else {
         return;
     };
 
     // Find the enclosing class definition (if any).
     let Some(Stmt::ClassDef(ast::StmtClassDef {
         name: parent_name, ..
-    })) = parents.find(|stmt| stmt.is_class_def_stmt()) else {
+    })) = parents.find(|stmt| stmt.is_class_def_stmt())
+    else {
         return;
     };
 
@@ -125,11 +130,12 @@ pub(crate) fn super_call_with_parameters(
         Expr::Name(ast::ExprName {
             id: second_arg_id, ..
         }),
-    ) = (first_arg, second_arg) else {
+    ) = (first_arg, second_arg)
+    else {
         return;
     };
 
-    if !(first_arg_id == parent_name && second_arg_id == parent_arg) {
+    if !(first_arg_id == parent_name.as_str() && second_arg_id == parent_arg.as_str()) {
         return;
     }
 

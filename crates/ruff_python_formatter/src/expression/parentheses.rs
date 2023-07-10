@@ -1,5 +1,7 @@
 use crate::comments::Comments;
+use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, first_non_trivia_token_rev, Token, TokenKind};
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::Ranged;
 
@@ -23,8 +25,14 @@ pub(super) fn default_expression_needs_parentheses(
         "Should only be called for expressions"
     );
 
+    #[allow(clippy::if_same_then_else)]
+    if parenthesize.is_always() {
+        Parentheses::Always
+    } else if parenthesize.is_never() {
+        Parentheses::Never
+    }
     // `Optional` or `Preserve` and expression has parentheses in source code.
-    if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, source) {
+    else if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, source) {
         Parentheses::Always
     }
     // `Optional` or `IfBreaks`: Add parentheses if the expression doesn't fit on a line but enforce
@@ -42,7 +50,7 @@ pub(super) fn default_expression_needs_parentheses(
 }
 
 /// Configures if the expression should be parenthesized.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum Parenthesize {
     /// Parenthesize the expression if it has parenthesis in the source.
     #[default]
@@ -53,14 +61,28 @@ pub enum Parenthesize {
 
     /// Parenthesizes the expression only if it doesn't fit on a line.
     IfBreaks,
+
+    /// Always adds parentheses
+    Always,
+
+    /// Never adds parentheses. Parentheses are handled by the caller.
+    Never,
 }
 
 impl Parenthesize {
-    const fn is_if_breaks(self) -> bool {
+    pub(crate) const fn is_always(self) -> bool {
+        matches!(self, Parenthesize::Always)
+    }
+
+    pub(crate) const fn is_never(self) -> bool {
+        matches!(self, Parenthesize::Never)
+    }
+
+    pub(crate) const fn is_if_breaks(self) -> bool {
         matches!(self, Parenthesize::IfBreaks)
     }
 
-    const fn is_preserve(self) -> bool {
+    pub(crate) const fn is_preserve(self) -> bool {
         matches!(self, Parenthesize::Preserve)
     }
 }
@@ -70,7 +92,8 @@ impl Parenthesize {
 /// whether there are parentheses in the source code or not.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Parentheses {
-    /// Always create parentheses
+    /// Always set parentheses regardless if the expression breaks or if they were
+    /// present in the source.
     Always,
 
     /// Only add parentheses when necessary because the expression breaks over multiple lines.
@@ -83,7 +106,7 @@ pub enum Parentheses {
     Never,
 }
 
-fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
     matches!(
         first_non_trivia_token(expr.end(), contents),
         Some(Token {
@@ -97,4 +120,38 @@ fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
             ..
         })
     )
+}
+
+pub(crate) fn parenthesized<'content, 'ast, Content>(
+    left: &'static str,
+    content: &'content Content,
+    right: &'static str,
+) -> FormatParenthesized<'content, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatParenthesized {
+        left,
+        content: Argument::new(content),
+        right,
+    }
+}
+
+pub(crate) struct FormatParenthesized<'content, 'ast> {
+    left: &'static str,
+    content: Argument<'content, PyFormatContext<'ast>>,
+    right: &'static str,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        write!(
+            f,
+            [group(&format_args![
+                text(self.left),
+                &soft_block_indent(&Arguments::from(&self.content)),
+                text(self.right)
+            ])]
+        )
+    }
 }

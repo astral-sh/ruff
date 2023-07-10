@@ -132,7 +132,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn body<U>(&mut self, stmts: &[Stmt<U>]) {
+    fn body(&mut self, stmts: &[Stmt]) {
         self.indent_depth = self.indent_depth.saturating_add(1);
         for stmt in stmts {
             self.unparse_stmt(stmt);
@@ -184,13 +184,13 @@ impl<'a> Generator<'a> {
         self.buffer
     }
 
-    pub fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
+    pub fn unparse_suite(&mut self, suite: &Suite) {
         for stmt in suite {
             self.unparse_stmt(stmt);
         }
     }
 
-    pub(crate) fn unparse_stmt<U>(&mut self, ast: &Stmt<U>) {
+    pub(crate) fn unparse_stmt(&mut self, ast: &Stmt) {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
@@ -467,7 +467,7 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
 
-                let mut orelse_: &[Stmt<U>] = orelse;
+                let mut orelse_: &[Stmt] = orelse;
                 loop {
                     if orelse_.len() == 1 && matches!(orelse_[0], Stmt::If(_)) {
                         if let Stmt::If(ast::StmtIf {
@@ -718,7 +718,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_except_handler<U>(&mut self, ast: &ExceptHandler<U>, star: bool) {
+    fn unparse_except_handler(&mut self, ast: &ExceptHandler, star: bool) {
         match ast {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
@@ -744,7 +744,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_pattern<U>(&mut self, ast: &Pattern<U>) {
+    fn unparse_pattern(&mut self, ast: &Pattern) {
         match ast {
             Pattern::MatchValue(ast::PatternMatchValue {
                 value,
@@ -831,7 +831,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_match_case<U>(&mut self, ast: &MatchCase<U>) {
+    fn unparse_match_case(&mut self, ast: &MatchCase) {
         self.p("case ");
         self.unparse_pattern(&ast.pattern);
         if let Some(guard) = &ast.guard {
@@ -842,7 +842,7 @@ impl<'a> Generator<'a> {
         self.body(&ast.body);
     }
 
-    pub(crate) fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) {
+    pub(crate) fn unparse_expr(&mut self, ast: &Expr, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
@@ -1191,7 +1191,7 @@ impl<'a> Generator<'a> {
                 self.p("*");
                 self.unparse_expr(value, precedence::MAX);
             }
-            Expr::Name(ast::ExprName { id, .. }) => self.p_id(id),
+            Expr::Name(ast::ExprName { id, .. }) => self.p(id.as_str()),
             Expr::List(ast::ExprList { elts, .. }) => {
                 self.p("[");
                 let mut first = true;
@@ -1289,7 +1289,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_args<U>(&mut self, args: &Arguments<U>) {
+    fn unparse_args(&mut self, args: &Arguments) {
         let mut first = true;
         for (i, arg_with_default) in args.posonlyargs.iter().chain(&args.args).enumerate() {
             self.p_delim(&mut first, ", ");
@@ -1314,7 +1314,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_arg<U>(&mut self, arg: &Arg<U>) {
+    fn unparse_arg(&mut self, arg: &Arg) {
         self.p_id(&arg.arg);
         if let Some(ann) = &arg.annotation {
             self.p(": ");
@@ -1322,7 +1322,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_arg_with_default<U>(&mut self, arg_with_default: &ArgWithDefault<U>) {
+    fn unparse_arg_with_default(&mut self, arg_with_default: &ArgWithDefault) {
         self.unparse_arg(&arg_with_default.def);
         if let Some(default) = &arg_with_default.default {
             self.p("=");
@@ -1330,7 +1330,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_comp<U>(&mut self, generators: &[Comprehension<U>]) {
+    fn unparse_comp(&mut self, generators: &[Comprehension]) {
         for comp in generators {
             self.p(if comp.is_async {
                 " async for "
@@ -1347,18 +1347,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_fstring_body<U>(&mut self, values: &[Expr<U>], is_spec: bool) {
+    fn unparse_fstring_body(&mut self, values: &[Expr], is_spec: bool) {
         for value in values {
             self.unparse_fstring_elem(value, is_spec);
         }
     }
 
-    fn unparse_formatted<U>(
-        &mut self,
-        val: &Expr<U>,
-        conversion: ConversionFlag,
-        spec: Option<&Expr<U>>,
-    ) {
+    fn unparse_formatted(&mut self, val: &Expr, conversion: ConversionFlag, spec: Option<&Expr>) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
@@ -1384,7 +1379,7 @@ impl<'a> Generator<'a> {
         self.p("}");
     }
 
-    fn unparse_fstring_elem<U>(&mut self, expr: &Expr<U>, is_spec: bool) {
+    fn unparse_fstring_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
             Expr::Constant(ast::ExprConstant { value, .. }) => {
                 if let Constant::Str(s) = value {
@@ -1414,7 +1409,7 @@ impl<'a> Generator<'a> {
         self.p(&s);
     }
 
-    fn unparse_joinedstr<U>(&mut self, values: &[Expr<U>], is_spec: bool) {
+    fn unparse_joinedstr(&mut self, values: &[Expr], is_spec: bool) {
         if is_spec {
             self.unparse_fstring_body(values, is_spec);
         } else {
@@ -1433,7 +1428,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_alias<U>(&mut self, alias: &Alias<U>) {
+    fn unparse_alias(&mut self, alias: &Alias) {
         self.p_id(&alias.name);
         if let Some(asname) = &alias.asname {
             self.p(" as ");
@@ -1441,7 +1436,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_with_item<U>(&mut self, with_item: &WithItem<U>) {
+    fn unparse_with_item(&mut self, with_item: &WithItem) {
         self.unparse_expr(&with_item.context_expr, precedence::MAX);
         if let Some(optional_vars) = &with_item.optional_vars {
             self.p(" as ");

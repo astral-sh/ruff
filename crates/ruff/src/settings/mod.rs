@@ -16,11 +16,11 @@ use ruff_macros::CacheKey;
 use crate::registry::{Rule, RuleNamespace, RuleSet, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
-    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
@@ -40,7 +40,7 @@ pub mod types;
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct AllSettings {
     pub cli: CliSettings,
     pub lib: Settings,
@@ -112,11 +112,11 @@ pub struct Settings {
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_builtins: flake8_builtins::settings::Settings,
     pub flake8_comprehensions: flake8_comprehensions::settings::Settings,
-    pub copyright: copyright::settings::Settings,
+    pub flake8_copyright: flake8_copyright::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
+    pub flake8_gettext: flake8_gettext::settings::Settings,
     pub flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
-    pub flake8_gettext: flake8_gettext::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_self: flake8_self::settings::Settings,
@@ -130,6 +130,7 @@ pub struct Settings {
     pub pydocstyle: pydocstyle::settings::Settings,
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
+    pub pyupgrade: pyupgrade::settings::Settings,
 }
 
 impl Settings {
@@ -210,9 +211,9 @@ impl Settings {
                 .flake8_comprehensions
                 .map(flake8_comprehensions::settings::Settings::from)
                 .unwrap_or_default(),
-            copyright: config
-                .copyright
-                .map(copyright::settings::Settings::try_from)
+            flake8_copyright: config
+                .flake8_copyright
+                .map(flake8_copyright::settings::Settings::try_from)
                 .transpose()?
                 .unwrap_or_default(),
             flake8_errmsg: config
@@ -257,7 +258,8 @@ impl Settings {
                 .unwrap_or_default(),
             isort: config
                 .isort
-                .map(isort::settings::Settings::from)
+                .map(isort::settings::Settings::try_from)
+                .transpose()?
                 .unwrap_or_default(),
             mccabe: config
                 .mccabe
@@ -283,6 +285,10 @@ impl Settings {
             pylint: config
                 .pylint
                 .map(pylint::settings::Settings::from)
+                .unwrap_or_default(),
+            pyupgrade: config
+                .pyupgrade
+                .map(pyupgrade::settings::Settings::from)
                 .unwrap_or_default(),
         })
     }

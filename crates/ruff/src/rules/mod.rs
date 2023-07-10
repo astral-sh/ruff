@@ -1,6 +1,5 @@
 #![allow(clippy::useless_format)]
 pub mod airflow;
-pub mod copyright;
 pub mod eradicate;
 pub mod flake8_2020;
 pub mod flake8_annotations;
@@ -12,6 +11,7 @@ pub mod flake8_bugbear;
 pub mod flake8_builtins;
 pub mod flake8_commas;
 pub mod flake8_comprehensions;
+pub mod flake8_copyright;
 pub mod flake8_datetimez;
 pub mod flake8_debugger;
 pub mod flake8_django;

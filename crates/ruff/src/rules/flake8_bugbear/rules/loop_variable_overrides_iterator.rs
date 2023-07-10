@@ -8,6 +8,33 @@ use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for loop control variables that override the loop iterable.
+///
+/// ## Why is this bad?
+/// Loop control variables should not override the loop iterable, as this can
+/// lead to confusing behavior.
+///
+/// Instead, use a distinct variable name for any loop control variables.
+///
+/// ## Example
+/// ```python
+/// items = [1, 2, 3]
+///
+/// for items in items:
+///     print(items)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// items = [1, 2, 3]
+///
+/// for item in items:
+///     print(item)
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `for` statement](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
 #[violation]
 pub struct LoopVariableOverridesIterator {
     name: String,

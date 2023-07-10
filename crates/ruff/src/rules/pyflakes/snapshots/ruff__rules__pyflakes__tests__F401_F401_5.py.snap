@@ -41,7 +41,7 @@ F401_5.py:4:8: F401 [*] `h.i` imported but unused
 2 | from a.b import c
 3 | from d.e import f as g
 4 | import h.i
-  |        ^ F401
+  |        ^^^ F401
 5 | import j.k as l
   |
   = help: Remove unused import: `h.i`

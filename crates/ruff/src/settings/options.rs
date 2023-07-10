@@ -8,11 +8,11 @@ use ruff_macros::ConfigurationOptions;
 use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
-    copyright, flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -433,7 +433,7 @@ pub struct Options {
     pub namespace_packages: Option<Vec<String>>,
     #[option(
         default = r#""py310""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -498,8 +498,8 @@ pub struct Options {
     /// Options for the `flake8-comprehensions` plugin.
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     #[option_group]
-    /// Options for the `copyright` plugin.
-    pub copyright: Option<copyright::settings::Options>,
+    /// Options for the `flake8-copyright` plugin.
+    pub flake8_copyright: Option<flake8_copyright::settings::Options>,
     #[option_group]
     /// Options for the `flake8-errmsg` plugin.
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
@@ -551,6 +551,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pylint` plugin.
     pub pylint: Option<pylint::settings::Options>,
+    #[option_group]
+    /// Options for the `pyupgrade` plugin.
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     #[option(
         default = "{}",

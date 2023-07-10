@@ -1,8 +1,8 @@
 use std::str::Chars;
 
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
 use ruff_python_whitespace::is_python_whitespace;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
 /// Searches for the first non-trivia character in `range`.
 ///
@@ -92,6 +92,24 @@ pub(crate) fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
     offset
 }
 
+fn is_identifier_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_' || is_non_ascii_identifier_start(c)
+}
+
+// Checks if the character c is a valid continuation character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_identifier_continuation(c: char) -> bool {
+    if c.is_ascii() {
+        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
+    } else {
+        is_xid_continue(c)
+    }
+}
+
+fn is_non_ascii_identifier_start(c: char) -> bool {
+    is_xid_start(c)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
@@ -112,9 +130,8 @@ impl Token {
         self.range.start()
     }
 
-    #[allow(unused)]
     pub(crate) const fn end(&self) -> TextSize {
-        self.range.start()
+        self.range.end()
     }
 }
 
@@ -165,7 +182,22 @@ pub(crate) enum TokenKind {
     /// '*'
     Star,
 
-    /// Any other non trivia token. Always has a length of 1
+    /// `.`.
+    Dot,
+
+    /// `else`
+    Else,
+
+    /// `if`
+    If,
+
+    /// `in`
+    In,
+
+    /// `match`
+    Match,
+
+    /// Any other non trivia token.
     Other,
 
     /// Returned for each character after [`TokenKind::Other`] has been returned once.
@@ -185,6 +217,7 @@ impl TokenKind {
             ':' => TokenKind::Colon,
             '/' => TokenKind::Slash,
             '*' => TokenKind::Star,
+            '.' => TokenKind::Dot,
             _ => TokenKind::Other,
         }
     }
@@ -212,6 +245,7 @@ pub(crate) struct SimpleTokenizer<'a> {
     /// `true` when it is known that the current `back` line has no comment for sure.
     back_line_has_no_comment: bool,
     bogus: bool,
+    source: &'a str,
     cursor: Cursor<'a>,
 }
 
@@ -222,6 +256,7 @@ impl<'a> SimpleTokenizer<'a> {
             back_offset: range.end(),
             back_line_has_no_comment: false,
             bogus: false,
+            source,
             cursor: Cursor::new(&source[range]),
         }
     }
@@ -235,6 +270,18 @@ impl<'a> SimpleTokenizer<'a> {
         Self::new(source, TextRange::up_to(offset))
     }
 
+    fn to_keyword_or_other(&self, range: TextRange) -> TokenKind {
+        let source = &self.source[range];
+        match source {
+            "if" => TokenKind::If,
+            "else" => TokenKind::Else,
+            "in" => TokenKind::In,
+            "match" => TokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
+            // ...,
+            _ => TokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+        }
+    }
+
     fn next_token(&mut self) -> Token {
         self.cursor.start_token();
 
@@ -242,7 +289,7 @@ impl<'a> SimpleTokenizer<'a> {
             return Token {
                 kind: TokenKind::EndOfFile,
                 range: TextRange::empty(self.offset),
-            }
+            };
         };
 
         if self.bogus {
@@ -276,12 +323,19 @@ impl<'a> SimpleTokenizer<'a> {
             '\\' => TokenKind::Continuation,
 
             c => {
-                let kind = TokenKind::from_non_trivia_char(c);
+                let kind = if is_identifier_start(c) {
+                    self.cursor.eat_while(is_identifier_continuation);
+                    let token_len = self.cursor.token_len();
+
+                    let range = TextRange::at(self.offset, token_len);
+                    self.to_keyword_or_other(range)
+                } else {
+                    TokenKind::from_non_trivia_char(c)
+                };
 
                 if kind == TokenKind::Other {
                     self.bogus = true;
                 }
-
                 kind
             }
         };
@@ -307,7 +361,7 @@ impl<'a> SimpleTokenizer<'a> {
             return Token {
                 kind: TokenKind::EndOfFile,
                 range: TextRange::empty(self.back_offset),
-            }
+            };
         };
 
         if self.bogus {
@@ -383,7 +437,29 @@ impl<'a> SimpleTokenizer<'a> {
                 } else if c == '\\' {
                     TokenKind::Continuation
                 } else {
-                    let kind = TokenKind::from_non_trivia_char(c);
+                    let kind = if is_identifier_continuation(c) {
+                        // if we only have identifier continuations but no start (e.g. 555) we
+                        // don't want to consume the chars, so in that case, we want to rewind the
+                        // cursor to here
+                        let savepoint = self.cursor.clone();
+                        self.cursor.eat_back_while(is_identifier_continuation);
+
+                        let token_len = self.cursor.token_len();
+                        let range = TextRange::at(self.back_offset - token_len, token_len);
+
+                        if self.source[range]
+                            .chars()
+                            .next()
+                            .is_some_and(is_identifier_start)
+                        {
+                            self.to_keyword_or_other(range)
+                        } else {
+                            self.cursor = savepoint;
+                            TokenKind::Other
+                        }
+                    } else {
+                        TokenKind::from_non_trivia_char(c)
+                    };
 
                     if kind == TokenKind::Other {
                         self.bogus = true;
@@ -614,6 +690,44 @@ mod tests {
     #[test]
     fn tokenize_continuation() {
         let source = "( \\\n )";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tricky_unicode() {
+        let source = "មុ";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn identifier_ending_in_non_start_char() {
+        let source = "i5";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn ignore_word_with_only_id_continuing_chars() {
+        let source = "555";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+
+        // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
+    }
+
+    #[test]
+    fn tokenize_multichar() {
+        let source = "if in else match";
 
         let test_case = tokenize(source);
 

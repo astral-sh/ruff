@@ -6,6 +6,46 @@ use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of mutable objects as function argument defaults.
+///
+/// ## Why is this bad?
+/// Function defaults are evaluated once, when the function is defined.
+///
+/// The same mutable object is then shared across all calls to the function.
+/// If the object is modified, those modifications will persist across calls,
+/// which can lead to unexpected behavior.
+///
+/// Instead, prefer to use immutable data structures, or take `None` as a
+/// default, and initialize a new mutable object inside the function body
+/// for each call.
+///
+/// ## Example
+/// ```python
+/// def add_to_list(item, some_list=[]):
+///     some_list.append(item)
+///     return some_list
+///
+///
+/// l1 = add_to_list(0)  # [0]
+/// l2 = add_to_list(1)  # [0, 1]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def add_to_list(item, some_list=None):
+///     if some_list is None:
+///         some_list = []
+///     some_list.append(item)
+///     return some_list
+///
+///
+/// l1 = add_to_list(0)  # [0]
+/// l2 = add_to_list(1)  # [1]
+/// ```
+///
+/// ## References
+/// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[violation]
 pub struct MutableArgumentDefault;
 
@@ -29,7 +69,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Argume
         .chain(&arguments.args)
         .chain(&arguments.kwonlyargs)
     {
-        let Some(default)= default else {
+        let Some(default) = default else {
             continue;
         };
 

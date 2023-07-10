@@ -26,7 +26,7 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
     semantic.resolve_call_path(func).map_or(false, |call_path| {
@@ -41,7 +41,7 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
     semantic.resolve_call_path(func).map_or(false, |call_path| {
@@ -53,7 +53,7 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
     semantic.resolve_call_path(func).map_or(false, |call_path| {

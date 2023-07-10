@@ -10,6 +10,38 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for docstrings that are indented with tabs.
+///
+/// ## Why is this bad?
+/// [PEP 8](https://peps.python.org/pep-0008/#tabs-or-spaces) recommends using
+/// spaces over tabs for indentation.
+///
+///
+/// ## Example
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+/// 	Sort the list in ascending order and return a copy of the result using the bubble
+/// 	sort algorithm.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the bubble
+///     sort algorithm.
+///     """
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct IndentWithSpaces;
 
@@ -20,6 +52,39 @@ impl Violation for IndentWithSpaces {
     }
 }
 
+/// ## What it does
+/// Checks for under-indented docstrings.
+///
+/// ## Why is this bad?
+/// [PEP 257] recommends that docstrings be indented to the same level as their
+/// opening quotes. Avoid under-indenting docstrings, for consistency.
+///
+/// ## Example
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+/// Sort the list in ascending order and return a copy of the result using the bubble sort
+/// algorithm.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the bubble
+///     sort algorithm.
+///     """
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct UnderIndentation;
 
@@ -34,6 +99,39 @@ impl AlwaysAutofixableViolation for UnderIndentation {
     }
 }
 
+/// ## What it does
+/// Checks for over-indented docstrings.
+///
+/// ## Why is this bad?
+/// [PEP 257] recommends that docstrings be indented to the same level as their
+/// opening quotes. Avoid over-indenting docstrings, for consistency.
+///
+/// ## Example
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+///         Sort the list in ascending order and return a copy of the result using the
+///         bubble sort algorithm.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def sort_list(l: list[int]) -> list[int]:
+///     """Return a sorted copy of the list.
+///
+///     Sort the list in ascending order and return a copy of the result using the bubble
+///     sort algorithm.
+///     """
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct OverIndentation;
 
@@ -91,8 +189,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                         clean_space(docstring.indentation),
                         TextRange::at(line.start(), line_indent.text_len()),
                     )));
@@ -139,8 +236,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     } else {
                         Edit::range_replacement(indent, over_indented)
                     };
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(edit));
+                    diagnostic.set_fix(Fix::automatic(edit));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -160,8 +256,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     } else {
                         Edit::range_replacement(indent, range)
                     };
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(edit));
+                    diagnostic.set_fix(Fix::automatic(edit));
                 }
                 checker.diagnostics.push(diagnostic);
             }
