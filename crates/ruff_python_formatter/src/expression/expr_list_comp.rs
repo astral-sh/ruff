@@ -30,11 +30,11 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
             f,
             [parenthesized(
                 "[",
-                &group(&self::format_args!(
-                    &elt.format(),
+                &self::format_args!(
+                    group(&elt.format()),
                     soft_line_break_or_space(),
                     group(&joined)
-                )),
+                ),
                 "]"
             )]
         )

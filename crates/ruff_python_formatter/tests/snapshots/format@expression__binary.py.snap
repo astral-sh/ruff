@@ -278,7 +278,8 @@ aaaaaaaaaaaaaa + {
     eeeeeee,
 }
 aaaaaaaaaaaaaa + [
-    a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    a
+    for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ]
 (
     aaaaaaaaaaaaaa
