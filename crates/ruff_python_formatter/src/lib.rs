@@ -280,12 +280,11 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-
-def test3():
-    if True:
-        field = (
-            model._meta.pk if from_field is None else model._meta.get_field(from_field)
-        )
+if [
+    aaaaaa,
+    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
+] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
+    ...
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

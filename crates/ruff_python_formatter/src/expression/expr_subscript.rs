@@ -6,8 +6,7 @@ use ruff_python_ast::node::AstNode;
 use crate::comments::{trailing_comments, Comments};
 use crate::context::NodeLevel;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
-    Parenthesize,
+    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;

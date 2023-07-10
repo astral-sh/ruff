@@ -259,7 +259,7 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
     }
 
     fn update_max_priority(&mut self, current_priority: OperatorPriority) {
-        self.update_max_priority_with_count(current_priority, 1)
+        self.update_max_priority_with_count(current_priority, 1);
     }
 
     fn update_max_priority_with_count(&mut self, current_priority: OperatorPriority, count: u32) {
@@ -288,6 +288,9 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
                 self.update_max_priority(OperatorPriority::Comprehension);
                 return;
             }
+            // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
+            // because each comparison requires a left operand, and `n` `operands` and right sides.
+            #[allow(clippy::cast_possible_truncation)]
             Expr::BoolOp(ast::ExprBoolOp {
                 range: _,
                 op: _,
@@ -308,13 +311,16 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
                 self.update_max_priority_with_count(OperatorPriority::Conditional, 2);
             }
 
+            // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
+            // because each comparison requires a left operand, and `n` `operands` and right sides.
+            #[allow(clippy::cast_possible_truncation)]
             Expr::Compare(ast::ExprCompare {
                 range: _,
                 left: _,
                 ops,
                 comparators: _,
             }) => {
-                self.update_max_priority_with_count(OperatorPriority::Comparator, ops.len() as u32)
+                self.update_max_priority_with_count(OperatorPriority::Comparator, ops.len() as u32);
             }
             Expr::Call(ast::ExprCall {
                 range: _,
@@ -349,7 +355,7 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
                 attr: _,
                 ctx: _,
             }) => {
-                if has_parentheses(&value, self.source) {
+                if has_parentheses(value, self.source) {
                     self.update_max_priority(OperatorPriority::Attribute);
                 }
             }
