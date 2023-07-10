@@ -44,7 +44,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 
         write!(
             f,
-            [in_parentheses_only_group(&format_args![
+            [group(&format_args![
                 text("["),
                 trailing_comments(dangling_comments),
                 soft_block_indent(&slice.format()),
