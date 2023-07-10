@@ -138,6 +138,29 @@ impl Parse for ast::StmtAssign {
     }
 }
 
+impl Parse for ast::StmtTypeAlias {
+    fn lex_starts_at(
+        source: &str,
+        offset: TextSize,
+    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
+        ast::Stmt::lex_starts_at(source, offset)
+    }
+    fn parse_tokens(
+        lxr: impl IntoIterator<Item = LexResult>,
+        source_path: &str,
+    ) -> Result<Self, ParseError> {
+        let node = ast::Stmt::parse_tokens(lxr, source_path)?;
+        match node {
+            ast::Stmt::TypeAlias(node) => Ok(node),
+            node => Err(ParseError {
+                error: ParseErrorType::InvalidToken,
+                offset: node.range().start(),
+                source_path: source_path.to_owned(),
+            }),
+        }
+    }
+}
+
 impl Parse for ast::StmtAugAssign {
     fn lex_starts_at(
         source: &str,

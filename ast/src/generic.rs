@@ -26,6 +26,7 @@ pub enum Ast {
     MatchCase(MatchCase),
     Pattern(Pattern),
     TypeIgnore(TypeIgnore),
+    TypeParam(TypeParam),
     Decorator(Decorator),
 }
 impl Node for Ast {
@@ -138,6 +139,12 @@ impl From<Pattern> for Ast {
 impl From<TypeIgnore> for Ast {
     fn from(node: TypeIgnore) -> Self {
         Ast::TypeIgnore(node)
+    }
+}
+
+impl From<TypeParam> for Ast {
+    fn from(node: TypeParam) -> Self {
+        Ast::TypeParam(node)
     }
 }
 
@@ -270,6 +277,8 @@ pub enum Stmt {
     AugAssign(StmtAugAssign),
     #[is(name = "ann_assign_stmt")]
     AnnAssign(StmtAnnAssign),
+    #[is(name = "type_alias_stmt")]
+    TypeAlias(StmtTypeAlias),
     #[is(name = "for_stmt")]
     For(StmtFor),
     #[is(name = "async_for_stmt")]
@@ -445,6 +454,31 @@ impl From<StmtDelete> for Stmt {
 }
 impl From<StmtDelete> for Ast {
     fn from(payload: StmtDelete) -> Self {
+        Stmt::from(payload).into()
+    }
+}
+
+
+/// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtTypeAlias {
+    pub range: TextRange,
+    pub name: Box<Expr>,
+    pub type_params: Vec<TypeParam>,
+    pub value: Box<Expr>,
+}
+
+impl Node for StmtTypeAlias {
+    const NAME: &'static str = "TypeAlias";
+    const FIELD_NAMES: &'static [&'static str] = &["name", "type_params", "value"];
+}
+impl From<StmtTypeAlias> for Stmt {
+    fn from(payload: StmtTypeAlias) -> Self {
+        Stmt::TypeAlias(payload)
+    }
+}
+impl From<StmtTypeAlias> for Ast {
+    fn from(payload: StmtTypeAlias) -> Self {
         Stmt::from(payload).into()
     }
 }
@@ -3081,6 +3115,87 @@ impl From<TypeIgnoreTypeIgnore> for Ast {
 
 impl Node for TypeIgnore {
     const NAME: &'static str = "type_ignore";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+
+
+/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum TypeParam {
+    TypeVar(TypeParamTypeVar),
+    ParamSpec(TypeParamParamSpec),
+    TypeVarTuple(TypeParamTypeVarTuple),
+}
+
+/// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeParamTypeVar {
+    pub range: TextRange,
+    pub name: Identifier,
+    pub bound: Option<Box<Expr>>,
+}
+
+impl Node for TypeParamTypeVar {
+    const NAME: &'static str = "TypeVar";
+    const FIELD_NAMES: &'static [&'static str] = &["name", "bound"];
+}
+impl From<TypeParamTypeVar> for TypeParam {
+    fn from(payload: TypeParamTypeVar) -> Self {
+        TypeParam::TypeVar(payload)
+    }
+}
+impl From<TypeParamTypeVar> for Ast {
+    fn from(payload: TypeParamTypeVar) -> Self {
+        TypeParam::from(payload).into()
+    }
+}
+
+/// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeParamParamSpec {
+    pub range: TextRange,
+    pub name: Identifier,
+}
+
+impl Node for TypeParamParamSpec {
+    const NAME: &'static str = "ParamSpec";
+    const FIELD_NAMES: &'static [&'static str] = &["name"];
+}
+impl From<TypeParamParamSpec> for TypeParam {
+    fn from(payload: TypeParamParamSpec) -> Self {
+        TypeParam::ParamSpec(payload)
+    }
+}
+impl From<TypeParamParamSpec> for Ast {
+    fn from(payload: TypeParamParamSpec) -> Self {
+        TypeParam::from(payload).into()
+    }
+}
+
+/// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeParamTypeVarTuple {
+    pub range: TextRange,
+    pub name: Identifier,
+}
+
+impl Node for TypeParamTypeVarTuple {
+    const NAME: &'static str = "TypeVarTuple";
+    const FIELD_NAMES: &'static [&'static str] = &["name"];
+}
+impl From<TypeParamTypeVarTuple> for TypeParam {
+    fn from(payload: TypeParamTypeVarTuple) -> Self {
+        TypeParam::TypeVarTuple(payload)
+    }
+}
+impl From<TypeParamTypeVarTuple> for Ast {
+    fn from(payload: TypeParamTypeVarTuple) -> Self {
+        TypeParam::from(payload).into()
+    }
+}
+
+impl Node for TypeParam {
+    const NAME: &'static str = "type_param";
     const FIELD_NAMES: &'static [&'static str] = &[];
 }
 

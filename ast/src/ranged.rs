@@ -87,6 +87,11 @@ impl Ranged for crate::generic::StmtDelete {
         self.range
     }
 }
+impl Ranged for crate::generic::StmtTypeAlias {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::generic::StmtAssign {
     fn range(&self) -> TextRange {
         self.range
@@ -205,6 +210,7 @@ impl Ranged for crate::Stmt {
             Self::ClassDef(node) => node.range(),
             Self::Return(node) => node.range(),
             Self::Delete(node) => node.range(),
+            Self::TypeAlias(node) => node.range(),
             Self::Assign(node) => node.range(),
             Self::AugAssign(node) => node.range(),
             Self::AnnAssign(node) => node.range(),
