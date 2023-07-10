@@ -294,9 +294,9 @@ jobs:
       - name: "Clone CPython 3.10"
         run: git clone --branch 3.10 --depth 1 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
       - name: "Check stability CPython"
-        run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython django
+        run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
       - name: "Clone django"
         # TODO(konstin): eventually we'll want stable tags rather than branches
         run: git clone --branch stable/4.2.x --depth 1 https://github.com/django/django django
       - name: "Check stability django"
-        run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython django
+        run: cargo run --bin ruff_dev -- format-dev --stability-check django
