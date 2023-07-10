@@ -1215,11 +1215,15 @@ fn handle_expr_if_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Looks for a token in the range that contains no other tokens.
+/// Looks for a token in the range that contains no other tokens except for parentheses outside
+/// the expression ranges
 fn find_only_token_in_range(range: TextRange, locator: &Locator, token_kind: TokenKind) -> Token {
-    let mut tokens = SimpleTokenizer::new(locator.contents(), range).skip_trivia();
+    let mut tokens = SimpleTokenizer::new(locator.contents(), range)
+        .skip_trivia()
+        .skip_while(|token| token.kind == TokenKind::RParen);
     let token = tokens.next().expect("Expected a token");
     debug_assert_eq!(token.kind(), token_kind);
+    let mut tokens = tokens.skip_while(|token| token.kind == TokenKind::LParen);
     debug_assert_eq!(tokens.next(), None);
     token
 }
