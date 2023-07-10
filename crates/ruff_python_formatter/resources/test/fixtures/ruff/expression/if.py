@@ -31,3 +31,11 @@ c2 = (
     # 8
     "b" # 9
 )
+
+# regression test: parentheses outside the expression ranges interfering with finding
+# the `if` and `else` token finding
+d1 = [
+    ("a") if # 1
+    ("b") else # 2
+    ("c")
+]
