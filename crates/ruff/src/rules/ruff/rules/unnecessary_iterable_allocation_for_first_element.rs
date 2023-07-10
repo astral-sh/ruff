@@ -34,25 +34,40 @@ use crate::registry::AsRule;
 #[violation]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     arg: String,
+    contains_slice: bool,
 }
 
 impl UnnecessaryIterableAllocationForFirstElement {
-    pub(crate) fn new(arg: String) -> Self {
-        Self { arg }
+    pub(crate) fn new(arg: String, contains_slice: bool) -> Self {
+        Self {
+            arg,
+            contains_slice,
+        }
     }
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Prefer `next(iter({}))` over `list({})[0]` or equivalent list comprehension",
-            self.arg, self.arg
-        )
+        if self.contains_slice {
+            format!(
+                "Prefer `[next(iter({}))]` over `list({})[:1]` or equivalent list comprehension/slice",
+                self.arg, self.arg
+            )
+        } else {
+            format!(
+                "Prefer `next(iter({}))` over `list({})[0]` or equivalent list comprehension/slice",
+                self.arg, self.arg
+            )
+        }
     }
 
     fn autofix_title(&self) -> String {
-        format!("Replace with `next(iter({}))`", self.arg)
+        if self.contains_slice {
+            format!("Replace with `[next(iter({}))]", self.arg)
+        } else {
+            format!("Replace with `next(iter({}))`", self.arg)
+        }
     }
 }
 
@@ -96,7 +111,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     };
 
     let mut diagnostic = Diagnostic::new(
-        UnnecessaryIterableAllocationForFirstElement::new(iter_name.to_string()),
+        UnnecessaryIterableAllocationForFirstElement::new(iter_name.to_string(), is_slice),
         *range,
     );
 
@@ -132,16 +147,15 @@ fn classify_subscript(expr: &Expr) -> ClassifiedSubscript {
             let upper = upper_index.as_ref().and_then(|u| get_effective_index(u));
             let step = step_value.as_ref().and_then(|s| get_effective_index(s));
 
-            let is_slice = upper.is_some() || step.is_some();
             if matches!(lower, None | Some(0)) {
                 if upper.unwrap_or(i64::MAX) > step.unwrap_or(1i64) {
-                    return ClassifiedSubscript::new(false, is_slice);
+                    return ClassifiedSubscript::new(false, true);
                 }
 
-                return ClassifiedSubscript::new(true, is_slice);
+                return ClassifiedSubscript::new(true, true);
             }
 
-            ClassifiedSubscript::new(false, is_slice)
+            ClassifiedSubscript::new(false, true)
         }
         _ => ClassifiedSubscript::new(false, false),
     }
