@@ -38,7 +38,8 @@ impl NeedsParentheses for ExprNamedExpr {
         comments: &Comments,
     ) -> Parentheses {
         match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            // TODO(konstin): Check if this matches black
+            // Unlike tuples, named expression parentheses are not part of the range even when
+            // mandatory
             Parentheses::Optional => Parentheses::Always,
             parentheses => parentheses,
         }
