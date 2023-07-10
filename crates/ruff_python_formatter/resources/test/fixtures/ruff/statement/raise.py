@@ -60,10 +60,6 @@ raise aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflak
 raise aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfk < (aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajl < aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashd) # the other end
 # sneaky comment
 
-raise ( # sould I stay here
-    # just a comment here
-) # trailing comment
-
 raise ( # another comment
 )
     
@@ -74,9 +70,21 @@ raise ( # sould I stay here
     # just a comment here
 ) # trailing comment
 
-raise ( # another comment
-)
-    
-raise (
-) # what now
+raise hello( # sould I stay here
+    # just a comment here
+) # trailing comment
+
+raise ( # sould I stay here
+    test,
+    # just a comment here
+) # trailing comment
+
+raise hello( # sould I stay here
+    # just a comment here
+    "hey"
+) # trailing comment
+
+a = ( # sould I stay here
+    # just a comment here
+) # trailing comment
 
