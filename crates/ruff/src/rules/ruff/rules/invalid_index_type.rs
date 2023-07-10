@@ -96,8 +96,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                                 slice_bound.range(),
                             ));
                         }
-                    };
-                    if matches!(
+                    } else if matches!(
                         slice_bound.as_ref(),
                         Expr::Tuple(_)
                             | Expr::List(_)
