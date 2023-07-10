@@ -134,8 +134,7 @@ fn mismatch(param_name: &str, covariant: Option<&Expr>, contravariant: Option<&E
     } else if param_name.ends_with("_contra") {
         contravariant.map_or(true, |contravariant| !is_const_true(contravariant))
     } else {
-        covariant.map_or(false, is_const_true)
-            || contravariant.map_or(false, is_const_true)
+        covariant.map_or(false, is_const_true) || contravariant.map_or(false, is_const_true)
     }
 }
 
