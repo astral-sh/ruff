@@ -21,7 +21,7 @@ pub(crate) enum Mode {
     /// Don't write to the file, check if the file is up-to-date and error if not.
     Check,
 
-    /// Write the generated help to stdout
+    /// Write the generated help to stdout.
     DryRun,
 }
 
