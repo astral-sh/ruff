@@ -259,13 +259,17 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
     }
 
     fn update_max_priority(&mut self, current_priority: OperatorPriority) {
+        self.update_max_priority_with_count(current_priority, 1)
+    }
+
+    fn update_max_priority_with_count(&mut self, current_priority: OperatorPriority, count: u32) {
         match self.max_priority.cmp(&current_priority) {
             Ordering::Less => {
-                self.max_priority_count = 1;
+                self.max_priority_count = count;
                 self.max_priority = current_priority;
             }
             Ordering::Equal => {
-                self.max_priority_count += 1;
+                self.max_priority_count += count;
             }
             Ordering::Greater => {}
         }
@@ -287,8 +291,11 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
             Expr::BoolOp(ast::ExprBoolOp {
                 range: _,
                 op: _,
-                values: _,
-            }) => self.update_max_priority(OperatorPriority::BooleanOperation),
+                values,
+            }) => self.update_max_priority_with_count(
+                OperatorPriority::BooleanOperation,
+                values.len().saturating_sub(1) as u32,
+            ),
             Expr::BinOp(ast::ExprBinOp {
                 op,
                 left: _,
@@ -310,7 +317,14 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
                 }
             }
 
-            Expr::Compare(_) => self.update_max_priority(OperatorPriority::Comparator),
+            Expr::Compare(ast::ExprCompare {
+                range: _,
+                left: _,
+                ops,
+                comparators: _,
+            }) => {
+                self.update_max_priority_with_count(OperatorPriority::Comparator, ops.len() as u32)
+            }
             Expr::Call(ast::ExprCall {
                 range: _,
                 func,
