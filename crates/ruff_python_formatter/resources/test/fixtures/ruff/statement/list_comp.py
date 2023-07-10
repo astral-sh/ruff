@@ -11,15 +11,22 @@
 ]
 
 [
-    # before a
+    # above a
     a  # a
-    # before for
+    # above for
     for # for
-    # before c
+    # above c
     c  # c
-    # before in
+    # above in
     in  # in
-    # before e
-    e
-    # before end
+    # above e
+    e  # e
+    # above if
+    if  # if
+    # above f
+    f  # f
+    # above if2
+    if  # if2
+    # above g
+    g  # g
 ]
