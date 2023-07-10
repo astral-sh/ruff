@@ -1658,6 +1658,9 @@ where
                 if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                     pylint::rules::type_param_name_mismatch(self, value, targets);
                 }
+                if self.settings.rules.enabled(Rule::TypeNameIncorrectVariance) {
+                    pylint::rules::type_name_incorrect_variance(self, value);
+                }
                 if self.settings.rules.enabled(Rule::TypeBivariance) {
                     pylint::rules::type_bivariance(self, value);
                 }

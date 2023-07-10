@@ -168,6 +168,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyflakes, "901") => (RuleGroup::Unspecified, rules::pyflakes::rules::RaiseNotImplemented),
 
         // pylint
+        (Pylint, "C0105") => (RuleGroup::Unspecified, rules::pylint::rules::TypeNameIncorrectVariance),
         (Pylint, "C0131") => (RuleGroup::Unspecified, rules::pylint::rules::TypeBivariance),
         (Pylint, "C0132") => (RuleGroup::Unspecified, rules::pylint::rules::TypeParamNameMismatch),
         (Pylint, "C0205") => (RuleGroup::Unspecified, rules::pylint::rules::SingleStringSlots),
