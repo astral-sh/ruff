@@ -11,7 +11,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Only integers or slices can be used as indices to these types. Using
-/// other types will result in a `TypeError`.
+/// other types will result in a `TypeError` at runtime and a `SyntaxWarning` at
+/// import time.
 ///
 /// ## Example
 /// ```python
