@@ -124,6 +124,9 @@ pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> b
     )
 }
 
+/// Formats `content` enclosed by the `left` and `right` parentheses. The implementation also ensures
+/// that expanding the parenthesized expression (or any of its children) doesn't enforce the
+/// optional parentheses around the outer-most expression to materialize.
 pub(crate) fn parenthesized<'content, 'ast, Content>(
     left: &'static str,
     content: &'content Content,
@@ -175,6 +178,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     }
 }
 
+/// Makes `content` a group, but only if the outer expression is parenthesized (a list, parenthesized expression, dict, ...)
+/// or if the expression gets parenthesized because it expands over multiple lines.
 pub(crate) fn in_parentheses_only_group<'content, 'ast, Content>(
     content: &'content Content,
 ) -> FormatInParenthesesOnlyGroup<'content, 'ast>
