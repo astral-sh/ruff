@@ -46,27 +46,34 @@ use crate::rules::pylint::helpers::type_param_name;
 pub struct TypeNameIncorrectVariance {
     kind: VarKind,
     param_name: String,
+    variance: VarVariance,
+    replacement_name: String,
 }
 
 impl Violation for TypeNameIncorrectVariance {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeNameIncorrectVariance { kind, param_name } = self;
-        format!("`{kind}` name \"{param_name}\" does not match variance")
+        let TypeNameIncorrectVariance {
+            kind,
+            param_name,
+            variance,
+            replacement_name,
+        } = self;
+        format!("`{kind}` name \"{param_name}\" does not reflect its {variance}; consider renaming it to \"{replacement_name}\"")
     }
 }
 
 /// PLC0105
 pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        args,
-        keywords,
-        ..
-    }) = value
-    else {
-        return;
-    };
+                       func,
+                       args,
+                       keywords,
+                       ..
+                   }) = value
+        else {
+            return;
+        };
 
     let Some(param_name) = type_param_name(args, keywords) else {
         return;
@@ -114,14 +121,26 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
                 None
             }
         })
-    else {
-        return;
+        else {
+            return;
+        };
+
+    let variance = variance(covariant, contravariant);
+    let name_root = param_name
+        .trim_end_matches("_co")
+        .trim_end_matches("_contra");
+    let replacement_name: String = match variance {
+        VarVariance::Covariance => format!("{name_root}_co"),
+        VarVariance::Contravariance => format!("{name_root}_contra"),
+        VarVariance::Invariance => name_root.to_string(),
     };
 
     checker.diagnostics.push(Diagnostic::new(
         TypeNameIncorrectVariance {
             kind,
             param_name: param_name.to_string(),
+            variance,
+            replacement_name,
         },
         func.range(),
     ));
@@ -138,6 +157,18 @@ fn mismatch(param_name: &str, covariant: Option<&Expr>, contravariant: Option<&E
     }
 }
 
+/// Return the variance of the type parameter.
+fn variance(covariant: Option<&Expr>, contravariant: Option<&Expr>) -> VarVariance {
+    match (
+        covariant.map(is_const_true),
+        contravariant.map(is_const_true),
+    ) {
+        (Some(true), _) => VarVariance::Covariance,
+        (_, Some(true)) => VarVariance::Contravariance,
+        _ => VarVariance::Invariance,
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum VarKind {
     TypeVar,
@@ -149,6 +180,23 @@ impl fmt::Display for VarKind {
         match self {
             VarKind::TypeVar => fmt.write_str("TypeVar"),
             VarKind::ParamSpec => fmt.write_str("ParamSpec"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum VarVariance {
+    Covariance,
+    Contravariance,
+    Invariance,
+}
+
+impl fmt::Display for VarVariance {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            VarVariance::Covariance => fmt.write_str("covariance"),
+            VarVariance::Contravariance => fmt.write_str("contravariance"),
+            VarVariance::Invariance => fmt.write_str("invariance"),
         }
     }
 }
