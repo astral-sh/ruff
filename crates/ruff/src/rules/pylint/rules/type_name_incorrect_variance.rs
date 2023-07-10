@@ -130,6 +130,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
         .trim_end_matches("_co")
         .trim_end_matches("_contra");
     let replacement_name: String = match variance {
+        VarVariance::Bivariance => return, // Bivariate type are invalid, so ignore them for this rule.
         VarVariance::Covariance => format!("{name_root}_co"),
         VarVariance::Contravariance => format!("{name_root}_contra"),
         VarVariance::Invariance => name_root.to_string(),
@@ -163,6 +164,7 @@ fn variance(covariant: Option<&Expr>, contravariant: Option<&Expr>) -> VarVarian
         covariant.map(is_const_true),
         contravariant.map(is_const_true),
     ) {
+        (Some(true), Some(true)) => VarVariance::Bivariance,
         (Some(true), _) => VarVariance::Covariance,
         (_, Some(true)) => VarVariance::Contravariance,
         _ => VarVariance::Invariance,
@@ -186,6 +188,7 @@ impl fmt::Display for VarKind {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum VarVariance {
+    Bivariance,
     Covariance,
     Contravariance,
     Invariance,
@@ -194,6 +197,7 @@ enum VarVariance {
 impl fmt::Display for VarVariance {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            VarVariance::Bivariance => fmt.write_str("bivariance"),
             VarVariance::Covariance => fmt.write_str("covariance"),
             VarVariance::Contravariance => fmt.write_str("contravariance"),
             VarVariance::Invariance => fmt.write_str("invariance"),

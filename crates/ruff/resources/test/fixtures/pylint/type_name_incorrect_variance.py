@@ -57,3 +57,12 @@ T_contra = TypeVar("T_contra", contravariant=True)
 T_contra = TypeVar("T_contra", covariant=False, contravariant=True)
 P_contra = ParamSpec("P_contra", contravariant=True)
 P_contra = ParamSpec("P_contra", covariant=False, contravariant=True)
+
+# Bivariate types are errors, but not covered by this check.
+
+T = TypeVar("T", covariant=True, contravariant=True)
+P = ParamSpec("P", covariant=True, contravariant=True)
+T_co = TypeVar("T_co", covariant=True, contravariant=True)
+P_co = ParamSpec("P_co", covariant=True, contravariant=True)
+T_contra = TypeVar("T_contra", covariant=True, contravariant=True)
+P_contra = ParamSpec("P_contra", covariant=True, contravariant=True)
