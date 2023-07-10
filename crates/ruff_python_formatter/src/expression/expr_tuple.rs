@@ -4,7 +4,6 @@ use crate::expression::parentheses::{
     default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
     Parenthesize,
 };
-use crate::expression::sequence::ExprSequence;
 use crate::prelude::*;
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_text_size::TextRange;
@@ -91,6 +90,23 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_dangling_comments(&self, _node: &ExprTuple, _f: &mut PyFormatter) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct ExprSequence<'a> {
+    elts: &'a [Expr],
+}
+
+impl<'a> ExprSequence<'a> {
+    const fn new(elts: &'a [Expr]) -> Self {
+        Self { elts }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        f.join_comma_separated().nodes(self.elts.iter()).finish()
     }
 }
 
