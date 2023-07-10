@@ -72,7 +72,7 @@ while x := f(x):
  (y := f(x))
  y0 = (y1 := f(x))
  foo(x=(y := f(x)))
-@@ -19,29 +19,29 @@
+@@ -19,10 +19,10 @@
      pass
  
  
@@ -86,10 +86,8 @@ while x := f(x):
 +lambda x: True
  x = (y := 0)
  (z := (y := (x := 0)))
--(info := (name, phone, *rest))
-+(info := (name, phone, *NOT_YET_IMPLEMENTED_ExprStarred))
- (x := 1, 2)
- (total := total + tax)
+ (info := (name, phone, *rest))
+@@ -31,17 +31,17 @@
  len(lines := f.readlines())
  foo(x := 3, cat="vector")
  foo(cat=(category := "vector"))
@@ -144,7 +142,7 @@ lambda x: True
 lambda x: True
 x = (y := 0)
 (z := (y := (x := 0)))
-(info := (name, phone, *NOT_YET_IMPLEMENTED_ExprStarred))
+(info := (name, phone, *rest))
 (x := 1, 2)
 (total := total + tax)
 len(lines := f.readlines())
