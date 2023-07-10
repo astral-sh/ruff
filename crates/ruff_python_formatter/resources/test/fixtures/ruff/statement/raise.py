@@ -69,3 +69,14 @@ raise ( # another comment
     
 raise (
 ) # what now
+
+raise ( # sould I stay here
+    # just a comment here
+) # trailing comment
+
+raise ( # another comment
+)
+    
+raise (
+) # what now
+
