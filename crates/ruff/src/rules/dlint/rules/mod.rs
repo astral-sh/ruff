@@ -1,3 +1,3 @@
-pub(crate) use catastrophic_re_use::*;
+pub(crate) use catastrophic_backtracking_regular_expression::*;
 
-mod catastrophic_re_use;
+mod catastrophic_backtracking_regular_expression;

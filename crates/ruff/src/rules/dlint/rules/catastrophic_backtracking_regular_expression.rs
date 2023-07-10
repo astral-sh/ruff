@@ -37,9 +37,9 @@ use crate::checkers::ast::Checker;
 /// - [Runaway Regular Expressions: Catastrophic Backtracking](https://www.regular-expressions.info/catastrophic.html)
 /// - [Preventing Regular Expression Denial of Service (ReDoS)](https://www.regular-expressions.info/redos.html)
 #[violation]
-pub struct CatastrophicReUse;
+pub struct CatastrophicBacktrackingRegularExpression;
 
-impl Violation for CatastrophicReUse {
+impl Violation for CatastrophicBacktrackingRegularExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Potentially dangerous regex expression can lead to catastrophic backtracking")
@@ -47,7 +47,7 @@ impl Violation for CatastrophicReUse {
 }
 
 /// DUO138
-pub(crate) fn catastrophic_re_use(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn catastrophic_backtracking_regular_expression(checker: &mut Checker, call: &ExprCall) {
     // Check if function id is a regex function first so we do not do an unnecessary expensive call
     // to resolve_call_path()
     if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &call.func.as_ref() {
@@ -86,7 +86,7 @@ pub(crate) fn catastrophic_re_use(checker: &mut Checker, call: &ExprCall) {
     if detect_redos(&hir) {
         checker
             .diagnostics
-            .push(Diagnostic::new(CatastrophicReUse, call.func.range()));
+            .push(Diagnostic::new(CatastrophicBacktrackingRegularExpression, call.func.range()));
     }
 }
 
@@ -111,6 +111,10 @@ fn is_regex_func(call_path: &CallPath) -> bool {
 const MAX_REPETITION_COUNT: u32 = 10;
 
 fn detect_redos(hir: &Hir) -> bool {
+    // Vulnerable regex patterns come in two scenarios. The regex must have grouping with repetition
+    // Then inside the repeated group one of two things can lead to catastrophic backtracking
+    //   1. Repetition
+    //   2. Alternation with overlapping
     match hir.kind() {
         HirKind::Concat(hirs) | HirKind::Alternation(hirs) => hirs.iter().any(detect_redos),
         // If there is an unbounded repetition inside of a repetition this could lead to

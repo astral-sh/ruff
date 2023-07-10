@@ -2937,8 +2937,8 @@ where
                 if self.enabled(Rule::DjangoLocalsInRenderFunction) {
                     flake8_django::rules::locals_in_render_function(self, func, args, keywords);
                 }
-                if self.enabled(Rule::CatastrophicReUse) {
-                    dlint::rules::catastrophic_re_use(self, expr_call);
+                if self.enabled(Rule::CatastrophicBacktrackingRegularExpression) {
+                    dlint::rules::catastrophic_backtracking_regular_expression(self, expr_call);
                 }
             }
             Expr::Dict(ast::ExprDict {
