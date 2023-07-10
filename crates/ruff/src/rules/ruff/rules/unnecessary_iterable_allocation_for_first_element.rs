@@ -8,36 +8,41 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Ensures that instead of creating a new list and indexing into it to find the first element of a
-/// collection (e.g., `list(...)[0]`), Python iterators are used.
+/// Checks for uses of `list(...)[0]` that can be replaced with
+/// `next(iter(...))`.
 ///
 /// ## Why is this bad?
-/// Creating a new list of great size can involve significant memory/speed concerns. Python's `next(iter(...))`
-/// pattern can be used in lieu of creating a new list. This pattern will lazily fetch the first
-/// element of the collection, avoiding the memory overhead involved with new list allocation.
-/// `next(iter(...))` also is much faster since the list itself doesn't get initialized at once.
+/// Calling `list(...)` will create a new list of the entire collection, which
+/// can be very expensive for large collections. If you only need the first
+/// element of the collection, you can use `next(iter(...))` to lazily fetch
+/// the first element without creating a new list.
+///
+/// Note that migrating from `list(...)[0]` to `next(iter(...))` can change
+/// the behavior of your program in two ways: first, `list(...)` will eagerly
+/// evaluate the entire collection, while `next(iter(...))` will only evaluate
+/// the first element, so any side effects from evaluating the collection will
+/// be delayed. Second, `list(...)[0]` will raise `IndexError` if the
+/// collection is empty, while `next(iter(...))` will raise `StopIteration`.
 ///
 /// ## Example
 /// ```python
-/// x = range(1000000000000)
-/// return list(x)[0]
+/// head = list(range(1000000000000))[0]
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = range(1000000000000)
-/// return next(iter(x))
+/// head = next(iter(range(1000000000000)))
 /// ```
 ///
 /// ## References
-/// - [Iterators and Iterables in Python: Run Efficient
-/// Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
+/// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[violation]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     arg: String,
     contains_slice: bool,
 }
 
+/// RUF015
 impl UnnecessaryIterableAllocationForFirstElement {
     pub(crate) fn new(arg: String, contains_slice: bool) -> Self {
         Self {
