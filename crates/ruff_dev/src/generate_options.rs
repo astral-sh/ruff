@@ -1,4 +1,6 @@
-//! Generate a Markdown-compatible listing of configuration options.
+//! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
+//!
+//! Used for <https://beta.ruff.rs/docs/settings/>
 use itertools::Itertools;
 
 use ruff::settings::options::Options;
