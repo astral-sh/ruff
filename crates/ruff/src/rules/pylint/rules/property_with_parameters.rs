@@ -55,7 +55,7 @@ pub(crate) fn property_with_parameters(
 ) {
     if !decorator_list
         .iter()
-        .any(|d| matches!(&d.expression, Expr::Name(ast::ExprName { id, .. }) if id == "property"))
+        .any(|decorator| matches!(&decorator.expression, Expr::Name(ast::ExprName { id, .. }) if id == "property"))
     {
         return;
     }

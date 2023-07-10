@@ -2196,18 +2196,24 @@ where
                 }
 
                 // Ex) Union[...]
-                if self.enabled(Rule::UnnecessaryLiteralUnion) {
-                    let mut check = true;
+                if self.any_enabled(&[Rule::UnnecessaryLiteralUnion, Rule::DuplicateUnionMember]) {
+                    // Determine if the current expression is an union
+                    // Avoid duplicate checks if the parent is an `Union[...]` since these rules traverse nested unions
+                    let is_unchecked_union = self
+                        .semantic
+                        .expr_grandparent()
+                        .and_then(Expr::as_subscript_expr)
+                        .map_or(true, |parent| {
+                            !self.semantic.match_typing_expr(&parent.value, "Union")
+                        });
 
-                    // Avoid duplicate checks if the parent is an `Union[...]`
-                    if let Some(Expr::Subscript(ast::ExprSubscript { value, .. })) =
-                        self.semantic.expr_grandparent()
-                    {
-                        check = !self.semantic.match_typing_expr(value, "Union");
-                    }
-
-                    if check {
-                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                    if is_unchecked_union {
+                        if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                            flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                        }
+                        if self.enabled(Rule::DuplicateUnionMember) {
+                            flake8_pyi::rules::duplicate_union_member(self, expr);
+                        }
                     }
                 }
 
