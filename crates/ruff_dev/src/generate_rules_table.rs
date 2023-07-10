@@ -11,19 +11,21 @@ const FIX_SYMBOL: &str = "🛠";
 const NURSERY_SYMBOL: &str = "🌅";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
-    table_out.push_str("| Code | Name | Message | Status |");
+    table_out.push_str("| Code | Name | Message | |");
     table_out.push('\n');
-    table_out.push_str("| ---- | ---- | ------- | ------ |");
+    table_out.push_str("| ---- | ---- | ------- | ------: |");
     table_out.push('\n');
     for rule in rules {
         let fix_token = match rule.autofixable() {
-            AutofixKind::None => "",
-            AutofixKind::Always | AutofixKind::Sometimes => FIX_SYMBOL,
+            AutofixKind::Always | AutofixKind::Sometimes => {
+                format!("<span style='opacity: 1'>{FIX_SYMBOL}</span>")
+            }
+            AutofixKind::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
         };
         let nursery_token = if rule.is_nursery() {
-            NURSERY_SYMBOL
+            format!("<span style='opacity: 1'>{NURSERY_SYMBOL}</span>")
         } else {
-            ""
+            format!("<span style='opacity: 0.1'>{NURSERY_SYMBOL}</span>")
         };
         let status_token = format!("{fix_token} {nursery_token}");
 
@@ -48,10 +50,19 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
 
 pub(crate) fn generate() -> String {
     // Generate the table string.
-    let mut table_out = format!(
-        "The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option.\n\
-        The {NURSERY_SYMBOL} emoji indicates that a rule is part of the nursery, a collection of newer lints that are still under development.\n\n"
-    );
+    let mut table_out = String::new();
+
+    table_out.push_str(&format!(
+        "The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option."));
+    table_out.push('\n');
+    table_out.push('\n');
+
+    table_out.push_str(&format!(
+        "The {NURSERY_SYMBOL} emoji indicates that a rule is part of the [\"nursery\"](../faq/#what-is-the-nursery)."
+    ));
+    table_out.push('\n');
+    table_out.push('\n');
+
     for linter in Linter::iter() {
         let codes_csv: String = match linter.common_prefix() {
             "" => linter
