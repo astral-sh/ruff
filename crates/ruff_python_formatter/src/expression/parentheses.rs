@@ -14,7 +14,7 @@ pub(crate) trait NeedsParentheses {
     ) -> Parentheses;
 }
 
-pub(crate) fn default_expression_needs_parentheses(
+pub(super) fn default_expression_needs_parentheses(
     node: AnyNodeRef,
     parenthesize: Parenthesize,
     source: &str,
