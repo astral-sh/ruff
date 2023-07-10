@@ -100,10 +100,15 @@ a < b > c == d
     == ddddddddddddddddddddd
 )
 
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa < [
-    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
-    ff,
-] < [ccccccccccccccccccccccccccccc, dddd] < ddddddddddddddddddddddddddddddddddddddddddd
+(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    < [
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        ff,
+    ]
+    < [ccccccccccccccccccccccccccccc, dddd]
+    < ddddddddddddddddddddddddddddddddddddddddddd
+)
 
 return 1 == 2 and (
     name,
