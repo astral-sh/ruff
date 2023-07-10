@@ -2161,7 +2161,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP604Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py310
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2289,7 +2290,8 @@ where
                                     }
                                 }
                                 if self.enabled(Rule::NonPEP585Annotation) {
-                                    if self.settings.target_version >= PythonVersion::Py39
+                                    if self.is_stub
+                                        || self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
                                             && self.semantic.in_annotation()
@@ -2367,7 +2369,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP585Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py39
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2540,10 +2543,10 @@ where
                 if self.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);
                 }
-                if self.enabled(Rule::NonPEP604Isinstance)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                if self.enabled(Rule::NonPEP604Isinstance) {
+                    if self.settings.target_version >= PythonVersion::Py310 {
+                        pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                    }
                 }
                 if self.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                     flake8_async::rules::blocking_http_call(self, expr);
