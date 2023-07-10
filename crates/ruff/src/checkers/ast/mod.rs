@@ -2436,19 +2436,19 @@ where
                     if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                         let attr = attr.as_str();
                         if let Expr::Constant(ast::ExprConstant {
-                            value: Constant::Str(value),
+                            value: Constant::Str(val),
                             ..
                         }) = value.as_ref()
                         {
                             if attr == "join" {
                                 // "...".join(...) call
                                 if self.enabled(Rule::StaticJoinToFString) {
-                                    flynt::rules::static_join_to_fstring(self, expr, value);
+                                    flynt::rules::static_join_to_fstring(self, expr, val);
                                 }
                             } else if attr == "format" {
                                 // "...".format(...) call
                                 let location = expr.range();
-                                match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
+                                match pyflakes::format::FormatSummary::try_from(val.as_ref()) {
                                     Err(e) => {
                                         if self.enabled(Rule::StringDotFormatInvalidFormat) {
                                             self.diagnostics.push(Diagnostic::new(
@@ -2492,7 +2492,13 @@ where
                                         }
 
                                         if self.enabled(Rule::FString) {
-                                            pyupgrade::rules::f_strings(self, &summary, expr);
+                                            pyupgrade::rules::f_strings(
+                                                self,
+                                                &summary,
+                                                expr,
+                                                value,
+                                                self.settings.line_length,
+                                            );
                                         }
                                     }
                                 }
