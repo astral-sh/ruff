@@ -56,11 +56,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
             | Expr::Tuple(_)
             | Expr::JoinedStr(_)
             | Expr::Constant(ExprConstant {
-                value: Constant::Str(_),
-                ..
-            })
-            | Expr::Constant(ExprConstant {
-                value: Constant::Bytes(_),
+                value: Constant::Str(_) | Constant::Bytes(_),
                 ..
             })
     ) {
