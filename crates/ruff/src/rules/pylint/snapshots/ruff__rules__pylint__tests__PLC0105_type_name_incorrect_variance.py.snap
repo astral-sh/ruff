@@ -27,7 +27,7 @@ type_name_incorrect_variance.py:7:5: PLC0105 `TypeVar` name "T" does not match v
 7 | T = TypeVar("T", contravariant=True)
   |     ^^^^^^^ PLC0105
 8 | T = TypeVar("T", covariant=False, contravariant=True)
-9 | U = ParamSpec("U", covariant=True)
+9 | P = ParamSpec("P", covariant=True)
   |
 
 type_name_incorrect_variance.py:8:5: PLC0105 `TypeVar` name "T" does not match variance
@@ -36,44 +36,44 @@ type_name_incorrect_variance.py:8:5: PLC0105 `TypeVar` name "T" does not match v
  7 | T = TypeVar("T", contravariant=True)
  8 | T = TypeVar("T", covariant=False, contravariant=True)
    |     ^^^^^^^ PLC0105
- 9 | U = ParamSpec("U", covariant=True)
-10 | U = ParamSpec("U", covariant=True, contravariant=False)
+ 9 | P = ParamSpec("P", covariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
    |
 
-type_name_incorrect_variance.py:9:5: PLC0105 `ParamSpec` name "U" does not match variance
+type_name_incorrect_variance.py:9:5: PLC0105 `ParamSpec` name "P" does not match variance
    |
  7 | T = TypeVar("T", contravariant=True)
  8 | T = TypeVar("T", covariant=False, contravariant=True)
- 9 | U = ParamSpec("U", covariant=True)
+ 9 | P = ParamSpec("P", covariant=True)
    |     ^^^^^^^^^ PLC0105
-10 | U = ParamSpec("U", covariant=True, contravariant=False)
-11 | U = ParamSpec("U", contravariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+11 | P = ParamSpec("P", contravariant=True)
    |
 
-type_name_incorrect_variance.py:10:5: PLC0105 `ParamSpec` name "U" does not match variance
+type_name_incorrect_variance.py:10:5: PLC0105 `ParamSpec` name "P" does not match variance
    |
  8 | T = TypeVar("T", covariant=False, contravariant=True)
- 9 | U = ParamSpec("U", covariant=True)
-10 | U = ParamSpec("U", covariant=True, contravariant=False)
+ 9 | P = ParamSpec("P", covariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
    |     ^^^^^^^^^ PLC0105
-11 | U = ParamSpec("U", contravariant=True)
-12 | U = ParamSpec("U", covariant=False, contravariant=True)
+11 | P = ParamSpec("P", contravariant=True)
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
    |
 
-type_name_incorrect_variance.py:11:5: PLC0105 `ParamSpec` name "U" does not match variance
+type_name_incorrect_variance.py:11:5: PLC0105 `ParamSpec` name "P" does not match variance
    |
- 9 | U = ParamSpec("U", covariant=True)
-10 | U = ParamSpec("U", covariant=True, contravariant=False)
-11 | U = ParamSpec("U", contravariant=True)
+ 9 | P = ParamSpec("P", covariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+11 | P = ParamSpec("P", contravariant=True)
    |     ^^^^^^^^^ PLC0105
-12 | U = ParamSpec("U", covariant=False, contravariant=True)
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
    |
 
-type_name_incorrect_variance.py:12:5: PLC0105 `ParamSpec` name "U" does not match variance
+type_name_incorrect_variance.py:12:5: PLC0105 `ParamSpec` name "P" does not match variance
    |
-10 | U = ParamSpec("U", covariant=True, contravariant=False)
-11 | U = ParamSpec("U", contravariant=True)
-12 | U = ParamSpec("U", covariant=False, contravariant=True)
+10 | P = ParamSpec("P", covariant=True, contravariant=False)
+11 | P = ParamSpec("P", contravariant=True)
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
    |     ^^^^^^^^^ PLC0105
 13 | 
 14 | T_co = TypeVar("T_co")
@@ -81,7 +81,7 @@ type_name_incorrect_variance.py:12:5: PLC0105 `ParamSpec` name "U" does not matc
 
 type_name_incorrect_variance.py:14:8: PLC0105 `TypeVar` name "T_co" does not match variance
    |
-12 | U = ParamSpec("U", covariant=False, contravariant=True)
+12 | P = ParamSpec("P", covariant=False, contravariant=True)
 13 | 
 14 | T_co = TypeVar("T_co")
    |        ^^^^^^^ PLC0105
@@ -125,7 +125,7 @@ type_name_incorrect_variance.py:18:8: PLC0105 `TypeVar` name "T_co" does not mat
 18 | T_co = TypeVar("T_co", contravariant=True)
    |        ^^^^^^^ PLC0105
 19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
-20 | U_co = ParamSpec("U_co")
+20 | P_co = ParamSpec("P_co")
    |
 
 type_name_incorrect_variance.py:19:8: PLC0105 `TypeVar` name "T_co" does not match variance
@@ -134,64 +134,64 @@ type_name_incorrect_variance.py:19:8: PLC0105 `TypeVar` name "T_co" does not mat
 18 | T_co = TypeVar("T_co", contravariant=True)
 19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
    |        ^^^^^^^ PLC0105
-20 | U_co = ParamSpec("U_co")
-21 | U_co = ParamSpec("U_co", covariant=False)
+20 | P_co = ParamSpec("P_co")
+21 | P_co = ParamSpec("P_co", covariant=False)
    |
 
-type_name_incorrect_variance.py:20:8: PLC0105 `ParamSpec` name "U_co" does not match variance
+type_name_incorrect_variance.py:20:8: PLC0105 `ParamSpec` name "P_co" does not match variance
    |
 18 | T_co = TypeVar("T_co", contravariant=True)
 19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
-20 | U_co = ParamSpec("U_co")
+20 | P_co = ParamSpec("P_co")
    |        ^^^^^^^^^ PLC0105
-21 | U_co = ParamSpec("U_co", covariant=False)
-22 | U_co = ParamSpec("U_co", contravariant=False)
+21 | P_co = ParamSpec("P_co", covariant=False)
+22 | P_co = ParamSpec("P_co", contravariant=False)
    |
 
-type_name_incorrect_variance.py:21:8: PLC0105 `ParamSpec` name "U_co" does not match variance
+type_name_incorrect_variance.py:21:8: PLC0105 `ParamSpec` name "P_co" does not match variance
    |
 19 | T_co = TypeVar("T_co", covariant=False, contravariant=True)
-20 | U_co = ParamSpec("U_co")
-21 | U_co = ParamSpec("U_co", covariant=False)
+20 | P_co = ParamSpec("P_co")
+21 | P_co = ParamSpec("P_co", covariant=False)
    |        ^^^^^^^^^ PLC0105
-22 | U_co = ParamSpec("U_co", contravariant=False)
-23 | U_co = ParamSpec("U_co", covariant=False, contravariant=False)
+22 | P_co = ParamSpec("P_co", contravariant=False)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
    |
 
-type_name_incorrect_variance.py:22:8: PLC0105 `ParamSpec` name "U_co" does not match variance
+type_name_incorrect_variance.py:22:8: PLC0105 `ParamSpec` name "P_co" does not match variance
    |
-20 | U_co = ParamSpec("U_co")
-21 | U_co = ParamSpec("U_co", covariant=False)
-22 | U_co = ParamSpec("U_co", contravariant=False)
+20 | P_co = ParamSpec("P_co")
+21 | P_co = ParamSpec("P_co", covariant=False)
+22 | P_co = ParamSpec("P_co", contravariant=False)
    |        ^^^^^^^^^ PLC0105
-23 | U_co = ParamSpec("U_co", covariant=False, contravariant=False)
-24 | U_co = ParamSpec("U_co", contravariant=True)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+24 | P_co = ParamSpec("P_co", contravariant=True)
    |
 
-type_name_incorrect_variance.py:23:8: PLC0105 `ParamSpec` name "U_co" does not match variance
+type_name_incorrect_variance.py:23:8: PLC0105 `ParamSpec` name "P_co" does not match variance
    |
-21 | U_co = ParamSpec("U_co", covariant=False)
-22 | U_co = ParamSpec("U_co", contravariant=False)
-23 | U_co = ParamSpec("U_co", covariant=False, contravariant=False)
+21 | P_co = ParamSpec("P_co", covariant=False)
+22 | P_co = ParamSpec("P_co", contravariant=False)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
    |        ^^^^^^^^^ PLC0105
-24 | U_co = ParamSpec("U_co", contravariant=True)
-25 | U_co = ParamSpec("U_co", covariant=False, contravariant=True)
+24 | P_co = ParamSpec("P_co", contravariant=True)
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
    |
 
-type_name_incorrect_variance.py:24:8: PLC0105 `ParamSpec` name "U_co" does not match variance
+type_name_incorrect_variance.py:24:8: PLC0105 `ParamSpec` name "P_co" does not match variance
    |
-22 | U_co = ParamSpec("U_co", contravariant=False)
-23 | U_co = ParamSpec("U_co", covariant=False, contravariant=False)
-24 | U_co = ParamSpec("U_co", contravariant=True)
+22 | P_co = ParamSpec("P_co", contravariant=False)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+24 | P_co = ParamSpec("P_co", contravariant=True)
    |        ^^^^^^^^^ PLC0105
-25 | U_co = ParamSpec("U_co", covariant=False, contravariant=True)
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
    |
 
-type_name_incorrect_variance.py:25:8: PLC0105 `ParamSpec` name "U_co" does not match variance
+type_name_incorrect_variance.py:25:8: PLC0105 `ParamSpec` name "P_co" does not match variance
    |
-23 | U_co = ParamSpec("U_co", covariant=False, contravariant=False)
-24 | U_co = ParamSpec("U_co", contravariant=True)
-25 | U_co = ParamSpec("U_co", covariant=False, contravariant=True)
+23 | P_co = ParamSpec("P_co", covariant=False, contravariant=False)
+24 | P_co = ParamSpec("P_co", contravariant=True)
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
    |        ^^^^^^^^^ PLC0105
 26 | 
 27 | T_contra = TypeVar("T_contra")
@@ -199,7 +199,7 @@ type_name_incorrect_variance.py:25:8: PLC0105 `ParamSpec` name "U_co" does not m
 
 type_name_incorrect_variance.py:27:12: PLC0105 `TypeVar` name "T_contra" does not match variance
    |
-25 | U_co = ParamSpec("U_co", covariant=False, contravariant=True)
+25 | P_co = ParamSpec("P_co", covariant=False, contravariant=True)
 26 | 
 27 | T_contra = TypeVar("T_contra")
    |            ^^^^^^^ PLC0105
@@ -243,7 +243,7 @@ type_name_incorrect_variance.py:31:12: PLC0105 `TypeVar` name "T_contra" does no
 31 | T_contra = TypeVar("T_contra", covariant=True)
    |            ^^^^^^^ PLC0105
 32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
-33 | U_contra = ParamSpec("U_contra")
+33 | P_contra = ParamSpec("P_contra")
    |
 
 type_name_incorrect_variance.py:32:12: PLC0105 `TypeVar` name "T_contra" does not match variance
@@ -252,64 +252,64 @@ type_name_incorrect_variance.py:32:12: PLC0105 `TypeVar` name "T_contra" does no
 31 | T_contra = TypeVar("T_contra", covariant=True)
 32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
    |            ^^^^^^^ PLC0105
-33 | U_contra = ParamSpec("U_contra")
-34 | U_contra = ParamSpec("U_contra", covariant=False)
+33 | P_contra = ParamSpec("P_contra")
+34 | P_contra = ParamSpec("P_contra", covariant=False)
    |
 
-type_name_incorrect_variance.py:33:12: PLC0105 `ParamSpec` name "U_contra" does not match variance
+type_name_incorrect_variance.py:33:12: PLC0105 `ParamSpec` name "P_contra" does not match variance
    |
 31 | T_contra = TypeVar("T_contra", covariant=True)
 32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
-33 | U_contra = ParamSpec("U_contra")
+33 | P_contra = ParamSpec("P_contra")
    |            ^^^^^^^^^ PLC0105
-34 | U_contra = ParamSpec("U_contra", covariant=False)
-35 | U_contra = ParamSpec("U_contra", contravariant=False)
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
    |
 
-type_name_incorrect_variance.py:34:12: PLC0105 `ParamSpec` name "U_contra" does not match variance
+type_name_incorrect_variance.py:34:12: PLC0105 `ParamSpec` name "P_contra" does not match variance
    |
 32 | T_contra = TypeVar("T_contra", covariant=True, contravariant=False)
-33 | U_contra = ParamSpec("U_contra")
-34 | U_contra = ParamSpec("U_contra", covariant=False)
+33 | P_contra = ParamSpec("P_contra")
+34 | P_contra = ParamSpec("P_contra", covariant=False)
    |            ^^^^^^^^^ PLC0105
-35 | U_contra = ParamSpec("U_contra", contravariant=False)
-36 | U_contra = ParamSpec("U_contra", covariant=False, contravariant=False)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
    |
 
-type_name_incorrect_variance.py:35:12: PLC0105 `ParamSpec` name "U_contra" does not match variance
+type_name_incorrect_variance.py:35:12: PLC0105 `ParamSpec` name "P_contra" does not match variance
    |
-33 | U_contra = ParamSpec("U_contra")
-34 | U_contra = ParamSpec("U_contra", covariant=False)
-35 | U_contra = ParamSpec("U_contra", contravariant=False)
+33 | P_contra = ParamSpec("P_contra")
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
    |            ^^^^^^^^^ PLC0105
-36 | U_contra = ParamSpec("U_contra", covariant=False, contravariant=False)
-37 | U_contra = ParamSpec("U_contra", covariant=True)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+37 | P_contra = ParamSpec("P_contra", covariant=True)
    |
 
-type_name_incorrect_variance.py:36:12: PLC0105 `ParamSpec` name "U_contra" does not match variance
+type_name_incorrect_variance.py:36:12: PLC0105 `ParamSpec` name "P_contra" does not match variance
    |
-34 | U_contra = ParamSpec("U_contra", covariant=False)
-35 | U_contra = ParamSpec("U_contra", contravariant=False)
-36 | U_contra = ParamSpec("U_contra", covariant=False, contravariant=False)
+34 | P_contra = ParamSpec("P_contra", covariant=False)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
    |            ^^^^^^^^^ PLC0105
-37 | U_contra = ParamSpec("U_contra", covariant=True)
-38 | U_contra = ParamSpec("U_contra", covariant=True, contravariant=False)
+37 | P_contra = ParamSpec("P_contra", covariant=True)
+38 | P_contra = ParamSpec("P_contra", covariant=True, contravariant=False)
    |
 
-type_name_incorrect_variance.py:37:12: PLC0105 `ParamSpec` name "U_contra" does not match variance
+type_name_incorrect_variance.py:37:12: PLC0105 `ParamSpec` name "P_contra" does not match variance
    |
-35 | U_contra = ParamSpec("U_contra", contravariant=False)
-36 | U_contra = ParamSpec("U_contra", covariant=False, contravariant=False)
-37 | U_contra = ParamSpec("U_contra", covariant=True)
+35 | P_contra = ParamSpec("P_contra", contravariant=False)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+37 | P_contra = ParamSpec("P_contra", covariant=True)
    |            ^^^^^^^^^ PLC0105
-38 | U_contra = ParamSpec("U_contra", covariant=True, contravariant=False)
+38 | P_contra = ParamSpec("P_contra", covariant=True, contravariant=False)
    |
 
-type_name_incorrect_variance.py:38:12: PLC0105 `ParamSpec` name "U_contra" does not match variance
+type_name_incorrect_variance.py:38:12: PLC0105 `ParamSpec` name "P_contra" does not match variance
    |
-36 | U_contra = ParamSpec("U_contra", covariant=False, contravariant=False)
-37 | U_contra = ParamSpec("U_contra", covariant=True)
-38 | U_contra = ParamSpec("U_contra", covariant=True, contravariant=False)
+36 | P_contra = ParamSpec("P_contra", covariant=False, contravariant=False)
+37 | P_contra = ParamSpec("P_contra", covariant=True)
+38 | P_contra = ParamSpec("P_contra", covariant=True, contravariant=False)
    |            ^^^^^^^^^ PLC0105
 39 | 
 40 | # Non-errors.
