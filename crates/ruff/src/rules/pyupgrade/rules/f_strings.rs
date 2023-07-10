@@ -337,7 +337,7 @@ pub(crate) fn f_strings(
     };
 
     // Avoid refactors that exceed the line length limit.
-    let col_offset = expr.start() - checker.locator.line_start(expr.start());
+    let col_offset = template.start() - checker.locator.line_start(template.start());
     if col_offset.to_usize() + contents.len() > line_length.get() {
         return;
     }
