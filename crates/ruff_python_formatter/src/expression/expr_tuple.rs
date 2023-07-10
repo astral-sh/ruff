@@ -1,5 +1,5 @@
 use crate::builders::optional_parentheses;
-use crate::comments::{dangling_comments, Comments, CommentLinePosition};
+use crate::comments::{dangling_comments, CommentLinePosition, Comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
     Parenthesize,
@@ -76,7 +76,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 debug_assert!(dangling[end_of_line_split..]
                     .iter()
                     .all(|comment| comment.line_position() == CommentLinePosition::OwnLine));
-                return write!(
+                write!(
                     f,
                     [group(&format_args![
                         text("("),
@@ -84,7 +84,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         soft_block_indent(&dangling_comments(&dangling[end_of_line_split..])),
                         text(")")
                     ])]
-                );
+                )
             }
             [single] => {
                 // A single element tuple always needs parentheses and a trailing comma
