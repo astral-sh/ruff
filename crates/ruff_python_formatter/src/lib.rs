@@ -281,13 +281,11 @@ if True:
     fn quick_test() {
         let src = r#"
 
-if (
-    field.is_relation
-    and not field.many_to_many
-    and hasattr(field, "attname")
-    and field.attname == name
-):
-    pass
+def test3():
+    if True:
+        field = (
+            model._meta.pk if from_field is None else model._meta.get_field(from_field)
+        )
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

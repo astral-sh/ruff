@@ -303,18 +303,9 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
                 range: _,
             }) => self.update_max_priority(OperatorPriority::from(*op)),
 
-            Expr::IfExp(ast::ExprIfExp {
-                range: _,
-                test,
-                body: _,
-                orelse: _,
-            }) => {
-                self.update_max_priority(OperatorPriority::Conditional);
-
-                // Nested if else expressions are always parenthesized. Ignore parentheses in this case
-                if let Expr::IfExp(_) = test.as_ref() {
-                    self.update_max_priority(OperatorPriority::Conditional);
-                }
+            Expr::IfExp(_) => {
+                // + 1 for the if and one for the else
+                self.update_max_priority_with_count(OperatorPriority::Conditional, 2);
             }
 
             Expr::Compare(ast::ExprCompare {
