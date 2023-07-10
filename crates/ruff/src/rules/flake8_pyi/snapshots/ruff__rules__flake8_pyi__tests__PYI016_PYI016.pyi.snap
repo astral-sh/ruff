@@ -340,7 +340,7 @@ PYI016.pyi:41:16: PYI016 [*] Duplicate union member `int`
    41 |+field14: int | str | int  # Error
 42 42 | 
 43 43 | # Should emit for duplicate literal types; also covered by PYI030
-44 44 | field15: typing.Literal[1] | typing.Literal[1]  # OK
+44 44 | field15: typing.Literal[1] | typing.Literal[1]  # Error
 
 PYI016.pyi:41:28: PYI016 [*] Duplicate union member `int`
    |
@@ -360,12 +360,12 @@ PYI016.pyi:41:28: PYI016 [*] Duplicate union member `int`
    41 |+field14: int | int | str  # Error
 42 42 | 
 43 43 | # Should emit for duplicate literal types; also covered by PYI030
-44 44 | field15: typing.Literal[1] | typing.Literal[1]  # OK
+44 44 | field15: typing.Literal[1] | typing.Literal[1]  # Error
 
 PYI016.pyi:44:30: PYI016 [*] Duplicate union member `typing.Literal[1]`
    |
 43 | # Should emit for duplicate literal types; also covered by PYI030
-44 | field15: typing.Literal[1] | typing.Literal[1]  # OK
+44 | field15: typing.Literal[1] | typing.Literal[1]  # Error
    |                              ^^^^^^^^^^^^^^^^^ PYI016
 45 | 
 46 | # Shouldn't emit if in new parent type
@@ -376,8 +376,8 @@ PYI016.pyi:44:30: PYI016 [*] Duplicate union member `typing.Literal[1]`
 41 41 | field14: int | int | str | int  # Error
 42 42 | 
 43 43 | # Should emit for duplicate literal types; also covered by PYI030
-44    |-field15: typing.Literal[1] | typing.Literal[1]  # OK
-   44 |+field15: typing.Literal[1]  # OK
+44    |-field15: typing.Literal[1] | typing.Literal[1]  # Error
+   44 |+field15: typing.Literal[1]  # Error
 45 45 | 
 46 46 | # Shouldn't emit if in new parent type
 47 47 | field16: int | dict[int, str]  # OK
