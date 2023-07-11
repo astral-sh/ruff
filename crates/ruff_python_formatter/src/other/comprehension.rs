@@ -3,13 +3,25 @@ use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use rustpython_parser::ast::{Comprehension, Ranged};
+use rustpython_parser::ast::{Comprehension, Expr, Ranged};
 
 #[derive(Default)]
 pub struct FormatComprehension;
 
 impl FormatNodeRule<Comprehension> for FormatComprehension {
     fn fmt_fields(&self, item: &Comprehension, f: &mut PyFormatter) -> FormatResult<()> {
+        struct Spacer<'a>(&'a Expr);
+
+        impl Format<PyFormatContext<'_>> for Spacer<'_> {
+            fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+                if f.context().comments().has_leading_comments(self.0) {
+                    soft_line_break_or_space().fmt(f)
+                } else {
+                    space().fmt(f)
+                }
+            }
+        }
+
         let Comprehension {
             range: _,
             target,
@@ -18,33 +30,40 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             is_async,
         } = item;
 
-        let comments = f.context().comments().clone();
-
         if *is_async {
             write!(f, [text("async"), space()])?;
         }
 
+        let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling_comments(item);
-
         let (before_target_comments, before_in_comments) = dangling_item_comments.split_at(
             dangling_item_comments
                 .partition_point(|comment| comment.slice().end() < target.range().start()),
         );
 
         let trailing_in_comments = comments.dangling_comments(iter);
+
+        let in_spacer = format_with(|f| {
+            if before_in_comments.is_empty() {
+                space().fmt(f)
+            } else {
+                soft_line_break_or_space().fmt(f)
+            }
+        });
+
         write!(
             f,
             [
                 text("for"),
                 trailing_comments(before_target_comments),
                 group(&format_args!(
-                    soft_line_break_or_space(),
+                    Spacer(target),
                     target.format(),
-                    soft_line_break_or_space(),
+                    in_spacer,
                     leading_comments(before_in_comments),
                     text("in"),
                     trailing_comments(trailing_in_comments),
-                    soft_line_break_or_space(),
+                    Spacer(iter),
                     iter.format(),
                 )),
             ]
@@ -64,7 +83,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                         leading_comments(own_line_if_comments),
                         text("if"),
                         trailing_comments(end_of_line_if_comments),
-                        soft_line_break_or_space(),
+                        Spacer(if_case),
                         if_case.format(),
                     )));
                 }
