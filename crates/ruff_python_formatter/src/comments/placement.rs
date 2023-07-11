@@ -1337,6 +1337,7 @@ fn handle_comprehension_comment<'a>(
     let mut last_end = comprehension.iter.range().end();
 
     for if_node in &comprehension.ifs {
+        // ```python
         // [
         //     a
         //     for
@@ -1352,7 +1353,7 @@ fn handle_comprehension_comment<'a>(
         //     # above g
         //     g  # g
         // ]
-
+        // ```
         let if_token = find_only_token_in_range(
             TextRange::new(last_end, if_node.range().start()),
             locator,
