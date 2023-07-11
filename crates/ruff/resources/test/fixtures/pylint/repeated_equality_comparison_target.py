@@ -35,3 +35,5 @@ foo in {"a", "b", "c"}  # Uses membership test already.
 foo not in {"a", "b", "c"}  # Uses membership test already.
 
 foo == "a"  # Single comparison.
+
+foo != "a"  # Single comparison.
