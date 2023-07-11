@@ -53,7 +53,7 @@ impl Violation for DjangoNullableModelStringField {
 
 /// DJ001
 pub(crate) fn nullable_model_string_field(checker: &mut Checker, body: &[Stmt]) {
-    for statement in body.iter() {
+    for statement in body {
         let Stmt::Assign(ast::StmtAssign { value, .. }) = statement else {
             continue;
         };
@@ -87,7 +87,7 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
     let mut null_key = false;
     let mut blank_key = false;
     let mut unique_key = false;
-    for keyword in keywords.iter() {
+    for keyword in keywords {
         let Some(argument) = &keyword.arg else {
             continue;
         };

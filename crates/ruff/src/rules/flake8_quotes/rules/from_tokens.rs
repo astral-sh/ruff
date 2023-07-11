@@ -322,7 +322,7 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
         string_contents.contains(good_single(quotes_settings.inline_quotes))
     });
 
-    for (range, trivia) in sequence.iter().zip(trivia.into_iter()) {
+    for (range, trivia) in sequence.iter().zip(trivia) {
         if trivia.is_multiline {
             // If our string is or contains a known good string, ignore it.
             if trivia

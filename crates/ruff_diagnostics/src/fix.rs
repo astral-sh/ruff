@@ -66,7 +66,7 @@ impl Fix {
     )]
     pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         Self {
-            edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+            edits: std::iter::once(edit).chain(rest).collect(),
             applicability: Applicability::Unspecified,
             isolation_level: IsolationLevel::default(),
         }
@@ -84,7 +84,7 @@ impl Fix {
     /// Create a new [`Fix`] with [automatic applicability](Applicability::Automatic) from multiple [`Edit`] elements.
     pub fn automatic_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         Self {
-            edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+            edits: std::iter::once(edit).chain(rest).collect(),
             applicability: Applicability::Automatic,
             isolation_level: IsolationLevel::default(),
         }
@@ -102,7 +102,7 @@ impl Fix {
     /// Create a new [`Fix`] with [suggested applicability](Applicability::Suggested) from multiple [`Edit`] elements.
     pub fn suggested_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         Self {
-            edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+            edits: std::iter::once(edit).chain(rest).collect(),
             applicability: Applicability::Suggested,
             isolation_level: IsolationLevel::default(),
         }
@@ -120,7 +120,7 @@ impl Fix {
     /// Create a new [`Fix`] with [manual applicability](Applicability::Manual) from multiple [`Edit`] elements.
     pub fn manual_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         Self {
-            edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+            edits: std::iter::once(edit).chain(rest).collect(),
             applicability: Applicability::Manual,
             isolation_level: IsolationLevel::default(),
         }

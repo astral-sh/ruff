@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = JsonEmitter::default();
+        let mut emitter = JsonEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

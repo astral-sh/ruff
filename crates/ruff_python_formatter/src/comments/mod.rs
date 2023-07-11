@@ -436,7 +436,7 @@ mod tests {
 
             let comment_ranges = comment_ranges.finish();
 
-            let parsed = parse_tokens(tokens.into_iter(), Mode::Module, "test.py")
+            let parsed = parse_tokens(tokens, Mode::Module, "test.py")
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {

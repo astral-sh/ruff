@@ -776,7 +776,7 @@ where
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt, self.locator);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for name in names.iter() {
+                    for name in names {
                         if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
@@ -972,7 +972,7 @@ where
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt, self.locator);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for name in names.iter() {
+                    for name in names {
                         if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
@@ -1617,7 +1617,7 @@ where
                     flake8_bandit::rules::assign_hardcoded_password_string(self, value, targets);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for target in targets.iter() {
+                    for target in targets {
                         if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
@@ -1749,7 +1749,7 @@ where
             }
             Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 if self.enabled(Rule::GlobalStatement) {
-                    for target in targets.iter() {
+                    for target in targets {
                         if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }

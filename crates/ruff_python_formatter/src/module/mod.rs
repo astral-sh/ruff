@@ -26,7 +26,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Mod {
     type Format<'a> = FormatRefWithRule<'a, Mod, FormatMod, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatMod::default())
+        FormatRefWithRule::new(self, FormatMod)
     }
 }
 
@@ -34,6 +34,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Mod {
     type Format = FormatOwnedWithRule<Mod, FormatMod, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, FormatMod::default())
+        FormatOwnedWithRule::new(self, FormatMod)
     }
 }

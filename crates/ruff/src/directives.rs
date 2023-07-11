@@ -427,22 +427,22 @@ ghi
             NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
         );
 
-        let contents = r#"x = \
-    1"#;
+        let contents = r"x = \
+    1";
         assert_eq!(
             noqa_mappings(contents),
             NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(6))])
         );
 
-        let contents = r#"from foo import \
+        let contents = r"from foo import \
     bar as baz, \
-    qux as quux"#;
+    qux as quux";
         assert_eq!(
             noqa_mappings(contents),
             NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(36))])
         );
 
-        let contents = r#"
+        let contents = r"
 # Foo
 from foo import \
     bar as baz, \
@@ -450,7 +450,7 @@ from foo import \
 x = \
     1
 y = \
-    2"#;
+    2";
         assert_eq!(
             noqa_mappings(contents),
             NoqaMapping::from_iter([

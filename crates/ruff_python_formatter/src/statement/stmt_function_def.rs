@@ -124,7 +124,7 @@ impl<'def, 'ast> AsFormat<PyFormatContext<'ast>> for AnyFunctionDefinition<'def>
     > where Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatAnyFunctionDef::default())
+        FormatRefWithRule::new(self, FormatAnyFunctionDef)
     }
 }
 
