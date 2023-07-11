@@ -90,10 +90,6 @@ impl NeedsParentheses for ExprSubscript {
         parenthesize: Parenthesize,
         context: &PyFormatContext,
     ) -> Parentheses {
-        // TODO: Issue, returns `Never` here but parentheses are necessary in return type positions.
-        // We don't have the position information available here which sux.
-        // Rename `optional_parentheses` to `parenthesize_if_breaks`
-        // Create a new optional parentheses function that does the whole magic stuff.
         match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             Parentheses::Optional => Parentheses::Never,
             parentheses => parentheses,
