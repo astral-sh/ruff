@@ -228,7 +228,7 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 }
 
 #[cfg(test)]
-#[cfg(unix)]
+#[cfg(unix)] // Remove when adding a second test
 mod test {
     use super::run;
     use crate::args::Overrides;
