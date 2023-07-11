@@ -280,8 +280,15 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-def foo() -> tuple[int, int, int,]:
-    return 2
+if a * [
+    bbbbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccccccccccccdddddddddddddddddddddddddd,
+] + a * e * [
+    ffff,
+    gggg,
+    hhhhhhhhhhhhhh,
+] * c:
+    pass
 
 "#;
         // Tokenize once
