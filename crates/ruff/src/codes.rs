@@ -266,6 +266,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "031") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::ReuseOfGroupbyGenerator),
         (Flake8Bugbear, "032") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UnintentionalTypeAnnotation),
         (Flake8Bugbear, "033") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::DuplicateValue),
+        (Flake8Bugbear, "034") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::ReSubPositionalArgs),
         (Flake8Bugbear, "904") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
 
