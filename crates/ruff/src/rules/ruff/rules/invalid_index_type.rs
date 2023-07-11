@@ -50,7 +50,7 @@ impl Violation for InvalidIndexType {
 }
 
 /// RUF015
-pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, expr: &'a ExprSubscript) {
+pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
     let ExprSubscript {
         value,
         slice: index,
@@ -72,12 +72,12 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, expr: &'a ExprSubscr
         return;
     }
 
-    // The types supported by this rule should always be checkable
-    let value_type = CheckableExprType::try_from(&value)
+    // The value types supported by this rule should always be checkable
+    let value_type = CheckableExprType::try_from(value)
         .expect("Expected indexed expression to be a checkable type.");
 
     // If the index is not a checkable type then we can't easily determine if there is a violation
-    let Some(index_type) = CheckableExprType::try_from(&index) else {
+    let Some(index_type) = CheckableExprType::try_from(index) else {
         return;
     };
 
@@ -165,7 +165,7 @@ enum CheckableExprType<'a> {
 impl fmt::Display for CheckableExprType<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Constant(constant) => f.write_str(&constant_type_name(constant)),
+            Self::Constant(constant) => f.write_str(constant_type_name(constant)),
             Self::JoinedStr => f.write_str("str"),
             Self::List => f.write_str("list"),
             Self::SetComp => f.write_str("set comprehension"),
