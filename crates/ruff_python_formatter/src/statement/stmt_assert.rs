@@ -14,27 +14,27 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
             test,
             msg,
         } = item;
+
+        write!(
+            f,
+            [
+                text("assert"),
+                space(),
+                test.format().with_options(Parenthesize::IfBreaks)
+            ]
+        )?;
+
         if let Some(msg) = msg {
             write!(
                 f,
                 [
-                    text("assert"),
-                    space(),
-                    test.format().with_options(Parenthesize::IfBreaks),
                     text(","),
                     space(),
                     msg.format().with_options(Parenthesize::IfBreaks)
                 ]
-            )
-        } else {
-            write!(
-                f,
-                [
-                    text("assert"),
-                    space(),
-                    test.format().with_options(Parenthesize::IfBreaks)
-                ]
-            )
+            )?;
         }
+
+        Ok(())
     }
 }
