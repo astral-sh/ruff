@@ -6,7 +6,7 @@ mod stack;
 
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
-use crate::format_element::{BestFittingMode, BestFittingVariants, LineMode, PrintMode};
+use crate::format_element::{BestFittingVariants, LineMode, PrintMode};
 use crate::prelude::tag;
 use crate::prelude::tag::{DedentMode, Tag, TagKind, VerbatimKind};
 use crate::printer::call_stack::{
@@ -135,8 +135,8 @@ impl<'a> Printer<'a> {
                 self.flush_line_suffixes(queue, stack, Some(HARD_BREAK));
             }
 
-            FormatElement::BestFitting { variants, mode } => {
-                self.print_best_fitting(variants, *mode, queue, stack)?;
+            FormatElement::BestFitting { variants } => {
+                self.print_best_fitting(variants, queue, stack)?;
             }
 
             FormatElement::Interned(content) => {
@@ -426,7 +426,6 @@ impl<'a> Printer<'a> {
     fn print_best_fitting(
         &mut self,
         variants: &'a BestFittingVariants,
-        mode: BestFittingMode,
         queue: &mut PrintQueue<'a>,
         stack: &mut PrintCallStack,
     ) -> PrintResult<()> {
@@ -452,9 +451,7 @@ impl<'a> Printer<'a> {
                 // args must be popped from the stack as soon as it sees the matching end entry.
                 let content = &variant[1..];
 
-                let entry_args = args
-                    .with_print_mode(PrintMode::Flat)
-                    .with_measure_mode(MeasureMode::from(mode));
+                let entry_args = args.with_print_mode(PrintMode::Flat);
 
                 queue.extend_back(content);
                 stack.push(TagKind::Entry, entry_args);
@@ -1065,13 +1062,10 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::SourcePosition(_) => {}
 
-            FormatElement::BestFitting { variants, mode } => {
-                let (slice, args) = match args.mode() {
-                    PrintMode::Flat => (
-                        variants.most_flat(),
-                        args.with_measure_mode(MeasureMode::from(*mode)),
-                    ),
-                    PrintMode::Expanded => (variants.most_expanded(), args),
+            FormatElement::BestFitting { variants } => {
+                let slice = match args.mode() {
+                    PrintMode::Flat => variants.most_flat(),
+                    PrintMode::Expanded => variants.most_expanded(),
                 };
 
                 if !matches!(slice.first(), Some(FormatElement::Tag(Tag::StartEntry))) {
@@ -1383,15 +1377,6 @@ enum MeasureMode {
     /// The content only fits if non of the lines exceed the print width. Lines are terminated by either
     /// a hard line break or a soft line break in [`PrintMode::Expanded`].
     AllLines,
-}
-
-impl From<BestFittingMode> for MeasureMode {
-    fn from(value: BestFittingMode) -> Self {
-        match value {
-            BestFittingMode::FirstLine => Self::FirstLine,
-            BestFittingMode::AllLines => Self::AllLines,
-        }
-    }
 }
 
 #[cfg(test)]
