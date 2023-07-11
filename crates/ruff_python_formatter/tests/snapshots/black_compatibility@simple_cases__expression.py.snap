@@ -291,13 +291,13 @@ last_call()
 -    "port1": port1_resource,
 -    "port2": port2_resource,
 -}[port_id]
-+lambda x: True
-+lambda x: True
-+lambda x: True
-+lambda x: True
-+lambda x: True
-+manylambdas = lambda x: True
-+foo = lambda x: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++manylambdas = lambda NOT_YET_IMPLEMENTED_lambda: True
++foo = lambda NOT_YET_IMPLEMENTED_lambda: True
  1 if True else 2
  str or None if True else str or bytes or None
  (str or None) if True else (str or bytes or None)
@@ -494,7 +494,7 @@ last_call()
 +    if False
 +    else {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +)
-+print(*lambda x: True)
++print(*lambda NOT_YET_IMPLEMENTED_lambda: True)
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
@@ -581,13 +581,13 @@ not great
 (~int) and (not ((v1 ^ (123 + v2)) | True))
 +really ** -confusing ** ~operator**-precedence
 flags & ~select.EPOLLIN and waiters.write_task is not None
-lambda x: True
-lambda x: True
-lambda x: True
-lambda x: True
-lambda x: True
-manylambdas = lambda x: True
-foo = lambda x: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+manylambdas = lambda NOT_YET_IMPLEMENTED_lambda: True
+foo = lambda NOT_YET_IMPLEMENTED_lambda: True
 1 if True else 2
 str or None if True else str or bytes or None
 (str or None) if True else (str or bytes or None)
@@ -785,7 +785,7 @@ print(
     if False
     else {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 )
-print(*lambda x: True)
+print(*lambda NOT_YET_IMPLEMENTED_lambda: True)
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
