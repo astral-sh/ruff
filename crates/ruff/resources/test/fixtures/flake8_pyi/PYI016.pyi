@@ -1,3 +1,5 @@
+import typing
+
 # Shouldn't affect non-union field types.
 field1: str
 
@@ -30,3 +32,42 @@ field10: (str | int) | str  # PYI016: Duplicate union member `str`
 
 # Should emit for nested unions.
 field11: dict[int | int, str]
+
+# Should emit for unions with more than two cases
+field12: int | int | int  # Error
+field13: int | int | int | int  # Error
+
+# Should emit for unions with more than two cases, even if not directly adjacent
+field14: int | int | str | int  # Error
+
+# Should emit for duplicate literal types; also covered by PYI030
+field15: typing.Literal[1] | typing.Literal[1]  # Error
+
+# Shouldn't emit if in new parent type
+field16: int | dict[int, str]  # OK
+
+# Shouldn't emit if not in a union parent
+field17: dict[int, int]  # OK
+
+# Should emit in cases with newlines
+field18: typing.Union[
+    set[
+        int  # foo
+    ],
+    set[
+        int  # bar
+    ],
+]  # Error, newline and comment will not be emitted in message
+
+
+# Should emit in cases with `typing.Union` instead of `|`
+field19: typing.Union[int, int]  # Error
+
+# Should emit in cases with nested `typing.Union`
+field20: typing.Union[int, typing.Union[int, str]]  # Error
+
+# Should emit in cases with mixed `typing.Union` and `|`
+field21: typing.Union[int, int | str]  # Error
+
+# Should emit only once in cases with multiple nested `typing.Union`
+field22: typing.Union[int, typing.Union[int, typing.Union[int, int]]]  # Error

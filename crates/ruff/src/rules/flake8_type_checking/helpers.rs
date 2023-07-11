@@ -38,7 +38,7 @@ pub(crate) fn runtime_evaluated(
 
 fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticModel) -> bool {
     if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = &semantic.scope().kind {
-        for base in bases.iter() {
+        for base in bases {
             if let Some(call_path) = semantic.resolve_call_path(base) {
                 if base_classes
                     .iter()
@@ -54,7 +54,7 @@ fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticMode
 
 fn runtime_evaluated_decorators(decorators: &[String], semantic: &SemanticModel) -> bool {
     if let ScopeKind::Class(ast::StmtClassDef { decorator_list, .. }) = &semantic.scope().kind {
-        for decorator in decorator_list.iter() {
+        for decorator in decorator_list {
             if let Some(call_path) = semantic.resolve_call_path(map_callable(&decorator.expression))
             {
                 if decorators

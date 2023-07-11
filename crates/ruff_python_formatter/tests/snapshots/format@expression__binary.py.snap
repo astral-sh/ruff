@@ -277,10 +277,10 @@ aaaaaaaaaaaaaa + {
     dddddddddddddddd,
     eeeeeee,
 }
-(
-    aaaaaaaaaaaaaa
-    + [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-)
+aaaaaaaaaaaaaa + [
+    a
+    for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+]
 (
     aaaaaaaaaaaaaa
     + (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
@@ -476,9 +476,9 @@ if (
 
 
 # Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
-for user_id in set(
-    target_user_ids
-) - {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}:
+for user_id in (
+    set(target_user_ids) - {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+):
     updates.append(UserPresenceState.default(user_id))
 
 # Keeps parenthesized left hand sides

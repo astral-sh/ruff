@@ -56,16 +56,14 @@ class DebugVisitor(Visitor[T]):
          if isinstance(node, Node):
              _type = type_repr(node.type)
 -            out(f'{indent}{_type}', fg='yellow')
--            self.tree_depth += 1
 +            out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow")
-+            NOT_YET_IMPLEMENTED_StmtAugAssign
+             self.tree_depth += 1
              for child in node.children:
 -                yield from self.visit(child)
 +                NOT_YET_IMPLEMENTED_ExprYieldFrom
  
--            self.tree_depth -= 1
+             self.tree_depth -= 1
 -            out(f'{indent}/{_type}', fg='yellow', bold=False)
-+            NOT_YET_IMPLEMENTED_StmtAugAssign
 +            out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow", bold=False)
          else:
              _type = token.tok_name.get(node.type, str(node.type))
@@ -102,11 +100,11 @@ class DebugVisitor(Visitor[T]):
         if isinstance(node, Node):
             _type = type_repr(node.type)
             out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow")
-            NOT_YET_IMPLEMENTED_StmtAugAssign
+            self.tree_depth += 1
             for child in node.children:
                 NOT_YET_IMPLEMENTED_ExprYieldFrom
 
-            NOT_YET_IMPLEMENTED_StmtAugAssign
+            self.tree_depth -= 1
             out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow", bold=False)
         else:
             _type = token.tok_name.get(node.type, str(node.type))

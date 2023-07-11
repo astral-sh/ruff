@@ -36,7 +36,7 @@ for (((((k, v))))) in d.items():
  for module in (core, _unicodefun):
      if hasattr(module, "_verify_python3_env"):
 -        module._verify_python3_env = lambda: None
-+        module._verify_python3_env = lambda x: True
++        module._verify_python3_env = lambda NOT_YET_IMPLEMENTED_lambda: True
  
  # Brackets remain for long for loop lines
  for (
@@ -63,7 +63,7 @@ for k, v in d.items():
 # Don't touch tuple brackets after `in`
 for module in (core, _unicodefun):
     if hasattr(module, "_verify_python3_env"):
-        module._verify_python3_env = lambda x: True
+        module._verify_python3_env = lambda NOT_YET_IMPLEMENTED_lambda: True
 
 # Brackets remain for long for loop lines
 for (

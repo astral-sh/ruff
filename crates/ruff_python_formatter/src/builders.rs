@@ -21,12 +21,21 @@ pub(crate) struct OptionalParentheses<'a, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        group(&format_args![
+        let saved_level = f.context().node_level();
+
+        f.context_mut()
+            .set_node_level(NodeLevel::ParenthesizedExpression);
+
+        let result = group(&format_args![
             if_group_breaks(&text("(")),
             soft_block_indent(&Arguments::from(&self.inner)),
-            if_group_breaks(&text(")"))
+            if_group_breaks(&text(")")),
         ])
-        .fmt(f)
+        .fmt(f);
+
+        f.context_mut().set_node_level(saved_level);
+
+        result
     }
 }
 
@@ -85,7 +94,7 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
 
         self.result = self.result.and_then(|_| {
             if let Some(last_end) = self.last_end.replace(node.end()) {
-                let source = self.fmt.context().contents();
+                let source = self.fmt.context().source();
                 let count_lines = |offset| {
                     // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
                     // in the node's range
@@ -113,7 +122,9 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
                         0 | 1 => hard_line_break().fmt(self.fmt),
                         _ => empty_line().fmt(self.fmt),
                     },
-                    NodeLevel::Expression => hard_line_break().fmt(self.fmt),
+                    NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
+                        hard_line_break().fmt(self.fmt)
+                    }
                 }?;
             }
 
@@ -251,7 +262,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
             if let Some(last_end) = self.end_of_last_entry.take() {
                 let magic_trailing_comma = self.fmt.options().magic_trailing_comma().is_respect()
                     && matches!(
-                        first_non_trivia_token(last_end, self.fmt.context().contents()),
+                        first_non_trivia_token(last_end, self.fmt.context().source()),
                         Some(Token {
                             kind: TokenKind::Comma,
                             ..
@@ -353,7 +364,7 @@ no_leading_newline = 30"#
     // Removes all empty lines
     #[test]
     fn ranged_builder_parenthesized_level() {
-        let printed = format_ranged(NodeLevel::Expression);
+        let printed = format_ranged(NodeLevel::Expression(None));
 
         assert_eq!(
             &printed,

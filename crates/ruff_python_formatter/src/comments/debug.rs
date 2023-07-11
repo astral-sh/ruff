@@ -29,10 +29,8 @@ impl Debug for DebugComment<'_> {
 
         strut
             .field("text", &self.comment.slice.text(self.source_code))
-            .field("position", &self.comment.line_position);
-
-        #[cfg(debug_assertions)]
-        strut.field("formatted", &self.comment.formatted.get());
+            .field("position", &self.comment.line_position)
+            .field("formatted", &self.comment.formatted.get());
 
         strut.finish()
     }

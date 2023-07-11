@@ -304,14 +304,6 @@ long_unmergable_string_with_pragma = (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,6 @@
- x = "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
- 
--x += "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
-+NOT_YET_IMPLEMENTED_StmtAugAssign
- 
- y = "Short string"
- 
 @@ -70,8 +70,8 @@
  bad_split3 = (
      "What if we have inline comments on "  # First Comment
@@ -441,7 +433,7 @@ long_unmergable_string_with_pragma = (
 ```py
 x = "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
 
-NOT_YET_IMPLEMENTED_StmtAugAssign
+x += "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
 
 y = "Short string"
 

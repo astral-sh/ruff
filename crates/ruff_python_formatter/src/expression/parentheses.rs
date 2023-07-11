@@ -1,7 +1,8 @@
-use crate::comments::Comments;
+use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, first_non_trivia_token_rev, Token, TokenKind};
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::prelude::tag::Condition;
+use ruff_formatter::{format_args, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::Ranged;
 
@@ -9,16 +10,14 @@ pub(crate) trait NeedsParentheses {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses;
 }
 
 pub(super) fn default_expression_needs_parentheses(
     node: AnyNodeRef,
     parenthesize: Parenthesize,
-    source: &str,
-    comments: &Comments,
+    context: &PyFormatContext,
 ) -> Parentheses {
     debug_assert!(
         node.is_expression(),
@@ -32,13 +31,13 @@ pub(super) fn default_expression_needs_parentheses(
         Parentheses::Never
     }
     // `Optional` or `Preserve` and expression has parentheses in source code.
-    else if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, source) {
+    else if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, context.source()) {
         Parentheses::Always
     }
     // `Optional` or `IfBreaks`: Add parentheses if the expression doesn't fit on a line but enforce
     // parentheses if the expression has leading comments
     else if !parenthesize.is_preserve() {
-        if comments.has_leading_comments(node) {
+        if context.comments().has_leading_comments(node) {
             Parentheses::Always
         } else {
             Parentheses::Optional
@@ -122,6 +121,9 @@ pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> b
     )
 }
 
+/// Formats `content` enclosed by the `left` and `right` parentheses. The implementation also ensures
+/// that expanding the parenthesized expression (or any of its children) doesn't enforce the
+/// optional parentheses around the outer-most expression to materialize.
 pub(crate) fn parenthesized<'content, 'ast, Content>(
     left: &'static str,
     content: &'content Content,
@@ -145,13 +147,67 @@ pub(crate) struct FormatParenthesized<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        write!(
-            f,
-            [group(&format_args![
+        let inner = format_with(|f| {
+            group(&format_args![
                 text(self.left),
                 &soft_block_indent(&Arguments::from(&self.content)),
                 text(self.right)
-            ])]
-        )
+            ])
+            .fmt(f)
+        });
+
+        let current_level = f.context().node_level();
+
+        f.context_mut()
+            .set_node_level(NodeLevel::ParenthesizedExpression);
+
+        let result = if let NodeLevel::Expression(Some(group_id)) = current_level {
+            // Use fits expanded if there's an enclosing group that adds the optional parentheses.
+            // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
+            fits_expanded(&inner)
+                .with_condition(Some(Condition::if_group_fits_on_line(group_id)))
+                .fmt(f)
+        } else {
+            // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
+            inner.fmt(f)
+        };
+
+        f.context_mut().set_node_level(current_level);
+
+        result
+    }
+}
+
+/// Makes `content` a group, but only if the outer expression is parenthesized (a list, parenthesized expression, dict, ...)
+/// or if the expression gets parenthesized because it expands over multiple lines.
+pub(crate) fn in_parentheses_only_group<'content, 'ast, Content>(
+    content: &'content Content,
+) -> FormatInParenthesesOnlyGroup<'content, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatInParenthesesOnlyGroup {
+        content: Argument::new(content),
+    }
+}
+
+pub(crate) struct FormatInParenthesesOnlyGroup<'content, 'ast> {
+    content: Argument<'content, PyFormatContext<'ast>>,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
+            // If this content is enclosed by a group that adds the optional parentheses, then *disable*
+            // this group *except* if the optional parentheses are shown.
+            conditional_group(
+                &Arguments::from(&self.content),
+                Condition::if_group_breaks(group_id),
+            )
+            .fmt(f)
+        } else {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+            group(&Arguments::from(&self.content)).fmt(f)
+        }
     }
 }

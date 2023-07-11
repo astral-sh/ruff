@@ -1,12 +1,16 @@
-use crate::comments::{trailing_comments, Comments};
+use rustpython_parser::ast::ExprSubscript;
+
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AstNode;
+
+use crate::comments::trailing_comments;
+use crate::context::NodeLevel;
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{group, soft_block_indent, text};
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::ExprSubscript;
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprSubscript;
@@ -27,10 +31,20 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             "The subscript expression must have at most a single comment, the one after the bracket"
         );
 
+        if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
+            // Enforce the optional parentheses for parenthesized values.
+            f.context_mut().set_node_level(NodeLevel::Expression(None));
+            let result = value.format().fmt(f);
+            f.context_mut()
+                .set_node_level(NodeLevel::Expression(Some(group_id)));
+            result?;
+        } else {
+            value.format().fmt(f)?;
+        }
+
         write!(
             f,
             [group(&format_args![
-                value.format(),
                 text("["),
                 trailing_comments(dangling_comments),
                 soft_block_indent(&slice.format()),
@@ -53,10 +67,9 @@ impl NeedsParentheses for ExprSubscript {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
+        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             Parentheses::Optional => Parentheses::Never,
             parentheses => parentheses,
         }

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast;
 use rustpython_parser::ast::{Expr, ExprIfExp, ExprSlice, Ranged};
 
@@ -14,9 +14,7 @@ use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSec
 use crate::other::arguments::{
     assign_argument_separator_comment_placement, find_argument_separators,
 };
-use crate::trivia::{
-    first_non_trivia_token, first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind,
-};
+use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(
@@ -40,6 +38,8 @@ pub(super) fn place_comment<'a>(
         handle_slice_comments,
         handle_attribute_comment,
         handle_expr_if_comment,
+        handle_comprehension_comment,
+        handle_trailing_expression_starred_star_end_of_line_comment,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -1191,10 +1191,16 @@ fn handle_expr_if_comment<'a>(
     }
 
     // Find the if and the else
-    let if_token =
-        find_only_token_str_in_range(TextRange::new(body.end(), test.start()), locator, "if");
-    let else_token =
-        find_only_token_str_in_range(TextRange::new(test.end(), orelse.start()), locator, "else");
+    let if_token = find_only_token_in_range(
+        TextRange::new(body.end(), test.start()),
+        locator,
+        TokenKind::If,
+    );
+    let else_token = find_only_token_in_range(
+        TextRange::new(test.end(), orelse.start()),
+        locator,
+        TokenKind::Else,
+    );
 
     // Between `if` and `test`
     if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
@@ -1211,26 +1217,163 @@ fn handle_expr_if_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Looks for a multi char token in the range that contains no other tokens. `SimpleTokenizer` only
-/// works with single char tokens so we check that we have the right token by string comparison.
-fn find_only_token_str_in_range(range: TextRange, locator: &Locator, token_str: &str) -> Token {
-    let token =
-        first_non_trivia_token(range.start(), locator.contents()).expect("Expected a token");
-    debug_assert!(
-        locator.after(token.start()).starts_with(token_str),
-        "expected a `{token_str}` token",
-    );
-    debug_assert!(
-        SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(token.start() + token_str.text_len(), range.end())
-        )
+fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
+    if comment.line_position().is_own_line() || comment.following_node().is_none() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let AnyNodeRef::ExprStarred(starred) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    CommentPlacement::leading(starred.as_any_node_ref(), comment)
+}
+
+/// Looks for a token in the range that contains no other tokens except for parentheses outside
+/// the expression ranges
+fn find_only_token_in_range(range: TextRange, locator: &Locator, token_kind: TokenKind) -> Token {
+    let mut tokens = SimpleTokenizer::new(locator.contents(), range)
         .skip_trivia()
-        .next()
-        .is_none(),
-        "Didn't expect any other token"
-    );
+        .skip_while(|token| token.kind == TokenKind::RParen);
+    let token = tokens.next().expect("Expected a token");
+    debug_assert_eq!(token.kind(), token_kind);
+    let mut tokens = tokens.skip_while(|token| token.kind == TokenKind::LParen);
+    debug_assert_eq!(tokens.next(), None);
     token
+}
+
+// Handle comments inside comprehensions, e.g.
+//
+// ```python
+// [
+//      a
+//      for  # dangling on the comprehension
+//      b
+//      # dangling on the comprehension
+//      in  # dangling on comprehension.iter
+//      # leading on the iter
+//      c
+//      # dangling on comprehension.if.n
+//      if  # dangling on comprehension.if.n
+//      d
+// ]
+// ```
+fn handle_comprehension_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let AnyNodeRef::Comprehension(comprehension) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+    let is_own_line = comment.line_position().is_own_line();
+
+    // Comments between the `for` and target
+    // ```python
+    // [
+    //      a
+    //      for  # attache as dangling on the comprehension
+    //      b in c
+    //  ]
+    // ```
+    if comment.slice().end() < comprehension.target.range().start() {
+        return if is_own_line {
+            // own line comments are correctly assigned as leading the target
+            CommentPlacement::Default(comment)
+        } else {
+            // after the `for`
+            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        };
+    }
+
+    let in_token = find_only_token_in_range(
+        TextRange::new(
+            comprehension.target.range().end(),
+            comprehension.iter.range().start(),
+        ),
+        locator,
+        TokenKind::In,
+    );
+
+    // Comments between the target and the `in`
+    // ```python
+    // [
+    //      a for b
+    //      # attach as dangling on the target
+    //      # (to be rendered as leading on the "in")
+    //      in c
+    //  ]
+    // ```
+    if comment.slice().start() < in_token.start() {
+        // attach as dangling comments on the target
+        // (to be rendered as leading on the "in")
+        return if is_own_line {
+            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        } else {
+            // correctly trailing on the target
+            CommentPlacement::Default(comment)
+        };
+    }
+
+    // Comments between the `in` and the iter
+    // ```python
+    // [
+    //      a for b
+    //      in  #  attach as dangling on the iter
+    //      c
+    //  ]
+    // ```
+    if comment.slice().start() < comprehension.iter.range().start() {
+        return if is_own_line {
+            CommentPlacement::Default(comment)
+        } else {
+            // after the `in` but same line, turn into trailing on the `in` token
+            CommentPlacement::dangling((&comprehension.iter).into(), comment)
+        };
+    }
+
+    let mut last_end = comprehension.iter.range().end();
+
+    for if_node in &comprehension.ifs {
+        // ```python
+        // [
+        //     a
+        //     for
+        //     c
+        //     in
+        //     e
+        //     # above if   <-- find these own-line between previous and `if` token
+        //     if  # if     <-- find these end-of-line between `if` and if node (`f`)
+        //     # above f    <-- already correctly assigned as leading `f`
+        //     f  # f       <-- already correctly assigned as trailing `f`
+        //     # above if2
+        //     if  # if2
+        //     # above g
+        //     g  # g
+        // ]
+        // ```
+        let if_token = find_only_token_in_range(
+            TextRange::new(last_end, if_node.range().start()),
+            locator,
+            TokenKind::If,
+        );
+        if is_own_line {
+            if last_end < comment.slice().start() && comment.slice().start() < if_token.start() {
+                return CommentPlacement::dangling((if_node).into(), comment);
+            }
+        } else {
+            if if_token.start() < comment.slice().start()
+                && comment.slice().start() < if_node.range().start()
+            {
+                return CommentPlacement::dangling((if_node).into(), comment);
+            }
+        }
+        last_end = if_node.range().end();
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.

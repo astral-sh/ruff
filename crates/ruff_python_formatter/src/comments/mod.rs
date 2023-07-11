@@ -87,11 +87,12 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
+use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use rustpython_parser::ast::Mod;
+use rustpython_parser::ast::{Mod, Ranged};
 
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
@@ -114,7 +115,7 @@ mod placement;
 mod visitor;
 
 /// A comment in the source document.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct SourceComment {
     /// The location of the comment in the source document.
     slice: SourceCodeSlice,
@@ -155,12 +156,17 @@ impl SourceComment {
     pub(crate) fn is_unformatted(&self) -> bool {
         !self.is_formatted()
     }
-}
 
-impl SourceComment {
     /// Returns a nice debug representation that prints the source code for every comment (and not just the range).
     pub(crate) fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
         DebugComment::new(self, source_code)
+    }
+}
+
+impl Ranged for SourceComment {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.slice.range()
     }
 }
 
@@ -211,7 +217,7 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// The comments of a syntax tree stored by node.
 ///
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct Comments<'a> {
     /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
     /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
@@ -400,7 +406,7 @@ impl<'a> Comments<'a> {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
 }
@@ -436,7 +442,7 @@ mod tests {
 
             let comment_ranges = comment_ranges.finish();
 
-            let parsed = parse_tokens(tokens.into_iter(), Mode::Module, "test.py")
+            let parsed = parse_tokens(tokens, Mode::Module, "test.py")
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {

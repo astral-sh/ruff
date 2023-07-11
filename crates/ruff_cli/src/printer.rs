@@ -181,13 +181,13 @@ impl Printer {
 
         match self.format {
             SerializationFormat::Json => {
-                JsonEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+                JsonEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::JsonLines => {
-                JsonLinesEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+                JsonLinesEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Junit => {
-                JunitEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+                JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Text => {
                 TextEmitter::default()
@@ -222,16 +222,16 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             SerializationFormat::Github => {
-                GithubEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+                GithubEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Gitlab => {
                 GitlabEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Pylint => {
-                PylintEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+                PylintEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Azure => {
-                AzureEmitter::default().emit(writer, &diagnostics.messages, &context)?;
+                AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
         }
 

@@ -1,14 +1,11 @@
-use crate::comments::{leading_comments, Comments};
-use crate::expression::binary_like::{BinaryLayout, FormatBinaryLike};
+use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
+    Parenthesize,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_formatter::{
-    write, FormatError, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
-};
-use rustpython_parser::ast::Expr;
+use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use rustpython_parser::ast::{CmpOp, ExprCompare};
 
 #[derive(Default)]
@@ -27,35 +24,16 @@ impl FormatRuleWithOptions<ExprCompare, PyFormatContext<'_>> for FormatExprCompa
 
 impl FormatNodeRule<ExprCompare> for FormatExprCompare {
     fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
-        item.fmt_binary(self.parentheses, f)
-    }
-}
-
-impl<'ast> FormatBinaryLike<'ast> for ExprCompare {
-    type FormatOperator = FormatOwnedWithRule<CmpOp, FormatCmpOp, PyFormatContext<'ast>>;
-
-    fn binary_layout(&self, source: &str) -> BinaryLayout {
-        if self.ops.len() == 1 {
-            match self.comparators.as_slice() {
-                [right] => BinaryLayout::from_left_right(&self.left, right, source),
-                [..] => BinaryLayout::Default,
-            }
-        } else {
-            BinaryLayout::Default
-        }
-    }
-
-    fn fmt_default(&self, f: &mut PyFormatter<'ast, '_>) -> FormatResult<()> {
         let ExprCompare {
             range: _,
             left,
             ops,
             comparators,
-        } = self;
+        } = item;
 
         let comments = f.context().comments().clone();
 
-        write!(f, [group(&left.format())])?;
+        write!(f, [in_parentheses_only_group(&left.format())])?;
 
         assert_eq!(comparators.len(), ops.len());
 
@@ -74,23 +52,17 @@ impl<'ast> FormatBinaryLike<'ast> for ExprCompare {
                 )?;
             }
 
-            write!(f, [operator.format(), space(), group(&comparator.format())])?;
+            write!(
+                f,
+                [
+                    operator.format(),
+                    space(),
+                    in_parentheses_only_group(&comparator.format())
+                ]
+            )?;
         }
 
         Ok(())
-    }
-
-    fn left(&self) -> FormatResult<&Expr> {
-        Ok(self.left.as_ref())
-    }
-
-    fn right(&self) -> FormatResult<&Expr> {
-        self.comparators.last().ok_or(FormatError::SyntaxError)
-    }
-
-    fn operator(&self) -> Self::FormatOperator {
-        let op = *self.ops.first().unwrap();
-        op.into_format()
     }
 }
 
@@ -98,27 +70,9 @@ impl NeedsParentheses for ExprCompare {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            parentheses @ Parentheses::Optional => match self.binary_layout(source) {
-                BinaryLayout::Default => parentheses,
-
-                BinaryLayout::ExpandRight
-                | BinaryLayout::ExpandLeft
-                | BinaryLayout::ExpandRightThenLeft
-                    if self
-                        .comparators
-                        .last()
-                        .map_or(false, |right| comments.has_leading_comments(right)) =>
-                {
-                    parentheses
-                }
-                _ => Parentheses::Custom,
-            },
-            parentheses => parentheses,
-        }
+        default_expression_needs_parentheses(self.into(), parenthesize, context)
     }
 }
 

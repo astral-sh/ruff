@@ -13,7 +13,7 @@ impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
 
         if let Some(constant) = value.as_constant_expr() {
             if constant.value.is_str()
-                && !is_expression_parenthesized(value.as_ref().into(), f.context().contents())
+                && !is_expression_parenthesized(value.as_ref().into(), f.context().source())
             {
                 return constant.format().with_options(StringLayout::Flat).fmt(f);
             }

@@ -1,6 +1,6 @@
 use crate::comments::Comments;
 use crate::PyFormatOptions;
-use ruff_formatter::{FormatContext, SourceCode};
+use ruff_formatter::{FormatContext, GroupId, SourceCode};
 use ruff_python_ast::source_code::Locator;
 use std::fmt::{Debug, Formatter};
 
@@ -22,7 +22,7 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    pub(crate) fn contents(&self) -> &'a str {
+    pub(crate) fn source(&self) -> &'a str {
         self.contents
     }
 
@@ -78,6 +78,9 @@ pub(crate) enum NodeLevel {
     /// (`if`, `while`, `match`, etc.).
     CompoundStatement,
 
-    /// Formatting nodes that are enclosed in a parenthesized expression.
-    Expression,
+    /// The root or any sub-expression.
+    Expression(Option<GroupId>),
+
+    /// Formatting nodes that are enclosed by a parenthesized (any `[]`, `{}` or `()`) expression.
+    ParenthesizedExpression,
 }

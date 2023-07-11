@@ -31,13 +31,7 @@ def t():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,19 +3,19 @@
- 
- def starred_return():
-     my_list = ["value2", "value3"]
--    return "value1", *my_list
-+    return "value1", *NOT_YET_IMPLEMENTED_ExprStarred
- 
+@@ -8,14 +8,14 @@
  
  def starred_yield():
      my_list = ["value2", "value3"]
@@ -66,7 +60,7 @@ def t():
 
 def starred_return():
     my_list = ["value2", "value3"]
-    return "value1", *NOT_YET_IMPLEMENTED_ExprStarred
+    return "value1", *my_list
 
 
 def starred_yield():

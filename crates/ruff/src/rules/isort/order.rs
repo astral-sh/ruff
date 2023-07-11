@@ -47,7 +47,7 @@ pub(crate) fn order_imports<'a>(
             )
             .chain(
                 // Include all star imports.
-                block.import_from_star.into_iter(),
+                block.import_from_star,
             )
             .map(
                 |(

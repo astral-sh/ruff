@@ -60,22 +60,17 @@ def func():
 ```diff
 --- Black
 +++ Ruff
-@@ -6,14 +6,7 @@
-     x = """
-     a really long string
-     """
--    lcomp3 = [
--        # This one is actually too long to fit in a single line.
--        element.split("\n", 1)[0]
--        # yup
--        for element in collection.select_elements()
--        # right
+@@ -12,7 +12,9 @@
+         # yup
+         for element in collection.select_elements()
+         # right
 -        if element is not None
--    ]
-+    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
++        if
++        element
++        is not None
+     ]
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
      if isinstance(exc_value, MultiError):
-         embedded = []
 ```
 
 ## Ruff Output
@@ -89,7 +84,16 @@ def func():
     x = """
     a really long string
     """
-    lcomp3 = [NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+    lcomp3 = [
+        # This one is actually too long to fit in a single line.
+        element.split("\n", 1)[0]
+        # yup
+        for element in collection.select_elements()
+        # right
+        if
+        element
+        is not None
+    ]
     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
     if isinstance(exc_value, MultiError):
         embedded = []

@@ -1,4 +1,4 @@
-use crate::comments::Comments;
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -11,7 +11,12 @@ pub struct FormatExprLambda;
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, _item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented_custom_text("lambda x: True")])
+        write!(
+            f,
+            [not_yet_implemented_custom_text(
+                "lambda NOT_YET_IMPLEMENTED_lambda: True"
+            )]
+        )
     }
 }
 
@@ -19,9 +24,8 @@ impl NeedsParentheses for ExprLambda {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        default_expression_needs_parentheses(self.into(), parenthesize, context)
     }
 }

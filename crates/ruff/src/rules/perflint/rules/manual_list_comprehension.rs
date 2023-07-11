@@ -57,26 +57,28 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     };
 
-    let (stmt, conditional) = match body {
+    let (stmt, if_test) = match body {
         // ```python
         // for x in y:
         //     if z:
         //         filtered.append(x)
         // ```
-        [Stmt::If(ast::StmtIf { body, orelse, .. })] => {
+        [Stmt::If(ast::StmtIf {
+            body, orelse, test, ..
+        })] => {
             if !orelse.is_empty() {
                 return;
             }
             let [stmt] = body.as_slice() else {
                 return;
             };
-            (stmt, true)
+            (stmt, Some(test))
         }
         // ```python
         // for x in y:
         //     filtered.append(f(x))
         // ```
-        [stmt] => (stmt, false),
+        [stmt] => (stmt, None),
         _ => return,
     };
 
@@ -103,7 +105,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     };
 
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if !conditional {
+    if if_test.is_none() {
         if arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
             return;
         }
@@ -122,6 +124,31 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         expr.as_name_expr().map_or(false, |expr| expr.id == *id)
     }) {
         return;
+    }
+
+    // Avoid if the value is used in the conditional test, e.g.,
+    //
+    // ```python
+    // for x in y:
+    //    if x in filtered:
+    //        filtered.append(x)
+    // ```
+    //
+    // Converting this to a list comprehension would raise a `NameError` as
+    // `filtered` is not defined yet:
+    //
+    // ```python
+    // filtered = [x for x in y if x in filtered]
+    // ```
+    if let Some(value_name) = value.as_name_expr() {
+        if if_test.map_or(false, |test| {
+            any_over_expr(test, &|expr| {
+                expr.as_name_expr()
+                    .map_or(false, |expr| expr.id == value_name.id)
+            })
+        }) {
+            return;
+        }
     }
 
     checker
