@@ -2,7 +2,7 @@ use anyhow::{bail, Context};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
 use indicatif::ProgressBar;
-use log::{error, warn};
+
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
@@ -532,6 +532,7 @@ Formatted twice:
             CheckFileError::IoError(error) => {
                 writeln!(f, "Error reading {}: {}", file.display(), error)?;
             }
+            #[cfg(not(debug_assertions))]
             CheckFileError::Slow(duration) => {
                 writeln!(
                     f,
@@ -569,6 +570,7 @@ enum CheckFileError {
     Panic { message: String },
 
     /// Formatting a file took too long
+    #[cfg(not(debug_assertions))]
     Slow(Duration),
 }
 
@@ -581,8 +583,9 @@ impl CheckFileError {
             | CheckFileError::SyntaxErrorInOutput { .. }
             | CheckFileError::FormatError(_)
             | CheckFileError::PrintError(_)
-            | CheckFileError::Panic { .. }
-            | CheckFileError::Slow(_) => false,
+            | CheckFileError::Panic { .. } => false,
+            #[cfg(not(debug_assertions))]
+            CheckFileError::Slow(_) => false,
         }
     }
 }
