@@ -11,6 +11,16 @@ F601.py:3:5: F601 Dictionary key literal `"a"` repeated
 5 |     ("a", "b"): 3,
   |
 
+F601.py:6:5: F601 Dictionary key literal `"a", "b"` repeated
+  |
+4 |     "b": 3,
+5 |     ("a", "b"): 3,
+6 |     ("a", "b"): 4,
+  |     ^^^^^^^^^^ F601
+7 |     1.0: 2,
+8 |     1: 0,
+  |
+
 F601.py:9:5: F601 Dictionary key literal `1` repeated
    |
  7 |     1.0: 2,
@@ -224,12 +234,16 @@ F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
 49    |-x = {"a": 1, "a": 1}
    49 |+x = {"a": 1}
 50 50 | x = {"a": 1, "b": 2, "a": 1}
+51 51 | 
+52 52 | x = {
 
 F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
    |
 49 | x = {"a": 1, "a": 1}
 50 | x = {"a": 1, "b": 2, "a": 1}
    |                      ^^^ F601
+51 | 
+52 | x = {
    |
    = help: Remove repeated key literal `"a"`
 
@@ -239,5 +253,17 @@ F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
 49 49 | x = {"a": 1, "a": 1}
 50    |-x = {"a": 1, "b": 2, "a": 1}
    50 |+x = {"a": 1, "b": 2}
+51 51 | 
+52 52 | x = {
+53 53 |     ('a', 'b'): 'asdf',
+
+F601.py:54:5: F601 Dictionary key literal `"a", "b"` repeated
+   |
+52 | x = {
+53 |     ('a', 'b'): 'asdf',
+54 |     ('a', 'b'): 'qwer',
+   |     ^^^^^^^^^^ F601
+55 | }
+   |
 
 

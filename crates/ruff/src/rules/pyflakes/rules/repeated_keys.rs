@@ -1,11 +1,12 @@
-use std::hash::{BuildHasherDefault, Hash};
+use std::hash::BuildHasherDefault;
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::comparable::ComparableExpr::{Constant, List, Tuple};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -125,26 +126,10 @@ impl Violation for MultiValueRepeatedKeyVariable {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
-enum DictionaryKey<'a> {
-    Constant(ComparableConstant<'a>),
-    Variable(&'a str),
-}
-
-fn into_dictionary_key(expr: &Expr) -> Option<DictionaryKey> {
-    match expr {
-        Expr::Constant(ast::ExprConstant { value, .. }) => {
-            Some(DictionaryKey::Constant(value.into()))
-        }
-        Expr::Name(ast::ExprName { id, .. }) => Some(DictionaryKey::Variable(id)),
-        _ => None,
-    }
-}
-
 /// F601, F602
 pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     // Generate a map from key to (index, value).
-    let mut seen: FxHashMap<DictionaryKey, FxHashSet<ComparableExpr>> =
+    let mut seen: FxHashMap<ComparableExpr, FxHashSet<ComparableExpr>> =
         FxHashMap::with_capacity_and_hasher(keys.len(), BuildHasherDefault::default());
 
     // Detect duplicate keys.
@@ -152,61 +137,54 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
         let Some(key) = key else {
             continue;
         };
-        if let Some(dict_key) = into_dictionary_key(key) {
-            if let Some(seen_values) = seen.get_mut(&dict_key) {
-                match dict_key {
-                    DictionaryKey::Constant(..) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                            let comparable_value: ComparableExpr = (&values[i]).into();
-                            let is_duplicate_value = seen_values.contains(&comparable_value);
-                            let mut diagnostic = Diagnostic::new(
-                                MultiValueRepeatedKeyLiteral {
-                                    name: checker.generator().expr(key),
-                                    repeated_value: is_duplicate_value,
-                                },
-                                key.range(),
-                            );
-                            if is_duplicate_value {
-                                if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                                        values[i - 1].end(),
-                                        values[i].end(),
-                                    )));
-                                }
-                            } else {
-                                seen_values.insert(comparable_value);
+        let dict_key = ComparableExpr::from(key);
+        if let Some(seen_values) = seen.get_mut(&dict_key) {
+            let comparable_value: ComparableExpr = (&values[i]).into();
+            let is_duplicate_value = seen_values.contains(&comparable_value);
+            match dict_key {
+                Constant(_) | Tuple(_) | List(_) => {
+                    if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
+                        let rule = MultiValueRepeatedKeyLiteral {
+                            name: checker.generator().expr(key),
+                            repeated_value: is_duplicate_value,
+                        };
+                        let mut diagnostic = Diagnostic::new(rule, key.range());
+                        if is_duplicate_value {
+                            if checker.patch(diagnostic.kind.rule()) {
+                                diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                                    values[i - 1].end(),
+                                    values[i].end(),
+                                )));
                             }
-                            checker.diagnostics.push(diagnostic);
+                        } else {
+                            seen_values.insert(comparable_value);
                         }
-                    }
-                    DictionaryKey::Variable(dict_key) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                            let comparable_value: ComparableExpr = (&values[i]).into();
-                            let is_duplicate_value = seen_values.contains(&comparable_value);
-                            let mut diagnostic = Diagnostic::new(
-                                MultiValueRepeatedKeyVariable {
-                                    name: dict_key.to_string(),
-                                    repeated_value: is_duplicate_value,
-                                },
-                                key.range(),
-                            );
-                            if is_duplicate_value {
-                                if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                                        values[i - 1].end(),
-                                        values[i].end(),
-                                    )));
-                                }
-                            } else {
-                                seen_values.insert(comparable_value);
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
-            } else {
-                seen.insert(dict_key, FxHashSet::from_iter([(&values[i]).into()]));
+                _ => {
+                    if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
+                        let rule = MultiValueRepeatedKeyVariable {
+                            name: checker.generator().expr(key),
+                            repeated_value: is_duplicate_value,
+                        };
+                        let mut diagnostic = Diagnostic::new(rule, key.range());
+                        if is_duplicate_value {
+                            if checker.patch(diagnostic.kind.rule()) {
+                                diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                                    values[i - 1].end(),
+                                    values[i].end(),
+                                )));
+                            }
+                        } else {
+                            seen_values.insert(comparable_value);
+                        }
+                        checker.diagnostics.push(diagnostic);
+                    }
+                }
             }
+        } else {
+            seen.insert(dict_key, FxHashSet::from_iter([(&values[i]).into()]));
         }
     }
 }
