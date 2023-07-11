@@ -165,10 +165,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
             .set_node_level(NodeLevel::ParenthesizedExpression);
 
         let result = if let NodeLevel::Expression(Some(group_id)) = current_level {
+            // Use fits expanded if there's an enclosing group that adds the optional parentheses.
+            // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
             fits_expanded(&inner)
                 .with_condition(Some(Condition::if_group_fits_on_line(group_id)))
                 .fmt(f)
         } else {
+            // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
             inner.fmt(f)
         };
 
@@ -198,12 +201,15 @@ pub(crate) struct FormatInParenthesesOnlyGroup<'content, 'ast> {
 impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
+            // If this content is enclosed by a group that adds the optional parentheses, then *disable*
+            // this group *except* if the optional parentheses are shown.
             conditional_group(
                 &Arguments::from(&self.content),
                 Condition::if_group_breaks(group_id),
             )
             .fmt(f)
         } else {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
             group(&Arguments::from(&self.content)).fmt(f)
         }
     }

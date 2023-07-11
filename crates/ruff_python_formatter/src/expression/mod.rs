@@ -113,11 +113,18 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
                 if can_omit_optional_parentheses(item, f.context()) {
                     let saved_level = f.context().node_level();
 
+                    // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
+                    // that is only active if the optional parentheses group expands.
                     let parens_id = f.group_id("optional_parentheses");
 
                     f.context_mut()
                         .set_node_level(NodeLevel::Expression(Some(parens_id)));
 
+                    // We can't use `soft_block_indent` here because that would always increment the indent,
+                    // even if the group does not break (the indent is not soft). This would result in
+                    // too deep indentations if a `parenthesized` group expands. Using `indent_if_group_breaks`
+                    // gives us the desired *soft* indentation that is only present if the optional parentheses
+                    // are shown.
                     let result = group(&format_args![
                         if_group_breaks(&text("(")),
                         indent_if_group_breaks(
@@ -223,6 +230,8 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 ///     the expression `a * b * c` contains two multiply operations. We prefer parentheses in that case.
 ///     `(a * b) * c` or `a * b + c` are okay, because the subexpression is parenthesized, or the expression uses operands with a lower priority
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
+///
+/// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = MaxOperatorPriorityVisitor::new(context.contents());
 
