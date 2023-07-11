@@ -143,7 +143,11 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, expr: &'a ExprSubscr
     }
 }
 
-/// An expression that can be checked for type compatibility
+/// An expression that can be checked for type compatibility.
+///
+/// These are generally "literal" type expressions in that we know their concrete type
+/// without additional analysis; opposed to expressions like a function call where we
+/// cannot determine what type it may return.
 #[derive(Debug)]
 enum CheckableExprType<'a> {
     Constant(&'a Constant),
