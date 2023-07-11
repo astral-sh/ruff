@@ -34,9 +34,9 @@ use crate::checkers::ast::Checker;
 /// result = {x: y for x, y in pairs if y % 2}
 /// ```
 #[violation]
-pub struct ManualDictCreation;
+pub struct ManualDictComprehension;
 
-impl Violation for ManualDictCreation {
+impl Violation for ManualDictComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a dictionary comprehension instead of a for-loop")
@@ -107,6 +107,6 @@ fn check_for_slow_dict_creation(checker: &mut Checker, names: &[&str], stmt: &St
     if names.contains(&value.as_str()) && names.contains(&key.as_str()) {
         checker
             .diagnostics
-            .push(Diagnostic::new(ManualDictCreation, *range));
+            .push(Diagnostic::new(ManualDictComprehension, *range));
     }
 }
