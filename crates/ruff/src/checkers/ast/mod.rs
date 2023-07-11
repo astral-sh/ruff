@@ -439,6 +439,14 @@ where
                     if self.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                         flake8_pyi::rules::no_return_argument_annotation(self, args);
                     }
+                    if self.enabled(Rule::BadExitAnnotation) {
+                        flake8_pyi::rules::bad_exit_annotation(
+                            self,
+                            stmt.is_async_function_def_stmt(),
+                            name,
+                            args,
+                        );
+                    }
                 }
                 if self.enabled(Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(

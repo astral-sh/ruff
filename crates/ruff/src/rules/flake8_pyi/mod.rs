@@ -19,6 +19,8 @@ mod tests {
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.pyi"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.py"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.pyi"))]
+    #[test_case(Rule::BadExitAnnotation, Path::new("PYI036.py"))]
+    #[test_case(Rule::BadExitAnnotation, Path::new("PYI036.pyi"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.py"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.py"))]
