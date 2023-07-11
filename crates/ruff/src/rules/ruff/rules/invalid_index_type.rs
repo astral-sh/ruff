@@ -101,6 +101,27 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                             ));
                         }
                     };
+                    if matches!(
+                        slice_bound.as_ref(),
+                        Expr::Tuple(_)
+                            | Expr::List(_)
+                            | Expr::Set(_)
+                            | Expr::Dict(_)
+                            | Expr::ListComp(_)
+                            | Expr::DictComp(_)
+                            | Expr::JoinedStr(_)
+                    ) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            InvalidIndexType {
+                                var_type: expression_type_name(value)
+                                    .expect("Failed to cast parent expression to type name"),
+                                idx_type: expression_type_name(slice_bound)
+                                    .expect("Failed to slice bound expression to type name"),
+                                slice_bound: true,
+                            },
+                            slice_bound.range(),
+                        ));
+                    }
                 }
             }
             // If it's some other data type, it's a violation
