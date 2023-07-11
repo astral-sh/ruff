@@ -108,6 +108,7 @@ Ok(
                 ],
                 decorator_list: [],
                 returns: None,
+                type_params: [],
                 type_comment: None,
             },
         ),

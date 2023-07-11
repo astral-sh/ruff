@@ -38,6 +38,7 @@ expression: parse_ast
                 },
             ],
             returns: None,
+            type_params: [],
             type_comment: None,
         },
     ),
@@ -57,6 +58,7 @@ expression: parse_ast
                     },
                 ),
             ],
+            type_params: [],
             decorator_list: [
                 Decorator {
                     range: 36..52,

@@ -85,6 +85,7 @@ expression: parse_ast
                     },
                 ),
             ),
+            type_params: [],
             type_comment: None,
         },
     ),

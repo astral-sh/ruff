@@ -970,10 +970,11 @@ FuncDef: ast::Stmt = {
         let returns = r.map(|x| Box::new(x));
         let end_location = body.last().unwrap().end();
         let type_comment = None;
+        let type_params = Vec::new();
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_comment, range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params, range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_comment, range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params, range: (location..end_location).into() }.into()
         }
     },
 };
@@ -1138,6 +1139,7 @@ ClassDef: ast::Stmt = {
             None => (vec![], vec![]),
         };
         let end_location = body.last().unwrap().end();
+        let type_params = Vec::new();
         ast::Stmt::ClassDef(
             ast::StmtClassDef {
                 name,
@@ -1145,6 +1147,7 @@ ClassDef: ast::Stmt = {
                 keywords,
                 body,
                 decorator_list,
+                type_params,
                 range: (location..end_location).into()
             },
         )

@@ -328,6 +328,7 @@ pub struct StmtFunctionDef {
     pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
+    pub type_params: Vec<TypeParam>,
     pub type_comment: Option<String>,
 }
 
@@ -339,6 +340,7 @@ impl Node for StmtFunctionDef {
         "body",
         "decorator_list",
         "returns",
+        "type_params",
         "type_comment",
     ];
 }
@@ -362,6 +364,7 @@ pub struct StmtAsyncFunctionDef {
     pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
+    pub type_params: Vec<TypeParam>,
     pub type_comment: Option<String>,
 }
 
@@ -373,6 +376,7 @@ impl Node for StmtAsyncFunctionDef {
         "body",
         "decorator_list",
         "returns",
+        "type_params",
         "type_comment",
     ];
 }
@@ -395,13 +399,14 @@ pub struct StmtClassDef {
     pub bases: Vec<Expr>,
     pub keywords: Vec<Keyword>,
     pub body: Vec<Stmt>,
+    pub type_params: Vec<TypeParam>,
     pub decorator_list: Vec<Decorator>,
 }
 
 impl Node for StmtClassDef {
     const NAME: &'static str = "ClassDef";
     const FIELD_NAMES: &'static [&'static str] =
-        &["name", "bases", "keywords", "body", "decorator_list"];
+        &["name", "bases", "keywords", "body", "decorator_list", "type_params"];
 }
 impl From<StmtClassDef> for Stmt {
     fn from(payload: StmtClassDef) -> Self {
