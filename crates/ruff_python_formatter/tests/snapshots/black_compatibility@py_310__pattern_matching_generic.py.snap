@@ -187,15 +187,6 @@ with match() as match:
  
      # At least one of the above branches must have been taken, because every Python
      # version has exactly one of the two 'ASYNC_*' flags
-@@ -91,7 +83,7 @@
- def lib2to3_parse(src_txt: str, target_versions: Iterable[TargetVersion] = ()) -> Node:
-     """Given a string with source, return the lib2to3 Node."""
-     if not src_txt.endswith("\n"):
--        src_txt += "\n"
-+        NOT_YET_IMPLEMENTED_StmtAugAssign
- 
-     grammars = get_grammars(set(target_versions))
- 
 @@ -99,9 +91,9 @@
  re.match()
  match = a
@@ -298,7 +289,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
 def lib2to3_parse(src_txt: str, target_versions: Iterable[TargetVersion] = ()) -> Node:
     """Given a string with source, return the lib2to3 Node."""
     if not src_txt.endswith("\n"):
-        NOT_YET_IMPLEMENTED_StmtAugAssign
+        src_txt += "\n"
 
     grammars = get_grammars(set(target_versions))
 
