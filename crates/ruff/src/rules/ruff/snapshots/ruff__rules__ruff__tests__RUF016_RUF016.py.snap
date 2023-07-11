@@ -127,6 +127,15 @@ RUF016.py:55:14: RUF016 Indexed access to type `list` uses type `set` instead of
 57 | # Should emit on invalid access using set comp
    |
 
+RUF016.py:58:14: RUF016 Indexed access to type `list` uses type `set comprehension` instead of an integer or slice.
+   |
+57 | # Should emit on invalid access using set comp
+58 | var = [1, 2][{x for x in range(2)}]
+   |              ^^^^^^^^^^^^^^^^^^^^^ RUF016
+59 | 
+60 | # Should emit on invalid access using bytes
+   |
+
 RUF016.py:61:14: RUF016 Indexed access to type `list` uses type `bytes` instead of an integer or slice.
    |
 60 | # Should emit on invalid access using bytes
@@ -173,6 +182,16 @@ RUF016.py:67:17: RUF016 Slice in indexed access to type `list` uses type `set` a
    |                 ^^^^^ RUF016
 68 | var = [1, 2, 3][{x for x in range(2)}:2]
 69 | var = [1, 2, 3][{"x": x for x in range(2)}:2]
+   |
+
+RUF016.py:68:17: RUF016 Slice in indexed access to type `list` uses type `set comprehension` as bound instead of an integer.
+   |
+66 | var = [1, 2, 3][1.2:2]
+67 | var = [1, 2, 3][{"x"}:2]
+68 | var = [1, 2, 3][{x for x in range(2)}:2]
+   |                 ^^^^^^^^^^^^^^^^^^^^^ RUF016
+69 | var = [1, 2, 3][{"x": x for x in range(2)}:2]
+70 | var = [1, 2, 3][[x for x in range(2)]:2]
    |
 
 RUF016.py:69:17: RUF016 Slice in indexed access to type `list` uses type `dict comprehension` as bound instead of an integer.
@@ -231,6 +250,16 @@ RUF016.py:76:19: RUF016 Slice in indexed access to type `list` uses type `set` a
    |                   ^^^^^ RUF016
 77 | var = [1, 2, 3][0:{x for x in range(2)}]
 78 | var = [1, 2, 3][0:{"x": x for x in range(2)}]
+   |
+
+RUF016.py:77:19: RUF016 Slice in indexed access to type `list` uses type `set comprehension` as bound instead of an integer.
+   |
+75 | var = [1, 2, 3][0:1.2]
+76 | var = [1, 2, 3][0:{"x"}]
+77 | var = [1, 2, 3][0:{x for x in range(2)}]
+   |                   ^^^^^^^^^^^^^^^^^^^^^ RUF016
+78 | var = [1, 2, 3][0:{"x": x for x in range(2)}]
+79 | var = [1, 2, 3][0:[x for x in range(2)]]
    |
 
 RUF016.py:78:19: RUF016 Slice in indexed access to type `list` uses type `dict comprehension` as bound instead of an integer.

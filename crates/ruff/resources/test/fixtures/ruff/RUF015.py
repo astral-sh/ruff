@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 x = range(10)
 
 # RUF015

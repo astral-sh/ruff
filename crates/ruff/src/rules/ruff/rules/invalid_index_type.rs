@@ -107,6 +107,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, expr: &'a ExprSubscr
                             | Expr::Set(_)
                             | Expr::Dict(_)
                             | Expr::ListComp(_)
+                            | Expr::SetComp(_)
                             | Expr::DictComp(_)
                             | Expr::JoinedStr(_)
                     ) {
@@ -131,6 +132,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, expr: &'a ExprSubscr
             | Expr::Set(_)
             | Expr::Dict(_)
             | Expr::ListComp(_)
+            | Expr::SetComp(_)
             | Expr::DictComp(_)
             | Expr::JoinedStr(_) => {
                 checker.diagnostics.push(Diagnostic::new(
@@ -172,12 +174,13 @@ fn expression_type_name(expr: &Expr) -> Option<&'static str> {
     match expr {
         Expr::Constant(ExprConstant { value, .. }) => Some(constant_type_name(value)),
         Expr::JoinedStr(_) => Some("str"),
+        Expr::Tuple(_) => Some("tuple"),
         Expr::List(_) => Some("list"),
-        Expr::ListComp(_) => Some("list comprehension"),
-        Expr::DictComp(_) => Some("dict comprehension"),
         Expr::Set(_) => Some("set"),
         Expr::Dict(_) => Some("dict"),
-        Expr::Tuple(_) => Some("tuple"),
+        Expr::ListComp(_) => Some("list comprehension"),
+        Expr::SetComp(_) => Some("set comprehension"),
+        Expr::DictComp(_) => Some("dict comprehension"),
         _ => None,
     }
 }
