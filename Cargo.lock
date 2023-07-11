@@ -1843,7 +1843,6 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
- "criterion",
  "dirs 5.0.1",
  "fern",
  "glob",

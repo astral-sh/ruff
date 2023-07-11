@@ -5,16 +5,11 @@ use std::path::Path;
 
 #[cfg(target_family = "unix")]
 use anyhow::Result;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use ruff_text_size::{TextLen, TextSize};
-
-static SHEBANG_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(?P<spaces>\s*)#!(?P<directive>.*)").unwrap());
 
 /// A shebang directive (e.g., `#!/usr/bin/env python3`).
 #[derive(Debug, PartialEq, Eq)]
-pub struct ShebangDirective<'a> {
+pub(crate) struct ShebangDirective<'a> {
     /// The offset of the directive contents (e.g., `/usr/bin/env python3`) from the start of the
     /// line.
     pub(crate) offset: TextSize,
@@ -23,8 +18,9 @@ pub struct ShebangDirective<'a> {
 }
 
 impl<'a> ShebangDirective<'a> {
-    ///
-    pub fn try_extract(line: &'a str) -> Option<Self> {
+    /// Parse a shebang directive from a line, or return `None` if the line does not contain a
+    /// shebang directive.
+    pub(crate) fn try_extract(line: &'a str) -> Option<Self> {
         // Trim whitespace.
         let directive = Self::lex_whitespace(line);
 

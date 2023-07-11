@@ -65,7 +65,7 @@ pub(crate) fn shebang_not_executable(
 pub(crate) fn shebang_not_executable(
     _filepath: &Path,
     _range: TextRange,
-    _shebang: Option<&ShebangDirective>,
+    _shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
     None
 }
