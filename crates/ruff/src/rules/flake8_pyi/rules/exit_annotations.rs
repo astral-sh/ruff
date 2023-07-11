@@ -52,13 +52,13 @@ enum ErrorKind {
 /// ## Example
 /// ```python
 /// class Foo:
-//     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ...
+///     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Foo:
-//     def __exit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None, weird_extra_arg: int = ...) -> None: ...
+///     def __exit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None, weird_extra_arg: int = ...) -> None: ...
 /// ```
 #[violation]
 pub struct BadExitAnnotation {
