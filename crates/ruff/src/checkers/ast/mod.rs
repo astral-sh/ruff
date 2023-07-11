@@ -2235,6 +2235,10 @@ where
                     ruff::rules::unnecessary_iterable_allocation_for_first_element(self, subscript);
                 }
 
+                if self.enabled(Rule::InvalidIndexType) {
+                    ruff::rules::invalid_index_type(self, value, slice);
+                }
+
                 pandas_vet::rules::subscript(self, value, expr);
             }
             Expr::Tuple(ast::ExprTuple {
