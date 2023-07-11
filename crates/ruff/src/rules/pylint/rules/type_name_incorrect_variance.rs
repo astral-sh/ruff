@@ -66,14 +66,14 @@ impl Violation for TypeNameIncorrectVariance {
 /// PLC0105
 pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
     let Expr::Call(ast::ExprCall {
-                       func,
-                       args,
-                       keywords,
-                       ..
-                   }) = value
-        else {
-            return;
-        };
+        func,
+        args,
+        keywords,
+        ..
+    }) = value
+    else {
+        return;
+    };
 
     let Some(param_name) = type_param_name(args, keywords) else {
         return;
@@ -121,9 +121,9 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
                 None
             }
         })
-        else {
-            return;
-        };
+    else {
+        return;
+    };
 
     let variance = variance(covariant, contravariant);
     let name_root = param_name

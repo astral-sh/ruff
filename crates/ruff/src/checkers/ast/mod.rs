@@ -2426,12 +2426,14 @@ where
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords,
-                range: _,
-            }) => {
+            Expr::Call(
+                call @ ast::ExprCall {
+                    func,
+                    args,
+                    keywords,
+                    range: _,
+                },
+            ) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = self.semantic.scope_mut();
@@ -2596,6 +2598,9 @@ where
                     Rule::SuspiciousFTPLibUsage,
                 ]) {
                     flake8_bandit::rules::suspicious_function_call(self, expr);
+                }
+                if self.enabled(Rule::ReSubPositionalArgs) {
+                    flake8_bugbear::rules::re_sub_positional_args(self, call);
                 }
                 if self.enabled(Rule::UnreliableCallableCheck) {
                     flake8_bugbear::rules::unreliable_callable_check(self, expr, func, args);
