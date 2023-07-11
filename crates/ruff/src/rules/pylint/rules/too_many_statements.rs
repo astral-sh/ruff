@@ -207,7 +207,6 @@ def f():
             print()
 "#;
         let stmts = Suite::parse(source, "<filename>")?;
-        // TODO(konstin): Was there a specific reason why this was 5? Doesn't seem right to me
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }

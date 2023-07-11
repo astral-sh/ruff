@@ -195,7 +195,6 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
                 return true;
             }
         }
-
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
