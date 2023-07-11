@@ -141,7 +141,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
  
      tup = (
-@@ -100,19 +98,32 @@
+@@ -100,19 +98,30 @@
      )
  
      c = call(
@@ -177,10 +177,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +    ],  # type: ignore
  )
  
--aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-+aaaaaaaaaaaaa, bbbbbbbbb = map(
-+    list, map(itertools.chain.from_iterable, zip(*NOT_YET_IMPLEMENTED_ExprStarred))
-+)  # type: ignore[arg-type]
+ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
@@ -312,9 +309,7 @@ call_to_some_function_asdf(
     ],  # type: ignore
 )
 
-aaaaaaaaaaaaa, bbbbbbbbb = map(
-    list, map(itertools.chain.from_iterable, zip(*NOT_YET_IMPLEMENTED_ExprStarred))
-)  # type: ignore[arg-type]
+aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 ```
 
 ## Black Output

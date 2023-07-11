@@ -38,6 +38,7 @@ pub(super) fn place_comment<'a>(
         handle_slice_comments,
         handle_attribute_comment,
         handle_expr_if_comment,
+        handle_trailing_expression_starred_star_end_of_line_comment,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -1213,6 +1214,21 @@ fn handle_expr_if_comment<'a>(
     }
 
     CommentPlacement::Default(comment)
+}
+
+fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
+    if comment.line_position().is_own_line() || comment.following_node().is_none() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let AnyNodeRef::ExprStarred(starred) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    CommentPlacement::leading(starred.as_any_node_ref(), comment)
 }
 
 /// Looks for a token in the range that contains no other tokens except for parentheses outside

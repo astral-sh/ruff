@@ -87,11 +87,12 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
+use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use rustpython_parser::ast::Mod;
+use rustpython_parser::ast::{Mod, Ranged};
 
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
@@ -114,7 +115,7 @@ mod placement;
 mod visitor;
 
 /// A comment in the source document.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct SourceComment {
     /// The location of the comment in the source document.
     slice: SourceCodeSlice,
@@ -155,12 +156,17 @@ impl SourceComment {
     pub(crate) fn is_unformatted(&self) -> bool {
         !self.is_formatted()
     }
-}
 
-impl SourceComment {
     /// Returns a nice debug representation that prints the source code for every comment (and not just the range).
     pub(crate) fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
         DebugComment::new(self, source_code)
+    }
+}
+
+impl Ranged for SourceComment {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.slice.range()
     }
 }
 
