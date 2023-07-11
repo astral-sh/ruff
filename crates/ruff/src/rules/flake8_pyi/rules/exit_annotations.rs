@@ -220,13 +220,13 @@ pub(crate) fn bad_exit_annotation(
     }
 
     // ...and so should all keyword-only args
-    if args.kwonlyargs.iter().any(|arg| arg.default.is_none()) {
+    for kwarg_missing_default in args.kwonlyargs.iter().filter(|arg| arg.default.is_none()) {
         checker.diagnostics.push(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
             },
-            args.range(),
+            kwarg_missing_default.range(),
         ));
     }
 

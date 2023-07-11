@@ -56,7 +56,7 @@ class BadOne:
 
 class BadTwo:
     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
-    async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ...# PYI036: Extra arg must have default
+    async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
 
 class BadThree:
     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg has bad annotation

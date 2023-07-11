@@ -35,15 +35,25 @@ PYI036.pyi:58:38: PYI036 All arguments after the first four in `__exit__` must h
 57 | class BadTwo:
 58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
    |                                      ^^^^^^^^^^^^^^^ PYI036
-59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ...# PYI036: Extra arg must have default
+59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
    |
 
-PYI036.pyi:59:24: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+PYI036.pyi:59:48: PYI036 All keyword-only arguments in `__aexit__` must have a default value
    |
 57 | class BadTwo:
 58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
-59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ...# PYI036: Extra arg must have default
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
+   |                                                ^^^^^^^^^^^^^^^^ PYI036
+60 | 
+61 | class BadThree:
+   |
+
+PYI036.pyi:59:66: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+   |
+57 | class BadTwo:
+58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
+59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
+   |                                                                  ^^^^^^^^^^^^^^^^ PYI036
 60 | 
 61 | class BadThree:
    |
@@ -150,12 +160,12 @@ PYI036.pyi:74:38: PYI036 All arguments after the first four in `__exit__` must h
 75 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ... # PYI036: kwargs must have default
    |
 
-PYI036.pyi:75:24: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+PYI036.pyi:75:48: PYI036 All keyword-only arguments in `__aexit__` must have a default value
    |
 73 | class BadSix:
 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
 75 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ... # PYI036: kwargs must have default
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+   |                                                ^^^^^^^^^^^^^^^ PYI036
    |
 
 
