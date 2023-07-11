@@ -2,6 +2,7 @@ use anyhow::{bail, Context};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
 use indicatif::ProgressBar;
+use log::{error, warn};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
@@ -531,6 +532,14 @@ Formatted twice:
             CheckFileError::IoError(error) => {
                 writeln!(f, "Error reading {}: {}", file.display(), error)?;
             }
+            CheckFileError::Slow(duration) => {
+                writeln!(
+                    f,
+                    "Slow formatting {}: Formatting the file took {}ms",
+                    file.display(),
+                    duration.as_millis()
+                )?;
+            }
         }
         Ok(())
     }
@@ -558,6 +567,9 @@ enum CheckFileError {
     IoError(io::Error),
     /// From `catch_unwind`
     Panic { message: String },
+
+    /// Formatting a file took too long
+    Slow(Duration),
 }
 
 impl CheckFileError {
@@ -569,7 +581,8 @@ impl CheckFileError {
             | CheckFileError::SyntaxErrorInOutput { .. }
             | CheckFileError::FormatError(_)
             | CheckFileError::PrintError(_)
-            | CheckFileError::Panic { .. } => false,
+            | CheckFileError::Panic { .. }
+            | CheckFileError::Slow(_) => false,
         }
     }
 }
@@ -586,6 +599,8 @@ fn format_dev_file(
     write: bool,
 ) -> Result<Statistics, CheckFileError> {
     let content = fs::read_to_string(input_path)?;
+    #[cfg(not(debug_assertions))]
+    let start = Instant::now();
     let printed = match format_module(&content, PyFormatOptions::default()) {
         Ok(printed) => printed,
         Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
@@ -599,6 +614,8 @@ fn format_dev_file(
         }
     };
     let formatted = printed.as_code();
+    #[cfg(not(debug_assertions))]
+    let format_duration = Instant::now() - start;
 
     if write && content != formatted {
         // Simple atomic write.
@@ -633,6 +650,11 @@ fn format_dev_file(
                 reformatted: reformatted.into_code(),
             });
         }
+    }
+
+    #[cfg(not(debug_assertions))]
+    if format_duration > Duration::from_millis(50) {
+        return Err(CheckFileError::Slow(format_duration));
     }
 
     Ok(Statistics::from_versions(&content, formatted))
