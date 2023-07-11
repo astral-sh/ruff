@@ -80,6 +80,7 @@ unicode-width = { version = "0.1.10" }
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
 
 [dev-dependencies]
+criterion = { version = "0.5.1" }
 insta = { workspace = true }
 pretty_assertions = "1.3.0"
 test-case = { workspace = true }
@@ -91,3 +92,7 @@ default = []
 schemars = ["dep:schemars"]
 # Enables the UnreachableCode rule
 unreachable-code = []
+
+[[bench]]
+name = "benchmark"
+harness = false

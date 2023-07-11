@@ -12,77 +12,85 @@ use ruff_text_size::{TextLen, TextSize};
 static SHEBANG_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?P<spaces>\s*)#!(?P<directive>.*)").unwrap());
 
+/// A shebang directive (e.g., `#!/usr/bin/env python3`).
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum ShebangDirective<'a> {
-    None,
-    // whitespace length, start of the shebang, contents
-    Match(TextSize, TextSize, &'a str),
+pub struct ShebangDirective<'a> {
+    /// The offset of the directive contents (e.g., `/usr/bin/env python3`) from the start of the
+    /// line.
+    pub(crate) offset: TextSize,
+    /// The contents of the directive (e.g., `"/usr/bin/env python3"`).
+    pub(crate) contents: &'a str,
 }
 
-pub(crate) fn extract_shebang(line: &str) -> ShebangDirective {
-    // Minor optimization to avoid matches in the common case.
-    if !line.contains('!') {
-        return ShebangDirective::None;
+impl<'a> ShebangDirective<'a> {
+    ///
+    pub fn try_extract(line: &'a str) -> Option<Self> {
+        // Trim whitespace.
+        let directive = Self::lex_whitespace(line);
+
+        // Trim the `#!` prefix.
+        let directive = Self::lex_char(directive, '#')?;
+        let directive = Self::lex_char(directive, '!')?;
+
+        Some(Self {
+            offset: line.text_len() - directive.text_len(),
+            contents: directive,
+        })
     }
-    match SHEBANG_REGEX.captures(line) {
-        Some(caps) => match caps.name("spaces") {
-            Some(spaces) => match caps.name("directive") {
-                Some(matches) => ShebangDirective::Match(
-                    spaces.as_str().text_len(),
-                    TextSize::try_from(matches.start()).unwrap(),
-                    matches.as_str(),
-                ),
-                None => ShebangDirective::None,
-            },
-            None => ShebangDirective::None,
-        },
-        None => ShebangDirective::None,
+
+    /// Lex optional leading whitespace.
+    #[inline]
+    fn lex_whitespace(line: &str) -> &str {
+        line.trim_start()
+    }
+
+    /// Lex a specific character, or return `None` if the character is not the first character in
+    /// the line.
+    #[inline]
+    fn lex_char(line: &str, c: char) -> Option<&str> {
+        let mut chars = line.chars();
+        if chars.next() == Some(c) {
+            Some(chars.as_str())
+        } else {
+            None
+        }
     }
 }
 
 #[cfg(target_family = "unix")]
-pub(crate) fn is_executable(filepath: &Path) -> Result<bool> {
-    {
-        let metadata = filepath.metadata()?;
-        let permissions = metadata.permissions();
-        Ok(permissions.mode() & 0o111 != 0)
-    }
+pub(super) fn is_executable(filepath: &Path) -> Result<bool> {
+    let metadata = filepath.metadata()?;
+    let permissions = metadata.permissions();
+    Ok(permissions.mode() & 0o111 != 0)
 }
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::TextSize;
+    use insta::assert_debug_snapshot;
 
-    use crate::rules::flake8_executable::helpers::{
-        extract_shebang, ShebangDirective, SHEBANG_REGEX,
-    };
+    use crate::rules::flake8_executable::helpers::ShebangDirective;
 
     #[test]
-    fn shebang_regex() {
-        // Positive cases
-        assert!(SHEBANG_REGEX.is_match("#!/usr/bin/python"));
-        assert!(SHEBANG_REGEX.is_match("#!/usr/bin/env python"));
-        assert!(SHEBANG_REGEX.is_match("    #!/usr/bin/env python"));
-        assert!(SHEBANG_REGEX.is_match("  #!/usr/bin/env python"));
-
-        // Negative cases
-        assert!(!SHEBANG_REGEX.is_match("hello world"));
+    fn shebang_non_match() {
+        let source = "not a match";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
     }
 
     #[test]
-    fn shebang_extract_match() {
-        assert_eq!(extract_shebang("not a match"), ShebangDirective::None);
-        assert_eq!(
-            extract_shebang("#!/usr/bin/env python"),
-            ShebangDirective::Match(TextSize::from(0), TextSize::from(2), "/usr/bin/env python")
-        );
-        assert_eq!(
-            extract_shebang("  #!/usr/bin/env python"),
-            ShebangDirective::Match(TextSize::from(2), TextSize::from(4), "/usr/bin/env python")
-        );
-        assert_eq!(
-            extract_shebang("print('test')  #!/usr/bin/python"),
-            ShebangDirective::None
-        );
+    fn shebang_end_of_line() {
+        let source = "print('test')  #!/usr/bin/python";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
+    }
+
+    #[test]
+    fn shebang_match() {
+        let source = "#!/usr/bin/env python";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
+    }
+
+    #[test]
+    fn shebang_leading_space() {
+        let source = "  #!/usr/bin/env python";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
     }
 }

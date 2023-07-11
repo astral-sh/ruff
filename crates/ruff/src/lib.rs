@@ -42,3 +42,5 @@ pub mod upstream_categories;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;
+
+pub use rules::flake8_executable::helpers::ShebangDirective;
