@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/list_comp.py
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/list_comp.py
 ---
 ## Input
 ```py
