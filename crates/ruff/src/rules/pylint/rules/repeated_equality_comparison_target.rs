@@ -15,7 +15,7 @@ use std::ops::Deref;
 /// values into a collection and use the `in` operator. This is faster and less
 /// verbose.
 ///
-/// If the items are hashable, use a `set` instead of a `list`. Membership
+/// If the items are hashable, use a `set` instead of a `tuple`. Membership
 /// using the `in` operator is more efficient for sets than for non-hashable
 /// collections like lists and tuples.
 ///
