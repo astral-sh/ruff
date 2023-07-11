@@ -1431,7 +1431,7 @@ impl<Context> std::fmt::Debug for Group<'_, Context> {
 ///
 /// # fn main() -> FormatResult<()> {
 /// use ruff_formatter::Formatted;
-/// let content = format_with(|f| {    ///
+/// let content = format_with(|f| {
 ///     let parentheses_id = f.group_id("parentheses");
 ///     group(&format_args![
 ///         if_group_breaks(&text("(")),
@@ -2006,12 +2006,7 @@ impl<Context> std::fmt::Debug for IndentIfGroupBreaks<'_, Context> {
 ///     ])
 /// });
 ///
-/// let formatted = format!(SimpleFormatContext::new(SimpleFormatOptions {
-///         line_width: LineWidth::try_from(16).unwrap(),
-///         ..SimpleFormatOptions::default()
-///     }),
-///     [content]
-/// )?;
+/// let formatted = format!(SimpleFormatContext::default(), [content])?;
 ///
 /// assert_eq!(
 ///     "a + [\n\ta, # comment\n\tb\n]",
