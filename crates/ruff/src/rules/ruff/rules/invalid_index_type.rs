@@ -54,6 +54,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
         Expr::List(_)
             | Expr::ListComp(_)
             | Expr::Tuple(_)
+            | Expr::JoinedStr(_)
             | Expr::Constant(ExprConstant {
                 value: Constant::Str(_),
                 ..
@@ -104,7 +105,8 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
             | Expr::Set(_)
             | Expr::Dict(_)
             | Expr::ListComp(_)
-            | Expr::DictComp(_) => {
+            | Expr::DictComp(_)
+            | Expr::JoinedStr(_) => {
                 checker.diagnostics.push(Diagnostic::new(
                     InvalidIndexType {
                         var_type: expression_type_name(value)
@@ -142,6 +144,7 @@ fn constant_type_name(constant: &Constant) -> String {
 fn expression_type_name(expr: &Expr) -> Option<String> {
     match expr {
         Expr::Constant(ExprConstant { value, .. }) => Some(constant_type_name(value)),
+        Expr::JoinedStr(_) => Some("str".to_string()),
         Expr::List(_) => Some("list".to_string()),
         Expr::ListComp(_) => Some("list comprehension".to_string()),
         Expr::DictComp(_) => Some("dict comprehension".to_string()),

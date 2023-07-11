@@ -1,170 +1,185 @@
-RUF015.py:18:13: RUF015 Indexed access to type `str` uses type `str` instead of an integer or slice.
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF016.py:19:13: RUF016 Indexed access to type `str` uses type `str` instead of an integer or slice.
    |
-17 | # Should emit for invalid access on strings
-18 | var = "abc"["x"]
-   |             ^^^ RUF015
-19 | var = f"abc"["x"]
-   |
-
-RUF015.py:22:17: RUF015 Indexed access to type `list` uses type `str` instead of an integer or slice.
-   |
-21 | # Should emit for invalid access on lists and tuples
-22 | var = [1, 2, 3]["x"]
-   |                 ^^^ RUF015
-23 | var = (1, 2, 3)["x"]
+18 | # Should emit for invalid access on strings
+19 | var = "abc"["x"]
+   |             ^^^ RUF016
+20 | var = f"abc"["x"]
    |
 
-RUF015.py:23:17: RUF015 Indexed access to type `tuple` uses type `str` instead of an integer or slice.
+RUF016.py:20:14: RUF016 Indexed access to type `str` uses type `str` instead of an integer or slice.
    |
-21 | # Should emit for invalid access on lists and tuples
-22 | var = [1, 2, 3]["x"]
-23 | var = (1, 2, 3)["x"]
-   |                 ^^^ RUF015
-24 | 
-25 | # Should emit for invalid access on list comprehensions
-   |
-
-RUF015.py:26:30: RUF015 Indexed access to type `list comprehension` uses type `str` instead of an integer or slice.
-   |
-25 | # Should emit for invalid access on list comprehensions
-26 | var = [x for x in range(10)]["x"]
-   |                              ^^^ RUF015
-27 | 
-28 | # Should emit for invalid access using tuple
+18 | # Should emit for invalid access on strings
+19 | var = "abc"["x"]
+20 | var = f"abc"["x"]
+   |              ^^^ RUF016
+21 | 
+22 | # Should emit for invalid access on lists and tuples
    |
 
-RUF015.py:29:13: RUF015 Indexed access to type `str` uses type `tuple` instead of an integer or slice.
+RUF016.py:23:17: RUF016 Indexed access to type `list` uses type `str` instead of an integer or slice.
    |
-28 | # Should emit for invalid access using tuple
-29 | var = "abc"[1, 2]
-   |             ^^^^ RUF015
-30 | 
-31 | # Should emit for invalid access using string
-   |
-
-RUF015.py:32:14: RUF015 Indexed access to type `list` uses type `str` instead of an integer or slice.
-   |
-31 | # Should emit for invalid access using string
-32 | var = [1, 2]["x"]
-   |              ^^^ RUF015
-33 | 
-34 | # Should emit for invalid access using float
+22 | # Should emit for invalid access on lists and tuples
+23 | var = [1, 2, 3]["x"]
+   |                 ^^^ RUF016
+24 | var = (1, 2, 3)["x"]
    |
 
-RUF015.py:35:14: RUF015 Indexed access to type `list` uses type `float` instead of an integer or slice.
+RUF016.py:24:17: RUF016 Indexed access to type `tuple` uses type `str` instead of an integer or slice.
    |
-34 | # Should emit for invalid access using float
-35 | var = [1, 2][0.25]
-   |              ^^^^ RUF015
-36 | 
-37 | # Should emit for invalid access using dict
-   |
-
-RUF015.py:38:14: RUF015 Indexed access to type `list` uses type `dict` instead of an integer or slice.
-   |
-37 | # Should emit for invalid access using dict
-38 | var = [1, 2][{"x": "y"}]
-   |              ^^^^^^^^^^ RUF015
-39 | 
-40 | # Should emit for invalid access using dict comp
+22 | # Should emit for invalid access on lists and tuples
+23 | var = [1, 2, 3]["x"]
+24 | var = (1, 2, 3)["x"]
+   |                 ^^^ RUF016
+25 | 
+26 | # Should emit for invalid access on list comprehensions
    |
 
-RUF015.py:41:14: RUF015 Indexed access to type `list` uses type `dict comprehension` instead of an integer or slice.
+RUF016.py:27:30: RUF016 Indexed access to type `list comprehension` uses type `str` instead of an integer or slice.
    |
-40 | # Should emit for invalid access using dict comp
-41 | var = [1, 2][{x: "y" for x in range(2)}]
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
-42 | 
-43 | # Should emit for invalid access using list 
-   |
-
-RUF015.py:44:14: RUF015 Indexed access to type `list` uses type `tuple` instead of an integer or slice.
-   |
-43 | # Should emit for invalid access using list 
-44 | var = [1, 2][2, 3]
-   |              ^^^^ RUF015
-45 | 
-46 | # Should emit for invalid access using list comp
+26 | # Should emit for invalid access on list comprehensions
+27 | var = [x for x in range(10)]["x"]
+   |                              ^^^ RUF016
+28 | 
+29 | # Should emit for invalid access using tuple
    |
 
-RUF015.py:47:14: RUF015 Indexed access to type `list` uses type `list comprehension` instead of an integer or slice.
+RUF016.py:30:13: RUF016 Indexed access to type `str` uses type `tuple` instead of an integer or slice.
    |
-46 | # Should emit for invalid access using list comp
-47 | var = [1, 2][[x for x in range(2)]]
-   |              ^^^^^^^^^^^^^^^^^^^^^ RUF015
-48 | 
-49 | # Should emit on invalid access using set
-   |
-
-RUF015.py:50:14: RUF015 Indexed access to type `list` uses type `set` instead of an integer or slice.
-   |
-49 | # Should emit on invalid access using set
-50 | var = [1, 2][{"x", "y"}]
-   |              ^^^^^^^^^^ RUF015
-51 | 
-52 | # Should emit for non-integer slice start
+29 | # Should emit for invalid access using tuple
+30 | var = "abc"[1, 2]
+   |             ^^^^ RUF016
+31 | 
+32 | # Should emit for invalid access using string
    |
 
-RUF015.py:53:17: RUF015 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
+RUF016.py:33:14: RUF016 Indexed access to type `list` uses type `str` instead of an integer or slice.
    |
-52 | # Should emit for non-integer slice start
-53 | var = [1, 2, 3]["x":2]
-   |                 ^^^ RUF015
-54 | var = [1, 2, 3][f"x":2]
-55 | var = [1, 2, 3][1.2:2]
-   |
-
-RUF015.py:55:17: RUF015 Slice in indexed access to type `list` uses type `float` as bound instead of an integer.
-   |
-53 | var = [1, 2, 3]["x":2]
-54 | var = [1, 2, 3][f"x":2]
-55 | var = [1, 2, 3][1.2:2]
-   |                 ^^^ RUF015
-56 | var = [1, 2, 3][{"x"}:2]
+32 | # Should emit for invalid access using string
+33 | var = [1, 2]["x"]
+   |              ^^^ RUF016
+34 | 
+35 | # Should emit for invalid access using float
    |
 
-RUF015.py:59:19: RUF015 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
+RUF016.py:36:14: RUF016 Indexed access to type `list` uses type `float` instead of an integer or slice.
    |
-58 | # Should emit for non-integer slice end
-59 | var = [1, 2, 3][0:"x"]
-   |                   ^^^ RUF015
-60 | var = [1, 2, 3][0:f"x"]
-61 | var = [1, 2, 3][0:1.2]
-   |
-
-RUF015.py:61:19: RUF015 Slice in indexed access to type `list` uses type `float` as bound instead of an integer.
-   |
-59 | var = [1, 2, 3][0:"x"]
-60 | var = [1, 2, 3][0:f"x"]
-61 | var = [1, 2, 3][0:1.2]
-   |                   ^^^ RUF015
-62 | 
-63 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
+35 | # Should emit for invalid access using float
+36 | var = [1, 2][0.25]
+   |              ^^^^ RUF016
+37 | 
+38 | # Should emit for invalid access using dict
    |
 
-RUF015.py:64:17: RUF015 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
+RUF016.py:39:14: RUF016 Indexed access to type `list` uses type `dict` instead of an integer or slice.
    |
-63 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
-64 | var = [1, 2, 3]["x":"y"]
-   |                 ^^^ RUF015
-65 | 
-66 | # Should emit once for repeated invalid access
-   |
-
-RUF015.py:64:21: RUF015 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
-   |
-63 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
-64 | var = [1, 2, 3]["x":"y"]
-   |                     ^^^ RUF015
-65 | 
-66 | # Should emit once for repeated invalid access
+38 | # Should emit for invalid access using dict
+39 | var = [1, 2][{"x": "y"}]
+   |              ^^^^^^^^^^ RUF016
+40 | 
+41 | # Should emit for invalid access using dict comp
    |
 
-RUF015.py:67:17: RUF015 Indexed access to type `list` uses type `str` instead of an integer or slice.
+RUF016.py:42:14: RUF016 Indexed access to type `list` uses type `dict comprehension` instead of an integer or slice.
    |
-66 | # Should emit once for repeated invalid access
-67 | var = [1, 2, 3]["x"]["y"]["z"]
-   |                 ^^^ RUF015
-68 | 
-69 | # Cannot emit on invalid access using variable
+41 | # Should emit for invalid access using dict comp
+42 | var = [1, 2][{x: "y" for x in range(2)}]
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF016
+43 | 
+44 | # Should emit for invalid access using list 
    |
+
+RUF016.py:45:14: RUF016 Indexed access to type `list` uses type `tuple` instead of an integer or slice.
+   |
+44 | # Should emit for invalid access using list 
+45 | var = [1, 2][2, 3]
+   |              ^^^^ RUF016
+46 | 
+47 | # Should emit for invalid access using list comp
+   |
+
+RUF016.py:48:14: RUF016 Indexed access to type `list` uses type `list comprehension` instead of an integer or slice.
+   |
+47 | # Should emit for invalid access using list comp
+48 | var = [1, 2][[x for x in range(2)]]
+   |              ^^^^^^^^^^^^^^^^^^^^^ RUF016
+49 | 
+50 | # Should emit on invalid access using set
+   |
+
+RUF016.py:51:14: RUF016 Indexed access to type `list` uses type `set` instead of an integer or slice.
+   |
+50 | # Should emit on invalid access using set
+51 | var = [1, 2][{"x", "y"}]
+   |              ^^^^^^^^^^ RUF016
+52 | 
+53 | # Should emit for non-integer slice start
+   |
+
+RUF016.py:54:17: RUF016 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
+   |
+53 | # Should emit for non-integer slice start
+54 | var = [1, 2, 3]["x":2]
+   |                 ^^^ RUF016
+55 | var = [1, 2, 3][f"x":2]
+56 | var = [1, 2, 3][1.2:2]
+   |
+
+RUF016.py:56:17: RUF016 Slice in indexed access to type `list` uses type `float` as bound instead of an integer.
+   |
+54 | var = [1, 2, 3]["x":2]
+55 | var = [1, 2, 3][f"x":2]
+56 | var = [1, 2, 3][1.2:2]
+   |                 ^^^ RUF016
+57 | var = [1, 2, 3][{"x"}:2]
+   |
+
+RUF016.py:60:19: RUF016 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
+   |
+59 | # Should emit for non-integer slice end
+60 | var = [1, 2, 3][0:"x"]
+   |                   ^^^ RUF016
+61 | var = [1, 2, 3][0:f"x"]
+62 | var = [1, 2, 3][0:1.2]
+   |
+
+RUF016.py:62:19: RUF016 Slice in indexed access to type `list` uses type `float` as bound instead of an integer.
+   |
+60 | var = [1, 2, 3][0:"x"]
+61 | var = [1, 2, 3][0:f"x"]
+62 | var = [1, 2, 3][0:1.2]
+   |                   ^^^ RUF016
+63 | 
+64 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
+   |
+
+RUF016.py:65:17: RUF016 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
+   |
+64 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
+65 | var = [1, 2, 3]["x":"y"]
+   |                 ^^^ RUF016
+66 | 
+67 | # Should emit once for repeated invalid access
+   |
+
+RUF016.py:65:21: RUF016 Slice in indexed access to type `list` uses type `str` as bound instead of an integer.
+   |
+64 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
+65 | var = [1, 2, 3]["x":"y"]
+   |                     ^^^ RUF016
+66 | 
+67 | # Should emit once for repeated invalid access
+   |
+
+RUF016.py:68:17: RUF016 Indexed access to type `list` uses type `str` instead of an integer or slice.
+   |
+67 | # Should emit once for repeated invalid access
+68 | var = [1, 2, 3]["x"]["y"]["z"]
+   |                 ^^^ RUF016
+69 | 
+70 | # Cannot emit on invalid access using variable in index
+   |
+
+
