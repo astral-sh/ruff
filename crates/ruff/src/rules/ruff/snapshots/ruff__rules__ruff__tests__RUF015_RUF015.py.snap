@@ -334,5 +334,3 @@ RUF015.py:19:1: RUF015 [*] Prefer `[next(iter(x))]` over `list(x)[:1]`
 20 20 | 
 21 21 | # OK (not indexing (solely) the first element)
 22 22 | list(x)
-
-
