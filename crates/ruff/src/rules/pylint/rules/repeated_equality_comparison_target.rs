@@ -73,7 +73,7 @@ pub(crate) fn repeated_equality_comparison_target(
                     .entry(left.deref().into())
                     .or_insert_with(|| (0, Vec::new()));
                 *count += 1;
-                matches.extend(comparators.iter().map(std::convert::Into::into));
+                matches.extend(comparators.iter().map(HashableExpr::from));
             }
             _ => continue,
         }
