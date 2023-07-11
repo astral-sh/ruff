@@ -15,6 +15,8 @@ use ruff_python_semantic::SemanticModel;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+type AnnotationValidator = fn(&SemanticModel, &Expr) -> bool;
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum FuncKind {
     Sync,
@@ -240,7 +242,7 @@ fn check_positional_args(
 ) {
     // For each argument we set up the extra predicate that the annotation needs to be checked
     // against
-    let validations: [(ErrorKind, fn(&SemanticModel, &Expr) -> bool); 3] = [
+    let validations: [(ErrorKind, AnnotationValidator); 3] = [
         (ErrorKind::FirstArgBadAnnotation, is_base_exception_type),
         (ErrorKind::SecondArgBadAnnotation, is_base_exception),
         (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
