@@ -31,7 +31,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         } = item;
 
         let saved_level = f.context().node_level();
-        f.context_mut().set_node_level(NodeLevel::Expression);
+        f.context_mut()
+            .set_node_level(NodeLevel::ParenthesizedExpression);
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling_comments(item);

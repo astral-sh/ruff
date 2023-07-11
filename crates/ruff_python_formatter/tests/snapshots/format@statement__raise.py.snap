@@ -143,8 +143,10 @@ raise (
     + cccccccccccccccccccccc
     + ddddddddddddddddddddddddd
 )
-raise aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbb + (
-    cccccccccccccccccccccc + ddddddddddddddddddddddddd
+raise (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbb
+    + (cccccccccccccccccccccc + ddddddddddddddddddddddddd)
 )
 raise (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

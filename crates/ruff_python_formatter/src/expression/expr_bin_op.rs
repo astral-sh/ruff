@@ -1,8 +1,7 @@
 use crate::comments::{trailing_comments, trailing_node_comments, Comments};
-use crate::expression::binary_like::{BinaryLayout, FormatBinaryLike};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, is_expression_parenthesized, NeedsParentheses,
-    Parenthesize,
+    default_expression_needs_parentheses, in_parentheses_only_group, is_expression_parenthesized,
+    NeedsParentheses, Parenthesize,
 };
 use crate::expression::Parentheses;
 use crate::prelude::*;
@@ -31,24 +30,11 @@ impl FormatRuleWithOptions<ExprBinOp, PyFormatContext<'_>> for FormatExprBinOp {
 
 impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
     fn fmt_fields(&self, item: &ExprBinOp, f: &mut PyFormatter) -> FormatResult<()> {
-        item.fmt_binary(self.parentheses, f)
-    }
-
-    fn fmt_dangling_comments(&self, _node: &ExprBinOp, _f: &mut PyFormatter) -> FormatResult<()> {
-        // Handled inside of `fmt_fields`
-        Ok(())
-    }
-}
-
-impl<'ast> FormatBinaryLike<'ast> for ExprBinOp {
-    type FormatOperator = FormatOwnedWithRule<Operator, FormatOperator, PyFormatContext<'ast>>;
-
-    fn fmt_default(&self, f: &mut PyFormatter<'ast, '_>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let source = f.context().contents();
-            let binary_chain: SmallVec<[&ExprBinOp; 4]> = iter::successors(Some(self), |parent| {
+            let binary_chain: SmallVec<[&ExprBinOp; 4]> = iter::successors(Some(item), |parent| {
                 parent.left.as_bin_op_expr().and_then(|bin_expression| {
                     if is_expression_parenthesized(bin_expression.as_any_node_ref(), source) {
                         None
@@ -63,7 +49,7 @@ impl<'ast> FormatBinaryLike<'ast> for ExprBinOp {
             let left_most = binary_chain.last().unwrap();
 
             // Format the left most expression
-            group(&left_most.left.format()).fmt(f)?;
+            in_parentheses_only_group(&left_most.left.format()).fmt(f)?;
 
             // Iterate upwards in the binary expression tree and, for each level, format the operator
             // and the right expression.
@@ -100,13 +86,13 @@ impl<'ast> FormatBinaryLike<'ast> for ExprBinOp {
                     space().fmt(f)?;
                 }
 
-                group(&right.format()).fmt(f)?;
+                in_parentheses_only_group(&right.format()).fmt(f)?;
 
                 // It's necessary to format the trailing comments because the code bypasses
                 // `FormatNodeRule::fmt` for the nested binary expressions.
                 // Don't call the formatting function for the most outer binary expression because
                 // these comments have already been formatted.
-                if current != self {
+                if current != item {
                     trailing_node_comments(current).fmt(f)?;
                 }
             }
@@ -114,19 +100,12 @@ impl<'ast> FormatBinaryLike<'ast> for ExprBinOp {
             Ok(())
         });
 
-        group(&format_inner).fmt(f)
+        in_parentheses_only_group(&format_inner).fmt(f)
     }
 
-    fn left(&self) -> FormatResult<&Expr> {
-        Ok(&self.left)
-    }
-
-    fn right(&self) -> FormatResult<&Expr> {
-        Ok(&self.right)
-    }
-
-    fn operator(&self) -> Self::FormatOperator {
-        self.op.into_format()
+    fn fmt_dangling_comments(&self, _node: &ExprBinOp, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Handled inside of `fmt_fields`
+        Ok(())
     }
 }
 
@@ -200,18 +179,6 @@ impl NeedsParentheses for ExprBinOp {
         source: &str,
         comments: &Comments,
     ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => {
-                if self.binary_layout(source) == BinaryLayout::Default
-                    || comments.has_leading_comments(self.right.as_ref())
-                    || comments.has_dangling_comments(self)
-                {
-                    Parentheses::Optional
-                } else {
-                    Parentheses::Custom
-                }
-            }
-            parentheses => parentheses,
-        }
+        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
     }
 }
