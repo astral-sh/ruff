@@ -12,6 +12,7 @@ pub mod node;
 pub mod relocate;
 pub mod source_code;
 pub mod statement_visitor;
+pub mod stmt_if;
 pub mod str;
 pub mod token_kind;
 pub mod types;

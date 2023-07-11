@@ -1,5 +1,5 @@
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Expr, Identifier, Stmt};
+use rustpython_parser::ast::{self, ElifElseClause, Expr, Identifier, Stmt};
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -8,10 +8,8 @@ use ruff_python_ast::visitor::Visitor;
 pub(super) struct Stack<'a> {
     /// The `return` statements in the current function.
     pub(super) returns: Vec<&'a ast::StmtReturn>,
-    /// The `else` statements in the current function.
-    pub(super) elses: Vec<&'a ast::StmtIf>,
-    /// The `elif` statements in the current function.
-    pub(super) elifs: Vec<&'a ast::StmtIf>,
+    /// The `elif` or `else` statements in the current function.
+    pub(super) elifs_elses: Vec<(&'a [Stmt], &'a ElifElseClause)>,
     /// The non-local variables in the current function.
     pub(super) non_locals: FxHashSet<&'a str>,
     /// Whether the current function is a generator.
@@ -117,27 +115,14 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
 
                 self.stack.returns.push(stmt_return);
             }
-            Stmt::If(stmt_if) => {
-                let is_elif_arm = self.parents.iter().any(|parent| {
-                    if let Stmt::If(ast::StmtIf { orelse, .. }) = parent {
-                        orelse.len() == 1 && &orelse[0] == stmt
-                    } else {
-                        false
-                    }
-                });
-
-                if !is_elif_arm {
-                    let has_elif =
-                        stmt_if.orelse.len() == 1 && stmt_if.orelse.first().unwrap().is_if_stmt();
-                    let has_else = !stmt_if.orelse.is_empty();
-
-                    if has_elif {
-                        // `stmt` is an `if` block followed by an `elif` clause.
-                        self.stack.elifs.push(stmt_if);
-                    } else if has_else {
-                        // `stmt` is an `if` block followed by an `else` clause.
-                        self.stack.elses.push(stmt_if);
-                    }
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                // TODO(konstin): What's the rational here/is the condition right? -> https://github.com/astral-sh/ruff/pull/2881
+                if let Some(first) = elif_else_clauses.first() {
+                    self.stack.elifs_elses.push((body, first));
                 }
             }
             _ => {}

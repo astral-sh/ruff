@@ -252,32 +252,40 @@ TRY004.py:230:9: TRY004 Prefer `TypeError` exception for invalid type
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-TRY004.py:267:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:239:9: TRY004 Prefer `TypeError` exception for invalid type
     |
-265 | def check_body(some_args):
-266 |     if isinstance(some_args, int):
-267 |         raise ValueError("...") # should be typeerror
+237 |         pass
+238 |     else:
+239 |         raise Exception("...")   # should be typeerror
+    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
+    |
+
+TRY004.py:276:9: TRY004 Prefer `TypeError` exception for invalid type
+    |
+274 | def check_body(some_args):
+275 |     if isinstance(some_args, int):
+276 |         raise ValueError("...") # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-TRY004.py:277:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:286:9: TRY004 Prefer `TypeError` exception for invalid type
     |
-275 | def multiple_elifs(some_args):
-276 |     if not isinstance(some_args, int):
-277 |         raise ValueError("...") # should be typerror
+284 | def multiple_elifs(some_args):
+285 |     if not isinstance(some_args, int):
+286 |         raise ValueError("...") # should be typerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
-278 |     elif some_args < 3:
-279 |         raise ValueError("...")  # this is ok
+287 |     elif some_args < 3:
+288 |         raise ValueError("...")  # this is ok
     |
 
-TRY004.py:288:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:297:9: TRY004 Prefer `TypeError` exception for invalid type
     |
-286 | def multiple_ifs(some_args):
-287 |     if not isinstance(some_args, int):
-288 |         raise ValueError("...") # should be typerror
+295 | def multiple_ifs(some_args):
+296 |     if not isinstance(some_args, int):
+297 |         raise ValueError("...") # should be typerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
-289 |     else:
-290 |         if some_args < 3:
+298 |     else:
+299 |         if some_args < 3:
     |
 
 

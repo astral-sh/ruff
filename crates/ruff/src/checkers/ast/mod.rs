@@ -1159,9 +1159,8 @@ where
             Stmt::If(
                 stmt_if @ ast::StmtIf {
                     test,
-                    body,
-                    orelse,
-                    range: _,
+                    elif_else_clauses,
+                    ..
                 },
             ) => {
                 if self.enabled(Rule::EmptyTypeCheckingBlock) {
@@ -1170,70 +1169,42 @@ where
                     }
                 }
                 if self.enabled(Rule::IfTuple) {
-                    pyflakes::rules::if_tuple(self, stmt, test);
+                    pyflakes::rules::if_tuple(self, stmt_if);
                 }
                 if self.enabled(Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
                         self,
-                        stmt,
-                        test,
-                        body,
-                        orelse,
+                        stmt_if,
                         self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::IfWithSameArms) {
-                    flake8_simplify::rules::if_with_same_arms(
-                        self,
-                        stmt,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::if_with_same_arms(self, self.locator, stmt_if);
                 }
                 if self.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfDictLookup) {
-                    flake8_simplify::rules::manual_dict_lookup(
-                        self,
-                        stmt,
-                        test,
-                        body,
-                        orelse,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::manual_dict_lookup(self, stmt_if);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfIfExp) {
-                    flake8_simplify::rules::use_ternary_operator(
-                        self,
-                        stmt,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::use_ternary_operator(self, stmt);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfDictGet) {
-                    flake8_simplify::rules::use_dict_get_with_default(
-                        self,
-                        stmt,
-                        test,
-                        body,
-                        orelse,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::use_dict_get_with_default(self, stmt_if);
                 }
                 if self.enabled(Rule::TypeCheckWithoutTypeError) {
                     tryceratops::rules::type_check_without_type_error(
                         self,
-                        body,
-                        test,
-                        orelse,
+                        stmt_if,
                         self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::OutdatedVersionBlock) {
-                    pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
+                    pyupgrade::rules::outdated_version_block(self, stmt_if);
                 }
                 if self.enabled(Rule::CollapsibleElseIf) {
-                    if let Some(diagnostic) =
-                        pylint::rules::collapsible_else_if(orelse, self.locator)
+                    if let Some(diagnostic) = pylint::rules::collapsible_else_if(elif_else_clauses)
                     {
                         self.diagnostics.push(diagnostic);
                     }
@@ -2053,7 +2024,7 @@ where
                 stmt_if @ ast::StmtIf {
                     test,
                     body,
-                    orelse,
+                    elif_else_clauses,
                     range: _,
                 },
             ) => {

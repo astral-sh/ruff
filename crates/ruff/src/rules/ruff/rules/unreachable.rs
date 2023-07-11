@@ -484,17 +484,44 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     self.unconditional_next_block(after)
                 }
                 // Statements that (can) divert the control flow.
-                Stmt::If(stmt) => {
-                    let next_after_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt.body));
-                    let orelse_after_block =
-                        self.maybe_next_block_index(after, || needs_next_block(&stmt.orelse));
-                    let next = self.append_blocks_if_not_empty(&stmt.body, next_after_block);
-                    let orelse = self.append_blocks_if_not_empty(&stmt.orelse, orelse_after_block);
+                Stmt::If(stmt_if) => {
+                    let after_consequent_block =
+                        self.maybe_next_block_index(after, || needs_next_block(&stmt_if.body));
+                    let after_alternate_block = self.maybe_next_block_index(after, || {
+                        stmt_if
+                            .elif_else_clauses
+                            .last()
+                            .map_or(true, |clause| needs_next_block(&clause.body))
+                    });
+
+                    let consequent =
+                        self.append_blocks_if_not_empty(&stmt_if.body, after_consequent_block);
+
+                    // Block ID of the next elif or else clause.
+                    let mut next_branch = after_alternate_block;
+
+                    for clause in stmt_if.elif_else_clauses.iter().rev() {
+                        let consequent =
+                            self.append_blocks_if_not_empty(&clause.body, after_consequent_block);
+
+                        next_branch = if let Some(test) = &clause.test {
+                            let next = NextBlock::If {
+                                condition: Condition::Test(test),
+                                next: consequent,
+                                orelse: next_branch,
+                            };
+                            let stmts = std::slice::from_ref(stmt);
+                            let block = BasicBlock { stmts, next };
+                            self.blocks.push(block)
+                        } else {
+                            consequent
+                        };
+                    }
+
                     NextBlock::If {
-                        condition: Condition::Test(&stmt.test),
-                        next,
-                        orelse,
+                        condition: Condition::Test(&stmt_if.test),
+                        next: consequent,
+                        orelse: next_branch,
                     }
                 }
                 Stmt::While(StmtWhile {
@@ -867,7 +894,7 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
 
     match last {
         Stmt::Return(_) | Stmt::Raise(_) => false,
-        Stmt::If(stmt) => needs_next_block(&stmt.body) || needs_next_block(&stmt.orelse),
+        Stmt::If(stmt) => needs_next_block(&stmt.body) || stmt.elif_else_clauses.last().map_or(true, |clause| needs_next_block(&clause.body)),
         Stmt::FunctionDef(_)
         | Stmt::AsyncFunctionDef(_)
         | Stmt::Import(_)
@@ -1063,6 +1090,11 @@ mod tests {
                 "first block should always terminate"
             );
 
+            let got_mermaid = MermaidGraph {
+                graph: &got,
+                source: &source,
+            };
+
             // All block index should be valid.
             let valid = BlockIndex::from_usize(got.blocks.len());
             for block in &got.blocks {
@@ -1075,11 +1107,6 @@ mod tests {
                     NextBlock::Terminate => {}
                 }
             }
-
-            let got_mermaid = MermaidGraph {
-                graph: &got,
-                source: &source,
-            };
 
             writeln!(
                 output,
