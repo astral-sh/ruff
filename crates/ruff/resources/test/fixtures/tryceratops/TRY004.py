@@ -305,6 +305,17 @@ def multiple_ifs(some_args):
                 pass
 
 
+def else_body(obj):
+    if isinstance(obj, datetime.timedelta):
+        return "TimeDelta"
+    elif isinstance(obj, relativedelta.relativedelta):
+        return "RelativeDelta"
+    elif isinstance(obj, CronExpression):
+        return "CronExpression"
+    else:
+        raise Exception(f"Unknown object type: {obj.__class__.__name__}")
+
+
 def early_return():
     if isinstance(this, some_type):
         if x in this:
