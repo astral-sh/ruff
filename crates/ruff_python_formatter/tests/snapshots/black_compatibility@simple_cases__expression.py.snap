@@ -324,10 +324,14 @@ last_call()
 -{(i**2) for i in (1, 2, 3)}
 -{(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))}
 -{((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)}
--[i for i in (1, 2, 3)]
--[(i**2) for i in (1, 2, 3)]
--[(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
--[((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+ [i for i in (1, 2, 3)]
+ [(i**2) for i in (1, 2, 3)]
+ [(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
+ [((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
 -{i: 0 for i in (1, 2, 3)}
 -{i: j for i, j in ((1, "a"), (2, "b"), (3, "c"))}
 -{a: b * 2 for a, b in dictionary.items()}
@@ -336,14 +340,6 @@ last_call()
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 -}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
@@ -369,9 +365,6 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
--]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
 +    (
 +        str,
 +        int,
@@ -379,6 +372,9 @@ last_call()
 +        dict[str, int],
 +    )
  ]
+-very_long_variable_name_filters: t.List[
+-    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
+-]
 -xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)
@@ -433,10 +429,11 @@ last_call()
  (*starred,)
  {
      "id": "1",
-@@ -208,24 +202,14 @@
+@@ -207,25 +201,15 @@
+ )
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -444,7 +441,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -645,10 +642,10 @@ str or None if (1 if True else 2) else str or bytes or None
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+[i for i in (1, 2, 3)]
+[(i**2) for i in (1, 2, 3)]
+[(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
+[((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
