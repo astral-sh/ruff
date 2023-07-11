@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use rustpython_parser::ast::{self, Comprehension, Constant, Expr};
+use rustpython_parser::ast::{self, Comprehension, Constant, Expr, ExprSubscript};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -78,17 +78,14 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
 /// RUF015
 pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     checker: &mut Checker,
-    subscript: &Expr,
+    subscript: &ExprSubscript,
 ) {
-    let Expr::Subscript(ast::ExprSubscript {
+    let ast::ExprSubscript {
         value,
         slice,
         range,
         ..
-    }) = subscript
-    else {
-        return;
-    };
+    } = subscript;
 
     let Some(subscript_kind) = classify_subscript(slice) else {
         return;

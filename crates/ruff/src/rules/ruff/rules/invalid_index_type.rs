@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprConstant, ExprSlice, Ranged};
+use rustpython_parser::ast::{Constant, Expr, ExprConstant, ExprSlice, ExprSubscript, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -46,11 +46,12 @@ impl Violation for InvalidIndexType {
 }
 
 /// RUF015
-/// Expects components of a `Subscript` expression
-pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, slice: &'a Expr) {
+pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, expr: &'a ExprSubscript) {
+    let ExprSubscript { value, slice, .. } = expr;
+
     // If the value being indexed is a list, tuple, string, f-string, bytes, or comprehension
     if matches!(
-        value,
+        value.as_ref(),
         Expr::List(_)
             | Expr::ListComp(_)
             | Expr::Tuple(_)
@@ -61,7 +62,7 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
             })
     ) {
         // Then check the contents of the index
-        match slice {
+        match slice.as_ref() {
             // If the index is a const, only allow integers
             Expr::Constant(ExprConstant {
                 value: index_value, ..
@@ -70,8 +71,9 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                     checker.diagnostics.push(Diagnostic::new(
                         InvalidIndexType {
                             var_type: expression_type_name(value)
-                                .expect("Failed to cast parent expression to type name"),
-                            idx_type: constant_type_name(index_value),
+                                .expect("Failed to cast parent expression to type name")
+                                .to_string(),
+                            idx_type: constant_type_name(index_value).to_string(),
                             slice_bound: false,
                         },
                         slice.range(),
@@ -89,8 +91,9 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                             checker.diagnostics.push(Diagnostic::new(
                                 InvalidIndexType {
                                     var_type: expression_type_name(value)
-                                        .expect("Failed to cast parent expression to type name"),
-                                    idx_type: constant_type_name(index_value),
+                                        .expect("Failed to cast parent expression to type name")
+                                        .to_string(),
+                                    idx_type: constant_type_name(index_value).to_string(),
                                     slice_bound: true,
                                 },
                                 slice_bound.range(),
@@ -109,9 +112,11 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                         checker.diagnostics.push(Diagnostic::new(
                             InvalidIndexType {
                                 var_type: expression_type_name(value)
-                                    .expect("Failed to cast parent expression to type name"),
+                                    .expect("Failed to cast parent expression to type name")
+                                    .to_string(),
                                 idx_type: expression_type_name(slice_bound)
-                                    .expect("Failed to slice bound expression to type name"),
+                                    .expect("Failed to slice bound expression to type name")
+                                    .to_string(),
                                 slice_bound: true,
                             },
                             slice_bound.range(),
@@ -130,9 +135,11 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
                 checker.diagnostics.push(Diagnostic::new(
                     InvalidIndexType {
                         var_type: expression_type_name(value)
-                            .expect("Failed to cast parent expression to type name"),
+                            .expect("Failed to cast parent expression to type name")
+                            .to_string(),
                         idx_type: expression_type_name(slice)
-                            .expect("Failed to cast index expression to type name"),
+                            .expect("Failed to cast index expression to type name")
+                            .to_string(),
                         slice_bound: false,
                     },
                     slice.range(),
@@ -144,8 +151,8 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
     }
 }
 
-fn constant_type_name(constant: &Constant) -> String {
-    (match constant {
+fn constant_type_name(constant: &Constant) -> &'static str {
+    match constant {
         Constant::None => "None",
         Constant::Bool(_) => "bool",
         Constant::Str(_) => "str",
@@ -155,22 +162,21 @@ fn constant_type_name(constant: &Constant) -> String {
         Constant::Float(_) => "float",
         Constant::Complex { .. } => "complex",
         Constant::Ellipsis => "ellipsis",
-    })
-    .to_string()
+    }
 }
 
 /// Utility for casting expressions to their Python type name
 /// Does not cover all cases, only implements expressions needed in RUF015
-fn expression_type_name(expr: &Expr) -> Option<String> {
+fn expression_type_name(expr: &Expr) -> Option<&'static str> {
     match expr {
         Expr::Constant(ExprConstant { value, .. }) => Some(constant_type_name(value)),
-        Expr::JoinedStr(_) => Some("str".to_string()),
-        Expr::List(_) => Some("list".to_string()),
-        Expr::ListComp(_) => Some("list comprehension".to_string()),
-        Expr::DictComp(_) => Some("dict comprehension".to_string()),
-        Expr::Set(_) => Some("set".to_string()),
-        Expr::Dict(_) => Some("dict".to_string()),
-        Expr::Tuple(_) => Some("tuple".to_string()),
+        Expr::JoinedStr(_) => Some("str"),
+        Expr::List(_) => Some("list"),
+        Expr::ListComp(_) => Some("list comprehension"),
+        Expr::DictComp(_) => Some("dict comprehension"),
+        Expr::Set(_) => Some("set"),
+        Expr::Dict(_) => Some("dict"),
+        Expr::Tuple(_) => Some("tuple"),
         _ => None,
     }
 }
