@@ -512,7 +512,7 @@ fn pad_expression(content: String, range: TextRange, checker: &Checker) -> Strin
     // If the expression is immediately preceded by an opening brace, then
     // we need to add a space before the expression.
     let prefix = checker.locator.up_to(range.start());
-    let left_pad = matches!(prefix.chars().rev().next(), Some('{'));
+    let left_pad = matches!(prefix.chars().next_back(), Some('{'));
 
     // If the expression is immediately preceded by an opening brace, then
     // we need to add a space before the expression.

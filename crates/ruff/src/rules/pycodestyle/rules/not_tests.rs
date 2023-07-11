@@ -93,7 +93,7 @@ pub(crate) fn not_tests(
             if !matches!(&ops[..], [CmpOp::In | CmpOp::Is]) {
                 return;
             }
-            for op in ops.iter() {
+            for op in ops {
                 match op {
                     CmpOp::In => {
                         if check_not_in {

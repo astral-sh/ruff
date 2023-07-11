@@ -81,7 +81,7 @@ fn has_dunder_method(body: &[Stmt]) -> bool {
 }
 
 fn is_non_abstract_model(bases: &[Expr], body: &[Stmt], semantic: &SemanticModel) -> bool {
-    for base in bases.iter() {
+    for base in bases {
         if is_model_abstract(body) {
             continue;
         }
@@ -94,18 +94,18 @@ fn is_non_abstract_model(bases: &[Expr], body: &[Stmt], semantic: &SemanticModel
 
 /// Check if class is abstract, in terms of Django model inheritance.
 fn is_model_abstract(body: &[Stmt]) -> bool {
-    for element in body.iter() {
+    for element in body {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
         };
         if name != "Meta" {
             continue;
         }
-        for element in body.iter() {
+        for element in body {
             let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = element else {
                 continue;
             };
-            for target in targets.iter() {
+            for target in targets {
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };

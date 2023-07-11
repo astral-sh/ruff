@@ -136,7 +136,7 @@ for node in nodes:
             fn format(&self) -> Self::Format<'_> {{
                 FormatRefWithRule::new(
                     self,
-                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
+                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
                 )
             }}
         }}
@@ -149,7 +149,7 @@ for node in nodes:
             fn into_format(self) -> Self::Format {{
                 FormatOwnedWithRule::new(
                     self,
-                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
+                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
                 )
             }}
         }}
