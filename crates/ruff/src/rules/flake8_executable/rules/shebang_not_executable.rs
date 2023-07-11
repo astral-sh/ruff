@@ -48,15 +48,16 @@ pub(crate) fn shebang_not_executable(
     range: TextRange,
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, content) = shebang {
-        if let Ok(false) = is_executable(filepath) {
-            let diagnostic = Diagnostic::new(
-                ShebangNotExecutable,
-                TextRange::at(range.start() + start, content.text_len()),
-            );
-            return Some(diagnostic);
-        }
+    let ShebangDirective { offset, contents } = shebang;
+
+    if let Ok(false) = is_executable(filepath) {
+        let diagnostic = Diagnostic::new(
+            ShebangNotExecutable,
+            TextRange::at(range.start() + offset, contents.text_len()),
+        );
+        return Some(diagnostic);
     }
+
     None
 }
 

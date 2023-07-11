@@ -9,7 +9,7 @@ use ruff_python_whitespace::UniversalNewlines;
 
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
-use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
+use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
@@ -87,33 +87,35 @@ pub(crate) fn check_physical_lines(
                 || enforce_shebang_newline
                 || enforce_shebang_python
             {
-                let shebang = extract_shebang(&line);
-                if enforce_shebang_not_executable {
-                    if let Some(diagnostic) = shebang_not_executable(path, line.range(), &shebang) {
-                        diagnostics.push(diagnostic);
+                if let Some(shebang) = ShebangDirective::try_extract(&line) {
+                    has_any_shebang = true;
+                    if enforce_shebang_not_executable {
+                        if let Some(diagnostic) =
+                            shebang_not_executable(path, line.range(), &shebang)
+                        {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_missing {
-                    if !has_any_shebang && matches!(shebang, ShebangDirective::Match(..)) {
-                        has_any_shebang = true;
+                    if enforce_shebang_whitespace {
+                        if let Some(diagnostic) =
+                            shebang_whitespace(line.range(), &shebang, fix_shebang_whitespace)
+                        {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_whitespace {
-                    if let Some(diagnostic) =
-                        shebang_whitespace(line.range(), &shebang, fix_shebang_whitespace)
-                    {
-                        diagnostics.push(diagnostic);
+                    if enforce_shebang_newline {
+                        if let Some(diagnostic) =
+                            shebang_newline(line.range(), &shebang, index == 0)
+                        {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_newline {
-                    if let Some(diagnostic) = shebang_newline(line.range(), &shebang, index == 0) {
-                        diagnostics.push(diagnostic);
+                    if enforce_shebang_python {
+                        if let Some(diagnostic) = shebang_python(line.range(), &shebang) {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_python {
-                    if let Some(diagnostic) = shebang_python(line.range(), &shebang) {
-                        diagnostics.push(diagnostic);
-                    }
+                } else {
                 }
             }
         }
