@@ -56,9 +56,9 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
                 // while maintaining the right amount of empty lines between the comment
                 // and the last decorator.
                 let decorator_end =
-                    skip_trailing_trivia(last_decorator.end(), f.context().contents());
+                    skip_trailing_trivia(last_decorator.end(), f.context().source());
 
-                let leading_line = if lines_after(decorator_end, f.context().contents()) <= 1 {
+                let leading_line = if lines_after(decorator_end, f.context().source()) <= 1 {
                     hard_line_break()
                 } else {
                     empty_line()

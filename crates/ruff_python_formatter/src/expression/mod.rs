@@ -9,7 +9,6 @@ use ruff_formatter::{
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
-use crate::comments::Comments;
 use crate::context::NodeLevel;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
@@ -64,11 +63,7 @@ impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
 
 impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     fn fmt(&self, item: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
-        let parentheses = item.needs_parentheses(
-            self.parenthesize,
-            f.context().contents(),
-            f.context().comments(),
-        );
+        let parentheses = item.needs_parentheses(self.parenthesize, f.context());
 
         let format_expr = format_with(|f| match item {
             Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
@@ -172,37 +167,36 @@ impl NeedsParentheses for Expr {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
         match self {
-            Expr::BoolOp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::NamedExpr(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::BinOp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::UnaryOp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Lambda(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::IfExp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Dict(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Set(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::ListComp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::SetComp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::DictComp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::GeneratorExp(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Await(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Yield(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::YieldFrom(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Compare(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Call(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::FormattedValue(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::JoinedStr(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Constant(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Attribute(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Subscript(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Starred(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Name(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::List(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Tuple(expr) => expr.needs_parentheses(parenthesize, source, comments),
-            Expr::Slice(expr) => expr.needs_parentheses(parenthesize, source, comments),
+            Expr::BoolOp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::NamedExpr(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::BinOp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::UnaryOp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Lambda(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::IfExp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Dict(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Set(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::ListComp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::SetComp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::DictComp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::GeneratorExp(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Await(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Yield(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::YieldFrom(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Compare(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Call(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::FormattedValue(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::JoinedStr(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Constant(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Attribute(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Subscript(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Starred(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Name(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::List(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Tuple(expr) => expr.needs_parentheses(parenthesize, context),
+            Expr::Slice(expr) => expr.needs_parentheses(parenthesize, context),
         }
     }
 }
@@ -233,7 +227,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
-    let mut visitor = MaxOperatorPriorityVisitor::new(context.contents());
+    let mut visitor = MaxOperatorPriorityVisitor::new(context.source());
 
     visitor.visit_subexpression(expr);
 

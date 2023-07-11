@@ -97,14 +97,13 @@ impl NeedsParentheses for ExprAttribute {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        if has_breaking_comments_attribute_chain(self, comments) {
+        if has_breaking_comments_attribute_chain(self, context.comments()) {
             return Parentheses::Always;
         }
 
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
+        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
             Parentheses::Optional => Parentheses::Never,
             parentheses => parentheses,
         }

@@ -1,4 +1,5 @@
-use crate::comments::{dangling_comments, Comments, SourceComment};
+use crate::comments::{dangling_comments, SourceComment};
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
@@ -27,8 +28,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
             step,
         } = item;
 
-        let (first_colon, second_colon) =
-            find_colons(f.context().contents(), *range, lower, upper)?;
+        let (first_colon, second_colon) = find_colons(f.context().source(), *range, lower, upper)?;
 
         // Handle comment placement
         // In placements.rs, we marked comment for None nodes a dangling and associated all others
@@ -263,9 +263,8 @@ impl NeedsParentheses for ExprSlice {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        default_expression_needs_parentheses(self.into(), parenthesize, context)
     }
 }

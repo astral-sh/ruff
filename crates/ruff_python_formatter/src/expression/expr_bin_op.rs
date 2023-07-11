@@ -1,4 +1,4 @@
-use crate::comments::{trailing_comments, trailing_node_comments, Comments};
+use crate::comments::{trailing_comments, trailing_node_comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, in_parentheses_only_group, is_expression_parenthesized,
     NeedsParentheses, Parenthesize,
@@ -33,7 +33,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
         let comments = f.context().comments().clone();
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            let source = f.context().contents();
+            let source = f.context().source();
             let binary_chain: SmallVec<[&ExprBinOp; 4]> = iter::successors(Some(item), |parent| {
                 parent.left.as_bin_op_expr().and_then(|bin_expression| {
                     if is_expression_parenthesized(bin_expression.as_any_node_ref(), source) {
@@ -176,9 +176,8 @@ impl NeedsParentheses for ExprBinOp {
     fn needs_parentheses(
         &self,
         parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
+        context: &PyFormatContext,
     ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        default_expression_needs_parentheses(self.into(), parenthesize, context)
     }
 }
