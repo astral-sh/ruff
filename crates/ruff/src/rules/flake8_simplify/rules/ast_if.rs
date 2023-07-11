@@ -717,10 +717,9 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
 /// SIM116
 pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
     // Throughout this rule:
-    // * Each if-statement's test must consist of a constant equality check with the same variable.
-    // * Each if-statement's body must consist of a single `return`.
-    // * Each if-statement's orelse must be either another if-statement or empty.
-    // * The final if-statement's orelse must be empty, or a single `return`.
+    // * Each if or elif statement's test must consist of a constant equality check with the same variable.
+    // * Each if or elif statement's body must consist of a single `return`.
+    // * The else clause must be empty, or a single `return`.
     let StmtIf {
         body,
         test,
@@ -764,7 +763,7 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
     for clause in elif_else_clauses {
         let ElifElseClause { test, body, .. } = clause;
         let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
-            continue;
+            return;
         };
 
         // `elif`
@@ -775,26 +774,26 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
             range: _,
         })) = test.as_ref()
         else {
-            continue;
+            return;
         };
 
         let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
-            continue;
+            return;
         };
         if id != target || ops != &[CmpOp::Eq] {
-            continue;
+            return;
         }
         let [Expr::Constant(ast::ExprConstant {
             value: constant, ..
         })] = comparators.as_slice()
         else {
-            continue;
+            return;
         };
 
         if value.as_ref().map_or(false, |value| {
             contains_effect(value, |id| checker.semantic().is_builtin(id))
         }) {
-            continue;
+            return;
         };
 
         constants.insert(constant.into());
@@ -802,6 +801,23 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
 
     if constants.len() < 3 {
         return;
+    }
+
+    // The else must also be a single effect-free return statement
+    if let Some(ElifElseClause {
+        test: None,
+        body,
+        range: _,
+    }) = elif_else_clauses.last()
+    {
+        let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
+            return;
+        };
+        if value.as_ref().map_or(false, |value| {
+            contains_effect(value, |id| checker.semantic().is_builtin(id))
+        }) {
+            return;
+        };
     }
 
     checker.diagnostics.push(Diagnostic::new(
