@@ -1,4 +1,4 @@
-use crate::builders::optional_parentheses;
+use crate::builders::parenthesize_if_expands;
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::Parentheses;
 use crate::prelude::*;
@@ -48,7 +48,7 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
             let format_continuation = FormatStringContinuation::new(self.constant, self.layout);
 
             if let StringLayout::Default(Some(Parentheses::Custom)) = self.layout {
-                optional_parentheses(&format_continuation).fmt(f)
+                parenthesize_if_expands(&format_continuation).fmt(f)
             } else {
                 format_continuation.fmt(f)
             }

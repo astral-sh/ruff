@@ -1,11 +1,10 @@
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::Parenthesize;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::{space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
-use rustpython_parser::ast::Expr;
 use rustpython_parser::ast::StmtAssign;
+
+use ruff_formatter::write;
+
+use crate::expression::parentheses::Parenthesize;
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 // Note: This currently does wrap but not the black way so the types below likely need to be
 // replaced entirely
@@ -22,32 +21,11 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             value,
             type_comment: _,
         } = item;
-        write!(
-            f,
-            [
-                LhsAssignList::new(targets),
-                value.format().with_options(Parenthesize::IfBreaks)
-            ]
-        )
-    }
-}
 
-#[derive(Debug)]
-struct LhsAssignList<'a> {
-    lhs_assign_list: &'a [Expr],
-}
-
-impl<'a> LhsAssignList<'a> {
-    const fn new(lhs_assign_list: &'a [Expr]) -> Self {
-        Self { lhs_assign_list }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for LhsAssignList<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        for element in self.lhs_assign_list {
-            write!(f, [&element.format(), space(), text("="), space(),])?;
+        for target in targets {
+            write!(f, [target.format(), space(), text("="), space()])?;
         }
-        Ok(())
+
+        write!(f, [value.format().with_options(Parenthesize::IfBreaks)])
     }
 }

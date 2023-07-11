@@ -357,38 +357,7 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -131,34 +131,28 @@
- tuple[str, ...]
- tuple[str, int, float, dict[str, int]]
- tuple[
--    str,
--    int,
--    float,
--    dict[str, int],
-+    (
-+        str,
-+        int,
-+        float,
-+        dict[str, int],
-+    )
- ]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
--]
--xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)
--xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)
--xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)  # type: ignore
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
- slice[0]
+@@ -152,13 +152,13 @@
  slice[0:1]
  slice[0:1:2]
  slice[:]
@@ -405,7 +374,7 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -172,7 +166,7 @@
+@@ -172,7 +172,7 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
@@ -414,7 +383,7 @@ last_call()
  numpy[np.newaxis, :]
  (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
  {"2.7": dead, "3.7": long_live or die_hard}
-@@ -181,10 +175,10 @@
+@@ -181,10 +181,10 @@
  (SomeName)
  SomeName
  (Good, Bad, Ugly)
@@ -429,11 +398,10 @@ last_call()
  (*starred,)
  {
      "id": "1",
-@@ -207,25 +201,15 @@
- )
+@@ -208,24 +208,14 @@
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -441,7 +409,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -463,7 +431,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,10 +221,10 @@
+@@ -237,10 +227,10 @@
  
  
  def gen():
@@ -478,7 +446,7 @@ last_call()
  
  
  async def f():
-@@ -248,18 +232,22 @@
+@@ -248,18 +238,22 @@
  
  
  print(*[] or [1])
@@ -509,7 +477,7 @@ last_call()
      ...
  for i in call():
      ...
-@@ -328,13 +316,18 @@
+@@ -328,13 +322,18 @@
  ):
      return True
  if (
@@ -531,7 +499,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +335,8 @@
+@@ -342,7 +341,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -679,17 +647,23 @@ dict[str, int]
 tuple[str, ...]
 tuple[str, int, float, dict[str, int]]
 tuple[
-    (
-        str,
-        int,
-        float,
-        dict[str, int],
-    )
+    str,
+    int,
+    float,
+    dict[str, int],
 ]
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
+very_long_variable_name_filters: t.List[
+    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
+]
+xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)
+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)
+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)  # type: ignore
 slice[0]
 slice[0:1]
 slice[0:1:2]

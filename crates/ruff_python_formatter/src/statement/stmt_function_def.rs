@@ -1,6 +1,6 @@
 use crate::comments::{leading_comments, trailing_comments};
 use crate::context::NodeLevel;
-use crate::expression::parentheses::Parenthesize;
+use crate::expression::parentheses::{optional_parentheses, Parenthesize};
 use crate::prelude::*;
 use crate::trivia::{lines_after, skip_trailing_trivia};
 use crate::FormatNodeRule;
@@ -97,9 +97,9 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
                     space(),
                     text("->"),
                     space(),
-                    return_annotation
-                        .format()
-                        .with_options(Parenthesize::IfBreaks)
+                    optional_parentheses(
+                        &return_annotation.format().with_options(Parenthesize::Never)
+                    )
                 ]
             )?;
         }

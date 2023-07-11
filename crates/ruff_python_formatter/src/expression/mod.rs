@@ -2,17 +2,16 @@ use rustpython_parser::ast;
 use rustpython_parser::ast::{Expr, Operator};
 use std::cmp::Ordering;
 
-use crate::builders::optional_parentheses;
-use ruff_formatter::{
-    format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
-};
+use crate::builders::parenthesize_if_expands;
+use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::context::NodeLevel;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, NeedsParentheses, Parentheses, Parenthesize,
+    is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
+    Parentheses, Parenthesize,
 };
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
@@ -106,37 +105,9 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             // Add optional parentheses. Ignore if the item renders parentheses itself.
             Parentheses::Optional => {
                 if can_omit_optional_parentheses(item, f.context()) {
-                    let saved_level = f.context().node_level();
-
-                    // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
-                    // that is only active if the optional parentheses group expands.
-                    let parens_id = f.group_id("optional_parentheses");
-
-                    f.context_mut()
-                        .set_node_level(NodeLevel::Expression(Some(parens_id)));
-
-                    // We can't use `soft_block_indent` here because that would always increment the indent,
-                    // even if the group does not break (the indent is not soft). This would result in
-                    // too deep indentations if a `parenthesized` group expands. Using `indent_if_group_breaks`
-                    // gives us the desired *soft* indentation that is only present if the optional parentheses
-                    // are shown.
-                    let result = group(&format_args![
-                        if_group_breaks(&text("(")),
-                        indent_if_group_breaks(
-                            &format_args![soft_line_break(), format_expr],
-                            parens_id
-                        ),
-                        soft_line_break(),
-                        if_group_breaks(&text(")"))
-                    ])
-                    .with_group_id(Some(parens_id))
-                    .fmt(f);
-
-                    f.context_mut().set_node_level(saved_level);
-
-                    result
-                } else {
                     optional_parentheses(&format_expr).fmt(f)
+                } else {
+                    parenthesize_if_expands(&format_expr).fmt(f)
                 }
             }
             Parentheses::Custom | Parentheses::Never => {

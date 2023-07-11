@@ -6,20 +6,20 @@ use ruff_text_size::TextSize;
 use rustpython_parser::ast::Ranged;
 
 /// Adds parentheses and indents `content` if it doesn't fit on a line.
-pub(crate) fn optional_parentheses<'ast, T>(content: &T) -> OptionalParentheses<'_, 'ast>
+pub(crate) fn parenthesize_if_expands<'ast, T>(content: &T) -> ParenthesizeIfExpands<'_, 'ast>
 where
     T: Format<PyFormatContext<'ast>>,
 {
-    OptionalParentheses {
+    ParenthesizeIfExpands {
         inner: Argument::new(content),
     }
 }
 
-pub(crate) struct OptionalParentheses<'a, 'ast> {
+pub(crate) struct ParenthesizeIfExpands<'a, 'ast> {
     inner: Argument<'a, PyFormatContext<'ast>>,
 }
 
-impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
+impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let saved_level = f.context().node_level();
 
