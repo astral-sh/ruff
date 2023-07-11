@@ -48,7 +48,7 @@ impl Violation for InvalidIndexType {
 /// RUF015
 /// Expects components of a `Subscript` expression
 pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, slice: &'a Expr) {
-    // If the value being indexed is a list, tuple, string, or comprehension
+    // If the value being indexed is a list, tuple, string, f-string, bytes, or comprehension
     if matches!(
         value,
         Expr::List(_)
@@ -57,6 +57,10 @@ pub(crate) fn invalid_index_type<'a>(checker: &mut Checker, value: &'a Expr, sli
             | Expr::JoinedStr(_)
             | Expr::Constant(ExprConstant {
                 value: Constant::Str(_),
+                ..
+            })
+            | Expr::Constant(ExprConstant {
+                value: Constant::Bytes(_),
                 ..
             })
     ) {
