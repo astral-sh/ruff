@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/perflint/mod.rs
 ---
-PERF403.py:5:9: PERF403 Use a dict comprehension to create a (filtered) copy of a dict
+PERF403.py:5:9: PERF403 Use a dictionary comprehension instead of a for-loop
   |
 3 |     fruit = ["apple", "pear", "orange"]
 4 |     for idx, name in enumerate(fruit):
@@ -9,7 +9,7 @@ PERF403.py:5:9: PERF403 Use a dict comprehension to create a (filtered) copy of 
   |         ^^^^^^^^^^^^^^^^^^ PERF403
   |
 
-PERF403.py:13:13: PERF403 Use a dict comprehension to create a (filtered) copy of a dict
+PERF403.py:13:13: PERF403 Use a dictionary comprehension instead of a for-loop
    |
 11 |     for idx, name in enumerate(fruit):
 12 |         if idx % 2:
@@ -17,7 +17,7 @@ PERF403.py:13:13: PERF403 Use a dict comprehension to create a (filtered) copy o
    |             ^^^^^^^^^^^^^^^^^^ PERF403
    |
 
-PERF403.py:21:13: PERF403 Use a dict comprehension to create a (filtered) copy of a dict
+PERF403.py:21:13: PERF403 Use a dictionary comprehension instead of a for-loop
    |
 19 |     for idx, name in enumerate(fruit):
 20 |         if idx % 2:
@@ -27,7 +27,7 @@ PERF403.py:21:13: PERF403 Use a dict comprehension to create a (filtered) copy o
 23 |             result[idx] = name
    |
 
-PERF403.py:33:13: PERF403 Use a dict comprehension to create a (filtered) copy of a dict
+PERF403.py:33:13: PERF403 Use a dictionary comprehension instead of a for-loop
    |
 31 |     for idx, name in enumerate(fruit):
 32 |         if idx % 2:
