@@ -1,0 +1,52 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+abstract_class_instantiated.py:143:5: PLE0110 Abstract class 'BadMroAbstractMethods' with abstract methods instantiated
+    |
+141 |     NoMroAbstractMethods()
+142 | 
+143 |     BadMroAbstractMethods()  # [abstract-class-instantiated]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ PLE0110
+144 |     BadClass()  # [abstract-class-instantiated]
+145 |     SecondBadClass()  # [abstract-class-instantiated]
+    |
+
+abstract_class_instantiated.py:144:5: PLE0110 Abstract class 'BadClass' with abstract methods instantiated
+    |
+143 |     BadMroAbstractMethods()  # [abstract-class-instantiated]
+144 |     BadClass()  # [abstract-class-instantiated]
+    |     ^^^^^^^^^^ PLE0110
+145 |     SecondBadClass()  # [abstract-class-instantiated]
+146 |     ThirdBadClass()  # [abstract-class-instantiated]
+    |
+
+abstract_class_instantiated.py:145:5: PLE0110 Abstract class 'SecondBadClass' with abstract methods instantiated
+    |
+143 |     BadMroAbstractMethods()  # [abstract-class-instantiated]
+144 |     BadClass()  # [abstract-class-instantiated]
+145 |     SecondBadClass()  # [abstract-class-instantiated]
+    |     ^^^^^^^^^^^^^^^^ PLE0110
+146 |     ThirdBadClass()  # [abstract-class-instantiated]
+147 |     FourthBadClass()  # [abstract-class-instantiated]
+    |
+
+abstract_class_instantiated.py:146:5: PLE0110 Abstract class 'ThirdBadClass' with abstract methods instantiated
+    |
+144 |     BadClass()  # [abstract-class-instantiated]
+145 |     SecondBadClass()  # [abstract-class-instantiated]
+146 |     ThirdBadClass()  # [abstract-class-instantiated]
+    |     ^^^^^^^^^^^^^^^ PLE0110
+147 |     FourthBadClass()  # [abstract-class-instantiated]
+148 |     FifthBadClass()  # [abstract-class-instantiated]
+    |
+
+abstract_class_instantiated.py:147:5: PLE0110 Abstract class 'FourthBadClass' with abstract methods instantiated
+    |
+145 |     SecondBadClass()  # [abstract-class-instantiated]
+146 |     ThirdBadClass()  # [abstract-class-instantiated]
+147 |     FourthBadClass()  # [abstract-class-instantiated]
+    |     ^^^^^^^^^^^^^^^^ PLE0110
+148 |     FifthBadClass()  # [abstract-class-instantiated]
+    |
+
+
