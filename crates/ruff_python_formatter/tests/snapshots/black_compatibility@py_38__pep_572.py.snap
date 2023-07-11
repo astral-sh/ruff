@@ -76,10 +76,10 @@ while x := f(x):
 -(x := lambda: 1)
 -(x := lambda: (y := 1))
 -lambda line: (m := re.match(pattern, line)) and m.group(1)
-+lambda x: True
-+(x := lambda x: True)
-+(x := lambda x: True)
-+lambda x: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
++(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
++lambda NOT_YET_IMPLEMENTED_lambda: True
  x = (y := 0)
  (z := (y := (x := 0)))
  (info := (name, phone, *rest))
@@ -132,10 +132,10 @@ def foo(answer: (p := 42) = 5):
     pass
 
 
-lambda x: True
-(x := lambda x: True)
-(x := lambda x: True)
-lambda x: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
+(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
+lambda NOT_YET_IMPLEMENTED_lambda: True
 x = (y := 0)
 (z := (y := (x := 0)))
 (info := (name, phone, *rest))

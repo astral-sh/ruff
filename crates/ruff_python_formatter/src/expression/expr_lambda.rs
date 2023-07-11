@@ -11,7 +11,12 @@ pub struct FormatExprLambda;
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, _item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented_custom_text("lambda x: True")])
+        write!(
+            f,
+            [not_yet_implemented_custom_text(
+                "lambda NOT_YET_IMPLEMENTED_lambda: True"
+            )]
+        )
     }
 }
 
