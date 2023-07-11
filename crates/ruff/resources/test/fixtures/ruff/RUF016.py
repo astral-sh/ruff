@@ -67,7 +67,7 @@ var = [1, 2, 3]["x":"y"]
 # Should emit once for repeated invalid access
 var = [1, 2, 3]["x"]["y"]["z"]
 
-# Cannot emit on invalid access using variable
+# Cannot emit on invalid access using variable in index
 x = "x"
 var = "abc"[x]
 
@@ -75,3 +75,7 @@ var = "abc"[x]
 def func():
     return 1
 var = "abc"[func()]
+
+# Cannot emit on invalid access using a variable in parent
+x = [1, 2, 3]
+var = x["y"]
