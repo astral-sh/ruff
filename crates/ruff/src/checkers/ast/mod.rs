@@ -2142,7 +2142,7 @@ where
 
         // Pre-visit.
         match expr {
-            subscript @ Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.any_enabled(&[
                     Rule::FutureRewritableTypeAnnotation,
@@ -2233,6 +2233,10 @@ where
                 }
                 if self.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
                     ruff::rules::unnecessary_iterable_allocation_for_first_element(self, subscript);
+                }
+
+                if self.enabled(Rule::InvalidIndexType) {
+                    ruff::rules::invalid_index_type(self, subscript);
                 }
 
                 pandas_vet::rules::subscript(self, value, expr);
