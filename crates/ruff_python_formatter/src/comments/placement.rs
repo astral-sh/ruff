@@ -40,6 +40,7 @@ pub(super) fn place_comment<'a>(
         handle_expr_if_comment,
         handle_comprehension_comment,
         handle_trailing_expression_starred_star_end_of_line_comment,
+        handle_comment_before_walrus,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -1230,6 +1231,52 @@ fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
     };
 
     CommentPlacement::leading(starred.as_any_node_ref(), comment)
+}
+
+/// Assign comments between the target and `:=` as trailing the target instead of leading the value
+///
+/// ```python
+/// if (
+///     x
+///     # make trailing x (instead of leading y)
+///     :=
+///     y
+/// )
+///    ...
+/// ```
+// TODO: can this also handle comments before colon in dicts
+fn handle_comment_before_walrus<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let AnyNodeRef::ExprNamedExpr(named) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    if !comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    let walrus = find_only_token_in_range(
+        TextRange::new(named.target.range().end(), named.value.range().start()),
+        locator,
+        TokenKind::Walrus,
+    );
+
+    // Comments between the target and the `:=`
+    // ```python
+    // [
+    //      a
+    //      # attach as trailing on the target `a` (instead of leading on the value `b`)
+    //      :=
+    //      in b
+    //  ]
+    // ```
+    if comment.slice().end() < walrus.start() {
+        return CommentPlacement::trailing((&*named.target).into(), comment);
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Looks for a token in the range that contains no other tokens except for parentheses outside

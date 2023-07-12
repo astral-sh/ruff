@@ -3,7 +3,7 @@ use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{space, text};
+use ruff_formatter::prelude::{soft_line_break, space, text};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprNamedExpr;
 
@@ -17,16 +17,27 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
             value,
             range: _,
         } = item;
-        write!(
-            f,
-            [
-                target.format(),
-                space(),
-                text(":="),
-                space(),
-                value.format(),
-            ]
-        )
+
+        write!(f, [target.format()])?;
+
+        let comments = f.context().comments().clone();
+        let trailing_target_comments = comments.trailing_comments(target.as_ref());
+        let leading_value_comments = comments.leading_comments(value.as_ref());
+
+        if trailing_target_comments.is_empty() {
+            write!(f, [space()])?;
+        } else {
+            write!(f, [soft_line_break()])?;
+        }
+
+        write!(f, [text(":=")])?;
+
+        if leading_value_comments.is_empty() {
+            write!(f, [space()])?;
+        } else {
+            write!(f, [soft_line_break()])?;
+        }
+        write!(f, [value.format()])
     }
 }
 
