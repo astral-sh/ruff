@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.277"
+version = "0.0.278"
 description = """
 Convert Flake8 configuration files to Ruff configuration files.
 """
