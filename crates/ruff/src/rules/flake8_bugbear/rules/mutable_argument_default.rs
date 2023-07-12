@@ -1,14 +1,13 @@
-use ruff_python_ast::{ParameterWithDefault, Parameters, Ranged, Stmt};
-
-use crate::registry::AsRule;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::leading_space;
+use ruff_python_ast::{ParameterWithDefault, Parameters, Ranged, Stmt};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -99,8 +98,8 @@ pub(crate) fn mutable_argument_default(
             if checker.patch(diagnostic.kind.rule())
                 // Do not try to fix if the function is only one line.
                 && checker
-                    .locator()
-                    .contains_line_break(TextRange::new(parameters.range().end(), body[0].start()))
+                .locator()
+                .contains_line_break(TextRange::new(parameters.range().end(), body[0].start()))
             {
                 // Set the default arg value to None
                 let arg_edit = Edit::range_replacement("None".to_string(), default.range());
