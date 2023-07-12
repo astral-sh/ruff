@@ -1,0 +1,64 @@
+---
+source: parser/src/parser.rs
+expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+---
+[
+    ClassDef(
+        StmtClassDef {
+            range: 0..31,
+            name: Identifier(
+                "Foo",
+            ),
+            bases: [
+                Name(
+                    ExprName {
+                        range: 18..19,
+                        id: Identifier(
+                            "A",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+                Name(
+                    ExprName {
+                        range: 21..22,
+                        id: Identifier(
+                            "B",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+            ],
+            keywords: [],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 27..31,
+                    },
+                ),
+            ],
+            decorator_list: [],
+            type_params: [
+                TypeVar(
+                    TypeParamTypeVar {
+                        range: 10..16,
+                        name: Identifier(
+                            "T",
+                        ),
+                        bound: Some(
+                            Name(
+                                ExprName {
+                                    range: 13..16,
+                                    id: Identifier(
+                                        "str",
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+]

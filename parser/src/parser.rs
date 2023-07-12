@@ -632,6 +632,79 @@ class Foo(A, B):
         insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
     }
 
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_empty_generic() {
+        let source = "\
+class Foo[](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_generic_type() {
+        let source = "\
+class Foo[T](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_generic_type_with_bound() {
+        let source = "\
+class Foo[T: str](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_multiple_generic_types() {
+        let source = "\
+class Foo[T, U](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_generic_type_var_tuple() {
+        let source = "\
+class Foo[*U](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_generic_param_spec() {
+        let source = "\
+class Foo[**P](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_all_possible_generic_types() {
+        let source = "\
+class Foo[X, Y, *U, **P](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
     #[test]
     fn test_parse_dict_comprehension() {
         let source = "{x1: x2 for y in z}";

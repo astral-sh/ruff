@@ -1,0 +1,79 @@
+---
+source: parser/src/parser.rs
+expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+---
+[
+    ClassDef(
+        StmtClassDef {
+            range: 0..38,
+            name: Identifier(
+                "Foo",
+            ),
+            bases: [
+                Name(
+                    ExprName {
+                        range: 25..26,
+                        id: Identifier(
+                            "A",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+                Name(
+                    ExprName {
+                        range: 28..29,
+                        id: Identifier(
+                            "B",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+            ],
+            keywords: [],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 34..38,
+                    },
+                ),
+            ],
+            decorator_list: [],
+            type_params: [
+                TypeVar(
+                    TypeParamTypeVar {
+                        range: 10..11,
+                        name: Identifier(
+                            "X",
+                        ),
+                        bound: None,
+                    },
+                ),
+                TypeVar(
+                    TypeParamTypeVar {
+                        range: 13..14,
+                        name: Identifier(
+                            "Y",
+                        ),
+                        bound: None,
+                    },
+                ),
+                TypeVarTuple(
+                    TypeParamTypeVarTuple {
+                        range: 16..18,
+                        name: Identifier(
+                            "U",
+                        ),
+                    },
+                ),
+                ParamSpec(
+                    TypeParamParamSpec {
+                        range: 20..23,
+                        name: Identifier(
+                            "P",
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+]

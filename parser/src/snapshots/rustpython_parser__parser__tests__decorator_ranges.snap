@@ -44,7 +44,7 @@ expression: parse_ast
     ),
     ClassDef(
         StmtClassDef {
-            range: 36..73,
+            range: 53..73,
             name: Identifier {
                 id: "Abcd",
                 range: 59..63,
