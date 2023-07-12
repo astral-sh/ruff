@@ -44,7 +44,6 @@ path = "tests/fixtures.rs"
 test = true
 required-features = [ "serde" ]
 
-
 [features]
 serde = ["dep:serde", "ruff_formatter/serde"]
 default = ["serde"]

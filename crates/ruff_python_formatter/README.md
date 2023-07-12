@@ -276,6 +276,14 @@ python scripts/check_ecosystem.py --checkouts target/checkouts --projects github
 cargo run --bin ruff_dev -- format-dev --stability-check --multi-project target/checkouts
 ```
 
+Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additional options:
+
+- `--write`: Format the files and write them back to disk
+- `--stability-check`: Format twice (but don't write to disk) and check for differences and crashes
+- `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
+- `--error-file`: Use together with `--multi-project`, this writes all errors (but not status
+  messages) to a file.
+
 ## The orphan rules and trait structure
 
 For the formatter, we would like to implement `Format` from the rust_formatter crate for all AST

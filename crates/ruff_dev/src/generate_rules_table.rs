@@ -1,4 +1,6 @@
 //! Generate a Markdown-compatible table of supported lint rules.
+//!
+//! Used for <https://beta.ruff.rs/docs/rules/>.
 
 use itertools::Itertools;
 use strum::IntoEnumIterator;

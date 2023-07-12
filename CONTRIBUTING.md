@@ -438,7 +438,7 @@ Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
   Range (min … max):   29.813 s … 30.356 s    10 runs
 ```
 
-## Microbenchmarks
+### Microbenchmarks
 
 The `ruff_benchmark` crate benchmarks the linter and the formatter on individual files.
 
@@ -448,7 +448,7 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
-### Benchmark driven Development
+#### Benchmark driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
 `--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
@@ -463,7 +463,7 @@ cargo benchmark --save-baseline=main
 cargo benchmark --baseline=main
 ```
 
-### PR Summary
+#### PR Summary
 
 You can use `--save-baseline` and `critcmp` to get a pretty comparison between two recordings.
 This is useful to illustrate the improvements of a PR.
@@ -484,21 +484,21 @@ You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comp
 cargo install critcmp
 ```
 
-### Tips
+#### Tips
 
 - Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
   to only run the pydantic tests.
 - Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo benchmark --quick` to get faster results (more prone to noise)
 
-## Profiling Projects
+### Profiling Projects
 
 You can either use the microbenchmarks from above or a project directory for benchmarking. There
 are a lot of profiling tools out there,
 [The Rust Performance Book](https://nnethercote.github.io/perf-book/profiling.html) lists some
 examples.
 
-### Linux
+#### Linux
 
 Install `perf` and build `ruff_benchmark` with the `release-debug` profile and then run it with perf
 
@@ -531,7 +531,7 @@ An alternative is to convert the perf data to `flamegraph.svg` using
 flamegraph --perfdata perf.data
 ```
 
-### Mac
+#### Mac
 
 Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
 
@@ -550,3 +550,134 @@ cargo instruments -t time --bench linter --profile release-debug -p ruff_benchma
 - You may want to pass an additional filter to run a single test file
 
 Otherwise, follow the instructions from the linux section.
+
+## `cargo dev`
+
+`cargo dev` is a shortcut for `cargo run --package ruff_dev --bin ruff_dev`. You can run some useful
+utils with it:
+
+- `cargo dev print-ast <file>`: Print the AST of a python file using the
+  [RustPython parser](https://github.com/astral-sh/RustPython-Parser/tree/main/parser) that is
+  mainly used in Ruff. For `if True: pass # comment`, you can see the syntax tree, the byte offsets
+  for start and stop of each node and also how the `:` token, the comment and whitespace are not
+  represented anymore:
+
+```text
+[
+    If(
+        StmtIf {
+            range: 0..13,
+            test: Constant(
+                ExprConstant {
+                    range: 3..7,
+                    value: Bool(
+                        true,
+                    ),
+                    kind: None,
+                },
+            ),
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 9..13,
+                    },
+                ),
+            ],
+            orelse: [],
+        },
+    ),
+]
+```
+
+- `cargo dev print-tokens <file>`: Print the tokens that the AST is built upon. Again for
+  `if True: pass # comment`:
+
+```text
+0 If 2
+3 True 7
+7 Colon 8
+9 Pass 13
+14 Comment(
+    "# comment",
+) 23
+23 Newline 24
+```
+
+- `cargo dev print-cst <file>`: Print the CST of a python file using
+  [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
+  in Ruff. E.g. for `if True: pass # comment` everything including the whitespace is represented:
+
+```text
+Module {
+    body: [
+        Compound(
+            If(
+                If {
+                    test: Name(
+                        Name {
+                            value: "True",
+                            lpar: [],
+                            rpar: [],
+                        },
+                    ),
+                    body: SimpleStatementSuite(
+                        SimpleStatementSuite {
+                            body: [
+                                Pass(
+                                    Pass {
+                                        semicolon: None,
+                                    },
+                                ),
+                            ],
+                            leading_whitespace: SimpleWhitespace(
+                                " ",
+                            ),
+                            trailing_whitespace: TrailingWhitespace {
+                                whitespace: SimpleWhitespace(
+                                    " ",
+                                ),
+                                comment: Some(
+                                    Comment(
+                                        "# comment",
+                                    ),
+                                ),
+                                newline: Newline(
+                                    None,
+                                    Real,
+                                ),
+                            },
+                        },
+                    ),
+                    orelse: None,
+                    leading_lines: [],
+                    whitespace_before_test: SimpleWhitespace(
+                        " ",
+                    ),
+                    whitespace_after_test: SimpleWhitespace(
+                        "",
+                    ),
+                    is_elif: false,
+                },
+            ),
+        ),
+    ],
+    header: [],
+    footer: [],
+    default_indent: "    ",
+    default_newline: "\n",
+    has_trailing_newline: true,
+    encoding: "utf-8",
+}
+```
+
+- `cargo dev generate-all`: Update `ruff.schema.json`, `docs/configuration.md` and `docs/rules`.
+  You can also set `RUFF_UPDATE_SCHEMA=1` to update `ruff.schema.json` during `cargo test`.
+- `cargo dev generate-cli-help`, `cargo dev generate-docs` and `cargo dev generate-json-schema`:
+  Update just `docs/configuration.md`, `docs/rules` and `ruff.schema.json` respectively.
+- `cargo dev generate-options`: Generate a markdown-compatible table of all `pyproject.toml`
+  options. Used for <https://beta.ruff.rs/docs/settings/>
+- `cargo dev generate-rules-table`: Generate a markdown-compatible table of all rules. Used for <https://beta.ruff.rs/docs/rules/>
+- `cargo dev round-trip <python file or jupyter notebook>`: Read a Python file or Jupyter Notebook,
+  parse it, serialize the parsed representation and write it back. Used to check how good our
+  representation is so that fixes don't rewrite irrelevant parts of a file.
+- `cargo dev format_dev`: See ruff_python_formatter README.md

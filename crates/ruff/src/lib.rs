@@ -14,6 +14,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod autofix;
 mod checkers;
 mod codes;
+mod comments;
 mod cst;
 pub mod directives;
 mod doc_lines;

@@ -5,10 +5,12 @@ use crate::expression::parentheses::{
     default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
     Parenthesize,
 };
+use crate::trivia::{SimpleTokenizer, TokenKind};
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{format_with, group, text};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ExprCall;
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Expr, ExprCall, Ranged};
 
 #[derive(Default)]
 pub struct FormatExprCall;
@@ -43,15 +45,25 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
             );
         }
 
-        let all_args = format_with(|f| {
-            f.join_comma_separated()
-                .entries(
-                    // We have the parentheses from the call so the arguments never need any
-                    args.iter()
-                        .map(|arg| (arg, arg.format().with_options(Parenthesize::Never))),
-                )
-                .nodes(keywords.iter())
-                .finish()
+        let all_args = format_with(|f: &mut PyFormatter| {
+            let source = f.context().source();
+            let mut joiner = f.join_comma_separated(item.end());
+            match args.as_slice() {
+                [argument] if keywords.is_empty() => {
+                    let parentheses =
+                        if is_single_argument_parenthesized(argument, item.end(), source) {
+                            Parenthesize::Always
+                        } else {
+                            Parenthesize::Never
+                        };
+                    joiner.entry(argument, &argument.format().with_options(parentheses));
+                }
+                arguments => {
+                    joiner.nodes(arguments).nodes(keywords.iter());
+                }
+            }
+
+            joiner.finish()
         });
 
         write!(
@@ -96,4 +108,29 @@ impl NeedsParentheses for ExprCall {
             parentheses => parentheses,
         }
     }
+}
+
+fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source: &str) -> bool {
+    let mut has_seen_r_paren = false;
+
+    for token in
+        SimpleTokenizer::new(source, TextRange::new(argument.end(), call_end)).skip_trivia()
+    {
+        match token.kind() {
+            TokenKind::RParen => {
+                if has_seen_r_paren {
+                    return true;
+                }
+                has_seen_r_paren = true;
+            }
+            // Skip over any trailing comma
+            TokenKind::Comma => continue,
+            _ => {
+                // Passed the arguments
+                break;
+            }
+        }
+    }
+
+    false
 }

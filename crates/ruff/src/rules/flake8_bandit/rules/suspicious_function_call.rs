@@ -22,9 +22,9 @@ use crate::registry::AsRule;
 /// modules. Instead, consider safer formats, such as JSON.
 ///
 /// If you must deserialize untrusted data with `pickle`, consider signing the
-/// data with a secret key and verifying the signature before deserializing
-/// (such as with `hmac`). This will prevent an attacker from modifying the
-/// serialized data to inject arbitrary objects.
+/// data with a secret key and verifying the signature before deserializing the
+/// payload, This will prevent an attacker from injecting arbitrary objects
+/// into the serialized data.
 ///
 /// ## Example
 /// ```python
@@ -67,9 +67,9 @@ impl Violation for SuspiciousPickleUsage {
 /// formats, such as JSON.
 ///
 /// If you must deserialize untrusted data with `marshal`, consider signing the
-/// data with a secret key and verifying the signature before deserializing
-/// (such as with `hmac`). This will prevent an attacker from modifying the
-/// serialized data to inject arbitrary objects.
+/// data with a secret key and verifying the signature before deserializing the
+/// payload, This will prevent an attacker from injecting arbitrary objects
+/// into the serialized data.
 ///
 /// ## Example
 /// ```python
@@ -111,7 +111,7 @@ impl Violation for SuspiciousMarshalUsage {
 /// that rely on these hash functions.
 ///
 /// Avoid using weak or broken cryptographic hash functions in security
-/// contexts. Instead, use a known secure hash function such as SHA256.
+/// contexts. Instead, use a known secure hash function such as SHA-256.
 ///
 /// ## Example
 /// ```python
@@ -238,7 +238,6 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 /// creates the file when it is called. Consider using `tempfile.mkstemp`
 /// instead, either directly or via a context manager such as
 /// `tempfile.TemporaryFile`.
-///
 ///
 /// ## Example
 /// ```python
@@ -434,13 +433,12 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
-/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
-/// which protects against XML attacks.
+/// Consider using the `defusedxml` package when parsing untrusted XML data,
+/// to protect against XML attacks.
 ///
 /// ## Example
 /// ```python
@@ -475,13 +473,12 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
-/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
-/// which protects against XML attacks.
+/// Consider using the `defusedxml` package when parsing untrusted XML data,
+/// to protect against XML attacks.
 ///
 /// ## Example
 /// ```python
@@ -516,13 +513,12 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
-/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
-/// which protects against XML attacks.
+/// Consider using the `defusedxml` package when parsing untrusted XML data,
+/// to protect against XML attacks.
 ///
 /// ## Example
 /// ```python
@@ -557,13 +553,12 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
-/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
-/// which protects against XML attacks.
+/// Consider using the `defusedxml` package when parsing untrusted XML data,
+/// to protect against XML attacks.
 ///
 /// ## Example
 /// ```python
@@ -598,13 +593,12 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
-/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
-/// which protects against XML attacks.
+/// Consider using the `defusedxml` package when parsing untrusted XML data,
+/// to protect against XML attacks.
 ///
 /// ## Example
 /// ```python
@@ -639,13 +633,12 @@ impl Violation for SuspiciousXMLSaxUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
-/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
-/// which protects against XML attacks.
+/// Consider using the `defusedxml` package when parsing untrusted XML data,
+/// to protect against XML attacks.
 ///
 /// ## Example
 /// ```python
@@ -680,13 +673,12 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
-/// Consider using the `defusedxml` packaging when parsing untrusted XML data,
-/// which protects against XML attacks.
+/// Consider using the `defusedxml` package when parsing untrusted XML data,
+/// to protect against XML attacks.
 ///
 /// ## Example
 /// ```python
@@ -721,10 +713,9 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// Checks for uses of insecure XML parsers.
 ///
 /// ## Why is this bad?
-/// Many XML parsers are vulnerable to XML attacks, such as entity expansion
-/// which cause excessive memory and CPU usage by exploiting recursion. In some
-/// situations, it may be possible for an attacker to access unauthorized
-/// resources.
+/// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
+/// which cause excessive memory and CPU usage by exploiting recursion. An
+/// attacker could use such methods to access unauthorized resources.
 ///
 /// ## Example
 /// ```python
@@ -751,11 +742,11 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// Checks for uses of `ssl._create_unverified_context`.
 ///
 /// ## Why is this bad?
-/// [PEP 476](https://peps.python.org/pep-0476/) enabled certificate and
-/// hostname validation by default in Python standard library HTTP clients.
-/// Previously, Python did not validate certificates by default, which could
-/// allow an attacker to perform a "man in the middle" attack where they
-/// intercept and modify the traffic between the client and server.
+/// [PEP 476] enabled certificate and hostname validation by default in Python
+/// standard library HTTP clients. Previously, Python did not validate
+/// certificates by default, which could allow an attacker to perform a "man in
+/// the middle" attack by intercepting and modifying traffic between client and
+/// server.
 ///
 /// To support legacy environments, `ssl._create_unverified_context` reverts to
 /// the previous behavior that does perform verification. Otherwise, use
@@ -778,6 +769,8 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// ## References
 /// - [PEP 476 – Enabling certificate verification by default for stdlib http clients: Opting out](https://peps.python.org/pep-0476/#opting-out)
 /// - [Python documentation: `ssl` — TLS/SSL wrapper for socket objects](https://docs.python.org/3/library/ssl.html)
+///
+/// [PEP 476]: https://peps.python.org/pep-0476/
 #[violation]
 pub struct SuspiciousUnverifiedContextUsage;
 
@@ -813,8 +806,8 @@ impl Violation for SuspiciousTelnetUsage {
 /// Checks for the use of FTP-related functions.
 ///
 /// ## Why is this bad?
-/// FTP is considered insecure because it does not encrypt data sent over the
-/// connection and is vulnerable to numerous attacks.
+/// FTP is considered insecure as it does not encrypt data sent over the
+/// connection and is thus vulnerable to numerous attacks.
 ///
 /// Instead, consider using FTPS (which secures FTP using SSL/TLS) or SFTP.
 ///

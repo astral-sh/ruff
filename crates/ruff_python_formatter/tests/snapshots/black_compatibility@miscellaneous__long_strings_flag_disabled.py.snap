@@ -315,30 +315,7 @@ long_unmergable_string_with_pragma = (
  
  bad_split_func1(
      "But what should happen when code has already "
-@@ -96,15 +96,13 @@
- )
- 
- bad_split_func3(
--    (
--        "But what should happen when code has already "
--        r"been formatted but in the wrong way? Like "
--        "with a space at the end instead of the "
--        r"beginning. Or what about when it is split too "
--        r"soon? In the case of a split that is too "
--        "short, black will try to honer the custom "
--        "split."
--    ),
-+    "But what should happen when code has already "
-+    r"been formatted but in the wrong way? Like "
-+    "with a space at the end instead of the "
-+    r"beginning. Or what about when it is split too "
-+    r"soon? In the case of a split that is too "
-+    "short, black will try to honer the custom "
-+    "split.",
-     xxx,
-     yyy,
-     zzz,
-@@ -143,9 +141,9 @@
+@@ -143,9 +143,9 @@
      )
  )
  
@@ -350,53 +327,40 @@ long_unmergable_string_with_pragma = (
  
  comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
  
-@@ -212,29 +210,25 @@
+@@ -165,14 +165,14 @@
+ 
+ triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
+ 
+-assert (
+-    some_type_of_boolean_expression
+-), "Followed by a really really really long string that is used to provide context to the AssertionError exception."
++assert some_type_of_boolean_expression, (
++    "Followed by a really really really long string that is used to provide context to the AssertionError exception."
++)
+ 
+-assert (
+-    some_type_of_boolean_expression
+-), "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+-    "formatting"
++assert some_type_of_boolean_expression, (
++    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
++        "formatting"
++    )
  )
  
+ assert some_type_of_boolean_expression, (
+@@ -221,8 +221,8 @@
  func_with_bad_comma(
--    (
--        "This is a really long string argument to a function that has a trailing comma"
--        " which should NOT be there."
--    ),
-+    "This is a really long string argument to a function that has a trailing comma"
-+    " which should NOT be there."
- )
- 
- func_with_bad_comma(
--    (
--        "This is a really long string argument to a function that has a trailing comma"
+     (
+         "This is a really long string argument to a function that has a trailing comma"
 -        " which should NOT be there."
 -    ),  # comment after comma
-+    "This is a really long string argument to a function that has a trailing comma"
-+    " which should NOT be there."  # comment after comma
++        " which should NOT be there."  # comment after comma
++    ),
  )
  
  func_with_bad_parens_that_wont_fit_in_one_line(
--    ("short string that should have parens stripped"), x, y, z
-+    "short string that should have parens stripped", x, y, z
- )
- 
- func_with_bad_parens_that_wont_fit_in_one_line(
--    x, y, ("short string that should have parens stripped"), z
-+    x, y, "short string that should have parens stripped", z
- )
- 
- func_with_bad_parens(
--    ("short string that should have parens stripped"),
-+    "short string that should have parens stripped",
-     x,
-     y,
-     z,
-@@ -243,7 +237,7 @@
- func_with_bad_parens(
-     x,
-     y,
--    ("short string that should have parens stripped"),
-+    "short string that should have parens stripped",
-     z,
- )
- 
-@@ -271,10 +265,10 @@
+@@ -271,10 +271,10 @@
  
  
  def foo():
@@ -512,13 +476,15 @@ bad_split_func2(
 )
 
 bad_split_func3(
-    "But what should happen when code has already "
-    r"been formatted but in the wrong way? Like "
-    "with a space at the end instead of the "
-    r"beginning. Or what about when it is split too "
-    r"soon? In the case of a split that is too "
-    "short, black will try to honer the custom "
-    "split.",
+    (
+        "But what should happen when code has already "
+        r"been formatted but in the wrong way? Like "
+        "with a space at the end instead of the "
+        r"beginning. Or what about when it is split too "
+        r"soon? In the case of a split that is too "
+        "short, black will try to honer the custom "
+        "split."
+    ),
     xxx,
     yyy,
     zzz,
@@ -579,14 +545,14 @@ pragma_comment_string2 = "Lines which end with an inline pragma comment of the f
 
 triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
 
-assert (
-    some_type_of_boolean_expression
-), "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+)
 
-assert (
-    some_type_of_boolean_expression
-), "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
-    "formatting"
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+        "formatting"
+    )
 )
 
 assert some_type_of_boolean_expression, (
@@ -626,25 +592,29 @@ func_with_bad_comma(
 )
 
 func_with_bad_comma(
-    "This is a really long string argument to a function that has a trailing comma"
-    " which should NOT be there."
+    (
+        "This is a really long string argument to a function that has a trailing comma"
+        " which should NOT be there."
+    ),
 )
 
 func_with_bad_comma(
-    "This is a really long string argument to a function that has a trailing comma"
-    " which should NOT be there."  # comment after comma
+    (
+        "This is a really long string argument to a function that has a trailing comma"
+        " which should NOT be there."  # comment after comma
+    ),
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    "short string that should have parens stripped", x, y, z
+    ("short string that should have parens stripped"), x, y, z
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    x, y, "short string that should have parens stripped", z
+    x, y, ("short string that should have parens stripped"), z
 )
 
 func_with_bad_parens(
-    "short string that should have parens stripped",
+    ("short string that should have parens stripped"),
     x,
     y,
     z,
@@ -653,7 +623,7 @@ func_with_bad_parens(
 func_with_bad_parens(
     x,
     y,
-    "short string that should have parens stripped",
+    ("short string that should have parens stripped"),
     z,
 )
 
