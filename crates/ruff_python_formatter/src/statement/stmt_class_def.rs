@@ -76,12 +76,13 @@ impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
             bases,
             keywords,
             name,
+            body,
             ..
         } = self.class_definition;
 
         let source = f.context().source();
 
-        let mut joiner = f.join_comma_separated();
+        let mut joiner = f.join_comma_separated(body.first().unwrap().start());
 
         if let Some((first, rest)) = bases.split_first() {
             // Manually handle parentheses for the first expression because the logic in `FormatExpr`

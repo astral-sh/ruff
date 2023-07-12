@@ -2,7 +2,7 @@ use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{dynamic_text, format_with, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
-use rustpython_parser::ast::StmtImportFrom;
+use rustpython_parser::ast::{Ranged, StmtImportFrom};
 
 #[derive(Default)]
 pub struct FormatStmtImportFrom;
@@ -39,7 +39,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             }
         }
         let names = format_with(|f| {
-            f.join_comma_separated()
+            f.join_comma_separated(item.end())
                 .entries(names.iter().map(|name| (name, name.format())))
                 .finish()
         });

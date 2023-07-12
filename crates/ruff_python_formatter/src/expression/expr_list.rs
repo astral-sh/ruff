@@ -6,7 +6,7 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
-use rustpython_parser::ast::ExprList;
+use rustpython_parser::ast::{ExprList, Ranged};
 
 #[derive(Default)]
 pub struct FormatExprList;
@@ -53,7 +53,11 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             "A non-empty expression list has dangling comments"
         );
 
-        let items = format_with(|f| f.join_comma_separated().nodes(elts.iter()).finish());
+        let items = format_with(|f| {
+            f.join_comma_separated(item.end())
+                .nodes(elts.iter())
+                .finish()
+        });
 
         parenthesized("[", &items, "]").fmt(f)
     }

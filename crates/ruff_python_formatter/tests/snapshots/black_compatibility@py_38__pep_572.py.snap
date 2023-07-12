@@ -83,7 +83,7 @@ while x := f(x):
  x = (y := 0)
  (z := (y := (x := 0)))
  (info := (name, phone, *rest))
-@@ -31,17 +31,17 @@
+@@ -31,9 +31,9 @@
  len(lines := f.readlines())
  foo(x := 3, cat="vector")
  foo(cat=(category := "vector"))
@@ -95,9 +95,8 @@ while x := f(x):
      return env_base
  if self._is_special and (ans := self._check_nans(context=context)):
      return ans
- foo(b := 2, a=1)
--foo((b := 2), a=1)
-+foo(b := 2, a=1)
+@@ -41,7 +41,7 @@
+ foo((b := 2), a=1)
  foo(c=(b := 2), a=1)
  
 -while x := f(x):
@@ -151,7 +150,7 @@ if (env_base := os.environ.get("PYTHONUSERBASE", None)):
 if self._is_special and (ans := self._check_nans(context=context)):
     return ans
 foo(b := 2, a=1)
-foo(b := 2, a=1)
+foo((b := 2), a=1)
 foo(c=(b := 2), a=1)
 
 while (x := f(x)):

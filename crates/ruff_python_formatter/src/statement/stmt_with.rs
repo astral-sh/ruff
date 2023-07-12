@@ -68,8 +68,11 @@ impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling_comments(self);
 
-        let joined_items =
-            format_with(|f| f.join_comma_separated().nodes(self.items().iter()).finish());
+        let joined_items = format_with(|f| {
+            f.join_comma_separated(self.body().first().unwrap().start())
+                .nodes(self.items().iter())
+                .finish()
+        });
 
         if self.is_async() {
             write!(f, [text("async"), space()])?;
