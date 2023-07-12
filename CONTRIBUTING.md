@@ -95,28 +95,35 @@ The vast majority of the code, including all lint rules, lives in the `ruff` cra
 
 At time of writing, the repository includes the following crates:
 
-- `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+- `crates/ruff`: library crate containing all lint rules and the core logic such as settings for
+  running them. If you're working on a rule, it's in here.
 - `crates/ruff_benchmark`: binary crate for running micro-benchmarks.
 - `crates/ruff_cache`: library crate for caching lint results.
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
 - `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
-  `cargo dev generate-all`).
-- `crates/ruff_diagnostics`: library crate for the lint diagnostics APIs.
-- `crates/ruff_formatter`: library crate for generic code formatting logic based on an intermediate
-  representation.
+  `cargo dev generate-all`), see the [`cargo dev`](#cargo-dev) section below.
+- `crates/ruff_diagnostics`: library crate for the rule-independent parts of the lint diagnostics
+  APIs.
+- `crates/ruff_formatter`: library crate for language agnostic code formatting logic based on an
+  intermediate representation. In a way it's the backend for `ruff_python_formatter`.
 - `crates/ruff_index`: library crate inspired by `rustc_index`.
-- `crates/ruff_macros`: library crate containing macros used by Ruff.
-- `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
-- `crates/ruff_python_formatter`: library crate containing Python-specific code formatting logic.
+- `crates/ruff_macros`: proc macro crate containing macros used by Ruff.
+- `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities. Note
+  that the AST nodes are defined in [rustpython-ast](https://github.com/astral-sh/RustPython-Parser)
+- `crates/ruff_python_formatter`: library crate implement the python formatter. Emits an
+  intermediate representation for each node that `ruff_formatter` prints into text fitting the line
+  length limit.
 - `crates/ruff_python_semantic`: library crate containing Python-specific semantic analysis logic,
-  including Ruff's semantic model.
-- `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data.
+  including Ruff's semantic model. This is used to answer e.g. what the original name of an aliased
+  import is or where a specific symbol is a local variable and where it was defined.
+- `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data, e.g.
+  the names of all built-in exceptions and which standard library types are immutable.
 - `crates/ruff_python_whitespace`: library crate containing Python-specific whitespace analysis
-  logic.
+  logic (indentation and newlines).
 - `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
-- `crates/ruff_testing_macros`: library crate containing macros used for testing Ruff.
 - `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
-- `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module.
+- `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module. Used for the
+  playground.
 
 ### Example: Adding a new lint rule
 
