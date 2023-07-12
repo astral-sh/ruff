@@ -92,7 +92,7 @@ class Repository(NamedTuple):
     async def _get_commit(self: Self, checkout_dir: Path) -> str:
         """Return the commit sha for the repository in the checkout directory."""
         git_sha_process = await create_subprocess_exec(
-            *["git", "rev-parse", "head"],
+            *["git", "rev-parse", "HEAD"],
             cwd=str(checkout_dir),
             stdout=PIPE,
         )
