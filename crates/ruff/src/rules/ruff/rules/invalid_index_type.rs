@@ -37,9 +37,9 @@ impl Violation for InvalidIndexType {
         let InvalidIndexType {
             value_type,
             index_type,
-            ..
+            is_slice,
         } = self;
-        if self.is_slice {
+        if *is_slice {
             format!("Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer.")
         } else {
             format!(
