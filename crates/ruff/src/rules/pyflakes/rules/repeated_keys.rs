@@ -130,7 +130,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
         };
 
         match key {
-            Expr::Constant(_) | Expr::Tuple(_) => {
+            Expr::Constant(_) | Expr::Tuple(_) | Expr::JoinedStr(_) => {
                 if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
                     let mut diagnostic = Diagnostic::new(
                         MultiValueRepeatedKeyLiteral {
