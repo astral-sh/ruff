@@ -84,7 +84,7 @@ class Repository(NamedTuple):
     def url_for(self: Self, commit_sha: str, path: str, lnum: int | None = None) -> str:
         """Return the GitHub URL for the given commit, path, and line number, if given."""
         # Default to main branch
-        url = f"https://github.com/{self.org}/{self.repo}" f"/blob/{commit_sha}/{path}"
+        url = f"https://github.com/{self.org}/{self.repo}/blob/{commit_sha}/{path}"
         if lnum:
             url += f"#L{lnum}"
         return url
@@ -93,7 +93,7 @@ class Repository(NamedTuple):
         """Return the commit sha for the repository in the checkout directory."""
         git_sha_process = await create_subprocess_exec(
             *["git", "rev-parse", "HEAD"],
-            cwd=str(checkout_dir),
+            cwd=checkout_dir,
             stdout=PIPE,
         )
         git_sha_stdout, _ = await git_sha_process.communicate()
