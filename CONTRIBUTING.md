@@ -438,7 +438,7 @@ Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
   Range (min … max):   29.813 s … 30.356 s    10 runs
 ```
 
-## Microbenchmarks
+### Microbenchmarks
 
 The `ruff_benchmark` crate benchmarks the linter and the formatter on individual files.
 
@@ -448,7 +448,7 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
-### Benchmark driven Development
+#### Benchmark driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
 `--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
@@ -463,7 +463,7 @@ cargo benchmark --save-baseline=main
 cargo benchmark --baseline=main
 ```
 
-### PR Summary
+#### PR Summary
 
 You can use `--save-baseline` and `critcmp` to get a pretty comparison between two recordings.
 This is useful to illustrate the improvements of a PR.
@@ -484,21 +484,21 @@ You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comp
 cargo install critcmp
 ```
 
-### Tips
+#### Tips
 
 - Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
   to only run the pydantic tests.
 - Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo benchmark --quick` to get faster results (more prone to noise)
 
-## Profiling Projects
+### Profiling Projects
 
 You can either use the microbenchmarks from above or a project directory for benchmarking. There
 are a lot of profiling tools out there,
 [The Rust Performance Book](https://nnethercote.github.io/perf-book/profiling.html) lists some
 examples.
 
-### Linux
+#### Linux
 
 Install `perf` and build `ruff_benchmark` with the `release-debug` profile and then run it with perf
 
@@ -531,7 +531,7 @@ An alternative is to convert the perf data to `flamegraph.svg` using
 flamegraph --perfdata perf.data
 ```
 
-### Mac
+#### Mac
 
 Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
 
