@@ -52,18 +52,12 @@ fn is_known_type(call_path: &CallPath, minor_version: u32) -> bool {
     }
 }
 
-/// Returns a vector of all the expressions in a slice.
-///
-/// ## Panics
-///
-/// Panics if the slice is not a tuple or a constant. This should never happen
-/// as this function is only used in typing context where the slice cannot be
-/// anything else.
+/// Returns a vector of all the expressions in a slice. If the slice is not a
+/// tuple, it will be wrapped in a vector.
 fn resolve_slice_value(slice: &Expr) -> Vec<&Expr> {
     match slice {
         Expr::Tuple(ast::ExprTuple { elts: elements, .. }) => elements.iter().collect(),
-        Expr::Constant(_) => vec![slice],
-        _ => unreachable!("type slice must be a tuple or a constant"),
+        _ => vec![slice],
     }
 }
 
