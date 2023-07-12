@@ -9,7 +9,7 @@ on:
       sha:
         description: "Optionally, the full sha of the commit to be released"
         type: string
-  push:
+  pull_request:
     paths:
       # When we change pyproject.toml, we want to ensure that the maturin builds still work
       - pyproject.toml
