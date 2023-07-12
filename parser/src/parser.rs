@@ -697,7 +697,7 @@ class Foo[**P](A, B):
     #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_class_with_all_possible_generic_types() {
         let source = "\
-class Foo[X, Y, *U, **P](A, B):
+class Foo[X, Y: str, *U, **P](A, B):
   pass
 ";
         insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());

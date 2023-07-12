@@ -5,14 +5,14 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
 [
     ClassDef(
         StmtClassDef {
-            range: 0..38,
+            range: 0..43,
             name: Identifier(
                 "Foo",
             ),
             bases: [
                 Name(
                     ExprName {
-                        range: 25..26,
+                        range: 30..31,
                         id: Identifier(
                             "A",
                         ),
@@ -21,7 +21,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ),
                 Name(
                     ExprName {
-                        range: 28..29,
+                        range: 33..34,
                         id: Identifier(
                             "B",
                         ),
@@ -33,7 +33,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             body: [
                 Pass(
                     StmtPass {
-                        range: 34..38,
+                        range: 39..43,
                     },
                 ),
             ],
@@ -50,16 +50,26 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ),
                 TypeVar(
                     TypeParamTypeVar {
-                        range: 13..14,
+                        range: 13..19,
                         name: Identifier(
                             "Y",
                         ),
-                        bound: None,
+                        bound: Some(
+                            Name(
+                                ExprName {
+                                    range: 16..19,
+                                    id: Identifier(
+                                        "str",
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
                     },
                 ),
                 TypeVarTuple(
                     TypeParamTypeVarTuple {
-                        range: 16..18,
+                        range: 21..23,
                         name: Identifier(
                             "U",
                         ),
@@ -67,7 +77,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ),
                 ParamSpec(
                     TypeParamParamSpec {
-                        range: 20..23,
+                        range: 25..28,
                         name: Identifier(
                             "P",
                         ),
