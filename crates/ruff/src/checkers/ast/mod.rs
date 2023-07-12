@@ -5,8 +5,8 @@ use log::error;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ExceptHandler, Expr,
-    ExprContext, Keyword, Operator, Pattern, Ranged, Stmt, Suite, UnaryOp,
+    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler,
+    Expr, ExprContext, Keyword, Operator, Pattern, Ranged, Stmt, Suite, UnaryOp,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
@@ -4315,6 +4315,14 @@ impl<'a> Checker<'a> {
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
         self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`ElifElseClause`]
+    fn visit_elif_else_clause(&mut self, clause: &'a ElifElseClause) {
+        if let Some(test) = &clause.test {
+            self.visit_boolean_test(test);
+        }
+        self.visit_body(&clause.body);
     }
 
     /// Add a [`Binding`] to the current scope, bound to the given name.
