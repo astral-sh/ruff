@@ -6,7 +6,6 @@ use rustpython_parser::ast::{Expr, Ranged};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::comparable::ComparableExpr::{Constant, List, Tuple};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -44,7 +43,6 @@ use crate::registry::{AsRule, Rule};
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
     name: String,
-    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
@@ -52,20 +50,13 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyLiteral { name, .. } = self;
+        let MultiValueRepeatedKeyLiteral { name } = self;
         format!("Dictionary key literal `{name}` repeated")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let MultiValueRepeatedKeyLiteral {
-            repeated_value,
-            name,
-        } = self;
-        if *repeated_value {
-            Some(format!("Remove repeated key literal `{name}`"))
-        } else {
-            None
-        }
+        let MultiValueRepeatedKeyLiteral { name } = self;
+        Some(format!("Remove repeated key literal `{name}`"))
     }
 }
 
@@ -101,7 +92,6 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
     name: String,
-    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyVariable {
@@ -109,20 +99,13 @@ impl Violation for MultiValueRepeatedKeyVariable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyVariable { name, .. } = self;
+        let MultiValueRepeatedKeyVariable { name } = self;
         format!("Dictionary key `{name}` repeated")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let MultiValueRepeatedKeyVariable {
-            repeated_value,
-            name,
-        } = self;
-        if *repeated_value {
-            Some(format!("Remove repeated key `{name}`"))
-        } else {
-            None
-        }
+        let MultiValueRepeatedKeyVariable { name } = self;
+        Some(format!("Remove repeated key `{name}`"))
     }
 }
 
@@ -137,54 +120,56 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
         let Some(key) = key else {
             continue;
         };
-        let dict_key = ComparableExpr::from(key);
-        if let Some(seen_values) = seen.get_mut(&dict_key) {
-            let comparable_value: ComparableExpr = (&values[i]).into();
-            let is_duplicate_value = seen_values.contains(&comparable_value);
-            match dict_key {
-                Constant(_) | Tuple(_) | List(_) => {
-                    if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                        let rule = MultiValueRepeatedKeyLiteral {
-                            name: checker.generator().expr(key),
-                            repeated_value: is_duplicate_value,
-                        };
-                        let mut diagnostic = Diagnostic::new(rule, key.range());
-                        if is_duplicate_value {
-                            if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                                    values[i - 1].end(),
-                                    values[i].end(),
-                                )));
-                            }
-                        } else {
-                            seen_values.insert(comparable_value);
+
+        let comparable_key = ComparableExpr::from(key);
+        let comparable_value = ComparableExpr::from(&values[i]);
+
+        let Some(seen_values) = seen.get_mut(&comparable_key) else {
+            seen.insert(comparable_key, FxHashSet::from_iter([comparable_value]));
+            continue;
+        };
+
+        match key {
+            Expr::Constant(_) | Expr::Tuple(_) => {
+                if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
+                    let mut diagnostic = Diagnostic::new(
+                        MultiValueRepeatedKeyLiteral {
+                            name: checker.locator.slice(key.range()).to_string(),
+                        },
+                        key.range(),
+                    );
+                    if checker.patch(diagnostic.kind.rule()) {
+                        if !seen_values.insert(comparable_value) {
+                            diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                                values[i - 1].end(),
+                                values[i].end(),
+                            )));
                         }
-                        checker.diagnostics.push(diagnostic);
                     }
-                }
-                _ => {
-                    if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                        let rule = MultiValueRepeatedKeyVariable {
-                            name: checker.generator().expr(key),
-                            repeated_value: is_duplicate_value,
-                        };
-                        let mut diagnostic = Diagnostic::new(rule, key.range());
-                        if is_duplicate_value {
-                            if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                                    values[i - 1].end(),
-                                    values[i].end(),
-                                )));
-                            }
-                        } else {
-                            seen_values.insert(comparable_value);
-                        }
-                        checker.diagnostics.push(diagnostic);
-                    }
+                    checker.diagnostics.push(diagnostic);
                 }
             }
-        } else {
-            seen.insert(dict_key, FxHashSet::from_iter([(&values[i]).into()]));
+            Expr::Name(_) => {
+                if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
+                    let mut diagnostic = Diagnostic::new(
+                        MultiValueRepeatedKeyVariable {
+                            name: checker.locator.slice(key.range()).to_string(),
+                        },
+                        key.range(),
+                    );
+                    if checker.patch(diagnostic.kind.rule()) {
+                        let comparable_value: ComparableExpr = (&values[i]).into();
+                        if !seen_values.insert(comparable_value) {
+                            diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                                values[i - 1].end(),
+                                values[i].end(),
+                            )));
+                        }
+                    }
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+            _ => {}
         }
     }
 }
