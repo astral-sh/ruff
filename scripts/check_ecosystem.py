@@ -82,7 +82,9 @@ class Repository(NamedTuple):
         yield await self._get_commit(checkout_dir)
 
     def url_for(self: Self, commit_sha: str, path: str, lnum: int | None = None) -> str:
-        """Return the GitHub URL for the given commit, path, and line number, if given."""
+        """
+        Return the GitHub URL for the given commit, path, and line number, if given.
+        """
         # Default to main branch
         url = (
             f"https://github.com/{self.org}/{self.repo}"
