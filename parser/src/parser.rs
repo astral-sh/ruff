@@ -654,6 +654,16 @@ class Foo[T: str](A, B):
 
     #[test]
     #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_class_with_generic_type_with_tuple_bound() {
+        let source = "\
+class Foo[T: (str, bytes)](A, B):
+  pass
+";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_class_with_multiple_generic_types() {
         let source = "\
 class Foo[T, U](A, B):
