@@ -7,9 +7,9 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_whitespace::UniversalNewlines;
 
+use crate::comments::shebang::ShebangDirective;
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
-use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };

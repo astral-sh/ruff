@@ -7,10 +7,10 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::comments::shebang::ShebangDirective;
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
-use crate::rules::flake8_executable::helpers::ShebangDirective;
 
 /// ## What it does
 /// Checks for a shebang directive in a file that is not executable.
