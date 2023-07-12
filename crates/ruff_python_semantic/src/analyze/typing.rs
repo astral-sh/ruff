@@ -122,29 +122,7 @@ pub enum Pep604Operator {
 }
 
 /// Return the PEP 604 operator variant to which the given subscript [`Expr`] corresponds, if any.
-pub fn to_pep604_operator(
-    value: &Expr,
-    slice: &Expr,
-    semantic: &SemanticModel,
-) -> Option<Pep604Operator> {
-    /// Returns `true` if any argument in the slice is a string.
-    fn any_arg_is_str(slice: &Expr) -> bool {
-        match slice {
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            }) => true,
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(any_arg_is_str),
-            _ => false,
-        }
-    }
-
-    // If any of the _arguments_ are forward references, we can't use PEP 604.
-    // Ex) `Union["str", "int"]` can't be converted to `"str" | "int"`.
-    if any_arg_is_str(slice) {
-        return None;
-    }
-
+pub fn to_pep604_operator(value: &Expr, semantic: &SemanticModel) -> Option<Pep604Operator> {
     semantic
         .resolve_call_path(value)
         .as_ref()

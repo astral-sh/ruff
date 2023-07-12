@@ -2152,8 +2152,7 @@ where
                     Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP604Annotation,
                 ]) {
-                    if let Some(operator) = typing::to_pep604_operator(value, slice, &self.semantic)
-                    {
+                    if let Some(operator) = typing::to_pep604_operator(value, &self.semantic) {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if !self.is_stub
                                 && self.settings.target_version < PythonVersion::Py310
