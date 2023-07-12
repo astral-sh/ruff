@@ -56,9 +56,6 @@ pub(crate) fn repeated_equality_comparison_target(
     op: BoolOp,
     values: &[Expr],
 ) {
-    if !op.is_or() && !op.is_and() {
-        return;
-    }
     if any(values.iter(), |v| !is_allowed_value(op, v)) {
         return;
     }
