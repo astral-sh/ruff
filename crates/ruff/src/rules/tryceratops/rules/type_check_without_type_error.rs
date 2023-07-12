@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use rustpython_parser::ast::{self, ElifElseClause, Expr, Ranged, Stmt, StmtIf};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt, StmtIf};
 
 use crate::checkers::ast::Checker;
 
@@ -195,31 +195,7 @@ pub(crate) fn type_check_without_type_error(
             }
         }
 
-        // The `elif` body raises the wrong exception
-        for item in &clause.body {
-            if has_control_flow(item) {
-                return;
-            }
-            if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
-                check_raise(checker, exc, item);
-            }
-        }
-    }
-
-    if let Some(ElifElseClause {
-        test: None,
-        body,
-        range: _,
-    }) = stmt_if.elif_else_clauses.last()
-    {
-        // The `else` body raises the wrong exception
-        for item in body {
-            if has_control_flow(item) {
-                return;
-            }
-            if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
-                check_raise(checker, exc, item);
-            }
-        }
+        // The `elif` or `else` body raises the wrong exception
+        check_body(checker, &clause.body);
     }
 }
