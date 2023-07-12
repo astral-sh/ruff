@@ -1,5 +1,6 @@
-use ruff_text_size::{TextRange, TextSize};
 use std::ops::Sub;
+
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

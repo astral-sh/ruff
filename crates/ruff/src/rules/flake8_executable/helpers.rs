@@ -1,8 +1,9 @@
 #![cfg(target_family = "unix")]
 
-use anyhow::Result;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+
+use anyhow::Result;
 
 pub(super) fn is_executable(filepath: &Path) -> Result<bool> {
     let metadata = filepath.metadata()?;

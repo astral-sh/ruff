@@ -1,5 +1,0 @@
----
-source: crates/ruff/src/rules/flake8_executable/helpers.rs
-expression: "ShebangDirective::try_extract(source)"
----
-None

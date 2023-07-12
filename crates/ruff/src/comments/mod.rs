@@ -1,1 +1,1 @@
-pub mod shebang;
+pub(crate) mod shebang;
