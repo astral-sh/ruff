@@ -2,6 +2,7 @@ use rustpython_parser::ast::StmtAssign;
 
 use ruff_formatter::write;
 
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -26,6 +27,13 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             write!(f, [target.format(), space(), text("="), space()])?;
         }
 
-        write!(f, [value.format().with_options(Parenthesize::IfBreaks)])
+        write!(
+            f,
+            [maybe_parenthesize_expression(
+                value,
+                item,
+                Parenthesize::IfBreaks
+            )]
+        )
     }
 }

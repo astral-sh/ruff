@@ -1,5 +1,6 @@
 use crate::comments::{leading_alternate_branch_comments, trailing_comments};
 use crate::expression::expr_tuple::TupleParentheses;
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
@@ -17,7 +18,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
                 .format()
                 .with_options(TupleParentheses::StripInsideForLoop)
                 .fmt(f),
-            other => other.format().with_options(Parenthesize::IfBreaks).fmt(f),
+            other => maybe_parenthesize_expression(other, self.0, Parenthesize::IfBreaks).fmt(f),
         }
     }
 }
@@ -54,7 +55,7 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                 space(),
                 text("in"),
                 space(),
-                iter.format().with_options(Parenthesize::IfBreaks),
+                maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
                 text(":"),
                 trailing_comments(trailing_condition_comments),
                 block_indent(&body.format())

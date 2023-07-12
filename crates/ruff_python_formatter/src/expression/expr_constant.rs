@@ -1,25 +1,17 @@
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
-use crate::expression::string::{FormatString, StringLayout};
+use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast::{Constant, ExprConstant, Ranged};
+
+use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::str::is_implicit_concatenation;
+
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::string::{FormatString, StringPrefix, StringQuotes};
 use crate::prelude::*;
 use crate::{not_yet_implemented_custom_text, verbatim_text, FormatNodeRule};
-use ruff_formatter::{write, FormatRuleWithOptions};
-use rustpython_parser::ast::{Constant, ExprConstant};
 
 #[derive(Default)]
-pub struct FormatExprConstant {
-    string_layout: StringLayout,
-}
-
-impl FormatRuleWithOptions<ExprConstant, PyFormatContext<'_>> for FormatExprConstant {
-    type Options = StringLayout;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.string_layout = options;
-        self
-    }
-}
+pub struct FormatExprConstant;
 
 impl FormatNodeRule<ExprConstant> for FormatExprConstant {
     fn fmt_fields(&self, item: &ExprConstant, f: &mut PyFormatter) -> FormatResult<()> {
@@ -39,7 +31,7 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
             Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. } => {
                 write!(f, [verbatim_text(item)])
             }
-            Constant::Str(_) => FormatString::new(item, self.string_layout).fmt(f),
+            Constant::Str(_) => FormatString::new(item).fmt(f),
             Constant::Bytes(_) => {
                 not_yet_implemented_custom_text(r#"b"NOT_YET_IMPLEMENTED_BYTE_STRING""#).fmt(f)
             }
@@ -61,20 +53,32 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
 impl NeedsParentheses for ExprConstant {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
+        _parent: AnyNodeRef,
         context: &PyFormatContext,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
-            Parentheses::Optional if self.value.is_str() && parenthesize.is_if_breaks() => {
-                // Custom handling that only adds parentheses for implicit concatenated strings.
-                if parenthesize.is_if_breaks() {
-                    Parentheses::Custom
-                } else {
-                    Parentheses::Optional
-                }
+    ) -> OptionalParentheses {
+        if self.value.is_str() {
+            let contents = context.locator().slice(self.range());
+            // Don't wrap triple quoted strings
+            if is_multiline_string(self, context.source()) || !is_implicit_concatenation(contents) {
+                OptionalParentheses::Never
+            } else {
+                OptionalParentheses::Multiline
             }
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
+        } else {
+            OptionalParentheses::Never
         }
+    }
+}
+
+pub(super) fn is_multiline_string(constant: &ExprConstant, source: &str) -> bool {
+    if constant.value.is_str() {
+        let contents = &source[constant.range()];
+        let prefix = StringPrefix::parse(contents);
+        let quotes =
+            StringQuotes::parse(&contents[TextRange::new(prefix.text_len(), contents.text_len())]);
+
+        quotes.map_or(false, StringQuotes::is_triple) && contents.contains(['\n', '\r'])
+    } else {
+        false
     }
 }

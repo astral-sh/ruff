@@ -105,9 +105,7 @@ raise a from OsError(
 )
 
 # some comment
-raise a from (
-    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
-)  # some comment
+raise a from aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa  # some comment
 # some comment
 
 raise OsError(

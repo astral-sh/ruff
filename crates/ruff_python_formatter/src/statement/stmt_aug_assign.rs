@@ -1,3 +1,4 @@
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
@@ -23,7 +24,7 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
                 op.format(),
                 text("="),
                 space(),
-                value.format().with_options(Parenthesize::IfBreaks)
+                maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
             ]
         )
     }

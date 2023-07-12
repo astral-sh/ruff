@@ -1,4 +1,5 @@
 use crate::comments::trailing_comments;
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
@@ -60,7 +61,10 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         if let Some(type_) = type_ {
             write!(
                 f,
-                [space(), type_.format().with_options(Parenthesize::IfBreaks)]
+                [
+                    space(),
+                    maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
+                ]
             )?;
             if let Some(name) = name {
                 write!(f, [space(), text("as"), space(), name.format()])?;

@@ -122,11 +122,10 @@ def foo3(list_a, list_b):
 -        .order_by(User.created_at.desc())
 -        .with_for_update(key_share=True)
 -        .all()
--    )
-+        filter
-+    )(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
-+        User.created_at.desc()
-+    ).with_for_update(key_share=True).all()
++        filter(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
++            User.created_at.desc()
++        ).with_for_update(key_share=True).all()
+     )
      return results
  
  
@@ -224,10 +223,10 @@ def foo(list_a, list_b):
             db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
         ).filter(User.xyz.is_(None)).
         # Another comment about the filtering on is_quux goes here.
-        filter
-    )(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
-        User.created_at.desc()
-    ).with_for_update(key_share=True).all()
+        filter(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
+            User.created_at.desc()
+        ).with_for_update(key_share=True).all()
+    )
     return results
 
 
