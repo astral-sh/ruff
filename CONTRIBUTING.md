@@ -25,7 +25,7 @@ creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your
 You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
 community. We have labeled [beginner-friendly tasks in the issue tracker](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 as well as [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug) and
-[improvements we want](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
+[improvements that are ready for contributions](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted).
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:
 [_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
