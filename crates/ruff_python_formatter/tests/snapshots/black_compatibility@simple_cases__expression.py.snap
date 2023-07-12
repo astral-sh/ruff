@@ -357,38 +357,7 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -131,34 +131,28 @@
- tuple[str, ...]
- tuple[str, int, float, dict[str, int]]
- tuple[
--    str,
--    int,
--    float,
--    dict[str, int],
--]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
-+    (
-+        str,
-+        int,
-+        float,
-+        dict[str, int],
-+    )
- ]
--xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)
--xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)
--xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)  # type: ignore
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
- slice[0]
+@@ -152,13 +152,13 @@
  slice[0:1]
  slice[0:1:2]
  slice[:]
@@ -429,7 +398,7 @@ last_call()
  (*starred,)
  {
      "id": "1",
-@@ -208,24 +202,14 @@
+@@ -208,24 +208,14 @@
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
  )
@@ -477,7 +446,7 @@ last_call()
  
  
  async def f():
-@@ -248,8 +232,12 @@
+@@ -248,8 +238,12 @@
  
  
  print(*[] or [1])
@@ -492,7 +461,7 @@ last_call()
  assert not Test, "Short message"
  assert this is ComplexTest and not requirements.fit_in_a_single_line(
      force=False
-@@ -259,7 +247,9 @@
+@@ -259,7 +253,9 @@
      ...
  for y in ():
      ...
@@ -503,7 +472,7 @@ last_call()
      ...
  for i in call():
      ...
-@@ -328,13 +318,18 @@
+@@ -328,13 +324,18 @@
  ):
      return True
  if (
@@ -525,7 +494,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +337,8 @@
+@@ -342,7 +343,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e

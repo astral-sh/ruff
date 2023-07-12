@@ -387,7 +387,7 @@ long_unmergable_string_with_pragma = (
      x,
      y,
      z,
-@@ -243,21 +237,13 @@
+@@ -243,7 +237,7 @@
  func_with_bad_parens(
      x,
      y,
@@ -396,24 +396,7 @@ long_unmergable_string_with_pragma = (
      z,
  )
  
--annotated_variable: Final = (
--    "This is a large "
--    + STRING
--    + " that has been "
--    + CONCATENATED
--    + "using the '+' operator."
--)
--annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
--annotated_variable: Literal[
--    "fakse_literal"
--] = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
- 
- backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\"
- backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
-@@ -271,10 +257,10 @@
+@@ -271,10 +265,10 @@
  
  
  def foo():
