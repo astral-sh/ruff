@@ -1,23 +1,28 @@
-assert (
-    # Asserted
+assert True  # Trailing same-line
+assert True is True  # Trailing same-line
+assert 1, "Some string"  # Trailing same-line
+assert aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # Trailing same-line
+
+assert (  # Dangle1
+    # Dangle2
 )
 
-# Some assert
+# Leading assert
 assert (
-    # Let's go inside
-    True  # Go around this
-    # Below that    
-), "Some string"  # Outside this way
-# Passed all that
+    # Leading test value
+    True  # Trailing test value same-line
+    # Trailing test value own-line 
+), "Some string"  # Trailing msg same-line
+# Trailing assert
 
-# Dangle this here
+# Random dangler
 
-# Some assert
+# Leading assert
 assert (
-    # Let's go inside
-    True  # Go around this
-    # Below that
+    # Leading test value
+    True  # Trailing test value same-line
+    # Trailing test value own-line 
 
-    # Dangle that there
-), "Some string"  # Outside this way
-# Passed all that
+    # Test dangler
+), "Some string"  # Trailing msg same-line
+# Trailing assert
