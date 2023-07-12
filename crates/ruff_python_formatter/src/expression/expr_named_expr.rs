@@ -1,3 +1,4 @@
+use crate::comments::dangling_comments;
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
@@ -23,6 +24,7 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
         let comments = f.context().comments().clone();
         let trailing_target_comments = comments.trailing_comments(target.as_ref());
         let leading_value_comments = comments.leading_comments(value.as_ref());
+        let dangling_item_comments = comments.dangling_comments(item);
 
         if trailing_target_comments.is_empty() {
             write!(f, [space()])?;
@@ -30,7 +32,7 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
             write!(f, [soft_line_break()])?;
         }
 
-        write!(f, [text(":=")])?;
+        write!(f, [text(":="), dangling_comments(dangling_item_comments)])?;
 
         if leading_value_comments.is_empty() {
             write!(f, [space()])?;
@@ -38,6 +40,15 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
             write!(f, [soft_line_break()])?;
         }
         write!(f, [value.format()])
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _node: &ExprNamedExpr,
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled in `fmt_fields`
+        Ok(())
     }
 }
 

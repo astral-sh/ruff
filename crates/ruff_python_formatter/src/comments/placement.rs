@@ -40,7 +40,7 @@ pub(super) fn place_comment<'a>(
         handle_expr_if_comment,
         handle_comprehension_comment,
         handle_trailing_expression_starred_star_end_of_line_comment,
-        handle_comment_before_walrus,
+        handle_walrus_comments,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -1233,19 +1233,19 @@ fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
     CommentPlacement::leading(starred.as_any_node_ref(), comment)
 }
 
-/// Assign comments between the target and `:=` as trailing the target instead of leading the value
+/// Handle comments around `:=`
 ///
 /// ```python
 /// if (
 ///     x
 ///     # make trailing x (instead of leading y)
-///     :=
+///     :=  # make dangling on the NamedExpr node
 ///     y
 /// )
 ///    ...
 /// ```
 // TODO: can this also handle comments before colon in dicts
-fn handle_comment_before_walrus<'a>(
+fn handle_walrus_comments<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
@@ -1253,15 +1253,13 @@ fn handle_comment_before_walrus<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    if !comment.line_position().is_own_line() {
-        return CommentPlacement::Default(comment);
-    }
-
     let walrus = find_only_token_in_range(
         TextRange::new(named.target.range().end(), named.value.range().start()),
         locator,
         TokenKind::Walrus,
     );
+
+    let is_own_line = comment.line_position().is_own_line();
 
     // Comments between the target and the `:=`
     // ```python
@@ -1273,7 +1271,27 @@ fn handle_comment_before_walrus<'a>(
     //  ]
     // ```
     if comment.slice().end() < walrus.start() {
-        return CommentPlacement::trailing((&*named.target).into(), comment);
+        return if is_own_line {
+            CommentPlacement::trailing((&*named.target).into(), comment)
+        } else {
+            CommentPlacement::Default(comment)
+        };
+    }
+
+    // Comments after the `:=`
+    // ```python
+    // [
+    //      a
+    //      :=  # attach as dangling on the NamedExpr
+    //      in b
+    //  ]
+    // ```
+    if comment.slice().end() < named.value.range().start() {
+        return if is_own_line {
+            CommentPlacement::Default(comment)
+        } else {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        };
     }
 
     CommentPlacement::Default(comment)
