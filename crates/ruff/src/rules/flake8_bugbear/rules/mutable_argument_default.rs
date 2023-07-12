@@ -4,9 +4,9 @@ use crate::registry::AsRule;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::leading_space;
+use ruff_python_ast::whitespace::indentation_at_offset;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::TextRange;
-use ruff_python_ast::whitespace::indentation_at_offset;
 
 use crate::checkers::ast::Checker;
 
@@ -61,7 +61,9 @@ impl Violation for MutableArgumentDefault {
         format!("Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`")
     }
     fn autofix_title(&self) -> Option<String> {
-        Some(format!("Do not use mutable data structures for argument defaults"))
+        Some(format!(
+            "Do not use mutable data structures for argument defaults"
+        ))
     }
 }
 
@@ -104,7 +106,8 @@ pub(crate) fn mutable_argument_default(
 
                 // Add conditional check to set the default arg to its original value if still None
                 let mut check_lines = String::new();
-                let indentation = indentation_at_offset(checker.locator, body[0].start()).unwrap_or_default();
+                let indentation =
+                    indentation_at_offset(checker.locator, body[0].start()).unwrap_or_default();
                 let indentation = leading_space(indentation);
                 // body[0].start() starts at correct indentation so we do need to add indentation
                 // before pushing the if statement
