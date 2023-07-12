@@ -52,24 +52,56 @@ fn is_known_type(call_path: &CallPath, minor_version: u32) -> bool {
     }
 }
 
+/// Returns a vector of all the expressions in a slice.
+///
+/// ## Panics
+///
+/// Panics if the slice is not a tuple or a constant. This should never happen
+/// as this function is only used in typing context where the slice cannot be
+/// anything else.
+fn resolve_slice_value(slice: &Expr) -> Vec<&Expr> {
+    match slice {
+        Expr::Tuple(ast::ExprTuple { elts: elements, .. }) => elements.iter().collect(),
+        Expr::Constant(_) => vec![slice],
+        _ => unreachable!("type slice must be a tuple or a constant"),
+    }
+}
+
 #[derive(Debug)]
 enum TypingTarget<'a> {
+    /// Literal `None` type.
     None,
+
+    /// A `typing.Any` type.
     Any,
+
+    /// Literal `object` type.
     Object,
+
+    /// Forward reference to a type e.g., `"List[str]"`.
     ForwardReference(Expr),
+
+    /// A `typing.Union` type or `|` separated types e.g., `Union[int, str]`
+    /// or `int | str`.
     Union(Vec<&'a Expr>),
+
+    /// A `typing.Literal` type e.g., `Literal[1, 2, 3]`.
     Literal(Vec<&'a Expr>),
+
+    /// A `typing.Optional` type e.g., `Optional[int]`.
     Optional(&'a Expr),
+
+    /// A `typing.Annotated` type e.g., `Annotated[int, ...]`.
     Annotated(&'a Expr),
 
-    /// Special type used to represent an unknown type (and not a typing target).
-    /// This could be a type alias. It's also used when parsing a forward
-    /// reference fails.
-    ///
-    /// Note that this is not the same as returning `None` in `try_from_expr` as
-    /// `None` means that it's a known type but we don't know which one.
+    /// Special type used to represent an unknown type (and not a typing target)
+    /// which could be a type alias.
     Unknown,
+
+    /// Special type used to represent a known type (and not a typing target).
+    /// A known type is either a builtin type, any object from the standard
+    /// library, or a type from the `typing_extensions` module.
+    Known,
 }
 
 impl<'a> TypingTarget<'a> {
@@ -82,17 +114,15 @@ impl<'a> TypingTarget<'a> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if semantic.match_typing_expr(value, "Optional") {
-                    return Some(TypingTarget::Optional(slice.as_ref()));
-                }
-                let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else {
-                    return None;
-                };
-                if semantic.match_typing_expr(value, "Literal") {
-                    Some(TypingTarget::Literal(elements.iter().collect()))
+                    Some(TypingTarget::Optional(slice.as_ref()))
+                } else if semantic.match_typing_expr(value, "Literal") {
+                    Some(TypingTarget::Literal(resolve_slice_value(slice)))
                 } else if semantic.match_typing_expr(value, "Union") {
-                    Some(TypingTarget::Union(elements.iter().collect()))
+                    Some(TypingTarget::Union(resolve_slice_value(slice)))
                 } else if semantic.match_typing_expr(value, "Annotated") {
-                    elements.first().map(TypingTarget::Annotated)
+                    resolve_slice_value(slice.as_ref())
+                        .first()
+                        .map(|&expr| TypingTarget::Annotated(expr))
                 } else {
                     semantic.resolve_call_path(value).map_or(
                         // If we can't resolve the call path, it must be defined
@@ -100,7 +130,7 @@ impl<'a> TypingTarget<'a> {
                         Some(TypingTarget::Unknown),
                         |call_path| {
                             if is_known_type(&call_path, minor_version) {
-                                None
+                                Some(TypingTarget::Known)
                             } else {
                                 Some(TypingTarget::Unknown)
                             }
@@ -120,10 +150,7 @@ impl<'a> TypingTarget<'a> {
                 range,
                 ..
             }) => parse_type_annotation(string, *range, locator)
-                // In case of a parse error, we return `Any` to avoid false positives.
-                .map_or(Some(TypingTarget::Unknown), |(expr, _)| {
-                    Some(TypingTarget::ForwardReference(expr))
-                }),
+                .map_or(None, |(expr, _)| Some(TypingTarget::ForwardReference(expr))),
             _ => semantic.resolve_call_path(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the
                 // same file, so we assume it's `Any` as it could be a type alias.
@@ -137,7 +164,7 @@ impl<'a> TypingTarget<'a> {
                         // If it's not a known type, we assume it's `Any`.
                         Some(TypingTarget::Unknown)
                     } else {
-                        None
+                        Some(TypingTarget::Known)
                     }
                 },
             ),
@@ -157,45 +184,35 @@ impl<'a> TypingTarget<'a> {
             | TypingTarget::Any
             | TypingTarget::Object
             | TypingTarget::Unknown => true,
+            TypingTarget::Known => false,
             TypingTarget::Literal(elements) => elements.iter().any(|element| {
-                let Some(new_target) =
-                    TypingTarget::try_from_expr(element, semantic, locator, minor_version)
-                else {
-                    return false;
-                };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
-                match new_target {
-                    TypingTarget::None => true,
-                    TypingTarget::Literal(_) => {
+                match TypingTarget::try_from_expr(element, semantic, locator, minor_version) {
+                    None | Some(TypingTarget::None) => true,
+                    Some(new_target @ TypingTarget::Literal(_)) => {
                         new_target.contains_none(semantic, locator, minor_version)
                     }
                     _ => false,
                 }
             }),
             TypingTarget::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) =
-                    TypingTarget::try_from_expr(element, semantic, locator, minor_version)
-                else {
-                    return false;
-                };
-                new_target.contains_none(semantic, locator, minor_version)
+                TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_none(semantic, locator, minor_version)
+                    })
             }),
             TypingTarget::Annotated(element) => {
-                let Some(new_target) =
-                    TypingTarget::try_from_expr(element, semantic, locator, minor_version)
-                else {
-                    return false;
-                };
-                new_target.contains_none(semantic, locator, minor_version)
+                TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_none(semantic, locator, minor_version)
+                    })
             }
             TypingTarget::ForwardReference(expr) => {
-                let Some(new_target) =
-                    TypingTarget::try_from_expr(expr, semantic, locator, minor_version)
-                else {
-                    return false;
-                };
-                new_target.contains_none(semantic, locator, minor_version)
+                TypingTarget::try_from_expr(expr, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_none(semantic, locator, minor_version)
+                    })
             }
         }
     }
@@ -213,30 +230,25 @@ impl<'a> TypingTarget<'a> {
             TypingTarget::Literal(_)
             | TypingTarget::None
             | TypingTarget::Object
+            | TypingTarget::Known
             | TypingTarget::Unknown => false,
             TypingTarget::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) =
-                    TypingTarget::try_from_expr(element, semantic, locator, minor_version)
-                else {
-                    return false;
-                };
-                new_target.contains_any(semantic, locator, minor_version)
+                TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_any(semantic, locator, minor_version)
+                    })
             }),
             TypingTarget::Annotated(element) | TypingTarget::Optional(element) => {
-                let Some(new_target) =
-                    TypingTarget::try_from_expr(element, semantic, locator, minor_version)
-                else {
-                    return false;
-                };
-                new_target.contains_any(semantic, locator, minor_version)
+                TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_any(semantic, locator, minor_version)
+                    })
             }
             TypingTarget::ForwardReference(expr) => {
-                let Some(new_target) =
-                    TypingTarget::try_from_expr(expr, semantic, locator, minor_version)
-                else {
-                    return false;
-                };
-                new_target.contains_any(semantic, locator, minor_version)
+                TypingTarget::try_from_expr(expr, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_any(semantic, locator, minor_version)
+                    })
             }
         }
     }
@@ -255,21 +267,18 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
     locator: &Locator,
     minor_version: u32,
 ) -> Option<&'a Expr> {
-    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator, minor_version)
-    else {
-        return Some(annotation);
-    };
-    match target {
-        // Short circuit on top level `None`, `Any` or `Optional`
-        TypingTarget::None | TypingTarget::Optional(_) | TypingTarget::Any => None,
+    match TypingTarget::try_from_expr(annotation, semantic, locator, minor_version) {
+        None |
+            // Short circuit on top level `None`, `Any` or `Optional`
+            Some(TypingTarget::None | TypingTarget::Optional(_) | TypingTarget::Any) => None,
         // Top-level `Annotated` node should check for the inner type and
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should
         // be returned.
-        TypingTarget::Annotated(expr) => {
+        Some(TypingTarget::Annotated(expr)) => {
             type_hint_explicitly_allows_none(expr, semantic, locator, minor_version)
         }
-        _ => {
+        Some(target) => {
             if target.contains_none(semantic, locator, minor_version) {
                 None
             } else {
@@ -288,19 +297,16 @@ pub(crate) fn type_hint_resolves_to_any(
     locator: &Locator,
     minor_version: u32,
 ) -> bool {
-    let Some(target) = TypingTarget::try_from_expr(annotation, semantic, locator, minor_version)
-    else {
-        return false;
-    };
-    match target {
-        // Short circuit on top level `Any`
-        TypingTarget::Any => true,
+    match TypingTarget::try_from_expr(annotation, semantic, locator, minor_version) {
+        None |
+            // Short circuit on top level `Any`
+            Some(TypingTarget::Any) => true,
         // Top-level `Annotated` node should check if the inner type resolves
         // to `Any`.
-        TypingTarget::Annotated(expr) => {
+        Some(TypingTarget::Annotated(expr)) => {
             type_hint_resolves_to_any(expr, semantic, locator, minor_version)
         }
-        _ => target.contains_any(semantic, locator, minor_version),
+        Some(target) => target.contains_any(semantic, locator, minor_version),
     }
 }
 
