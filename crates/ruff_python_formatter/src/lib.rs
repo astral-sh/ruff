@@ -280,11 +280,16 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-if [
-    aaaaaa,
-    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
-] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
-    ...
+if a * [
+    bbbbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccccccccccccdddddddddddddddddddddddddd,
+] + a * e * [
+    ffff,
+    gggg,
+    hhhhhhhhhhhhhh,
+] * c:
+    pass
+
 "#;
         // Tokenize once
         let mut tokens = Vec::new();

@@ -201,7 +201,7 @@ if True:
             ]
         );
 
-        let contents = r#"
+        let contents = r"
 x = 1; import sys
 import os
 
@@ -215,7 +215,7 @@ if True:
 
 x = 1; \
 import os
-"#
+"
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));

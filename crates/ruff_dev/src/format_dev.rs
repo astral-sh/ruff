@@ -2,6 +2,7 @@ use anyhow::{bail, Context};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
 use indicatif::ProgressBar;
+
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
@@ -48,16 +49,27 @@ fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ign
     Ok(paths)
 }
 
-/// Collects statistics over the formatted files, currently only computes the Jaccard index
+/// Collects statistics over the formatted files to compute the Jaccard index or the similarity
+/// index.
+///
+/// If we define `B` as the black formatted input and `R` as the ruff formatted output, then
+/// * `B∩R`: Unchanged lines, neutral in the diff
+/// * `B\R`: Black only lines, minus in the diff
+/// * `R\B`: Ruff only lines, plus in the diff
 ///
 /// The [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index) can be defined as
 /// ```text
-/// J(A, B) = |A∩B| / (|A\B| + |B\A| + |A∩B|)
+/// J(B, R) = |B∩R| / (|B\R| + |R\B| + |B∩R|)
 /// ```
-/// where in our case `A` is the black formatted input, `B` is the ruff formatted output and the
-/// intersection are the lines in the diff that didn't change. We don't just track intersection and
-/// union so we can make statistics about size changes. If the input is not black formatted, this
-/// only becomes a measure for the changes made to the codebase during the initial formatting.
+/// which you can read as number unchanged lines in the diff divided by all lines in the diff. If
+/// the input is not black formatted, this only becomes a measure for the changes made to the
+/// codebase during the initial formatting.
+///
+/// Another measure is the similarity index, the percentage of unchanged lines. We compute it as
+/// ```text
+/// Sim(B, R) = |B∩R| / (|B\R| + |B∩R|)
+/// ```
+/// which you can alternatively read as all lines in the input
 #[derive(Default, Debug, Copy, Clone)]
 pub(crate) struct Statistics {
     /// The size of `A\B`, the number of lines only in the input, which we assume to be black
@@ -92,9 +104,15 @@ impl Statistics {
         }
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    /// We currently prefer the the similarity index, but i'd like to keep this around
+    #[allow(clippy::cast_precision_loss, unused)]
     pub(crate) fn jaccard_index(&self) -> f32 {
         self.intersection as f32 / (self.black_input + self.ruff_output + self.intersection) as f32
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    pub(crate) fn similarity_index(&self) -> f32 {
+        self.intersection as f32 / (self.black_input + self.intersection) as f32
     }
 }
 
@@ -171,10 +189,10 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         {
             print!("{}", result.display(args.format));
             println!(
-                "Found {} stability errors in {} files (jaccard index {:.3}) in {:.2}s",
+                "Found {} stability errors in {} files (similarity index {:.3}) in {:.2}s",
                 error_count,
                 result.file_count,
-                result.statistics.jaccard_index(),
+                result.statistics.similarity_index(),
                 result.duration.as_secs_f32(),
             );
         }
@@ -253,10 +271,10 @@ fn format_dev_multi_project(args: &Args) -> bool {
                         total_files += result.file_count;
 
                         bar.println(format!(
-                            "Finished {} with {} files (jaccard index {:.3}) in {:.2}s",
+                            "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
                             path.display(),
                             result.file_count,
-                            result.statistics.jaccard_index(),
+                            result.statistics.similarity_index(),
                             result.duration.as_secs_f32(),
                         ));
                         bar.println(result.display(args.format).to_string().trim_end());
@@ -514,6 +532,15 @@ Formatted twice:
             CheckFileError::IoError(error) => {
                 writeln!(f, "Error reading {}: {}", file.display(), error)?;
             }
+            #[cfg(not(debug_assertions))]
+            CheckFileError::Slow(duration) => {
+                writeln!(
+                    f,
+                    "Slow formatting {}: Formatting the file took {}ms",
+                    file.display(),
+                    duration.as_millis()
+                )?;
+            }
         }
         Ok(())
     }
@@ -541,6 +568,10 @@ enum CheckFileError {
     IoError(io::Error),
     /// From `catch_unwind`
     Panic { message: String },
+
+    /// Formatting a file took too long
+    #[cfg(not(debug_assertions))]
+    Slow(Duration),
 }
 
 impl CheckFileError {
@@ -553,6 +584,8 @@ impl CheckFileError {
             | CheckFileError::FormatError(_)
             | CheckFileError::PrintError(_)
             | CheckFileError::Panic { .. } => false,
+            #[cfg(not(debug_assertions))]
+            CheckFileError::Slow(_) => false,
         }
     }
 }
@@ -569,6 +602,8 @@ fn format_dev_file(
     write: bool,
 ) -> Result<Statistics, CheckFileError> {
     let content = fs::read_to_string(input_path)?;
+    #[cfg(not(debug_assertions))]
+    let start = Instant::now();
     let printed = match format_module(&content, PyFormatOptions::default()) {
         Ok(printed) => printed,
         Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
@@ -582,6 +617,8 @@ fn format_dev_file(
         }
     };
     let formatted = printed.as_code();
+    #[cfg(not(debug_assertions))]
+    let format_duration = Instant::now() - start;
 
     if write && content != formatted {
         // Simple atomic write.
@@ -616,6 +653,11 @@ fn format_dev_file(
                 reformatted: reformatted.into_code(),
             });
         }
+    }
+
+    #[cfg(not(debug_assertions))]
+    if format_duration > Duration::from_millis(50) {
+        return Err(CheckFileError::Slow(format_duration));
     }
 
     Ok(Statistics::from_versions(&content, formatted))

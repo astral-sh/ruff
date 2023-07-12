@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = PylintEmitter::default();
+        let mut emitter = PylintEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

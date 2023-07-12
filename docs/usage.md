@@ -38,6 +38,17 @@ Or, to enable autofix:
       args: [ --fix, --exit-non-zero-on-fix ]
 ```
 
+Or, to run the hook on Jupyter Notebooks too:
+
+```yaml
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.277
+  hooks:
+    - id: ruff
+      types_or: [python, pyi, jupyter]
+```
+
 Ruff's pre-commit hook should be placed after other formatting tools, such as Black and isort,
 _unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _before_ Black, isort,
 and other formatting tools, as Ruff's autofix behavior can output code changes that require

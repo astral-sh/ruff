@@ -3,8 +3,9 @@
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
+use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::settings::options::Options;
+use ruff::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_diagnostics::AutofixKind;
 
 const FIX_SYMBOL: &str = "🛠";
@@ -69,7 +70,7 @@ pub(crate) fn generate() -> String {
                 .upstream_categories()
                 .unwrap()
                 .iter()
-                .map(|UpstreamCategory(prefix, ..)| prefix.short_code())
+                .map(|c| c.prefix)
                 .join(", "),
             prefix => prefix.to_string(),
         };
@@ -114,16 +115,20 @@ pub(crate) fn generate() -> String {
             table_out.push('\n');
         }
 
-        if let Some(categories) = linter.upstream_categories() {
-            for UpstreamCategory(prefix, name) in categories {
-                table_out.push_str(&format!(
-                    "#### {name} ({}{})",
-                    linter.common_prefix(),
-                    prefix.short_code()
-                ));
+        let rules_by_upstream_category = linter
+            .all_rules()
+            .map(|rule| (rule.upstream_category(&linter), rule))
+            .into_group_map();
+
+        if rules_by_upstream_category.len() > 1 {
+            for (opt, rules) in &rules_by_upstream_category {
+                if opt.is_some() {
+                    let UpstreamCategoryAndPrefix { category, prefix } = opt.unwrap();
+                    table_out.push_str(&format!("#### {category} ({prefix})"));
+                }
                 table_out.push('\n');
                 table_out.push('\n');
-                generate_table(&mut table_out, prefix.clone().rules(), &linter);
+                generate_table(&mut table_out, rules.clone(), &linter);
             }
         } else {
             generate_table(&mut table_out, linter.all_rules(), &linter);

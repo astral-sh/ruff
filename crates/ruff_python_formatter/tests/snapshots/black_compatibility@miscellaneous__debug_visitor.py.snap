@@ -44,11 +44,8 @@ class DebugVisitor(Visitor[T]):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,26 +1,26 @@
- @dataclass
- class DebugVisitor(Visitor[T]):
--    tree_depth: int = 0
-+    NOT_YET_IMPLEMENTED_StmtAnnAssign
+@@ -3,24 +3,24 @@
+     tree_depth: int = 0
  
      def visit_default(self, node: LN) -> Iterator[T]:
 -        indent = ' ' * (2 * self.tree_depth)
@@ -56,16 +53,14 @@ class DebugVisitor(Visitor[T]):
          if isinstance(node, Node):
              _type = type_repr(node.type)
 -            out(f'{indent}{_type}', fg='yellow')
--            self.tree_depth += 1
 +            out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow")
-+            NOT_YET_IMPLEMENTED_StmtAugAssign
+             self.tree_depth += 1
              for child in node.children:
 -                yield from self.visit(child)
 +                NOT_YET_IMPLEMENTED_ExprYieldFrom
  
--            self.tree_depth -= 1
+             self.tree_depth -= 1
 -            out(f'{indent}/{_type}', fg='yellow', bold=False)
-+            NOT_YET_IMPLEMENTED_StmtAugAssign
 +            out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow", bold=False)
          else:
              _type = token.tok_name.get(node.type, str(node.type))
@@ -81,13 +76,6 @@ class DebugVisitor(Visitor[T]):
  
      @classmethod
      def show(cls, code: str) -> None:
-@@ -28,5 +28,5 @@
- 
-         Convenience method for debugging.
-         """
--        v: DebugVisitor[None] = DebugVisitor()
-+        NOT_YET_IMPLEMENTED_StmtAnnAssign
-         list(v.visit(lib2to3_parse(code)))
 ```
 
 ## Ruff Output
@@ -95,18 +83,18 @@ class DebugVisitor(Visitor[T]):
 ```py
 @dataclass
 class DebugVisitor(Visitor[T]):
-    NOT_YET_IMPLEMENTED_StmtAnnAssign
+    tree_depth: int = 0
 
     def visit_default(self, node: LN) -> Iterator[T]:
         indent = " " * (2 * self.tree_depth)
         if isinstance(node, Node):
             _type = type_repr(node.type)
             out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow")
-            NOT_YET_IMPLEMENTED_StmtAugAssign
+            self.tree_depth += 1
             for child in node.children:
                 NOT_YET_IMPLEMENTED_ExprYieldFrom
 
-            NOT_YET_IMPLEMENTED_StmtAugAssign
+            self.tree_depth -= 1
             out(NOT_YET_IMPLEMENTED_ExprJoinedStr, fg="yellow", bold=False)
         else:
             _type = token.tok_name.get(node.type, str(node.type))
@@ -123,7 +111,7 @@ class DebugVisitor(Visitor[T]):
 
         Convenience method for debugging.
         """
-        NOT_YET_IMPLEMENTED_StmtAnnAssign
+        v: DebugVisitor[None] = DebugVisitor()
         list(v.visit(lib2to3_parse(code)))
 ```
 

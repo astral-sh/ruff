@@ -776,7 +776,7 @@ where
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt, self.locator);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for name in names.iter() {
+                    for name in names {
                         if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
@@ -972,7 +972,7 @@ where
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt, self.locator);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for name in names.iter() {
+                    for name in names {
                         if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
@@ -1617,7 +1617,7 @@ where
                     flake8_bandit::rules::assign_hardcoded_password_string(self, value, targets);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for target in targets.iter() {
+                    for target in targets {
                         if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
@@ -1657,6 +1657,9 @@ where
                 }
                 if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                     pylint::rules::type_param_name_mismatch(self, value, targets);
+                }
+                if self.settings.rules.enabled(Rule::TypeNameIncorrectVariance) {
+                    pylint::rules::type_name_incorrect_variance(self, value);
                 }
                 if self.settings.rules.enabled(Rule::TypeBivariance) {
                     pylint::rules::type_bivariance(self, value);
@@ -1746,7 +1749,7 @@ where
             }
             Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 if self.enabled(Rule::GlobalStatement) {
-                    for target in targets.iter() {
+                    for target in targets {
                         if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
@@ -2139,7 +2142,7 @@ where
 
         // Pre-visit.
         match expr {
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.any_enabled(&[
                     Rule::FutureRewritableTypeAnnotation,
@@ -2148,7 +2151,8 @@ where
                     if let Some(operator) = typing::to_pep604_operator(value, slice, &self.semantic)
                     {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py310
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -2160,7 +2164,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP604Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py310
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2176,7 +2181,8 @@ where
 
                 // Ex) list[...]
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py39
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py39
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                         && typing::is_pep585_generic(value, &self.semantic)
@@ -2190,18 +2196,24 @@ where
                 }
 
                 // Ex) Union[...]
-                if self.enabled(Rule::UnnecessaryLiteralUnion) {
-                    let mut check = true;
+                if self.any_enabled(&[Rule::UnnecessaryLiteralUnion, Rule::DuplicateUnionMember]) {
+                    // Determine if the current expression is an union
+                    // Avoid duplicate checks if the parent is an `Union[...]` since these rules traverse nested unions
+                    let is_unchecked_union = self
+                        .semantic
+                        .expr_grandparent()
+                        .and_then(Expr::as_subscript_expr)
+                        .map_or(true, |parent| {
+                            !self.semantic.match_typing_expr(&parent.value, "Union")
+                        });
 
-                    // Avoid duplicate checks if the parent is an `Union[...]`
-                    if let Some(Expr::Subscript(ast::ExprSubscript { value, .. })) =
-                        self.semantic.expr_grandparent()
-                    {
-                        check = !self.semantic.match_typing_expr(value, "Union");
-                    }
-
-                    if check {
-                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                    if is_unchecked_union {
+                        if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                            flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                        }
+                        if self.enabled(Rule::DuplicateUnionMember) {
+                            flake8_pyi::rules::duplicate_union_member(self, expr);
+                        }
                     }
                 }
 
@@ -2218,6 +2230,13 @@ where
                 }
                 if self.enabled(Rule::UncapitalizedEnvironmentVariables) {
                     flake8_simplify::rules::use_capital_environment_variables(self, expr);
+                }
+                if self.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
+                    ruff::rules::unnecessary_iterable_allocation_for_first_element(self, subscript);
+                }
+
+                if self.enabled(Rule::InvalidIndexType) {
+                    ruff::rules::invalid_index_type(self, subscript);
                 }
 
                 pandas_vet::rules::subscript(self, value, expr);
@@ -2274,19 +2293,21 @@ where
                                 typing::to_pep585_generic(expr, &self.semantic)
                             {
                                 if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                    if self.settings.target_version < PythonVersion::Py39
+                                    if !self.is_stub
+                                        && self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
                                         && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                            self, expr,
-                                        );
+                                                self, expr,
+                                            );
                                     }
                                 }
                                 if self.enabled(Rule::NonPEP585Annotation) {
-                                    if self.settings.target_version >= PythonVersion::Py39
+                                    if self.is_stub
+                                        || self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
                                             && self.semantic.in_annotation()
@@ -2351,7 +2372,8 @@ where
                 ]) {
                     if let Some(replacement) = typing::to_pep585_generic(expr, &self.semantic) {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py39
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -2363,7 +2385,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP585Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py39
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2407,12 +2430,14 @@ where
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords,
-                range: _,
-            }) => {
+            Expr::Call(
+                call @ ast::ExprCall {
+                    func,
+                    args,
+                    keywords,
+                    range: _,
+                },
+            ) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = self.semantic.scope_mut();
@@ -2436,19 +2461,19 @@ where
                     if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                         let attr = attr.as_str();
                         if let Expr::Constant(ast::ExprConstant {
-                            value: Constant::Str(value),
+                            value: Constant::Str(val),
                             ..
                         }) = value.as_ref()
                         {
                             if attr == "join" {
                                 // "...".join(...) call
                                 if self.enabled(Rule::StaticJoinToFString) {
-                                    flynt::rules::static_join_to_fstring(self, expr, value);
+                                    flynt::rules::static_join_to_fstring(self, expr, val);
                                 }
                             } else if attr == "format" {
                                 // "...".format(...) call
                                 let location = expr.range();
-                                match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
+                                match pyflakes::format::FormatSummary::try_from(val.as_ref()) {
                                     Err(e) => {
                                         if self.enabled(Rule::StringDotFormatInvalidFormat) {
                                             self.diagnostics.push(Diagnostic::new(
@@ -2492,7 +2517,13 @@ where
                                         }
 
                                         if self.enabled(Rule::FString) {
-                                            pyupgrade::rules::f_strings(self, &summary, expr);
+                                            pyupgrade::rules::f_strings(
+                                                self,
+                                                &summary,
+                                                expr,
+                                                value,
+                                                self.settings.line_length,
+                                            );
                                         }
                                     }
                                 }
@@ -2530,10 +2561,10 @@ where
                 if self.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);
                 }
-                if self.enabled(Rule::NonPEP604Isinstance)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                if self.enabled(Rule::NonPEP604Isinstance) {
+                    if self.settings.target_version >= PythonVersion::Py310 {
+                        pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                    }
                 }
                 if self.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                     flake8_async::rules::blocking_http_call(self, expr);
@@ -2571,6 +2602,9 @@ where
                     Rule::SuspiciousFTPLibUsage,
                 ]) {
                     flake8_bandit::rules::suspicious_function_call(self, expr);
+                }
+                if self.enabled(Rule::ReSubPositionalArgs) {
+                    flake8_bugbear::rules::re_sub_positional_args(self, call);
                 }
                 if self.enabled(Rule::UnreliableCallableCheck) {
                     flake8_bugbear::rules::unreliable_callable_check(self, expr, func, args);
@@ -3137,7 +3171,8 @@ where
             }) => {
                 // Ex) `str | None`
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py310
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py310
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                     {
@@ -3148,7 +3183,6 @@ where
                         );
                     }
                 }
-
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic.in_type_definition()
@@ -3160,7 +3194,6 @@ where
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
                     }
-
                     if self.enabled(Rule::UnnecessaryLiteralUnion)
                         // Avoid duplicate checks if the parent is an `|`
                         && !matches!(

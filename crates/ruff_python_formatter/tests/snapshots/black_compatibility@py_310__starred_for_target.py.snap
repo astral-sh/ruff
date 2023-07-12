@@ -39,21 +39,8 @@ async for x in (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,27 +1,19 @@
--for x in *a, *b:
-+for x in *NOT_YET_IMPLEMENTED_ExprStarred, *NOT_YET_IMPLEMENTED_ExprStarred:
-     print(x)
- 
--for x in a, b, *c:
-+for x in a, b, *NOT_YET_IMPLEMENTED_ExprStarred:
-     print(x)
- 
--for x in *a, b, c:
-+for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, c:
-     print(x)
- 
--for x in *a, b, *c:
-+for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, *NOT_YET_IMPLEMENTED_ExprStarred:
+@@ -10,18 +10,10 @@
+ for x in *a, b, *c:
      print(x)
  
 -async for x in *a, *b:
@@ -80,16 +67,16 @@ async for x in (
 ## Ruff Output
 
 ```py
-for x in *NOT_YET_IMPLEMENTED_ExprStarred, *NOT_YET_IMPLEMENTED_ExprStarred:
+for x in *a, *b:
     print(x)
 
-for x in a, b, *NOT_YET_IMPLEMENTED_ExprStarred:
+for x in a, b, *c:
     print(x)
 
-for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, c:
+for x in *a, b, c:
     print(x)
 
-for x in *NOT_YET_IMPLEMENTED_ExprStarred, b, *NOT_YET_IMPLEMENTED_ExprStarred:
+for x in *a, b, *c:
     print(x)
 
 NOT_YET_IMPLEMENTED_StmtAsyncFor

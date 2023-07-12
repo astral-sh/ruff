@@ -31,13 +31,7 @@ def t():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,19 +3,19 @@
- 
- def starred_return():
-     my_list = ["value2", "value3"]
--    return "value1", *my_list
-+    return "value1", *NOT_YET_IMPLEMENTED_ExprStarred
- 
+@@ -8,7 +8,7 @@
  
  def starred_yield():
      my_list = ["value2", "value3"]
@@ -46,16 +40,12 @@ def t():
  
  
  # all right hand side expressions allowed in regular assignments are now also allowed in
- # annotated assignments
--a: Tuple[str, int] = "1", 2
--a: Tuple[int, ...] = b, *c, d
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
+@@ -18,4 +18,4 @@
  
  
  def t():
 -    a: str = yield "a"
-+    NOT_YET_IMPLEMENTED_StmtAnnAssign
++    a: str = NOT_YET_IMPLEMENTED_ExprYield
 ```
 
 ## Ruff Output
@@ -66,7 +56,7 @@ def t():
 
 def starred_return():
     my_list = ["value2", "value3"]
-    return "value1", *NOT_YET_IMPLEMENTED_ExprStarred
+    return "value1", *my_list
 
 
 def starred_yield():
@@ -76,12 +66,12 @@ def starred_yield():
 
 # all right hand side expressions allowed in regular assignments are now also allowed in
 # annotated assignments
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
+a: Tuple[str, int] = "1", 2
+a: Tuple[int, ...] = b, *c, d
 
 
 def t():
-    NOT_YET_IMPLEMENTED_StmtAnnAssign
+    a: str = NOT_YET_IMPLEMENTED_ExprYield
 ```
 
 ## Black Output

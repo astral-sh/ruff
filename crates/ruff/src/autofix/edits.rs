@@ -317,10 +317,10 @@ mod tests {
             Some(TextSize::from(6))
         );
 
-        let contents = r#"
+        let contents = r"
 x = 1 \
   ; y = 1
-"#
+"
         .trim();
         let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
@@ -349,10 +349,10 @@ x = 1 \
             TextSize::from(6)
         );
 
-        let contents = r#"
+        let contents = r"
 x = 1 \
   ; y = 1
-"#
+"
         .trim();
         let locator = Locator::new(contents);
         assert_eq!(

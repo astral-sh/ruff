@@ -22,15 +22,13 @@ x[(a := 1), (b := 3)]
 @@ -1,7 +1,7 @@
  # Unparenthesized walruses are now allowed in set literals & set comprehensions
  # since Python 3.9
--{x := 1, 2, 3}
+ {x := 1, 2, 3}
 -{x4 := x**5 for x in range(7)}
-+{NOT_YET_IMPLEMENTED_ExprNamedExpr, 2, 3}
 +{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
  # We better not remove the parentheses here (since it's a 3.10 feature)
--x[(a := 1)]
+ x[(a := 1)]
 -x[(a := 1), (b := 3)]
-+x[(NOT_YET_IMPLEMENTED_ExprNamedExpr)]
-+x[((NOT_YET_IMPLEMENTED_ExprNamedExpr), (NOT_YET_IMPLEMENTED_ExprNamedExpr))]
++x[((a := 1), (b := 3))]
 ```
 
 ## Ruff Output
@@ -38,11 +36,11 @@ x[(a := 1), (b := 3)]
 ```py
 # Unparenthesized walruses are now allowed in set literals & set comprehensions
 # since Python 3.9
-{NOT_YET_IMPLEMENTED_ExprNamedExpr, 2, 3}
+{x := 1, 2, 3}
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 # We better not remove the parentheses here (since it's a 3.10 feature)
-x[(NOT_YET_IMPLEMENTED_ExprNamedExpr)]
-x[((NOT_YET_IMPLEMENTED_ExprNamedExpr), (NOT_YET_IMPLEMENTED_ExprNamedExpr))]
+x[(a := 1)]
+x[((a := 1), (b := 3))]
 ```
 
 ## Black Output

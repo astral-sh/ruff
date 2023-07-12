@@ -227,7 +227,7 @@ d={'a':1,
 +    b
 +    c
 +    if True:
-+        NOT_YET_IMPLEMENTED_StmtRaise
++        raise RuntimeError
 +    if False:
 +        ...
 +    for i in range(10):
@@ -271,12 +271,12 @@ d={'a':1,
  def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
-+    offset = attr.ib(default=attr.Factory(lambda x: True))
++    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
 +    NOT_YET_IMPLEMENTED_StmtAssert
  
  
  def spaces_types(
-@@ -63,55 +76,54 @@
+@@ -63,15 +76,15 @@
  
  something = {
      # fmt: off
@@ -290,18 +290,12 @@ d={'a':1,
          # fmt: off
 -        'some big and',
 -        'complex subscript',
--        # fmt: on
--        goes + here,
--        andhere,
-+        (
-+            "some big and",
-+            "complex subscript",
-+            # fmt: on
-+            goes + here,
-+            andhere,
-+        )
-     ]
- 
++        "some big and",
++        "complex subscript",
+         # fmt: on
+         goes + here,
+         andhere,
+@@ -80,38 +93,35 @@
  
  def import_as_names():
      # fmt: off
@@ -316,7 +310,7 @@ d={'a':1,
      # fmt: off
 -    a , b = *hello
 -    'unformatted'
-+    a, b = *NOT_YET_IMPLEMENTED_ExprStarred
++    a, b = *hello
 +    "unformatted"
      # fmt: on
  
@@ -351,7 +345,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -132,10 +144,10 @@
+@@ -132,10 +142,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -366,7 +360,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -153,9 +165,7 @@
+@@ -153,9 +163,7 @@
              )
          )
          # fmt: off
@@ -377,7 +371,7 @@ d={'a':1,
          # fmt: on
      _type_comment_re = re.compile(
          r"""
-@@ -178,7 +188,7 @@
+@@ -178,7 +186,7 @@
          $
          """,
          # fmt: off
@@ -386,7 +380,7 @@ d={'a':1,
          # fmt: on
      )
  
-@@ -216,8 +226,7 @@
+@@ -216,8 +224,7 @@
      xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
  )
  # fmt: off
@@ -425,7 +419,7 @@ def func_no_args():
     b
     c
     if True:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise RuntimeError
     if False:
         ...
     for i in range(10):
@@ -457,7 +451,7 @@ def function_signature_stress_test(
 
 # fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
-    offset = attr.ib(default=attr.Factory(lambda x: True))
+    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
     NOT_YET_IMPLEMENTED_StmtAssert
 
 
@@ -488,13 +482,11 @@ something = {
 def subscriptlist():
     atom[
         # fmt: off
-        (
-            "some big and",
-            "complex subscript",
-            # fmt: on
-            goes + here,
-            andhere,
-        )
+        "some big and",
+        "complex subscript",
+        # fmt: on
+        goes + here,
+        andhere,
     ]
 
 
@@ -507,7 +499,7 @@ def import_as_names():
 
 def testlist_star_expr():
     # fmt: off
-    a, b = *NOT_YET_IMPLEMENTED_ExprStarred
+    a, b = *hello
     "unformatted"
     # fmt: on
 

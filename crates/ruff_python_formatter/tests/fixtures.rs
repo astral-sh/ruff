@@ -11,7 +11,15 @@ fn black_compatibility() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let options = PyFormatOptions::default();
+        let options_path = input_path.with_extension("options.json");
+
+        let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(options_path) {
+            let reader = BufReader::new(options_file);
+            serde_json::from_reader(reader).expect("Options to be a valid Json file")
+        } else {
+            PyFormatOptions::default()
+        };
+
         let printed = format_module(&content, options.clone()).unwrap_or_else(|err| {
             panic!(
                 "Formatting of {} to succeed but encountered error {err}",
@@ -32,18 +40,20 @@ fn black_compatibility() {
             // already perfectly captures the expected output.
             // The following code mimics insta's logic generating the snapshot name for a test.
             let workspace_path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-            let snapshot_name = insta::_function_name!()
-                .strip_prefix(&format!("{}::", module_path!()))
-                .unwrap();
-            let module_path = module_path!().replace("::", "__");
+
+            let mut components = input_path.components().rev();
+            let file_name = components.next().unwrap();
+            let test_suite = components.next().unwrap();
+
+            let snapshot_name = format!(
+                "black_compatibility@{}__{}.snap",
+                test_suite.as_os_str().to_string_lossy(),
+                file_name.as_os_str().to_string_lossy()
+            );
 
             let snapshot_path = Path::new(&workspace_path)
-                .join("src/snapshots")
-                .join(format!(
-                    "{module_path}__{}.snap",
-                    snapshot_name.replace(&['/', '\\'][..], "__")
-                ));
-
+                .join("tests/snapshots")
+                .join(snapshot_name);
             if snapshot_path.exists() && snapshot_path.is_file() {
                 // SAFETY: This is a convenience feature. That's why we don't want to abort
                 // when deleting a no longer needed snapshot fails.

@@ -31,11 +31,12 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         } = item;
 
         let saved_level = f.context().node_level();
-        f.context_mut().set_node_level(NodeLevel::Expression);
+        f.context_mut()
+            .set_node_level(NodeLevel::ParenthesizedExpression);
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling_comments(item);
-        let (slash, star) = find_argument_separators(f.context().contents(), item);
+        let (slash, star) = find_argument_separators(f.context().source(), item);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let separator = format_with(|f| write!(f, [text(","), soft_line_break_or_space()]));
@@ -141,7 +142,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 let maybe_comma_token = if ends_with_pos_only_argument_separator {
                     // `def a(b, c, /): ... `
                     let mut tokens =
-                        SimpleTokenizer::starts_at(last_node.end(), f.context().contents())
+                        SimpleTokenizer::starts_at(last_node.end(), f.context().source())
                             .skip_trivia();
 
                     let comma = tokens.next();
@@ -152,7 +153,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
                     tokens.next()
                 } else {
-                    first_non_trivia_token(last_node.end(), f.context().contents())
+                    first_non_trivia_token(last_node.end(), f.context().source())
                 };
 
                 if maybe_comma_token.map_or(false, |token| token.kind() == TokenKind::Comma) {

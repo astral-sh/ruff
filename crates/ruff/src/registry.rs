@@ -7,7 +7,7 @@ pub use codes::Rule;
 use ruff_macros::RuleNamespace;
 pub use rule_set::{RuleSet, RuleSetIterator};
 
-use crate::codes::{self, RuleCodePrefix};
+use crate::codes::{self};
 
 mod rule_set;
 
@@ -216,30 +216,6 @@ pub trait RuleNamespace: Sized {
     fn name(&self) -> &'static str;
 
     fn url(&self) -> Option<&'static str>;
-}
-
-/// The prefix and name for an upstream linter category.
-pub struct UpstreamCategory(pub RuleCodePrefix, pub &'static str);
-
-impl Linter {
-    pub const fn upstream_categories(&self) -> Option<&'static [UpstreamCategory]> {
-        match self {
-            Linter::Pycodestyle => Some(&[
-                UpstreamCategory(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E), "Error"),
-                UpstreamCategory(
-                    RuleCodePrefix::Pycodestyle(codes::Pycodestyle::W),
-                    "Warning",
-                ),
-            ]),
-            Linter::Pylint => Some(&[
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::C), "Convention"),
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::E), "Error"),
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::R), "Refactor"),
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::W), "Warning"),
-            ]),
-            _ => None,
-        }
-    }
 }
 
 #[derive(is_macro::Is, Copy, Clone)]

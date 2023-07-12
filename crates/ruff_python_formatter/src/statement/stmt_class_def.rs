@@ -79,7 +79,7 @@ impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
             ..
         } = self.class_definition;
 
-        let source = f.context().contents();
+        let source = f.context().source();
 
         let mut joiner = f.join_comma_separated();
 

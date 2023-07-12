@@ -24,14 +24,14 @@ impl Emitter for JsonLinesEmitter {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::json_lines::JsonLinesEmitter;
     use insta::assert_snapshot;
 
+    use crate::message::json_lines::JsonLinesEmitter;
     use crate::message::tests::{capture_emitter_output, create_messages};
 
     #[test]
     fn output() {
-        let mut emitter = JsonLinesEmitter::default();
+        let mut emitter = JsonLinesEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

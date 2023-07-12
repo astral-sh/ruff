@@ -147,8 +147,7 @@ match bar1:
  
  
  match = 1
--case: int = re.match(something)
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
+ case: int = re.match(something)
  
 -match re.match(case):
 -    case type("match", match):
@@ -214,21 +213,19 @@ match bar1:
  
 -    case case:
 -        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
- 
- 
+-
+-
 -match match:
 -    case case:
 -        pass
+-
 +NOT_YET_IMPLEMENTED_StmtMatch
- 
  
 -match a, *b(), c:
 -    case d, *f, g:
 -        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
  
- 
+-
 -match something:
 -    case {
 -        "key": key as key_1,
@@ -237,28 +234,30 @@ match bar1:
 -        pass
 -    case {"maybe": something(complicated as this) as that}:
 -        pass
--
 +NOT_YET_IMPLEMENTED_StmtMatch
+ 
  
 -match something:
 -    case 1 as a:
 -        pass
++NOT_YET_IMPLEMENTED_StmtMatch
  
 -    case 2 as b, 3 as c:
 -        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
  
 -    case 4 as d, (5 as e), (6 | 7 as g), *h:
 -        pass
++NOT_YET_IMPLEMENTED_StmtMatch
  
--
+ 
 -match bar1:
 -    case Foo(aa=Callable() as aa, bb=int()):
 -        print(bar1.aa, bar1.bb)
 -    case _:
 -        print("no match", "\n")
--
--
++NOT_YET_IMPLEMENTED_StmtMatch
+ 
+ 
 -match bar1:
 -    case Foo(
 -        normal=x, perhaps=[list, {"x": d, "y": 1.0}] as y, otherwise=something, q=t as u
@@ -276,7 +275,7 @@ NOT_YET_IMPLEMENTED_StmtMatch
 
 
 match = 1
-NOT_YET_IMPLEMENTED_StmtAnnAssign
+case: int = re.match(something)
 
 NOT_YET_IMPLEMENTED_StmtMatch
 
