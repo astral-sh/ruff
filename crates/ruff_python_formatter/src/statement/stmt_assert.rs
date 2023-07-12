@@ -24,7 +24,7 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
                     test.format().with_options(Parenthesize::IfBreaks),
                     text(","),
                     space(),
-                    &msg.format().with_options(Parenthesize::IfBreaks)
+                    msg.format().with_options(Parenthesize::IfBreaks)
                 ])]
             )?;
         } else {
