@@ -52,6 +52,15 @@ fn is_known_type(call_path: &CallPath, minor_version: u32) -> bool {
     }
 }
 
+/// Returns a vector of all the expressions in a slice. If the slice is not a
+/// tuple, it will be wrapped in a vector.
+fn resolve_slice_value(slice: &Expr) -> Vec<&Expr> {
+    match slice {
+        Expr::Tuple(ast::ExprTuple { elts: elements, .. }) => elements.iter().collect(),
+        _ => vec![slice],
+    }
+}
+
 #[derive(Debug)]
 enum TypingTarget<'a> {
     /// Literal `None` type.
@@ -99,17 +108,15 @@ impl<'a> TypingTarget<'a> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if semantic.match_typing_expr(value, "Optional") {
-                    return Some(TypingTarget::Optional(slice.as_ref()));
-                }
-                let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else {
-                    return None;
-                };
-                if semantic.match_typing_expr(value, "Literal") {
-                    Some(TypingTarget::Literal(elements.iter().collect()))
+                    Some(TypingTarget::Optional(slice.as_ref()))
+                } else if semantic.match_typing_expr(value, "Literal") {
+                    Some(TypingTarget::Literal(resolve_slice_value(slice)))
                 } else if semantic.match_typing_expr(value, "Union") {
-                    Some(TypingTarget::Union(elements.iter().collect()))
+                    Some(TypingTarget::Union(resolve_slice_value(slice)))
                 } else if semantic.match_typing_expr(value, "Annotated") {
-                    elements.first().map(TypingTarget::Annotated)
+                    resolve_slice_value(slice.as_ref())
+                        .first()
+                        .map(|&expr| TypingTarget::Annotated(expr))
                 } else {
                     semantic.resolve_call_path(value).map_or(
                         // If we can't resolve the call path, it must be defined
