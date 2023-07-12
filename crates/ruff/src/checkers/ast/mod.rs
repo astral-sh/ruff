@@ -18,7 +18,7 @@ use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
-use ruff_python_ast::{cast, helpers, identifier, str, visitor};
+use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
@@ -251,9 +251,8 @@ where
         // Pre-visit.
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
-                    for (name, range) in names.iter().zip(ranges.iter()) {
+                    for name in names {
                         if let Some(binding_id) = self.semantic.global_scope().get(name) {
                             // Mark the binding in the global scope as "rebound" in the current scope.
                             self.semantic
@@ -262,7 +261,7 @@ where
 
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
-                            *range,
+                            name.range(),
                             BindingKind::Global,
                             BindingFlags::GLOBAL,
                         );
@@ -272,21 +271,19 @@ where
                 }
 
                 if self.enabled(Rule::AmbiguousVariableName) {
-                    self.diagnostics
-                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            pycodestyle::rules::ambiguous_variable_name(name, *range)
-                        }));
+                    self.diagnostics.extend(names.iter().filter_map(|name| {
+                        pycodestyle::rules::ambiguous_variable_name(name, name.range())
+                    }));
                 }
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
-                    for (name, range) in names.iter().zip(ranges.iter()) {
+                    for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
                             // Mark the binding as "used".
                             self.semantic.add_local_reference(
                                 binding_id,
-                                *range,
+                                name.range(),
                                 ExecutionContext::Runtime,
                             );
 
@@ -297,7 +294,7 @@ where
 
                             // Add a binding to the current scope.
                             let binding_id = self.semantic.push_binding(
-                                *range,
+                                name.range(),
                                 BindingKind::Nonlocal(scope_id),
                                 BindingFlags::NONLOCAL,
                             );
@@ -309,17 +306,16 @@ where
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
                                     },
-                                    *range,
+                                    name.range(),
                                 ));
                             }
                         }
                     }
                 }
                 if self.enabled(Rule::AmbiguousVariableName) {
-                    self.diagnostics
-                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            pycodestyle::rules::ambiguous_variable_name(name, *range)
-                        }));
+                    self.diagnostics.extend(names.iter().filter_map(|name| {
+                        pycodestyle::rules::ambiguous_variable_name(name, name.range())
+                    }));
                 }
             }
             Stmt::Break(_) => {
