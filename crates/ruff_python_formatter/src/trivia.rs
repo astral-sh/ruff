@@ -185,6 +185,10 @@ pub(crate) enum TokenKind {
     /// `.`.
     Dot,
 
+    /// `:=`.
+    /// TODO: name?
+    Walrus,
+
     /// `else`
     Else,
 
@@ -322,6 +326,15 @@ impl<'a> SimpleTokenizer<'a> {
 
             '\\' => TokenKind::Continuation,
 
+            ':' => {
+                if self.cursor.first() == '=' {
+                    self.cursor.bump();
+                    TokenKind::Walrus
+                } else {
+                    TokenKind::Colon
+                }
+            }
+
             c => {
                 let kind = if is_identifier_start(c) {
                     self.cursor.eat_while(is_identifier_continuation);
@@ -457,6 +470,9 @@ impl<'a> SimpleTokenizer<'a> {
                             self.cursor = savepoint;
                             TokenKind::Other
                         }
+                    } else if c == '=' && self.cursor.last() == ':' {
+                        self.cursor.bump_back();
+                        TokenKind::Walrus
                     } else {
                         TokenKind::from_non_trivia_char(c)
                     };
@@ -680,6 +696,26 @@ mod tests {
     #[test]
     fn tokenize_comma() {
         let source = ",,,,";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_colon() {
+        let source = ":::";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_walrus() {
+        let source = ":=:=";
 
         let test_case = tokenize(source);
 

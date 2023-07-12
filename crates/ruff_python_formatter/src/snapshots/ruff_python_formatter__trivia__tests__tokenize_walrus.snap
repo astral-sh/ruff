@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_formatter/src/trivia.rs
+expression: test_case.tokens()
+---
+[
+    Token {
+        kind: Walrus,
+        range: 0..2,
+    },
+    Token {
+        kind: Walrus,
+        range: 2..4,
+    },
+]

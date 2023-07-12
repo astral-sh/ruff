@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_formatter/src/trivia.rs
+expression: test_case.tokens()
+---
+[
+    Token {
+        kind: Colon,
+        range: 0..1,
+    },
+    Token {
+        kind: Colon,
+        range: 1..2,
+    },
+    Token {
+        kind: Colon,
+        range: 2..3,
+    },
+]
