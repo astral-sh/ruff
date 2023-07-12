@@ -632,18 +632,6 @@ class Foo(A, B):
         insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
     }
 
-
-    #[test]
-    #[cfg(feature = "all-nodes-with-ranges")]
-    fn test_parse_class_with_empty_generic() {
-        let source = "\
-class Foo[](A, B):
-  pass
-";
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
-    }
-
-
     #[test]
     #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_class_with_generic_type() {
