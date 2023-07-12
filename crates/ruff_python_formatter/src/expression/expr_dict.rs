@@ -77,7 +77,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         }
 
         let format_pairs = format_with(|f| {
-            let mut joiner = f.join_comma_separated();
+            let mut joiner = f.join_comma_separated(item.end());
 
             for (key, value) in keys.iter().zip(values) {
                 let key_value_pair = KeyValuePair { key, value };
