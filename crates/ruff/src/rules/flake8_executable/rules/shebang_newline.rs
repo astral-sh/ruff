@@ -3,7 +3,7 @@ use ruff_text_size::{TextLen, TextRange};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::rules::flake8_executable::helpers::ShebangDirective;
+use crate::comments::shebang::ShebangDirective;
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.
