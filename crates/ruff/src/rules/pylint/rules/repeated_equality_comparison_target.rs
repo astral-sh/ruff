@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprCompare, Ranged};
+use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare, Ranged};
 use std::ops::Deref;
 
 /// ## What it does
@@ -50,18 +50,13 @@ impl Violation for RepeatedEqualityComparisonTarget {
 }
 
 /// PLR1714
-pub(crate) fn repeated_equality_comparison_target(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: BoolOp,
-    values: &[Expr],
-) {
-    if any(values.iter(), |v| !is_allowed_value(op, v)) {
+pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op: &ExprBoolOp) {
+    if any(bool_op.values.iter(), |v| !is_allowed_value(bool_op.op, v)) {
         return;
     }
     let mut left_to_comparators: FxHashMap<HashableExpr, (usize, Vec<HashableExpr>)> =
         FxHashMap::default();
-    for value in values {
+    for value in &bool_op.values {
         match value {
             Expr::Compare(ExprCompare {
                 left, comparators, ..
@@ -85,13 +80,13 @@ pub(crate) fn repeated_equality_comparison_target(
                 .iter()
                 .map(|c| checker.generator().expr(c.as_expr()))
                 .collect::<Vec<String>>(),
-            op,
+            bool_op.op,
         );
         checker.diagnostics.push(Diagnostic::new(
             RepeatedEqualityComparisonTarget {
                 expr: membership_expr,
             },
-            expr.range(),
+            bool_op.range(),
         ));
     }
 }
