@@ -766,58 +766,56 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
             return;
         };
 
-        // `elif`
-        let Some(Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-        })) = test.as_ref()
-        else {
-            return;
-        };
+        match test.as_ref() {
+            // `else`
+            None => {
+                // The else must also be a single effect-free return statement
+                let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+                    return;
+                };
+                if value.as_ref().map_or(false, |value| {
+                    contains_effect(value, |id| checker.semantic().is_builtin(id))
+                }) {
+                    return;
+                };
+            }
+            // `elif`
+            Some(Expr::Compare(ast::ExprCompare {
+                left,
+                ops,
+                comparators,
+                range: _,
+            })) => {
+                let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
+                    return;
+                };
+                if id != target || ops != &[CmpOp::Eq] {
+                    return;
+                }
+                let [Expr::Constant(ast::ExprConstant {
+                    value: constant, ..
+                })] = comparators.as_slice()
+                else {
+                    return;
+                };
 
-        let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
-            return;
-        };
-        if id != target || ops != &[CmpOp::Eq] {
-            return;
+                if value.as_ref().map_or(false, |value| {
+                    contains_effect(value, |id| checker.semantic().is_builtin(id))
+                }) {
+                    return;
+                };
+
+                constants.insert(constant.into());
+            }
+            // Different `elif`
+            _ => {
+                return;
+            }
         }
-        let [Expr::Constant(ast::ExprConstant {
-            value: constant, ..
-        })] = comparators.as_slice()
-        else {
-            return;
-        };
-
-        if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.semantic().is_builtin(id))
-        }) {
-            return;
-        };
-
-        constants.insert(constant.into());
     }
 
     if constants.len() < 3 {
         return;
-    }
-
-    // The else must also be a single effect-free return statement
-    if let Some(ElifElseClause {
-        test: None,
-        body,
-        range: _,
-    }) = elif_else_clauses.last()
-    {
-        let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
-            return;
-        };
-        if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.semantic().is_builtin(id))
-        }) {
-            return;
-        };
     }
 
     checker.diagnostics.push(Diagnostic::new(
