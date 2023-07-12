@@ -86,10 +86,7 @@ class Repository(NamedTuple):
         Return the GitHub URL for the given commit, path, and line number, if given.
         """
         # Default to main branch
-        url = (
-            f"https://github.com/{self.org}/{self.repo}"
-            f"/blob/{commit_sha}/{path}"
-        )
+        url = f"https://github.com/{self.org}/{self.repo}/blob/{commit_sha}/{path}"
         if lnum:
             url += f"#L{lnum}"
         return url
