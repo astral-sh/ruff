@@ -1,3 +1,4 @@
+use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::Parenthesize;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{format_args, group, space, text};
@@ -24,7 +25,8 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
                     test.format().with_options(Parenthesize::IfBreaks),
                     text(","),
                     space(),
-                    msg.format().with_options(Parenthesize::IfBreaks)
+                    // `msg` gets parentheses if expanded so we don't need any beyond that.
+                    parenthesize_if_expands(&msg.format().with_options(Parenthesize::Never))
                 ])]
             )?;
         } else {
