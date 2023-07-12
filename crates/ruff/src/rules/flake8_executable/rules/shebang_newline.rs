@@ -47,17 +47,14 @@ pub(crate) fn shebang_newline(
     shebang: &ShebangDirective,
     first_line: bool,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, content) = shebang {
-        if first_line {
-            None
-        } else {
-            let diagnostic = Diagnostic::new(
-                ShebangNotFirstLine,
-                TextRange::at(range.start() + start, content.text_len()),
-            );
-            Some(diagnostic)
-        }
-    } else {
+    let ShebangDirective { offset, contents } = shebang;
+
+    if first_line {
         None
+    } else {
+        Some(Diagnostic::new(
+            ShebangNotFirstLine,
+            TextRange::at(range.start() + offset, contents.text_len()),
+        ))
     }
 }

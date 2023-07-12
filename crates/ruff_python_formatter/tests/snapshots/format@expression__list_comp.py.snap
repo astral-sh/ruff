@@ -36,6 +36,19 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
     # above g
     g  # g
 ]
+
+[
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + [dddddddddddddddddd, eeeeeeeeeeeeeeeeeee]
+    for
+    ccccccccccccccccccccccccccccccccccccccc,
+    ddddddddddddddddddd, [eeeeeeeeeeeeeeeeeeeeee, fffffffffffffffffffffffff]
+    in
+    eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
+    if
+    fffffffffffffffffffffffffffffffffffffffffff < gggggggggggggggggggggggggggggggggggggggggggggg < hhhhhhhhhhhhhhhhhhhhhhhhhh
+    if
+    gggggggggggggggggggggggggggggggggggggggggggg
+]
 ```
 
 ## Output
@@ -44,20 +57,14 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
 
 [
     i
-    for
-    i
-    in
-    [
+    for i in [
         1,
     ]
 ]
 
 [
     a  # a
-    for  # for
-    c  # c
-    in  # in
-    e  # e
+    for c in e  # for  # c  # in  # e
 ]
 
 [
@@ -79,6 +86,21 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
     if  # if2
     # above g
     g  # g
+]
+
+[
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    + [dddddddddddddddddd, eeeeeeeeeeeeeeeeeee]
+    for (
+        ccccccccccccccccccccccccccccccccccccccc,
+        ddddddddddddddddddd,
+        [eeeeeeeeeeeeeeeeeeeeee, fffffffffffffffffffffffff],
+    ) in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
+    if fffffffffffffffffffffffffffffffffffffffffff
+    < gggggggggggggggggggggggggggggggggggggggggggggg
+    < hhhhhhhhhhhhhhhhhhhhhhhhhh
+    if gggggggggggggggggggggggggggggggggggggggggggg
 ]
 ```
 

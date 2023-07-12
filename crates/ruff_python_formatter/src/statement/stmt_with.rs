@@ -3,7 +3,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Ranged, StmtAsyncWith, StmtWith, Suite, WithItem};
 
-use crate::builders::optional_parentheses;
+use crate::builders::parenthesize_if_expands;
 use crate::comments::trailing_comments;
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -80,7 +80,7 @@ impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
             [
                 text("with"),
                 space(),
-                group(&optional_parentheses(&joined_items)),
+                group(&parenthesize_if_expands(&joined_items)),
                 text(":"),
                 trailing_comments(dangling_comments),
                 block_indent(&self.body().format())

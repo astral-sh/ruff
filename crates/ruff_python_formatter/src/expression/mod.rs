@@ -2,17 +2,16 @@ use rustpython_parser::ast;
 use rustpython_parser::ast::{Expr, Operator};
 use std::cmp::Ordering;
 
-use crate::builders::optional_parentheses;
-use ruff_formatter::{
-    format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
-};
+use crate::builders::parenthesize_if_expands;
+use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::context::NodeLevel;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, NeedsParentheses, Parentheses, Parenthesize,
+    is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
+    Parentheses, Parenthesize,
 };
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
@@ -106,37 +105,9 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             // Add optional parentheses. Ignore if the item renders parentheses itself.
             Parentheses::Optional => {
                 if can_omit_optional_parentheses(item, f.context()) {
-                    let saved_level = f.context().node_level();
-
-                    // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
-                    // that is only active if the optional parentheses group expands.
-                    let parens_id = f.group_id("optional_parentheses");
-
-                    f.context_mut()
-                        .set_node_level(NodeLevel::Expression(Some(parens_id)));
-
-                    // We can't use `soft_block_indent` here because that would always increment the indent,
-                    // even if the group does not break (the indent is not soft). This would result in
-                    // too deep indentations if a `parenthesized` group expands. Using `indent_if_group_breaks`
-                    // gives us the desired *soft* indentation that is only present if the optional parentheses
-                    // are shown.
-                    let result = group(&format_args![
-                        if_group_breaks(&text("(")),
-                        indent_if_group_breaks(
-                            &format_args![soft_line_break(), format_expr],
-                            parens_id
-                        ),
-                        soft_line_break(),
-                        if_group_breaks(&text(")"))
-                    ])
-                    .with_group_id(Some(parens_id))
-                    .fmt(f);
-
-                    f.context_mut().set_node_level(saved_level);
-
-                    result
-                } else {
                     optional_parentheses(&format_expr).fmt(f)
+                } else {
+                    parenthesize_if_expands(&format_expr).fmt(f)
                 }
             }
             Parentheses::Custom | Parentheses::Never => {
@@ -227,37 +198,30 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
-    let mut visitor = MaxOperatorPriorityVisitor::new(context.source());
-
+    let mut visitor = CanOmitOptionalParenthesesVisitor::new(context.source());
     visitor.visit_subexpression(expr);
-
-    let (max_operator_priority, operation_count, any_parenthesized_expression) = visitor.finish();
-
-    if operation_count > 1 {
-        false
-    } else if max_operator_priority == OperatorPriority::Attribute {
-        true
-    } else {
-        // Only use the more complex IR when there is any expression that we can possibly split by
-        any_parenthesized_expression
-    }
+    visitor.can_omit()
 }
 
 #[derive(Clone, Debug)]
-struct MaxOperatorPriorityVisitor<'input> {
+struct CanOmitOptionalParenthesesVisitor<'input> {
     max_priority: OperatorPriority,
     max_priority_count: u32,
     any_parenthesized_expressions: bool,
+    last: Option<&'input Expr>,
+    first: Option<&'input Expr>,
     source: &'input str,
 }
 
-impl<'input> MaxOperatorPriorityVisitor<'input> {
+impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     fn new(source: &'input str) -> Self {
         Self {
             source,
             max_priority: OperatorPriority::None,
             max_priority_count: 0,
             any_parenthesized_expressions: false,
+            last: None,
+            first: None,
         }
     }
 
@@ -334,6 +298,7 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the arguments are always parenthesized
                 self.visit_expr(func);
+                self.last = Some(expr);
                 return;
             }
             Expr::Subscript(_) => {
@@ -380,22 +345,40 @@ impl<'input> MaxOperatorPriorityVisitor<'input> {
         walk_expr(self, expr);
     }
 
-    fn finish(self) -> (OperatorPriority, u32, bool) {
-        (
-            self.max_priority,
-            self.max_priority_count,
-            self.any_parenthesized_expressions,
-        )
+    fn can_omit(self) -> bool {
+        if self.max_priority_count > 1 {
+            false
+        } else if self.max_priority == OperatorPriority::Attribute {
+            true
+        } else if !self.any_parenthesized_expressions {
+            // Only use the more complex IR when there is any expression that we can possibly split by
+            false
+        } else {
+            // Only use the layout if the first or last expression has parentheses of some sort.
+            let first_parenthesized = self
+                .first
+                .map_or(false, |first| has_parentheses(first, self.source));
+            let last_parenthesized = self
+                .last
+                .map_or(false, |last| has_parentheses(last, self.source));
+            first_parenthesized || last_parenthesized
+        }
     }
 }
 
-impl<'input> PreorderVisitor<'input> for MaxOperatorPriorityVisitor<'input> {
+impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
     fn visit_expr(&mut self, expr: &'input Expr) {
+        self.last = Some(expr);
+
         // Rule only applies for non-parenthesized expressions.
         if is_expression_parenthesized(AnyNodeRef::from(expr), self.source) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
+        }
+
+        if self.first.is_none() {
+            self.first = Some(expr);
         }
     }
 }

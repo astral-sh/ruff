@@ -1,4 +1,4 @@
-use crate::builders::optional_parentheses;
+use crate::builders::parenthesize_if_expands;
 use crate::comments::{dangling_comments, CommentLinePosition};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
@@ -17,6 +17,11 @@ pub enum TupleParentheses {
     Default,
     /// Effectively `Some(Parentheses)` in `Option<Parentheses>`
     Expr(Parentheses),
+
+    /// Black omits parentheses for tuples inside of subscripts except if the tuple is parenthesized
+    /// in the source code.
+    Subscript,
+
     /// Handle the special case where we remove parentheses even if they were initially present
     ///
     /// Normally, black keeps parentheses, but in the case of loops it formats
@@ -86,21 +91,32 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                     ])]
                 )
             }
-            [single] => {
-                // A single element tuple always needs parentheses and a trailing comma
-                parenthesized("(", &format_args![single.format(), &text(",")], ")").fmt(f)
-            }
+            [single] => match self.parentheses {
+                TupleParentheses::Subscript
+                    if !is_parenthesized(*range, elts, f.context().source()) =>
+                {
+                    write!(f, [single.format(), text(",")])
+                }
+                _ =>
+                // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
+                {
+                    parenthesized("(", &format_args![single.format(), text(",")], ")").fmt(f)
+                }
+            },
             // If the tuple has parentheses, we generally want to keep them. The exception are for
             // loops, see `TupleParentheses::StripInsideForLoop` doc comment.
             //
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
-            elts if is_parenthesized(*range, elts, f)
+            elts if is_parenthesized(*range, elts, f.context().source())
                 && self.parentheses != TupleParentheses::StripInsideForLoop =>
             {
                 parenthesized("(", &ExprSequence::new(elts), ")").fmt(f)
             }
-            elts => optional_parentheses(&ExprSequence::new(elts)).fmt(f),
+            elts => match self.parentheses {
+                TupleParentheses::Subscript => group(&ExprSequence::new(elts)).fmt(f),
+                _ => parenthesize_if_expands(&ExprSequence::new(elts)).fmt(f),
+            },
         }
     }
 
@@ -141,15 +157,9 @@ impl NeedsParentheses for ExprTuple {
 }
 
 /// Check if a tuple has already had parentheses in the input
-fn is_parenthesized(
-    tuple_range: TextRange,
-    elts: &[Expr],
-    f: &mut Formatter<PyFormatContext<'_>>,
-) -> bool {
+fn is_parenthesized(tuple_range: TextRange, elts: &[Expr], source: &str) -> bool {
     let parentheses = '(';
-    let first_char = &f.context().source()[usize::from(tuple_range.start())..]
-        .chars()
-        .next();
+    let first_char = &source[usize::from(tuple_range.start())..].chars().next();
     let Some(first_char) = first_char else {
         return false;
     };

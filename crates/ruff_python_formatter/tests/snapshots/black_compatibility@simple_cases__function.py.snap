@@ -151,15 +151,13 @@ def __await__(): return (yield)
 -        .all()
 -    )
 +    result = session.query(models.Customer.id).filter(
-+        models.Customer.account_id
-+        == account_id,
-+        models.Customer.email
-+        == email_address,
++        models.Customer.account_id == account_id,
++        models.Customer.email == email_address,
 +    ).order_by(models.Customer.id.asc()).all()
  
  
  def long_lines():
-@@ -135,14 +132,8 @@
+@@ -135,14 +130,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -252,10 +250,8 @@ def spaces2(result=_core.Value(None)):
 
 def example(session):
     result = session.query(models.Customer.id).filter(
-        models.Customer.account_id
-        == account_id,
-        models.Customer.email
-        == email_address,
+        models.Customer.account_id == account_id,
+        models.Customer.email == email_address,
     ).order_by(models.Customer.id.asc()).all()
 
 

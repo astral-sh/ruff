@@ -1,4 +1,4 @@
-use crate::builders::{optional_parentheses, PyFormatterExtensions};
+use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{dynamic_text, format_with, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
@@ -43,6 +43,6 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                 .entries(names.iter().map(|name| (name, name.format())))
                 .finish()
         });
-        optional_parentheses(&names).fmt(f)
+        parenthesize_if_expands(&names).fmt(f)
     }
 }

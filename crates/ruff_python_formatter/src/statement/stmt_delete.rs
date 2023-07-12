@@ -1,4 +1,4 @@
-use crate::builders::{optional_parentheses, PyFormatterExtensions};
+use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
 use crate::comments::dangling_node_comments;
 use crate::expression::parentheses::Parenthesize;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
@@ -36,7 +36,7 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
             }
             targets => {
                 let item = format_with(|f| f.join_comma_separated().nodes(targets.iter()).finish());
-                optional_parentheses(&item).fmt(f)
+                parenthesize_if_expands(&item).fmt(f)
             }
         }
     }

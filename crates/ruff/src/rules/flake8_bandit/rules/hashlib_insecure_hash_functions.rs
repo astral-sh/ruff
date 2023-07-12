@@ -8,6 +8,44 @@ use crate::checkers::ast::Checker;
 
 use super::super::helpers::string_literal;
 
+/// ## What it does
+/// Checks for uses of weak or broken cryptographic hash functions.
+///
+/// ## Why is this bad?
+/// Weak or broken cryptographic hash functions may be susceptible to
+/// collision attacks (where two different inputs produce the same hash) or
+/// pre-image attacks (where an attacker can find an input that produces a
+/// given hash). This can lead to security vulnerabilities in applications
+/// that rely on these hash functions.
+///
+/// Avoid using weak or broken cryptographic hash functions in security
+/// contexts. Instead, use a known secure hash function such as SHA256.
+///
+/// ## Example
+/// ```python
+/// import hashlib
+///
+///
+/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
+///     hash = hashlib.md5(certificate).hexdigest()
+///     return hash == known_hash
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import hashlib
+///
+///
+/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
+///     hash = hashlib.sha256(certificate).hexdigest()
+///     return hash == known_hash
+/// ```
+///
+/// ## References
+/// - [Python documentation: `hashlib` — Secure hashes and message digests](https://docs.python.org/3/library/hashlib.html)
+/// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+/// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
+/// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
 #[violation]
 pub struct HashlibInsecureHashFunction {
     string: String,

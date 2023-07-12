@@ -405,7 +405,7 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -172,7 +166,7 @@
+@@ -172,7 +172,7 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
@@ -414,7 +414,7 @@ last_call()
  numpy[np.newaxis, :]
  (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
  {"2.7": dead, "3.7": long_live or die_hard}
-@@ -181,10 +175,10 @@
+@@ -181,10 +181,10 @@
  (SomeName)
  SomeName
  (Good, Bad, Ugly)
@@ -462,7 +462,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,10 +221,10 @@
+@@ -237,10 +227,10 @@
  
  
  def gen():
@@ -673,17 +673,23 @@ dict[str, int]
 tuple[str, ...]
 tuple[str, int, float, dict[str, int]]
 tuple[
-    (
-        str,
-        int,
-        float,
-        dict[str, int],
-    )
+    str,
+    int,
+    float,
+    dict[str, int],
 ]
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
+very_long_variable_name_filters: t.List[
+    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
+]
+xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)
+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)
+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)  # type: ignore
 slice[0]
 slice[0:1]
 slice[0:1:2]

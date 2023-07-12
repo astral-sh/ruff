@@ -33,36 +33,40 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 
         let comments = f.context().comments().clone();
 
-        write!(f, [in_parentheses_only_group(&left.format())])?;
+        let inner = format_with(|f| {
+            write!(f, [in_parentheses_only_group(&left.format())])?;
 
-        assert_eq!(comparators.len(), ops.len());
+            assert_eq!(comparators.len(), ops.len());
 
-        for (operator, comparator) in ops.iter().zip(comparators) {
-            let leading_comparator_comments = comments.leading_comments(comparator);
-            if leading_comparator_comments.is_empty() {
-                write!(f, [soft_line_break_or_space()])?;
-            } else {
-                // Format the expressions leading comments **before** the operator
+            for (operator, comparator) in ops.iter().zip(comparators) {
+                let leading_comparator_comments = comments.leading_comments(comparator);
+                if leading_comparator_comments.is_empty() {
+                    write!(f, [soft_line_break_or_space()])?;
+                } else {
+                    // Format the expressions leading comments **before** the operator
+                    write!(
+                        f,
+                        [
+                            hard_line_break(),
+                            leading_comments(leading_comparator_comments)
+                        ]
+                    )?;
+                }
+
                 write!(
                     f,
                     [
-                        hard_line_break(),
-                        leading_comments(leading_comparator_comments)
+                        operator.format(),
+                        space(),
+                        in_parentheses_only_group(&comparator.format())
                     ]
                 )?;
             }
 
-            write!(
-                f,
-                [
-                    operator.format(),
-                    space(),
-                    in_parentheses_only_group(&comparator.format())
-                ]
-            )?;
-        }
+            Ok(())
+        });
 
-        Ok(())
+        in_parentheses_only_group(&inner).fmt(f)
     }
 }
 
