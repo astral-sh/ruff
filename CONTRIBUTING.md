@@ -579,7 +579,7 @@ utils with it:
     for start and stop of each node and also how the `:` token, the comment and whitespace are not
     represented anymore:
 
-````text
+```text
 [
     If(
         StmtIf {
@@ -604,10 +604,10 @@ utils with it:
         },
     ),
 ]
-    ```
+```
 
 - `cargo dev print-tokens <file>`: Print the tokens that the AST is built upon. Again for
-  `if True: pass # comment`:
+    `if True: pass # comment`:
 
 ```text
 0 If 2
@@ -618,7 +618,7 @@ utils with it:
     "# comment",
 ) 23
 23 Newline 24
-````
+```
 
 - `cargo dev print-cst <file>`: Print the CST of a python file using
     [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
