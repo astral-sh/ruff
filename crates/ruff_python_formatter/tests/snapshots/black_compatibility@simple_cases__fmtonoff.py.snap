@@ -207,7 +207,7 @@ d={'a':1,
 +from third_party import X, Y, Z
  # fmt: on
 -f"trigger 3.6 mode"
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  # Comment 1
  
  # Comment 2
@@ -407,7 +407,7 @@ from library import some_connection, some_decorator
 # fmt: off
 from third_party import X, Y, Z
 # fmt: on
-NOT_YET_IMPLEMENTED_ExprJoinedStr
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 # Comment 1
 
 # Comment 2

@@ -127,22 +127,36 @@ pub fn to_pep604_operator(
     slice: &Expr,
     semantic: &SemanticModel,
 ) -> Option<Pep604Operator> {
-    /// Returns `true` if any argument in the slice is a string.
-    fn any_arg_is_str(slice: &Expr) -> bool {
+    /// Returns `true` if any argument in the slice is a quoted annotation).
+    fn quoted_annotation(slice: &Expr) -> bool {
         match slice {
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(_),
                 ..
             }) => true,
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(any_arg_is_str),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
             _ => false,
         }
     }
 
-    // If any of the _arguments_ are forward references, we can't use PEP 604.
-    // Ex) `Union["str", "int"]` can't be converted to `"str" | "int"`.
-    if any_arg_is_str(slice) {
-        return None;
+    // If the slice is a forward reference (e.g., `Optional["Foo"]`), it can only be rewritten
+    // if we're in a typing-only context.
+    //
+    // This, for example, is invalid, as Python will evaluate `"Foo" | None` at runtime in order to
+    // populate the function's `__annotations__`:
+    // ```python
+    // def f(x: "Foo" | None): ...
+    // ```
+    //
+    // This, however, is valid:
+    // ```python
+    // def f():
+    //     x: "Foo" | None
+    // ```
+    if quoted_annotation(slice) {
+        if semantic.execution_context().is_runtime() {
+            return None;
+        }
     }
 
     semantic

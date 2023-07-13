@@ -1,6 +1,6 @@
-use crate::builders::parenthesize_if_expands;
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{format_args, group, space, text};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::StmtAssert;
@@ -22,15 +22,21 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
             write!(
                 f,
                 [group(&format_args![
-                    test.format().with_options(Parenthesize::IfBreaks),
+                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                     text(","),
                     space(),
-                    // `msg` gets parentheses if expanded so we don't need any beyond that.
-                    parenthesize_if_expands(&msg.format().with_options(Parenthesize::Never))
+                    maybe_parenthesize_expression(msg, item, Parenthesize::IfBreaks),
                 ])]
             )?;
         } else {
-            write!(f, [test.format().with_options(Parenthesize::IfBreaks)])?;
+            write!(
+                f,
+                [maybe_parenthesize_expression(
+                    test,
+                    item,
+                    Parenthesize::IfBreaks
+                )]
+            )?;
         }
 
         Ok(())

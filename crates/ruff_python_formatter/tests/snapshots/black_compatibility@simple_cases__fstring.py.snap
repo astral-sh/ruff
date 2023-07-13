@@ -35,31 +35,31 @@ but none started with prefix {parentdir_prefix}"
 -f'Hello \'{tricky + "example"}\''
 -f"Tried directories {str(rootdirs)} \
 -but none started with prefix {parentdir_prefix}"
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
-NOT_YET_IMPLEMENTED_ExprJoinedStr
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 ```
 
 ## Black Output

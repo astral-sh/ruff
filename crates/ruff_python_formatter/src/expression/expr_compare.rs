@@ -1,11 +1,11 @@
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
-    Parenthesize,
+    in_parentheses_only_group, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::{CmpOp, ExprCompare};
 
 #[derive(Default)]
@@ -73,10 +73,10 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 impl NeedsParentheses for ExprCompare {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, context)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }
 

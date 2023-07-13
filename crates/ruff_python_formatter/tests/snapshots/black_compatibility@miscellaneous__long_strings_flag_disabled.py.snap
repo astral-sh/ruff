@@ -304,26 +304,15 @@ long_unmergable_string_with_pragma = (
 ```diff
 --- Black
 +++ Ruff
-@@ -70,8 +70,8 @@
- bad_split3 = (
-     "What if we have inline comments on "  # First Comment
-     "each line of a bad split? In that "  # Second Comment
--    "case, we should just leave it alone."  # Third Comment
--)
-+    "case, we should just leave it alone."
-+)  # Third Comment
- 
- bad_split_func1(
-     "But what should happen when code has already "
 @@ -143,9 +143,9 @@
      )
  )
  
 -fstring = f"f-strings definitely make things more {difficult} than they need to be for {{black}}. But boy they sure are handy. The problem is that some lines will need to have the 'f' whereas others do not. This {line}, for example, needs one."
-+fstring = NOT_YET_IMPLEMENTED_ExprJoinedStr
++fstring = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
 -fstring_with_no_fexprs = f"Some regular string that needs to get split certainly but is NOT an fstring by any means whatsoever."
-+fstring_with_no_fexprs = NOT_YET_IMPLEMENTED_ExprJoinedStr
++fstring_with_no_fexprs = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
  
@@ -369,7 +358,7 @@ long_unmergable_string_with_pragma = (
  
  
 -x = f"This is a {{really}} long string that needs to be split without a doubt (i.e. most definitely). In short, this {string} that can't possibly be {{expected}} to fit all together on one line. In {fact} it may even take up three or more lines... like four or five... but probably just four."
-+x = NOT_YET_IMPLEMENTED_ExprJoinedStr
++x = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  long_unmergable_string_with_pragma = (
      "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
@@ -450,8 +439,8 @@ bad_split2 = (
 bad_split3 = (
     "What if we have inline comments on "  # First Comment
     "each line of a bad split? In that "  # Second Comment
-    "case, we should just leave it alone."
-)  # Third Comment
+    "case, we should just leave it alone."  # Third Comment
+)
 
 bad_split_func1(
     "But what should happen when code has already "
@@ -523,9 +512,9 @@ old_fmt_string3 = (
     )
 )
 
-fstring = NOT_YET_IMPLEMENTED_ExprJoinedStr
+fstring = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
-fstring_with_no_fexprs = NOT_YET_IMPLEMENTED_ExprJoinedStr
+fstring_with_no_fexprs = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
 
@@ -654,7 +643,7 @@ def foo():
     NOT_YET_IMPLEMENTED_ExprYield
 
 
-x = NOT_YET_IMPLEMENTED_ExprJoinedStr
+x = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 long_unmergable_string_with_pragma = (
     "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore

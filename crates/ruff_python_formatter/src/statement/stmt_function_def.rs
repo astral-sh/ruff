@@ -1,12 +1,14 @@
+use rustpython_parser::ast::{Ranged, StmtFunctionDef};
+
+use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
+use ruff_python_ast::function::AnyFunctionDefinition;
+
 use crate::comments::{leading_comments, trailing_comments};
 use crate::context::NodeLevel;
-use crate::expression::parentheses::{optional_parentheses, Parenthesize};
+use crate::expression::parentheses::{optional_parentheses, Parentheses};
 use crate::prelude::*;
 use crate::trivia::{lines_after, skip_trailing_trivia};
 use crate::FormatNodeRule;
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::function::AnyFunctionDefinition;
-use rustpython_parser::ast::{Ranged, StmtFunctionDef};
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;
@@ -98,7 +100,7 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
                     text("->"),
                     space(),
                     optional_parentheses(
-                        &return_annotation.format().with_options(Parenthesize::Never)
+                        &return_annotation.format().with_options(Parentheses::Never)
                     )
                 ]
             )?;
