@@ -36,7 +36,7 @@ As a concrete example: consider taking on one of the rules from the [`flake8-pyi
 plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi) for
 guidance.
 
-If there is something missing in the contributing docs, please comment [here](https://github.com/astral-sh/ruff/discussions/5693)!
+If you have suggestions on how we might improve the contributing documentation, [let us know](https://github.com/astral-sh/ruff/discussions/5693)!
 
 ### Prerequisites
 
