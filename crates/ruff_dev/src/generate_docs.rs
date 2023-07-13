@@ -115,8 +115,8 @@ fn process_documentation(documentation: &str, out: &mut String) {
         out.push_str(line);
     }
     if !after.is_empty() {
-        out.push_str("\n");
-        out.push_str("\n");
+        out.push('\n');
+        out.push('\n');
         out.push_str(&after);
     }
 }
