@@ -1,8 +1,9 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
+use itertools::Itertools;
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 
 use crate::checkers::ast::Checker;
@@ -48,32 +49,6 @@ impl Violation for NonPEP604Annotation {
     }
 }
 
-fn optional(expr: &Expr) -> Expr {
-    Expr::BinOp(ast::ExprBinOp {
-        left: Box::new(expr.clone()),
-        op: Operator::BitOr,
-        right: Box::new(Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            kind: None,
-            range: TextRange::default(),
-        })),
-        range: TextRange::default(),
-    })
-}
-
-fn union(elts: &[Expr]) -> Expr {
-    if elts.len() == 1 {
-        elts[0].clone()
-    } else {
-        Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(&elts[..elts.len() - 1])),
-            op: Operator::BitOr,
-            right: Box::new(elts[elts.len() - 1].clone()),
-            range: TextRange::default(),
-        })
-    }
-}
-
 /// UP007
 pub(crate) fn use_pep604_annotation(
     checker: &mut Checker,
@@ -89,7 +64,7 @@ pub(crate) fn use_pep604_annotation(
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::manual(Edit::range_replacement(
-                    checker.generator().expr(&optional(slice)),
+                    optional(slice, checker.locator),
                     expr.range(),
                 )));
             }
@@ -104,14 +79,14 @@ pub(crate) fn use_pep604_annotation(
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         diagnostic.set_fix(Fix::manual(Edit::range_replacement(
-                            checker.generator().expr(&union(elts)),
+                            union(elts, checker.locator),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
                         diagnostic.set_fix(Fix::manual(Edit::range_replacement(
-                            checker.generator().expr(slice),
+                            checker.locator.slice(slice.range()).to_string(),
                             expr.range(),
                         )));
                     }
@@ -120,4 +95,14 @@ pub(crate) fn use_pep604_annotation(
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+fn optional(expr: &Expr, locator: &Locator) -> String {
+    format!("{} | None", locator.slice(expr.range()))
+}
+
+fn union(elts: &[Expr], locator: &Locator) -> String {
+    elts.iter()
+        .map(|expr| locator.slice(expr.range()))
+        .join(" | ")
 }
