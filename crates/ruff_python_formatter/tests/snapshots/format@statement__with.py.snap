@@ -82,18 +82,14 @@ with (
 
 
 with (
-    (
-        a  # a  # comma
-    ),
+    a,  # a  # comma
     b,  # c
 ):  # colon
     ...
 
 
 with (
-    (
-        a  # a  # as
-    ) as b,  # b  # comma
+    a as b,  # a  # as  # b  # comma
     c,  # c
 ):  # colon
     ...  # body

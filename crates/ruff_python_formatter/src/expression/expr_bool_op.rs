@@ -1,10 +1,10 @@
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
-    Parenthesize,
+    in_parentheses_only_group, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::{BoolOp, ExprBoolOp};
 
 #[derive(Default)]
@@ -70,10 +70,10 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
 impl NeedsParentheses for ExprBoolOp {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, context)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }
 

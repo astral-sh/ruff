@@ -1,16 +1,17 @@
-use crate::builders::PyFormatterExtensions;
-use crate::comments::dangling_comments;
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
-    Parenthesize,
-};
-use crate::trivia::{SimpleTokenizer, TokenKind};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{format_with, group, text};
-use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, ExprCall, Ranged};
+
+use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
+
+use crate::comments::dangling_comments;
+
+use crate::expression::parentheses::{
+    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+};
+use crate::prelude::*;
+use crate::trivia::{SimpleTokenizer, TokenKind};
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprCall;
@@ -52,14 +53,21 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
                 [argument] if keywords.is_empty() => {
                     let parentheses =
                         if is_single_argument_parenthesized(argument, item.end(), source) {
-                            Parenthesize::Always
+                            Parentheses::Always
                         } else {
-                            Parenthesize::Never
+                            Parentheses::Never
                         };
                     joiner.entry(argument, &argument.format().with_options(parentheses));
                 }
                 arguments => {
-                    joiner.nodes(arguments).nodes(keywords.iter());
+                    joiner
+                        .entries(
+                            // We have the parentheses from the call so the arguments never need any
+                            arguments
+                                .iter()
+                                .map(|arg| (arg, arg.format().with_options(Parentheses::Preserve))),
+                        )
+                        .nodes(keywords.iter());
                 }
             }
 
@@ -100,13 +108,10 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 impl NeedsParentheses for ExprCall {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+    ) -> OptionalParentheses {
+        self.func.needs_parentheses(parent, context)
     }
 }
 

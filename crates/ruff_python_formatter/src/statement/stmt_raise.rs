@@ -1,8 +1,9 @@
 use crate::expression::parentheses::Parenthesize;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
 
+use crate::expression::maybe_parenthesize_expression;
 use rustpython_parser::ast::StmtRaise;
 
 #[derive(Default)]
@@ -21,7 +22,10 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
         if let Some(value) = exc {
             write!(
                 f,
-                [space(), value.format().with_options(Parenthesize::Optional)]
+                [
+                    space(),
+                    maybe_parenthesize_expression(value, item, Parenthesize::Optional)
+                ]
             )?;
         }
 
@@ -32,7 +36,7 @@ impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
                     space(),
                     text("from"),
                     space(),
-                    value.format().with_options(Parenthesize::Optional)
+                    maybe_parenthesize_expression(value, item, Parenthesize::Optional)
                 ]
             )?;
         }

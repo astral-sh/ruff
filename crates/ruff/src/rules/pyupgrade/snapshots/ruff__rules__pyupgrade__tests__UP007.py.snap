@@ -276,4 +276,20 @@ UP007.py:60:8: UP007 [*] Use `X | Y` for type annotations
    60 |+    x: str | int
 61 61 |     x: Union["str", "int"]
 
+UP007.py:61:8: UP007 [*] Use `X | Y` for type annotations
+   |
+59 |     x = Union["str", "int"]
+60 |     x: Union[str, int]
+61 |     x: Union["str", "int"]
+   |        ^^^^^^^^^^^^^^^^^^^ UP007
+   |
+   = help: Convert to `X | Y`
+
+ℹ Suggested fix
+58 58 |     x = Union[str, int]
+59 59 |     x = Union["str", "int"]
+60 60 |     x: Union[str, int]
+61    |-    x: Union["str", "int"]
+   61 |+    x: "str" | "int"
+
 

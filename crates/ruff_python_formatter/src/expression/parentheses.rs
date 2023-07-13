@@ -6,100 +6,49 @@ use ruff_formatter::{format_args, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::Ranged;
 
-pub(crate) trait NeedsParentheses {
-    fn needs_parentheses(
-        &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses;
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum OptionalParentheses {
+    /// Add parentheses if the expression expands over multiple lines
+    Multiline,
+
+    /// Always set parentheses regardless if the expression breaks or if they were
+    /// present in the source.
+    Always,
+
+    /// Never add parentheses
+    Never,
 }
 
-pub(super) fn default_expression_needs_parentheses(
-    node: AnyNodeRef,
-    parenthesize: Parenthesize,
-    context: &PyFormatContext,
-) -> Parentheses {
-    debug_assert!(
-        node.is_expression(),
-        "Should only be called for expressions"
-    );
-
-    #[allow(clippy::if_same_then_else)]
-    if parenthesize.is_always() {
-        Parentheses::Always
-    } else if parenthesize.is_never() {
-        Parentheses::Never
-    }
-    // `Optional` or `Preserve` and expression has parentheses in source code.
-    else if !parenthesize.is_if_breaks() && is_expression_parenthesized(node, context.source()) {
-        Parentheses::Always
-    }
-    // `Optional` or `IfBreaks`: Add parentheses if the expression doesn't fit on a line but enforce
-    // parentheses if the expression has leading comments
-    else if !parenthesize.is_preserve() {
-        if context.comments().has_leading_comments(node) {
-            Parentheses::Always
-        } else {
-            Parentheses::Optional
-        }
-    } else {
-        //`Preserve` and expression has no parentheses in the source code
-        Parentheses::Never
-    }
+pub(crate) trait NeedsParentheses {
+    /// Determines if this object needs optional parentheses or if it is safe to omit the parentheses.
+    fn needs_parentheses(
+        &self,
+        parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses;
 }
 
 /// Configures if the expression should be parenthesized.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub enum Parenthesize {
-    /// Parenthesize the expression if it has parenthesis in the source.
-    #[default]
-    Preserve,
-
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum Parenthesize {
     /// Parenthesizes the expression if it doesn't fit on a line OR if the expression is parenthesized in the source code.
     Optional,
 
     /// Parenthesizes the expression only if it doesn't fit on a line.
     IfBreaks,
-
-    /// Always adds parentheses
-    Always,
-
-    /// Never adds parentheses. Parentheses are handled by the caller.
-    Never,
-}
-
-impl Parenthesize {
-    pub(crate) const fn is_always(self) -> bool {
-        matches!(self, Parenthesize::Always)
-    }
-
-    pub(crate) const fn is_never(self) -> bool {
-        matches!(self, Parenthesize::Never)
-    }
-
-    pub(crate) const fn is_if_breaks(self) -> bool {
-        matches!(self, Parenthesize::IfBreaks)
-    }
-
-    pub(crate) const fn is_preserve(self) -> bool {
-        matches!(self, Parenthesize::Preserve)
-    }
 }
 
 /// Whether it is necessary to add parentheses around an expression.
 /// This is different from [`Parenthesize`] in that it is the resolved representation: It takes into account
 /// whether there are parentheses in the source code or not.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub enum Parentheses {
+    #[default]
+    Preserve,
+
     /// Always set parentheses regardless if the expression breaks or if they were
     /// present in the source.
     Always,
-
-    /// Only add parentheses when necessary because the expression breaks over multiple lines.
-    Optional,
-
-    /// Custom handling by the node's formatter implementation
-    Custom,
 
     /// Never add parentheses
     Never,
@@ -182,20 +131,20 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
 /// a parentheses (`()`, `[]`, `{}`).
 pub(crate) fn optional_parentheses<'content, 'ast, Content>(
     content: &'content Content,
-) -> OptionalParentheses<'content, 'ast>
+) -> FormatOptionalParentheses<'content, 'ast>
 where
     Content: Format<PyFormatContext<'ast>>,
 {
-    OptionalParentheses {
+    FormatOptionalParentheses {
         content: Argument::new(content),
     }
 }
 
-pub(crate) struct OptionalParentheses<'content, 'ast> {
+pub(crate) struct FormatOptionalParentheses<'content, 'ast> {
     content: Argument<'content, PyFormatContext<'ast>>,
 }
 
-impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
+impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let saved_level = f.context().node_level();
 

@@ -1,11 +1,9 @@
 use crate::comments::{dangling_node_comments, leading_comments};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
-    Parenthesize,
-};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::ast::{Expr, ExprDict};
@@ -99,12 +97,9 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
 impl NeedsParentheses for ExprDict {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

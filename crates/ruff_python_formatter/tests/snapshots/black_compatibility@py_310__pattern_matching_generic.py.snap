@@ -124,13 +124,13 @@ with match() as match:
  match = a
  with match() as match:
 -    match = f"{match}"
-+    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
++    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  re.match()
  match = a
  with match() as match:
 -    match = f"{match}"
-+    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
++    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  
  def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
@@ -157,7 +157,7 @@ with match() as match:
      match = a
      with match() as match:
 -        match = f"{match}"
-+        match = NOT_YET_IMPLEMENTED_ExprJoinedStr
++        match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
      def test_patma_139(self):
          x = False
@@ -192,13 +192,13 @@ with match() as match:
  match = a
  with match() as match:
 -    match = f"{match}"
-+    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
++    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  re.match()
  match = a
  with match() as match:
 -    match = f"{match}"
-+    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
++    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 ```
 
 ## Ruff Output
@@ -207,12 +207,12 @@ with match() as match:
 re.match()
 match = a
 with match() as match:
-    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 re.match()
 match = a
 with match() as match:
-    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 
 def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
@@ -245,7 +245,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
     re.match()
     match = a
     with match() as match:
-        match = NOT_YET_IMPLEMENTED_ExprJoinedStr
+        match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
     def test_patma_139(self):
         x = False
@@ -297,12 +297,12 @@ def lib2to3_parse(src_txt: str, target_versions: Iterable[TargetVersion] = ()) -
 re.match()
 match = a
 with match() as match:
-    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 re.match()
 match = a
 with match() as match:
-    match = NOT_YET_IMPLEMENTED_ExprJoinedStr
+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 ```
 
 ## Black Output
