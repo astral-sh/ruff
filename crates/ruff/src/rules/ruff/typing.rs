@@ -1,3 +1,4 @@
+use itertools::Either::{Left, Right};
 use rustpython_parser::ast::{self, Constant, Expr, Operator};
 
 use ruff_python_ast::call_path::CallPath;
@@ -52,6 +53,15 @@ fn is_known_type(call_path: &CallPath, minor_version: u32) -> bool {
     }
 }
 
+/// Returns an iterator over the expressions in a slice. If the slice is not a
+/// tuple, the iterator will only yield the slice.
+fn resolve_slice_value(slice: &Expr) -> impl Iterator<Item = &Expr> {
+    match slice {
+        Expr::Tuple(ast::ExprTuple { elts: elements, .. }) => Left(elements.iter()),
+        _ => Right(std::iter::once(slice)),
+    }
+}
+
 #[derive(Debug)]
 enum TypingTarget<'a> {
     /// Literal `None` type.
@@ -66,12 +76,14 @@ enum TypingTarget<'a> {
     /// Forward reference to a type e.g., `"List[str]"`.
     ForwardReference(Expr),
 
-    /// A `typing.Union` type or `|` separated types e.g., `Union[int, str]`
-    /// or `int | str`.
-    Union(Vec<&'a Expr>),
+    /// A `typing.Union` type e.g., `Union[int, str]`.
+    Union(&'a Expr),
+
+    /// A PEP 604 union type e.g., `int | str`.
+    PEP604Union(&'a Expr),
 
     /// A `typing.Literal` type e.g., `Literal[1, 2, 3]`.
-    Literal(Vec<&'a Expr>),
+    Literal(&'a Expr),
 
     /// A `typing.Optional` type e.g., `Optional[int]`.
     Optional(&'a Expr),
@@ -99,17 +111,15 @@ impl<'a> TypingTarget<'a> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if semantic.match_typing_expr(value, "Optional") {
-                    return Some(TypingTarget::Optional(slice.as_ref()));
-                }
-                let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else {
-                    return None;
-                };
-                if semantic.match_typing_expr(value, "Literal") {
-                    Some(TypingTarget::Literal(elements.iter().collect()))
+                    Some(TypingTarget::Optional(slice.as_ref()))
+                } else if semantic.match_typing_expr(value, "Literal") {
+                    Some(TypingTarget::Literal(slice))
                 } else if semantic.match_typing_expr(value, "Union") {
-                    Some(TypingTarget::Union(elements.iter().collect()))
+                    Some(TypingTarget::Union(slice))
                 } else if semantic.match_typing_expr(value, "Annotated") {
-                    elements.first().map(TypingTarget::Annotated)
+                    resolve_slice_value(slice.as_ref())
+                        .next()
+                        .map(TypingTarget::Annotated)
                 } else {
                     semantic.resolve_call_path(value).map_or(
                         // If we can't resolve the call path, it must be defined
@@ -125,9 +135,7 @@ impl<'a> TypingTarget<'a> {
                     )
                 }
             }
-            Expr::BinOp(..) => Some(TypingTarget::Union(
-                PEP604UnionIterator::new(expr).collect(),
-            )),
+            Expr::BinOp(..) => Some(TypingTarget::PEP604Union(expr)),
             Expr::Constant(ast::ExprConstant {
                 value: Constant::None,
                 ..
@@ -172,7 +180,7 @@ impl<'a> TypingTarget<'a> {
             | TypingTarget::Object
             | TypingTarget::Unknown => true,
             TypingTarget::Known => false,
-            TypingTarget::Literal(elements) => elements.iter().any(|element| {
+            TypingTarget::Literal(slice) => resolve_slice_value(slice).any(|element| {
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match TypingTarget::try_from_expr(element, semantic, locator, minor_version) {
@@ -183,14 +191,20 @@ impl<'a> TypingTarget<'a> {
                     _ => false,
                 }
             }),
-            TypingTarget::Union(elements) => elements.iter().any(|element| {
+            TypingTarget::Union(slice) => resolve_slice_value(slice).any(|element| {
                 TypingTarget::try_from_expr(element, semantic, locator, minor_version)
                     .map_or(true, |new_target| {
                         new_target.contains_none(semantic, locator, minor_version)
                     })
             }),
-            TypingTarget::Annotated(element) => {
+            TypingTarget::PEP604Union(expr) => PEP604UnionIterator::new(expr).any(|element| {
                 TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_none(semantic, locator, minor_version)
+                    })
+            }),
+            TypingTarget::Annotated(expr) => {
+                TypingTarget::try_from_expr(expr, semantic, locator, minor_version)
                     .map_or(true, |new_target| {
                         new_target.contains_none(semantic, locator, minor_version)
                     })
@@ -219,14 +233,20 @@ impl<'a> TypingTarget<'a> {
             | TypingTarget::Object
             | TypingTarget::Known
             | TypingTarget::Unknown => false,
-            TypingTarget::Union(elements) => elements.iter().any(|element| {
+            TypingTarget::Union(slice) => resolve_slice_value(slice).any(|element| {
                 TypingTarget::try_from_expr(element, semantic, locator, minor_version)
                     .map_or(true, |new_target| {
                         new_target.contains_any(semantic, locator, minor_version)
                     })
             }),
-            TypingTarget::Annotated(element) | TypingTarget::Optional(element) => {
+            TypingTarget::PEP604Union(expr) => PEP604UnionIterator::new(expr).any(|element| {
                 TypingTarget::try_from_expr(element, semantic, locator, minor_version)
+                    .map_or(true, |new_target| {
+                        new_target.contains_any(semantic, locator, minor_version)
+                    })
+            }),
+            TypingTarget::Annotated(expr) | TypingTarget::Optional(expr) => {
+                TypingTarget::try_from_expr(expr, semantic, locator, minor_version)
                     .map_or(true, |new_target| {
                         new_target.contains_any(semantic, locator, minor_version)
                     })
