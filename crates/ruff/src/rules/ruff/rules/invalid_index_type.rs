@@ -74,7 +74,10 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
 
     // The value types supported by this rule should always be checkable
     let Some(value_type) = CheckableExprType::try_from(value) else {
-        debug_assert!(false, "Index value must be a checkable type to generate a violation message.");
+        debug_assert!(
+            false,
+            "Index value must be a checkable type to generate a violation message."
+        );
         return;
     };
 

@@ -3484,11 +3484,13 @@ where
                     }
                 }
             }
-            Expr::BoolOp(ast::ExprBoolOp {
-                op,
-                values,
-                range: _,
-            }) => {
+            Expr::BoolOp(
+                bool_op @ ast::ExprBoolOp {
+                    op,
+                    values,
+                    range: _,
+                },
+            ) => {
                 if self.enabled(Rule::RepeatedIsinstanceCalls) {
                     pylint::rules::repeated_isinstance_calls(self, expr, *op, values);
                 }
@@ -3512,6 +3514,9 @@ where
                 }
                 if self.enabled(Rule::ExprAndFalse) {
                     flake8_simplify::rules::expr_and_false(self, expr);
+                }
+                if self.enabled(Rule::RepeatedEqualityComparisonTarget) {
+                    pylint::rules::repeated_equality_comparison_target(self, bool_op);
                 }
             }
             _ => {}
