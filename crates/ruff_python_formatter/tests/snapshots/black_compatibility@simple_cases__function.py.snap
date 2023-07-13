@@ -113,7 +113,7 @@ def __await__(): return (yield)
  from library import some_connection, some_decorator
 -
 -f"trigger 3.6 mode"
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  
  def func_no_args():
@@ -188,7 +188,7 @@ import sys
 from third_party import X, Y, Z
 
 from library import some_connection, some_decorator
-NOT_YET_IMPLEMENTED_ExprJoinedStr
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 
 def func_no_args():

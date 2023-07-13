@@ -71,7 +71,7 @@ def single_quote_docstring_over_line_limit2():
  
  def docstring_almost_at_line_limit_with_prefix():
 -    f"""long docstring................................................................"""
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  
  def mulitline_docstring_almost_at_line_limit():
@@ -83,7 +83,7 @@ def single_quote_docstring_over_line_limit2():
 -
 -    ..................................................................................
 -    """
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  
  def docstring_at_line_limit():
@@ -92,7 +92,7 @@ def single_quote_docstring_over_line_limit2():
  
  def docstring_at_line_limit_with_prefix():
 -    f"""long docstring..............................................................."""
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  
  def multiline_docstring_at_line_limit():
@@ -103,7 +103,7 @@ def single_quote_docstring_over_line_limit2():
 -    f"""first line----------------------------------------------------------------------
 -
 -    second line----------------------------------------------------------------------"""
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  
  def single_quote_docstring_over_line_limit():
@@ -118,7 +118,7 @@ def docstring_almost_at_line_limit():
 
 
 def docstring_almost_at_line_limit_with_prefix():
-    NOT_YET_IMPLEMENTED_ExprJoinedStr
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 
 def mulitline_docstring_almost_at_line_limit():
@@ -129,7 +129,7 @@ def mulitline_docstring_almost_at_line_limit():
 
 
 def mulitline_docstring_almost_at_line_limit_with_prefix():
-    NOT_YET_IMPLEMENTED_ExprJoinedStr
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 
 def docstring_at_line_limit():
@@ -137,7 +137,7 @@ def docstring_at_line_limit():
 
 
 def docstring_at_line_limit_with_prefix():
-    NOT_YET_IMPLEMENTED_ExprJoinedStr
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 
 def multiline_docstring_at_line_limit():
@@ -147,7 +147,7 @@ def multiline_docstring_at_line_limit():
 
 
 def multiline_docstring_at_line_limit_with_prefix():
-    NOT_YET_IMPLEMENTED_ExprJoinedStr
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 
 def single_quote_docstring_over_line_limit():
