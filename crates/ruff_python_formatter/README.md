@@ -282,7 +282,7 @@ Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additio
 - `--stability-check`: Format twice (but don't write to disk) and check for differences and crashes
 - `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
 - `--error-file`: Use together with `--multi-project`, this writes all errors (but not status
-  messages) to a file.
+    messages) to a file.
 
 ## The orphan rules and trait structure
 

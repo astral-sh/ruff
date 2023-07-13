@@ -3,13 +3,13 @@
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
 - [The Basics](#the-basics)
-  - [Prerequisites](#prerequisites)
-  - [Development](#development)
-  - [Project Structure](#project-structure)
-  - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
-    - [Rule naming convention](#rule-naming-convention)
-    - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
-  - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
+    - [Prerequisites](#prerequisites)
+    - [Development](#development)
+    - [Project Structure](#project-structure)
+    - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
+        - [Rule naming convention](#rule-naming-convention)
+        - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
+    - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
 - [MkDocs](#mkdocs)
 - [Release Process](#release-process)
 - [Benchmarks](#benchmarking-and-profiling)
@@ -23,9 +23,10 @@ For small changes (e.g., bug fixes), feel free to submit a PR.
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
 You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
-community. We have labeled [beginner-friendly tasks in the issue tracker](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-as well as [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug) and
-[improvements that are ready for contributions](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted).
+community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
+and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
+that are ready for contributions.
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:
 [_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
@@ -100,19 +101,19 @@ At time of writing, the repository includes the following crates:
 - `crates/ruff_cache`: library crate for caching lint results.
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
 - `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
-  `cargo dev generate-all`).
+    `cargo dev generate-all`).
 - `crates/ruff_diagnostics`: library crate for the lint diagnostics APIs.
 - `crates/ruff_formatter`: library crate for generic code formatting logic based on an intermediate
-  representation.
+    representation.
 - `crates/ruff_index`: library crate inspired by `rustc_index`.
 - `crates/ruff_macros`: library crate containing macros used by Ruff.
 - `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
 - `crates/ruff_python_formatter`: library crate containing Python-specific code formatting logic.
 - `crates/ruff_python_semantic`: library crate containing Python-specific semantic analysis logic,
-  including Ruff's semantic model.
+    including Ruff's semantic model.
 - `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data.
 - `crates/ruff_python_whitespace`: library crate containing Python-specific whitespace analysis
-  logic.
+    logic.
 - `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
 - `crates/ruff_testing_macros`: library crate containing macros used for testing Ruff.
 - `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
@@ -123,21 +124,21 @@ At time of writing, the repository includes the following crates:
 At a high level, the steps involved in adding a new lint rule are as follows:
 
 1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
-   (e.g., `AssertFalse`, as in, "allow `assert False`").
+    (e.g., `AssertFalse`, as in, "allow `assert False`").
 
 1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-   `#[violation]` to see examples.
+    `#[violation]` to see examples.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
-   (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
-   an `ast::StmtAssert` node).
+    (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
+    an `ast::StmtAssert` node).
 
 1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for
-   AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
-   `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
-   `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
+    AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
+    `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
+    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
 
 1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `B011`).
 
@@ -170,13 +171,13 @@ suppression comment would be framed as "allow `assert False`".
 As such, rule names should...
 
 - Highlight the pattern that is being linted against, rather than the preferred alternative.
-  For example, `AssertFalse` guards against `assert False` statements.
+    For example, `AssertFalse` guards against `assert False` statements.
 
 - _Not_ contain instructions on how to fix the violation, which instead belong in the rule
-  documentation and the `autofix_title`.
+    documentation and the `autofix_title`.
 
 - _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
-  convention.
+    convention.
 
 When re-implementing rules from other linters, we prioritize adhering to this convention over
 preserving the original rule name.
@@ -191,25 +192,25 @@ Ruff's output for each fixture, which you can then commit alongside your changes
 Once you've completed the code for the rule itself, you can define tests with the following steps:
 
 1. Add a Python file to `crates/ruff/resources/test/fixtures/[linter]` that contains the code you
-   want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
-   examples of both violations and non-violations.
+    want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
+    examples of both violations and non-violations.
 
 1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
-   with the output (you see the violations you expect, and no others), proceed to the next step.
-   For example, if you're adding a new rule named `E402`, you would run:
+    with the output (you see the violations you expect, and no others), proceed to the next step.
+    For example, if you're adding a new rule named `E402`, you would run:
 
-   ```shell
-   cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
-   ```
+    ```shell
+    cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
+    ```
 
 1. Add the test to the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. If you're contributing
-   a rule to a pre-existing set, you should be able to find a similar example to pattern-match
-   against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
-   e.g., `crates/ruff/src/rules/flake8_bugbear/mod.rs`)
+    a rule to a pre-existing set, you should be able to find a similar example to pattern-match
+    against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
+    e.g., `crates/ruff/src/rules/flake8_bugbear/mod.rs`)
 
 1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
-   with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
-   then commit the snapshot file alongside the rest of your changes.
+    with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
+    then commit the snapshot file alongside the rest of your changes.
 
 1. Run `cargo test` again to ensure that your test passes.
 
@@ -247,25 +248,25 @@ To preview any changes to the documentation locally:
 
 1. Install MkDocs and Material for MkDocs with:
 
-   ```shell
-   pip install -r docs/requirements.txt
-   ```
+    ```shell
+    pip install -r docs/requirements.txt
+    ```
 
 1. Generate the MkDocs site with:
 
-   ```shell
-   python scripts/generate_mkdocs.py
-   ```
+    ```shell
+    python scripts/generate_mkdocs.py
+    ```
 
 1. Run the development server with:
 
-   ```shell
-   # For contributors.
-   mkdocs serve -f mkdocs.generated.yml
+    ```shell
+    # For contributors.
+    mkdocs serve -f mkdocs.generated.yml
 
-   # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-   mkdocs serve -f mkdocs.insiders.yml
-   ```
+    # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
+    mkdocs serve -f mkdocs.insiders.yml
+    ```
 
 The documentation should then be available locally at
 [http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
@@ -286,20 +287,19 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 1. Create a PR with the version and `BREAKING_CHANGES.md` updated
 1. Merge the PR
 1. Run the release workflow with the version number (without starting `v`) as input. Make sure
-   main has your merged PR as last commit
+    main has your merged PR as last commit
 1. The release workflow will do the following:
-   1. Build all the assets. If this fails (even though we tested in step 4), we haven’t tagged or
-      uploaded anything, you can restart after pushing a fix
-   1. Upload to pypi
-   1. Create and push the git tag (from pyproject.toml). We create the git tag only here
-      because we can't change it ([#4468](https://github.com/charliermarsh/ruff/issues/4468)), so
-      we want to make sure everything up to and including publishing to pypi worked.
-   1. Attach artifacts to draft GitHub release
-   1. Trigger downstream repositories. This can fail without causing fallout, it is possible (if
-      inconvenient) to trigger the downstream jobs manually
-1. Create release notes in GitHub UI and promote from draft to proper release(<https://github.com/charliermarsh/ruff/releases/new>)
+    1. Build all the assets. If this fails (even though we tested in step 4), we haven’t tagged or
+        uploaded anything, you can restart after pushing a fix.
+    1. Upload to PyPI.
+    1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
+        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/charliermarsh/ruff/issues/4468)).
+    1. Attach artifacts to draft GitHub release
+    1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
+        downstream jobs manually if needed.
+1. Create release notes in GitHub UI and promote from draft.
 1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py)
-1. If needed, update ruff-lsp and ruff-vscode
+1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
 
 ## Ecosystem CI
 
@@ -452,7 +452,7 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
-#### Benchmark driven Development
+#### Benchmark-driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
 `--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
@@ -491,7 +491,7 @@ cargo install critcmp
 #### Tips
 
 - Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
-  to only run the pydantic tests.
+    to only run the pydantic tests.
 - Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo benchmark --quick` to get faster results (more prone to noise)
 
@@ -550,7 +550,7 @@ cargo instruments -t time --bench linter --profile release-debug -p ruff_benchma
 ```
 
 - `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc`
-  for profiling the allocations.
+    for profiling the allocations.
 - You may want to pass an additional filter to run a single test file
 
 Otherwise, follow the instructions from the linux section.
@@ -561,12 +561,12 @@ Otherwise, follow the instructions from the linux section.
 utils with it:
 
 - `cargo dev print-ast <file>`: Print the AST of a python file using the
-  [RustPython parser](https://github.com/astral-sh/RustPython-Parser/tree/main/parser) that is
-  mainly used in Ruff. For `if True: pass # comment`, you can see the syntax tree, the byte offsets
-  for start and stop of each node and also how the `:` token, the comment and whitespace are not
-  represented anymore:
+    [RustPython parser](https://github.com/astral-sh/RustPython-Parser/tree/main/parser) that is
+    mainly used in Ruff. For `if True: pass # comment`, you can see the syntax tree, the byte offsets
+    for start and stop of each node and also how the `:` token, the comment and whitespace are not
+    represented anymore:
 
-```text
+````text
 [
     If(
         StmtIf {
@@ -591,7 +591,7 @@ utils with it:
         },
     ),
 ]
-```
+    ```
 
 - `cargo dev print-tokens <file>`: Print the tokens that the AST is built upon. Again for
   `if True: pass # comment`:
@@ -605,11 +605,11 @@ utils with it:
     "# comment",
 ) 23
 23 Newline 24
-```
+````
 
 - `cargo dev print-cst <file>`: Print the CST of a python file using
-  [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
-  in Ruff. E.g. for `if True: pass # comment` everything including the whitespace is represented:
+    [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
+    in Ruff. E.g. for `if True: pass # comment` everything including the whitespace is represented:
 
 ```text
 Module {
@@ -675,13 +675,13 @@ Module {
 ```
 
 - `cargo dev generate-all`: Update `ruff.schema.json`, `docs/configuration.md` and `docs/rules`.
-  You can also set `RUFF_UPDATE_SCHEMA=1` to update `ruff.schema.json` during `cargo test`.
+    You can also set `RUFF_UPDATE_SCHEMA=1` to update `ruff.schema.json` during `cargo test`.
 - `cargo dev generate-cli-help`, `cargo dev generate-docs` and `cargo dev generate-json-schema`:
-  Update just `docs/configuration.md`, `docs/rules` and `ruff.schema.json` respectively.
+    Update just `docs/configuration.md`, `docs/rules` and `ruff.schema.json` respectively.
 - `cargo dev generate-options`: Generate a markdown-compatible table of all `pyproject.toml`
-  options. Used for <https://beta.ruff.rs/docs/settings/>
+    options. Used for <https://beta.ruff.rs/docs/settings/>
 - `cargo dev generate-rules-table`: Generate a markdown-compatible table of all rules. Used for <https://beta.ruff.rs/docs/rules/>
 - `cargo dev round-trip <python file or jupyter notebook>`: Read a Python file or Jupyter Notebook,
-  parse it, serialize the parsed representation and write it back. Used to check how good our
-  representation is so that fixes don't rewrite irrelevant parts of a file.
+    parse it, serialize the parsed representation and write it back. Used to check how good our
+    representation is so that fixes don't rewrite irrelevant parts of a file.
 - `cargo dev format_dev`: See ruff_python_formatter README.md
