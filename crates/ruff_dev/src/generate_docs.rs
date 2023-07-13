@@ -81,7 +81,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
     // a non-CommonMark-compliant Markdown parser, which doesn't support code
     // tags in link definitions
     // (see https://github.com/Python-Markdown/markdown/issues/280).
-    let documentation = Regex::new(r"\[`(.*?)`\]($|[^\[])").unwrap().replace_all(
+    let documentation = Regex::new(r"\[`(.*?)`]($|[^\[])").unwrap().replace_all(
         documentation,
         |caps: &Captures| {
             format!(
@@ -115,10 +115,10 @@ fn process_documentation(documentation: &str, out: &mut String) {
         out.push_str(line);
     }
     if !after.is_empty() {
-        out.push_str("\n\n");
+        out.push_str("\n");
+        out.push_str("\n");
         out.push_str(&after);
     }
-    out.push('\n');
 }
 
 #[cfg(test)]
@@ -130,11 +130,12 @@ mod tests {
         let mut output = String::new();
         process_documentation(
             "
-See also [`mccabe.max-complexity`].
+See also [`mccabe.max-complexity`] and [`task-tags`].
 Something [`else`][other].
 
 ## Options
 
+- `task-tags`
 - `mccabe.max-complexity`
 
 [other]: http://example.com.",
@@ -143,16 +144,19 @@ Something [`else`][other].
         assert_eq!(
             output,
             "
-See also [`mccabe.max-complexity`][mccabe.max-complexity].
+See also [`mccabe.max-complexity`][mccabe.max-complexity] and [`task-tags`][task-tags].
 Something [`else`][other].
 
 ## Options
 
+- [`task-tags`][task-tags]
 - [`mccabe.max-complexity`][mccabe.max-complexity]
 
 [other]: http://example.com.
 
-[mccabe.max-complexity]: ../../settings#mccabe-max-complexity\n"
+[task-tags]: ../../settings#task-tags
+[mccabe.max-complexity]: ../../settings#mccabe-max-complexity
+"
         );
     }
 }
