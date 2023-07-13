@@ -20,7 +20,12 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
 
         write!(
             f,
-            [target.format(), text(":"), space(), annotation.format()]
+            [
+                target.format(),
+                text(":"),
+                space(),
+                maybe_parenthesize_expression(annotation, item, Parenthesize::IfBreaks)
+            ]
         )?;
 
         if let Some(value) = value {
