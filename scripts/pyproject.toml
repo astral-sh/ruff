@@ -19,7 +19,6 @@ ignore = [
   "T",     # flake8-print
   "FBT",   # flake8-boolean-trap
   "PERF",  # perflint
-  "ANN401",
 ]
 
 [tool.ruff.isort]
