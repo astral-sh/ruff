@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Stmt, StmtClassDef};
+use rustpython_parser::ast::{Expr, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -50,18 +51,33 @@ impl Violation for NoSlotsInStrSubclass {
 
 /// SLOT000
 pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
-    if class.bases.iter().any(|base| {
-        checker
-            .semantic()
-            .resolve_call_path(base)
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["" | "builtins", "str"])
-            })
-    }) {
+    if is_str_subclass(&class.bases, checker.semantic()) {
         if !has_slots(&class.body) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(NoSlotsInStrSubclass, stmt.identifier()));
         }
     }
+}
+
+/// Return `true` if the class is a subclass of `str`, but _not_ a subclass of `enum.Enum`,
+/// `enum.IntEnum`, etc.
+fn is_str_subclass(bases: &[Expr], model: &SemanticModel) -> bool {
+    let mut is_str_subclass = false;
+    for base in bases {
+        if let Some(call_path) = model.resolve_call_path(base) {
+            match call_path.as_slice() {
+                ["" | "builtins", "str"] => {
+                    is_str_subclass = true;
+                }
+                ["enum", "Enum" | "IntEnum" | "StrEnum" | "Flag" | "IntFlag" | "ReprEnum" | "EnumCheck"] =>
+                {
+                    // Ignore enum classes.
+                    return false;
+                }
+                _ => {}
+            }
+        }
+    }
+    is_str_subclass
 }
