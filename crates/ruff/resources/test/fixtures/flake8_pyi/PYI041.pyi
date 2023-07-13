@@ -6,6 +6,7 @@ from typing_extensions import (
     TypeAlias,
 )
 
+# Type aliases not flagged
 TA0: TypeAlias = int
 TA1: TypeAlias = int | float | bool
 TA2: TypeAlias = Union[int, float, bool]
