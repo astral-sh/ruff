@@ -106,7 +106,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
 
                 let anchor = option.replace('.', "-");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
-                after.push_str(&format!("[{option}]: ../../settings#{anchor}"));
+                after.push_str(&format!("[{option}]: ../../settings#{anchor}\n"));
 
                 continue;
             }
