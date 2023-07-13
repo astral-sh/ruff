@@ -1,5 +1,7 @@
 //! Minimize a failing python file.
 //!
+//! See `--help` (or the [Args] docs) for usage.
+//!
 //! ## Example
 //!
 //! Minimize a file with unstable formatting
@@ -17,7 +19,7 @@
 //!
 //! Minimize a file with a syntax error
 //! ```shell
-//! run --bin ruff_minimizer -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/a.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
+//! cargo run --bin ruff_minimizer -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/code.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
 //! ```
 //! This could emit
 //! ```python
@@ -41,6 +43,16 @@ use std::str;
 use std::time::Instant;
 use tracing::debug;
 
+const STRATEGIES: &[&dyn Strategy] = &[
+    (&StrategyRemoveModuleMember),
+    (&StrategyRemoveStatement),
+    (&StrategyRemoveExpression),
+    (&StrategyReplaceStatementWithPass),
+    (&StrategyRemoveLine),
+    (&StrategyRemoveNewline),
+];
+
+/// Each strategy is a way of producing possible minimizations
 trait Strategy {
     fn name(&self) -> &'static str;
 
@@ -51,20 +63,13 @@ trait Strategy {
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>>;
 }
 
-const STRATEGIES: &[&dyn Strategy] = &[
-    (&StrategyRemoveModuleMember),
-    (&StrategyRemoveStatement),
-    (&StrategyRemoveExpression),
-    (&StrategyReplaceStatementWithPass),
-    (&StrategyRemoveLine),
-    (&StrategyRemoveNewline),
-];
-
-/// `dyn ExactSizeStringIter + ExactSizeIterator` vtable surrogate trait that rust wants
+/// vtable surrogate trait that rust wants
 trait ExactSizeStringIter: Iterator<Item = String> + ExactSizeIterator {}
 
 impl<T> ExactSizeStringIter for T where T: Iterator<Item = String> + ExactSizeIterator {}
 
+/// Remove a top level member from a module. Generally the most effective strategy since most
+/// top level items will be unrelated to the error.
 struct StrategyRemoveModuleMember;
 
 impl Strategy for StrategyRemoveModuleMember {
@@ -88,6 +93,7 @@ impl Strategy for StrategyRemoveModuleMember {
     }
 }
 
+/// Finds the ranges of all statements.
 #[derive(Default)]
 struct StatementCollector {
     /// The ranges of all statements
@@ -154,6 +160,7 @@ impl Strategy for StrategyRemoveStatement {
     }
 }
 
+/// A body is invalid without any statements, but maybe replacing it with a pass works.
 struct StrategyReplaceStatementWithPass;
 
 impl Strategy for StrategyReplaceStatementWithPass {
@@ -169,6 +176,7 @@ impl Strategy for StrategyReplaceStatementWithPass {
     }
 }
 
+/// Finds the ranges of all expressions.
 #[derive(Default)]
 struct ExpressionCollector {
     /// The ranges of all expressions
@@ -204,6 +212,7 @@ impl Strategy for StrategyRemoveExpression {
     }
 }
 
+/// Remove each line (physical lines, not logical lines).
 struct StrategyRemoveLine;
 
 impl Strategy for StrategyRemoveLine {
@@ -231,6 +240,7 @@ impl Strategy for StrategyRemoveLine {
     }
 }
 
+/// Try removing newline characters
 struct StrategyRemoveNewline;
 
 impl Strategy for StrategyRemoveNewline {
@@ -265,7 +275,8 @@ impl Strategy for StrategyRemoveNewline {
     }
 }
 
-/// Returns strategy, name, pos in iteration, minimized code
+/// Returns strategy, posing in the iteration (so they can be skipped in the next attempt) and
+/// minimized code.
 fn minimization_step(
     input: &str,
     location: &Path,
@@ -277,7 +288,7 @@ fn minimization_step(
     let ast =
         ruff_rustpython::parse_program_tokens(tokens, "input.py").context("not valid python")?;
 
-    // Try the last succeeding strategy first
+    // Try the last succeeding strategy first, skipping all that failed last time
     if let Some((last_strategy, last_idx)) = last_strategy_and_idx {
         let iter = last_strategy.candidates(input, &ast)?;
         println!(
@@ -293,14 +304,8 @@ fn minimization_step(
         }
     }
 
-    // Try all strategies in order
+    // Try all strategies in order, including the last successfull one without skipping inputs
     for strategy in STRATEGIES {
-        if last_strategy_and_idx.map_or(false, |(last_strategy, _)| {
-            // It's not sound to ptr::eq trait objects and Eq isn't object safe
-            last_strategy.name() == strategy.name()
-        }) {
-            continue;
-        }
         let iter = strategy.candidates(input, &ast)?;
         println!("Trying {} {} candidates", iter.len(), strategy.name());
         for (idx, entry) in iter.enumerate() {
@@ -315,6 +320,7 @@ fn minimization_step(
     Ok(None)
 }
 
+/// Does the candidate still produce the expected error?
 fn is_failing(
     input: &str,
     location: &Path,
@@ -341,12 +347,26 @@ fn is_failing(
     }
 }
 
+/// You specify an input file that fails. The minimizer will write minimization candidates to the
+/// the file given as second argument. It will run the command and if the output still matches the
+/// error pattern, the candidate will be considered a successful minimization step, otherwise it's
+/// rolled back.
+///
+/// ## Example
+///  ```shell
+/// cargo run --bin ruff_minimizer -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/code.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
+/// ```
+/// This could emit (if it wasn't fixed):
+/// ```python
+/// class RepresentationQtModel():
+///             data[:,] = rep.data
+/// ```
 #[derive(Parser)]
 struct Args {
-    /// The input file
-    file: PathBuf,
-    /// The minimization attempt will be copied to this location
-    location: PathBuf,
+    /// The input file that fails
+    input_file: PathBuf,
+    /// The minimization attempt is written to this location
+    output_file: PathBuf,
     /// Continue this path of the minimization if either stderr or stdout match this regex
     error_pattern: String,
     /// The command to run to test if the smaller version still emits the same error
@@ -356,6 +376,7 @@ struct Args {
 }
 
 fn run() -> Result<()> {
+    // e.g. `RUST_LOG=ruff_minimizer=debug`
     tracing_subscriber::fmt::init();
 
     let args: Args = Args::parse();
@@ -365,15 +386,15 @@ fn run() -> Result<()> {
     let loop_start = Instant::now();
 
     let mut num_iterations = 0;
-    // normalize line endings for the remove newlines rule
-    let mut input = fs::read_to_string(args.file)?.replace('\r', "");
+    // normalize line endings for the remove newline dependent rules
+    let mut input = fs::read_to_string(args.input_file)?.replace('\r', "");
     let mut last_strategy_and_idx = None;
     loop {
         let start = Instant::now();
         num_iterations += 1;
         let smaller_failure = minimization_step(
             &input,
-            &args.location,
+            &args.output_file,
             &command_args,
             &pattern,
             last_strategy_and_idx,
@@ -390,7 +411,7 @@ fn run() -> Result<()> {
             last_strategy_and_idx = Some((strategy, idx));
         } else {
             // The last minimization failed, write back the original content
-            fs::write(&args.location, input.as_bytes())?;
+            fs::write(&args.output_file, input.as_bytes())?;
             break;
         }
     }
@@ -398,7 +419,7 @@ fn run() -> Result<()> {
     println!(
         "Done with {num_iterations} iterations in {:.1}s. Find your minimized example in {}",
         loop_start.elapsed().as_secs_f32(),
-        args.location.display()
+        args.output_file.display()
     );
 
     Ok(())
