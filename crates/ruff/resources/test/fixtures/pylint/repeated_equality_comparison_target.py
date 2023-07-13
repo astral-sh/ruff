@@ -1,5 +1,4 @@
 # Errors.
-
 foo == "a" or foo == "b"
 
 foo != "a" and foo != "b"
@@ -10,18 +9,14 @@ foo != "a" and foo != "b" and foo != "c"
 
 foo == a or foo == "b" or foo == 3  # Mixed types.
 
-# False negatives.
-
-# The current implementation doesn't support yoda conditions, but PyLint does!
-
+# False negatives (the current implementation doesn't support Yoda conditions).
 "a" == foo or "b" == foo or "c" == foo
 
 "a" != foo and "b" != foo and "c" != foo
 
-"a" == foo or foo == "b" or "c" == foo  # Mixed yoda conditions.
+"a" == foo or foo == "b" or "c" == foo
 
-# Non-errors.
-
+# OK
 foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
 
 foo != "a" or foo != "b" or foo != "c"  # `or` mixed with `!=`.
