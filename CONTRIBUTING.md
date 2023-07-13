@@ -96,7 +96,7 @@ The vast majority of the code, including all lint rules, lives in the `ruff` cra
 At time of writing, the repository includes the following crates:
 
 - `crates/ruff`: library crate containing all lint rules and the core logic for running them.
-   If you're working on a rule, it's in here.
+  If you're working on a rule, it's in here.
 - `crates/ruff_benchmark`: binary crate for running micro-benchmarks.
 - `crates/ruff_cache`: library crate for caching lint results.
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
