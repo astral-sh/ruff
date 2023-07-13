@@ -49,6 +49,8 @@ mod tests {
     #[test_case(Rule::PassStatementStubBody, Path::new("PYI009.pyi"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.py"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.pyi"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.pyi"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
     #[test_case(Rule::UnassignedSpecialVariableInStub, Path::new("PYI035.py"))]
