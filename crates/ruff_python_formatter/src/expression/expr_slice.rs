@@ -1,14 +1,12 @@
 use crate::comments::{dangling_comments, SourceComment};
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::trivia::Token;
 use crate::trivia::{first_non_trivia_token, TokenKind};
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprSlice;
 use rustpython_parser::ast::{Expr, Ranged};
@@ -262,9 +260,9 @@ fn leading_comments_spacing(
 impl NeedsParentheses for ExprSlice {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, context)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }

@@ -1,14 +1,16 @@
-use crate::builders::parenthesize_if_expands;
-use crate::comments::{dangling_comments, CommentLinePosition};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
-    Parenthesize,
-};
-use crate::prelude::*;
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprTuple;
 use rustpython_parser::ast::{Expr, Ranged};
+
+use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
+
+use crate::builders::parenthesize_if_expands;
+use crate::comments::{dangling_comments, CommentLinePosition};
+use crate::expression::parentheses::{
+    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+};
+use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
@@ -148,13 +150,10 @@ impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
 impl NeedsParentheses for ExprTuple {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }
 

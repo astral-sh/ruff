@@ -304,17 +304,6 @@ long_unmergable_string_with_pragma = (
 ```diff
 --- Black
 +++ Ruff
-@@ -70,8 +70,8 @@
- bad_split3 = (
-     "What if we have inline comments on "  # First Comment
-     "each line of a bad split? In that "  # Second Comment
--    "case, we should just leave it alone."  # Third Comment
--)
-+    "case, we should just leave it alone."
-+)  # Third Comment
- 
- bad_split_func1(
-     "But what should happen when code has already "
 @@ -143,9 +143,9 @@
      )
  )
@@ -458,8 +447,8 @@ bad_split2 = (
 bad_split3 = (
     "What if we have inline comments on "  # First Comment
     "each line of a bad split? In that "  # Second Comment
-    "case, we should just leave it alone."
-)  # Third Comment
+    "case, we should just leave it alone."  # Third Comment
+)
 
 bad_split_func1(
     "But what should happen when code has already "

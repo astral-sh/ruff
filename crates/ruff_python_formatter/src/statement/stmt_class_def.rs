@@ -1,5 +1,6 @@
 use crate::comments::trailing_comments;
-use crate::expression::parentheses::Parenthesize;
+
+use crate::expression::parentheses::Parentheses;
 use crate::prelude::*;
 use crate::trivia::{SimpleTokenizer, TokenKind};
 use ruff_formatter::{format_args, write};
@@ -100,13 +101,13 @@ impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
                 .count();
 
             // Ignore the first parentheses count
-            let parenthesize = if left_paren_count > 1 {
-                Parenthesize::Always
+            let parentheses = if left_paren_count > 1 {
+                Parentheses::Always
             } else {
-                Parenthesize::Never
+                Parentheses::Never
             };
 
-            joiner.entry(first, &first.format().with_options(parenthesize));
+            joiner.entry(first, &first.format().with_options(parentheses));
             joiner.nodes(rest.iter());
         }
 

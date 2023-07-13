@@ -398,10 +398,11 @@ last_call()
  (*starred,)
  {
      "id": "1",
-@@ -208,24 +208,14 @@
+@@ -207,25 +207,15 @@
+ )
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -409,7 +410,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -446,7 +447,7 @@ last_call()
  
  
  async def f():
-@@ -248,18 +238,22 @@
+@@ -248,18 +238,20 @@
  
  
  print(*[] or [1])
@@ -471,13 +472,11 @@ last_call()
  for y in ():
      ...
 -for z in (i for i in (1, 2, 3)):
-+for (
-+    z
-+) in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
++for z in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
      ...
  for i in call():
      ...
-@@ -328,13 +322,18 @@
+@@ -328,13 +320,18 @@
  ):
      return True
  if (
@@ -499,7 +498,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +341,8 @@
+@@ -342,7 +339,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -767,9 +766,7 @@ for (x,) in (1,), (2,), (3,):
     ...
 for y in ():
     ...
-for (
-    z
-) in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
+for z in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
     ...
 for i in call():
     ...
