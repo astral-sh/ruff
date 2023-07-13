@@ -7,40 +7,6 @@ use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
-/// Custom iterator to collect all the `|` separated expressions in a PEP 604
-/// union type.
-struct PEP604UnionIterator<'a> {
-    stack: Vec<&'a Expr>,
-}
-
-impl<'a> PEP604UnionIterator<'a> {
-    fn new(expr: &'a Expr) -> Self {
-        Self { stack: vec![expr] }
-    }
-}
-
-impl<'a> Iterator for PEP604UnionIterator<'a> {
-    type Item = &'a Expr;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(expr) = self.stack.pop() {
-            match expr {
-                Expr::BinOp(ast::ExprBinOp {
-                    left,
-                    op: Operator::BitOr,
-                    right,
-                    ..
-                }) => {
-                    self.stack.push(left);
-                    self.stack.push(right);
-                }
-                _ => return Some(expr),
-            }
-        }
-        None
-    }
-}
-
 /// Returns `true` if the given call path is a known type.
 ///
 /// A known type is either a builtin type, any object from the standard library,
@@ -80,7 +46,7 @@ enum TypingTarget<'a> {
     Union(&'a Expr),
 
     /// A PEP 604 union type e.g., `int | str`.
-    PEP604Union(&'a Expr),
+    PEP604Union(&'a Expr, &'a Expr),
 
     /// A `typing.Literal` type e.g., `Literal[1, 2, 3]`.
     Literal(&'a Expr),
@@ -135,7 +101,12 @@ impl<'a> TypingTarget<'a> {
                     )
                 }
             }
-            Expr::BinOp(..) => Some(TypingTarget::PEP604Union(expr)),
+            Expr::BinOp(ast::ExprBinOp {
+                left,
+                op: Operator::BitOr,
+                right,
+                ..
+            }) => Some(TypingTarget::PEP604Union(left, right)),
             Expr::Constant(ast::ExprConstant {
                 value: Constant::None,
                 ..
@@ -197,7 +168,7 @@ impl<'a> TypingTarget<'a> {
                         new_target.contains_none(semantic, locator, minor_version)
                     })
             }),
-            TypingTarget::PEP604Union(expr) => PEP604UnionIterator::new(expr).any(|element| {
+            TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
                 TypingTarget::try_from_expr(element, semantic, locator, minor_version)
                     .map_or(true, |new_target| {
                         new_target.contains_none(semantic, locator, minor_version)
@@ -239,7 +210,7 @@ impl<'a> TypingTarget<'a> {
                         new_target.contains_any(semantic, locator, minor_version)
                     })
             }),
-            TypingTarget::PEP604Union(expr) => PEP604UnionIterator::new(expr).any(|element| {
+            TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
                 TypingTarget::try_from_expr(element, semantic, locator, minor_version)
                     .map_or(true, |new_target| {
                         new_target.contains_any(semantic, locator, minor_version)
