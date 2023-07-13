@@ -116,8 +116,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         };
 
         for binding in scope
-            .bindings_for_name(binding_name)
-            .map(|binding_id| &checker.semantic_model().bindings[binding_id])
+            .get_all(binding_name)
+            .map(|binding_id| checker.semantic().binding(binding_id))
         {
             let Some(qualified_name) = binding.qualified_name() else {
                 break;
