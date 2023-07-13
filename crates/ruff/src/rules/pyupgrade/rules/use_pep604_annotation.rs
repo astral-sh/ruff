@@ -1,6 +1,6 @@
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,26 +57,6 @@ pub(crate) fn use_pep604_annotation(
     slice: &Expr,
     operator: Pep604Operator,
 ) {
-    // If the slice is a forward reference (e.g., `Optional["Foo"]`), it can only be rewritten
-    // if we're in a typing-only context.
-    //
-    // This, for example, is invalid, as Python will evaluate `"Foo" | None` at runtime in order to
-    // populate the function's `__annotations__`:
-    // ```python
-    // def f(x: "Foo" | None): ...
-    // ```
-    //
-    // This, however, is valid:
-    // ```python
-    // def f():
-    //     x: "Foo" | None
-    // ```
-    if quoted_annotation(slice) {
-        if checker.semantic().execution_context().is_runtime() {
-            return;
-        }
-    }
-
     // Avoid fixing forward references, or types not in an annotation.
     let fixable = checker.semantic().in_type_definition()
         && !checker.semantic().in_complex_string_type_definition();
@@ -116,18 +96,6 @@ pub(crate) fn use_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
-    }
-}
-
-/// Returns `true` if any argument in the slice is a forward reference (i.e., a quoted annotation).
-fn quoted_annotation(slice: &Expr) -> bool {
-    match slice {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        }) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
-        _ => false,
     }
 }
 

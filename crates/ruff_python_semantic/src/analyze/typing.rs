@@ -122,7 +122,43 @@ pub enum Pep604Operator {
 }
 
 /// Return the PEP 604 operator variant to which the given subscript [`Expr`] corresponds, if any.
-pub fn to_pep604_operator(value: &Expr, semantic: &SemanticModel) -> Option<Pep604Operator> {
+pub fn to_pep604_operator(
+    value: &Expr,
+    slice: &Expr,
+    semantic: &SemanticModel,
+) -> Option<Pep604Operator> {
+    /// Returns `true` if any argument in the slice is a quoted annotation).
+    fn quoted_annotation(slice: &Expr) -> bool {
+        match slice {
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(_),
+                ..
+            }) => true,
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
+            _ => false,
+        }
+    }
+
+    // If the slice is a forward reference (e.g., `Optional["Foo"]`), it can only be rewritten
+    // if we're in a typing-only context.
+    //
+    // This, for example, is invalid, as Python will evaluate `"Foo" | None` at runtime in order to
+    // populate the function's `__annotations__`:
+    // ```python
+    // def f(x: "Foo" | None): ...
+    // ```
+    //
+    // This, however, is valid:
+    // ```python
+    // def f():
+    //     x: "Foo" | None
+    // ```
+    if quoted_annotation(slice) {
+        if semantic.execution_context().is_runtime() {
+            return None;
+        }
+    }
+
     semantic
         .resolve_call_path(value)
         .as_ref()
