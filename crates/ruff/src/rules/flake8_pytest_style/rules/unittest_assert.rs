@@ -3,7 +3,9 @@ use std::hash::BuildHasherDefault;
 use anyhow::{anyhow, bail, Result};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Keyword, Stmt, Unaryop};
+use rustpython_parser::ast::{
+    self, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -149,10 +151,10 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
     })
 }
 
-fn compare(left: &Expr, cmpop: Cmpop, right: &Expr) -> Expr {
+fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
         left: Box::new(left.clone()),
-        ops: vec![cmpop],
+        ops: vec![cmp_op],
         comparators: vec![right.clone()],
         range: TextRange::default(),
     })
@@ -206,9 +208,7 @@ impl UnittestAssert {
         keywords: &'a [Keyword],
     ) -> Result<FxHashMap<&'a str, &'a Expr>> {
         // If we have variable-length arguments, abort.
-        if args.iter().any(|arg| matches!(arg, Expr::Starred(_)))
-            || keywords.iter().any(|kw| kw.arg.is_none())
-        {
+        if args.iter().any(Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none()) {
             bail!("Variable-length arguments are not supported");
         }
 
@@ -263,14 +263,14 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 Ok(if matches!(self, UnittestAssert::False) {
-                    let node = expr.clone();
-                    let node1 = Expr::UnaryOp(ast::ExprUnaryOp {
-                        op: Unaryop::Not,
-                        operand: Box::new(node),
-                        range: TextRange::default(),
-                    });
-                    let unary_expr = node1;
-                    assert(&unary_expr, msg)
+                    assert(
+                        &Expr::UnaryOp(ast::ExprUnaryOp {
+                            op: UnaryOp::Not,
+                            operand: Box::new(expr.clone()),
+                            range: TextRange::default(),
+                        }),
+                        msg,
+                    )
                 } else {
                     assert(expr, msg)
                 })
@@ -292,18 +292,18 @@ impl UnittestAssert {
                     .get("second")
                     .ok_or_else(|| anyhow!("Missing argument `second`"))?;
                 let msg = args.get("msg").copied();
-                let cmpop = match self {
-                    UnittestAssert::Equal | UnittestAssert::Equals => Cmpop::Eq,
-                    UnittestAssert::NotEqual | UnittestAssert::NotEquals => Cmpop::NotEq,
-                    UnittestAssert::Greater => Cmpop::Gt,
-                    UnittestAssert::GreaterEqual => Cmpop::GtE,
-                    UnittestAssert::Less => Cmpop::Lt,
-                    UnittestAssert::LessEqual => Cmpop::LtE,
-                    UnittestAssert::Is => Cmpop::Is,
-                    UnittestAssert::IsNot => Cmpop::IsNot,
+                let cmp_op = match self {
+                    UnittestAssert::Equal | UnittestAssert::Equals => CmpOp::Eq,
+                    UnittestAssert::NotEqual | UnittestAssert::NotEquals => CmpOp::NotEq,
+                    UnittestAssert::Greater => CmpOp::Gt,
+                    UnittestAssert::GreaterEqual => CmpOp::GtE,
+                    UnittestAssert::Less => CmpOp::Lt,
+                    UnittestAssert::LessEqual => CmpOp::LtE,
+                    UnittestAssert::Is => CmpOp::Is,
+                    UnittestAssert::IsNot => CmpOp::IsNot,
                     _ => unreachable!(),
                 };
-                let expr = compare(first, cmpop, second);
+                let expr = compare(first, cmp_op, second);
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::In | UnittestAssert::NotIn => {
@@ -314,12 +314,12 @@ impl UnittestAssert {
                     .get("container")
                     .ok_or_else(|| anyhow!("Missing argument `container`"))?;
                 let msg = args.get("msg").copied();
-                let cmpop = if matches!(self, UnittestAssert::In) {
-                    Cmpop::In
+                let cmp_op = if matches!(self, UnittestAssert::In) {
+                    CmpOp::In
                 } else {
-                    Cmpop::NotIn
+                    CmpOp::NotIn
                 };
-                let expr = compare(member, cmpop, container);
+                let expr = compare(member, cmp_op, container);
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
@@ -327,17 +327,17 @@ impl UnittestAssert {
                     .get("expr")
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
-                let cmpop = if matches!(self, UnittestAssert::IsNone) {
-                    Cmpop::Is
+                let cmp_op = if matches!(self, UnittestAssert::IsNone) {
+                    CmpOp::Is
                 } else {
-                    Cmpop::IsNot
+                    CmpOp::IsNot
                 };
                 let node = Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
                     kind: None,
                     range: TextRange::default(),
                 });
-                let expr = compare(expr, cmpop, &node);
+                let expr = compare(expr, cmp_op, &node);
                 Ok(assert(&expr, msg))
             }
             UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
@@ -364,7 +364,7 @@ impl UnittestAssert {
                     Ok(assert(&isinstance, msg))
                 } else {
                     let node = ast::ExprUnaryOp {
-                        op: Unaryop::Not,
+                        op: UnaryOp::Not,
                         operand: Box::new(isinstance),
                         range: TextRange::default(),
                     };
@@ -390,7 +390,7 @@ impl UnittestAssert {
                 };
                 let node1 = ast::ExprAttribute {
                     value: Box::new(node.into()),
-                    attr: "search".into(),
+                    attr: Identifier::new("search".to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
@@ -405,7 +405,7 @@ impl UnittestAssert {
                     Ok(assert(&re_search, msg))
                 } else {
                     let node = ast::ExprUnaryOp {
-                        op: Unaryop::Not,
+                        op: UnaryOp::Not,
                         operand: Box::new(re_search),
                         range: TextRange::default(),
                     };

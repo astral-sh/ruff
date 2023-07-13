@@ -1,11 +1,15 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Excepthandler, MatchCase, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Ranged, Stmt};
+use std::iter::Peekable;
+use std::slice;
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::directives::IsortDirectives;
+use crate::jupyter::Notebook;
 use crate::rules::isort::helpers;
+use crate::source_kind::SourceKind;
 
 /// A block of imports within a Python module.
 #[derive(Debug, Default)]
@@ -28,7 +32,8 @@ pub(crate) struct BlockBuilder<'a> {
     locator: &'a Locator<'a>,
     is_stub: bool,
     blocks: Vec<Block<'a>>,
-    splits: &'a [TextSize],
+    splits: Peekable<slice::Iter<'a, TextSize>>,
+    cell_offsets: Option<Peekable<slice::Iter<'a, TextSize>>>,
     exclusions: &'a [TextRange],
     nested: bool,
 }
@@ -38,14 +43,19 @@ impl<'a> BlockBuilder<'a> {
         locator: &'a Locator<'a>,
         directives: &'a IsortDirectives,
         is_stub: bool,
+        source_kind: Option<&'a SourceKind>,
     ) -> Self {
         Self {
             locator,
             is_stub,
             blocks: vec![Block::default()],
-            splits: &directives.splits,
+            splits: directives.splits.iter().peekable(),
             exclusions: &directives.exclusions,
             nested: false,
+            cell_offsets: source_kind
+                .and_then(SourceKind::notebook)
+                .map(Notebook::cell_offsets)
+                .map(|offsets| offsets.iter().peekable()),
         }
     }
 
@@ -119,29 +129,58 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        // Track manual splits.
-        for (index, split) in self.splits.iter().enumerate() {
-            if stmt.start() >= *split {
-                self.finalize(self.trailer_for(stmt));
-                self.splits = &self.splits[index + 1..];
-            } else {
-                break;
+        // Track manual splits (e.g., `# isort: split`).
+        if self
+            .splits
+            .next_if(|split| stmt.start() >= **split)
+            .is_some()
+        {
+            // Skip any other splits that occur before the current statement, to support, e.g.:
+            // ```python
+            // # isort: split
+            // # isort: split
+            // import foo
+            // ```
+            while self
+                .splits
+                .peek()
+                .map_or(false, |split| stmt.start() >= **split)
+            {
+                self.splits.next();
             }
+
+            self.finalize(self.trailer_for(stmt));
         }
 
-        // Test if the statement is in an excluded range
-        let mut is_excluded = false;
-        for (index, exclusion) in self.exclusions.iter().enumerate() {
-            if exclusion.end() < stmt.start() {
-                self.exclusions = &self.exclusions[index + 1..];
-            } else {
-                is_excluded = exclusion.contains(stmt.start());
-                break;
+        // Track Jupyter notebook cell offsets as splits. This will make sure
+        // that each cell is considered as an individual block to organize the
+        // imports in. Thus, not creating an edit which spans across multiple
+        // cells.
+        if let Some(cell_offsets) = self.cell_offsets.as_mut() {
+            if cell_offsets
+                .next_if(|cell_offset| stmt.start() >= **cell_offset)
+                .is_some()
+            {
+                // Skip any other cell offsets that occur before the current statement (e.g., in
+                // the case of multiple empty cells).
+                while cell_offsets
+                    .peek()
+                    .map_or(false, |split| stmt.start() >= **split)
+                {
+                    cell_offsets.next();
+                }
+
+                self.finalize(None);
             }
         }
 
         // Track imports.
-        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) && !is_excluded {
+        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
+            && !self
+                .exclusions
+                .iter()
+                .any(|exclusion| exclusion.contains(stmt.start()))
+        {
             self.track_import(stmt);
         } else {
             self.finalize(self.trailer_for(stmt));
@@ -244,8 +283,8 @@ where
                 finalbody,
                 range: _,
             }) => {
-                for excepthandler in handlers {
-                    self.visit_excepthandler(excepthandler);
+                for except_handler in handlers {
+                    self.visit_except_handler(except_handler);
                 }
 
                 for stmt in body {
@@ -268,12 +307,12 @@ where
         self.nested = prev_nested;
     }
 
-    fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
+    fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
         let prev_nested = self.nested;
         self.nested = true;
 
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-            excepthandler;
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
+            except_handler;
         for stmt in body {
             self.visit_stmt(stmt);
         }

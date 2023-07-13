@@ -171,3 +171,17 @@ def f():
         if x.isdigit():
             return True
     return False
+
+async def f():
+    # OK
+    for x in iterable:
+        if await check(x):
+            return True
+    return False
+
+async def f():
+    # SIM110
+    for x in iterable:
+        if check(x):
+            return True
+    return False

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::scope::ScopeId;
+use ruff_python_semantic::ScopeId;
 
 use crate::checkers::ast::Checker;
 
@@ -34,12 +34,12 @@ impl Violation for UnusedAnnotation {
 
 /// F842
 pub(crate) fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
-    let scope = &checker.semantic_model().scopes[scope];
+    let scope = &checker.semantic().scopes[scope];
 
     let bindings: Vec<_> = scope
         .bindings()
         .filter_map(|(name, binding_id)| {
-            let binding = &checker.semantic_model().bindings[binding_id];
+            let binding = checker.semantic().binding(binding_id);
             if binding.kind.is_annotation()
                 && !binding.is_used()
                 && !checker.settings.dummy_variable_rgx.is_match(name)

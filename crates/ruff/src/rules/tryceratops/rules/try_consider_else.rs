@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Ranged, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -44,7 +44,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/errors.html)
+/// - [Python documentation: Errors and Exceptions](https://docs.python.org/3/tutorial/errors.html)
 #[violation]
 pub struct TryConsiderElse;
 
@@ -60,13 +60,13 @@ pub(crate) fn try_consider_else(
     checker: &mut Checker,
     body: &[Stmt],
     orelse: &[Stmt],
-    handler: &[Excepthandler],
+    handler: &[ExceptHandler],
 ) {
     if body.len() > 1 && orelse.is_empty() && !handler.is_empty() {
         if let Some(stmt) = body.last() {
             if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
                 if let Some(value) = value {
-                    if contains_effect(value, |id| checker.semantic_model().is_builtin(id)) {
+                    if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
                         return;
                     }
                 }

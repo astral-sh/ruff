@@ -342,16 +342,16 @@ pub(crate) fn reuse_of_groupby_generator(
     };
     // Check if the function call is `itertools.groupby`
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["itertools", "groupby"]
+            matches!(call_path.as_slice(), ["itertools", "groupby"])
         })
     {
         return;
     }
     let mut finder = GroupNameFinder::new(group_name);
-    for stmt in body.iter() {
+    for stmt in body {
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {

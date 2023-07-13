@@ -36,10 +36,5 @@ f"{ascii(bla)}"  # OK
 )
 
 
-f"{str(bla)}"  # RUF010
-
-f"{str(bla):20}"  # RUF010
-
-f"{bla!s}"  # RUF010
-
-f"{bla!s:20}"  # OK
+# OK
+f"{str({})}"

@@ -1,9 +1,20 @@
 pub mod analyze;
-pub mod binding;
-pub mod context;
-pub mod definition;
-pub mod globals;
-pub mod model;
-pub mod node;
-pub mod reference;
-pub mod scope;
+mod binding;
+mod context;
+mod definition;
+mod globals;
+mod model;
+mod node;
+mod reference;
+mod scope;
+mod star_import;
+
+pub use binding::*;
+pub use context::*;
+pub use definition::*;
+pub use globals::*;
+pub use model::*;
+pub use node::*;
+pub use reference::*;
+pub use scope::*;
+pub use star_import::*;

@@ -38,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/enum.html#enum.Enum)
+/// - [Python documentation: `enum.Enum`](https://docs.python.org/3/library/enum.html#enum.Enum)
 #[violation]
 pub struct NonUniqueEnums {
     value: String,
@@ -66,9 +66,11 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
     if !bases.iter().any(|expr| {
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
+            .map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["enum", "Enum"])
+            })
     }) {
         return;
     }
@@ -81,9 +83,11 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             if checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(func)
-                .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
+                .map_or(false, |call_path| {
+                    matches!(call_path.as_slice(), ["enum", "auto"])
+                })
             {
                 continue;
             }

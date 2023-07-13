@@ -3,12 +3,35 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for docstrings that do not start with a capital letter.
+///
+/// ## Why is this bad?
+/// The first character in a docstring should be capitalized for, grammatical
+/// correctness and consistency.
+///
+/// ## Example
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """return the mean of the given values."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct FirstLineCapitalized {
     first_word: String,
@@ -46,7 +69,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
 
     let body = docstring.body();
     let Some(first_word) = body.split(' ').next() else {
-        return
+        return;
     };
 
     // Like pydocstyle, we only support ASCII for now.
@@ -76,8 +99,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             capitalized_word,
             TextRange::at(body.start(), first_word.text_len()),
         )));

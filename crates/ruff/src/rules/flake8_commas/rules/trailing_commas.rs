@@ -222,12 +222,11 @@ impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
 
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
+    diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     let tokens = tokens
         .iter()
         .flatten()
@@ -326,8 +325,7 @@ pub(crate) fn trailing_commas(
             let comma = prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
             if settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(diagnostic.range())));
+                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(diagnostic.range())));
             }
             diagnostics.push(diagnostic);
         }
@@ -367,8 +365,7 @@ pub(crate) fn trailing_commas(
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
                 let contents = locator.slice(missing_comma.1);
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     format!("{contents},"),
                     missing_comma.1,
                 )));
@@ -389,6 +386,4 @@ pub(crate) fn trailing_commas(
             stack.pop();
         }
     }
-
-    diagnostics
 }

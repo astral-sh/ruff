@@ -9,9 +9,11 @@ use super::settings::RelativeImportsOrder;
 use super::sorting::{cmp_import_from, cmp_members, cmp_modules};
 use super::types::{AliasData, CommentSet, ImportBlock, OrderedImportBlock};
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
     order_by_type: bool,
+    case_sensitive: bool,
     relative_imports_order: RelativeImportsOrder,
     classes: &'a BTreeSet<String>,
     constants: &'a BTreeSet<String>,
@@ -25,7 +27,9 @@ pub(crate) fn order_imports<'a>(
         block
             .import
             .into_iter()
-            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, force_to_top)),
+            .sorted_by(|(alias1, _), (alias2, _)| {
+                cmp_modules(alias1, alias2, force_to_top, case_sensitive)
+            }),
     );
 
     // Sort `Stmt::ImportFrom`.
@@ -43,7 +47,7 @@ pub(crate) fn order_imports<'a>(
             )
             .chain(
                 // Include all star imports.
-                block.import_from_star.into_iter(),
+                block.import_from_star,
             )
             .map(
                 |(
@@ -70,6 +74,7 @@ pub(crate) fn order_imports<'a>(
                                     constants,
                                     variables,
                                     force_to_top,
+                                    case_sensitive,
                                 )
                             })
                             .collect::<Vec<(AliasData, CommentSet)>>(),
@@ -83,6 +88,7 @@ pub(crate) fn order_imports<'a>(
                         import_from2,
                         relative_imports_order,
                         force_to_top,
+                        case_sensitive,
                     )
                     .then_with(|| match (aliases1.first(), aliases2.first()) {
                         (None, None) => Ordering::Equal,
@@ -96,6 +102,7 @@ pub(crate) fn order_imports<'a>(
                             constants,
                             variables,
                             force_to_top,
+                            case_sensitive,
                         ),
                     })
                 },

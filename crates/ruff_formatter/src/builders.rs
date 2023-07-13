@@ -528,7 +528,22 @@ impl<Context> Format<Context> for LineSuffixBoundary {
 /// use ruff_formatter::prelude::*;
 /// use ruff_formatter::{format, write, LineWidth};
 ///
-/// enum SomeLabelId {}
+/// #[derive(Debug, Copy, Clone)]
+/// enum MyLabels {
+///     Main
+/// }
+///
+/// impl tag::LabelDefinition for MyLabels {
+///     fn value(&self) -> u64 {
+///         *self as u64
+///     }
+///
+///     fn name(&self) -> &'static str {
+///         match self {
+///             Self::Main => "Main"
+///         }
+///     }
+/// }
 ///
 /// # fn main() -> FormatResult<()> {
 /// let formatted = format!(
@@ -537,24 +552,24 @@ impl<Context> Format<Context> for LineSuffixBoundary {
 ///         let mut recording = f.start_recording();
 ///         write!(recording, [
 ///             labelled(
-///                 LabelId::of::<SomeLabelId>(),
+///                 LabelId::of(MyLabels::Main),
 ///                 &text("'I have a label'")
 ///             )
 ///         ])?;
 ///
 ///         let recorded = recording.stop();
 ///
-///         let is_labelled = recorded.first().map_or(false, |element| element.has_label(LabelId::of::<SomeLabelId>()));
+///         let is_labelled = recorded.first().map_or(false, |element| element.has_label(LabelId::of(MyLabels::Main)));
 ///
 ///         if is_labelled {
-///             write!(f, [text(" has label SomeLabelId")])
+///             write!(f, [text(" has label `Main`")])
 ///         } else {
-///             write!(f, [text(" doesn't have label SomeLabelId")])
+///             write!(f, [text(" doesn't have label `Main`")])
 ///         }
 ///     })]
 /// )?;
 ///
-/// assert_eq!("'I have a label' has label SomeLabelId", formatted.print()?.as_code());
+/// assert_eq!("'I have a label' has label `Main`", formatted.print()?.as_code());
 /// # Ok(())
 /// # }
 /// ```
@@ -1395,9 +1410,138 @@ impl<Context> Format<Context> for Group<'_, Context> {
 
 impl<Context> std::fmt::Debug for Group<'_, Context> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GroupElements")
+        f.debug_struct("Group")
             .field("group_id", &self.group_id)
             .field("should_expand", &self.should_expand)
+            .field("content", &"{{content}}")
+            .finish()
+    }
+}
+
+/// Sets the `condition` for the group. The element will behave as a regular group if `condition` is met,
+/// and as *ungrouped* content if the condition is not met.
+///
+/// ## Examples
+///
+/// Only expand before operators if the parentheses are necessary.
+///
+/// ```
+/// # use ruff_formatter::prelude::*;
+/// # use ruff_formatter::{format, format_args, LineWidth, SimpleFormatOptions};
+///
+/// # fn main() -> FormatResult<()> {
+/// use ruff_formatter::Formatted;
+/// let content = format_with(|f| {
+///     let parentheses_id = f.group_id("parentheses");
+///     group(&format_args![
+///         if_group_breaks(&text("(")),
+///         indent_if_group_breaks(&format_args![
+///             soft_line_break(),
+///             conditional_group(&format_args![
+///                 text("'aaaaaaa'"),
+///                 soft_line_break_or_space(),
+///                 text("+"),
+///                 space(),
+///                 fits_expanded(&conditional_group(&format_args![
+///                     text("["),
+///                     soft_block_indent(&format_args![
+///                         text("'Good morning!',"),
+///                         soft_line_break_or_space(),
+///                         text("'How are you?'"),
+///                     ]),
+///                     text("]"),
+///                 ], tag::Condition::if_group_fits_on_line(parentheses_id))),
+///                 soft_line_break_or_space(),
+///                 text("+"),
+///                 space(),
+///                 conditional_group(&format_args![
+///                     text("'bbbb'"),
+///                     soft_line_break_or_space(),
+///                     text("and"),
+///                     space(),
+///                     text("'c'")
+///                 ], tag::Condition::if_group_fits_on_line(parentheses_id))
+///             ], tag::Condition::if_breaks()),
+///         ], parentheses_id),
+///         soft_line_break(),
+///         if_group_breaks(&text(")"))
+///     ])
+///     .with_group_id(Some(parentheses_id))
+///     .fmt(f)
+/// });
+///
+/// let formatted = format!(SimpleFormatContext::default(), [content])?;
+/// let document = formatted.into_document();
+///
+/// // All content fits
+/// let all_fits = Formatted::new(document.clone(), SimpleFormatContext::new(SimpleFormatOptions {
+///     line_width: LineWidth::try_from(65).unwrap(),
+///     ..SimpleFormatOptions::default()
+/// }));
+///
+/// assert_eq!(
+///     "'aaaaaaa' + ['Good morning!', 'How are you?'] + 'bbbb' and 'c'",
+///     all_fits.print()?.as_code()
+/// );
+///
+/// // The parentheses group fits, because it can expand the list,
+/// let list_expanded = Formatted::new(document.clone(), SimpleFormatContext::new(SimpleFormatOptions {
+///     line_width: LineWidth::try_from(21).unwrap(),
+///     ..SimpleFormatOptions::default()
+/// }));
+///
+/// assert_eq!(
+///     "'aaaaaaa' + [\n\t'Good morning!',\n\t'How are you?'\n] + 'bbbb' and 'c'",
+///     list_expanded.print()?.as_code()
+/// );
+///
+/// // It is necessary to split all groups to fit the content
+/// let all_expanded = Formatted::new(document, SimpleFormatContext::new(SimpleFormatOptions {
+///     line_width: LineWidth::try_from(11).unwrap(),
+///     ..SimpleFormatOptions::default()
+/// }));
+///
+/// assert_eq!(
+///     "(\n\t'aaaaaaa'\n\t+ [\n\t\t'Good morning!',\n\t\t'How are you?'\n\t]\n\t+ 'bbbb'\n\tand 'c'\n)",
+///     all_expanded.print()?.as_code()
+/// );
+/// # Ok(())
+/// # }
+/// ```
+#[inline]
+pub fn conditional_group<Content, Context>(
+    content: &Content,
+    condition: Condition,
+) -> ConditionalGroup<Context>
+where
+    Content: Format<Context>,
+{
+    ConditionalGroup {
+        content: Argument::new(content),
+        condition,
+    }
+}
+
+#[derive(Clone)]
+pub struct ConditionalGroup<'content, Context> {
+    content: Argument<'content, Context>,
+    condition: Condition,
+}
+
+impl<Context> Format<Context> for ConditionalGroup<'_, Context> {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(StartConditionalGroup(
+            tag::ConditionalGroup::new(self.condition),
+        )))?;
+        f.write_fmt(Arguments::from(&self.content))?;
+        f.write_element(FormatElement::Tag(EndConditionalGroup))
+    }
+}
+
+impl<Context> std::fmt::Debug for ConditionalGroup<'_, Context> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConditionalGroup")
+            .field("condition", &self.condition)
             .field("content", &"{{content}}")
             .finish()
     }
@@ -1826,6 +1970,86 @@ impl<Context> std::fmt::Debug for IndentIfGroupBreaks<'_, Context> {
     }
 }
 
+/// Changes the definition of *fits* for `content`. Instead of measuring it in *flat*, measure it with
+/// all line breaks expanded and test if no line exceeds the line width. The [`FitsExpanded`] acts
+/// as a expands boundary similar to best fitting, meaning that a [hard_line_break] will not cause the parent group to expand.
+///
+/// Useful in conjunction with a group with a condition.
+///
+/// ## Examples
+/// The outer group with the binary expression remains *flat* regardless of the array expression
+/// that spans multiple lines.
+///
+/// ```
+/// # use ruff_formatter::{format, format_args, LineWidth, SimpleFormatOptions, write};
+/// # use ruff_formatter::prelude::*;
+///
+/// # fn main() -> FormatResult<()> {
+/// let content = format_with(|f| {
+///     let group_id = f.group_id("header");
+///
+///     write!(f, [
+///         group(&format_args![
+///             text("a"),
+///             soft_line_break_or_space(),
+///             text("+"),
+///             space(),
+///             fits_expanded(&group(&format_args![
+///                 text("["),
+///                 soft_block_indent(&format_args![
+///                     text("a,"), space(), text("# comment"), expand_parent(), soft_line_break_or_space(),
+///                     text("b")
+///                 ]),
+///                 text("]")
+///             ]))
+///         ]),
+///     ])
+/// });
+///
+/// let formatted = format!(SimpleFormatContext::default(), [content])?;
+///
+/// assert_eq!(
+///     "a + [\n\ta, # comment\n\tb\n]",
+///     formatted.print()?.as_code()
+/// );
+/// # Ok(())
+/// # }
+/// ```
+pub fn fits_expanded<Content, Context>(content: &Content) -> FitsExpanded<Context>
+where
+    Content: Format<Context>,
+{
+    FitsExpanded {
+        content: Argument::new(content),
+        condition: None,
+    }
+}
+
+#[derive(Clone)]
+pub struct FitsExpanded<'a, Context> {
+    content: Argument<'a, Context>,
+    condition: Option<Condition>,
+}
+
+impl<Context> FitsExpanded<'_, Context> {
+    /// Sets a `condition` to when the content should fit in expanded mode. The content uses the regular fits
+    /// definition if the `condition` is not met.
+    pub fn with_condition(mut self, condition: Option<Condition>) -> Self {
+        self.condition = condition;
+        self
+    }
+}
+
+impl<Context> Format<Context> for FitsExpanded<'_, Context> {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(StartFitsExpanded(
+            tag::FitsExpanded::new().with_condition(self.condition),
+        )))?;
+        f.write_fmt(Arguments::from(&self.content))?;
+        f.write_element(FormatElement::Tag(EndFitsExpanded))
+    }
+}
+
 /// Utility for formatting some content with an inline lambda function.
 #[derive(Copy, Clone)]
 pub struct FormatWith<Context, T> {
@@ -2131,11 +2355,11 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
 /// The first variant is the most flat, and the last is the most expanded variant.
 /// See [`best_fitting!`] macro for a more in-detail documentation
 #[derive(Copy, Clone)]
-pub struct FormatBestFitting<'a, Context> {
+pub struct BestFitting<'a, Context> {
     variants: Arguments<'a, Context>,
 }
 
-impl<'a, Context> FormatBestFitting<'a, Context> {
+impl<'a, Context> BestFitting<'a, Context> {
     /// Creates a new best fitting IR with the given variants. The method itself isn't unsafe
     /// but it is to discourage people from using it because the printer will panic if
     /// the slice doesn't contain at least the least and most expanded variants.
@@ -2154,7 +2378,7 @@ impl<'a, Context> FormatBestFitting<'a, Context> {
     }
 }
 
-impl<Context> Format<Context> for FormatBestFitting<'_, Context> {
+impl<Context> Format<Context> for BestFitting<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let mut buffer = VecBuffer::new(f.state_mut());
         let variants = self.variants.items();
@@ -2172,9 +2396,11 @@ impl<Context> Format<Context> for FormatBestFitting<'_, Context> {
         // SAFETY: The constructor guarantees that there are always at least two variants. It's, therefore,
         // safe to call into the unsafe `from_vec_unchecked` function
         let element = unsafe {
-            FormatElement::BestFitting(format_element::BestFitting::from_vec_unchecked(
-                formatted_variants,
-            ))
+            FormatElement::BestFitting {
+                variants: format_element::BestFittingVariants::from_vec_unchecked(
+                    formatted_variants,
+                ),
+            }
         };
 
         f.write_element(element)

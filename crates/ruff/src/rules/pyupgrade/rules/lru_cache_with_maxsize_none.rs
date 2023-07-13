@@ -1,13 +1,47 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Decorator, Expr, Keyword, Ranged};
+use rustpython_parser::ast::{self, Decorator, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of `functools.lru_cache` that set `maxsize=None`.
+///
+/// ## Why is this bad?
+/// Since Python 3.9, `functools.cache` can be used as a drop-in replacement
+/// for `functools.lru_cache(maxsize=None)`. When possible, prefer
+/// `functools.cache` as it is more readable and idiomatic.
+///
+/// ## Example
+/// ```python
+/// import functools
+///
+///
+/// @functools.lru_cache(maxsize=None)
+/// def foo():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import functools
+///
+///
+/// @functools.cache
+/// def foo():
+///     ...
+/// ```
+///
+/// ## Options
+/// - `target-version`
+///
+/// ## References
+/// - [Python documentation: `@functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 #[violation]
 pub struct LRUCacheWithMaxsizeNone;
 
@@ -24,13 +58,14 @@ impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
 
 /// UP033
 pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Decorator]) {
-    for decorator in decorator_list.iter() {
+    for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
             range: _,
-        }) = &decorator.expression else {
+        }) = &decorator.expression
+        else {
             continue;
         };
 
@@ -38,10 +73,10 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
         if args.is_empty()
             && keywords.len() == 1
             && checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| {
-                    call_path.as_slice() == ["functools", "lru_cache"]
+                    matches!(call_path.as_slice(), ["functools", "lru_cache"])
                 })
         {
             let Keyword {
@@ -49,16 +84,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 value,
                 range: _,
             } = &keywords[0];
-            if arg.as_ref().map_or(false, |arg| arg == "maxsize")
-                && matches!(
-                    value,
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::None,
-                        kind: None,
-                        range: _,
-                    })
-                )
-            {
+            if arg.as_ref().map_or(false, |arg| arg == "maxsize") && is_const_none(value) {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
@@ -68,12 +94,11 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
                             &ImportRequest::import("functools", "cache"),
                             decorator.start(),
-                            checker.semantic_model(),
+                            checker.semantic(),
                         )?;
                         let reference_edit =
                             Edit::range_replacement(binding, decorator.expression.range());
-                        #[allow(deprecated)]
-                        Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
+                        Ok(Fix::automatic_edits(import_edit, [reference_edit]))
                     });
                 }
                 checker.diagnostics.push(diagnostic);

@@ -27,10 +27,10 @@ impl Violation for CallDateFromtimestamp {
 /// Use `datetime.datetime.fromtimestamp(, tz=).date()` instead.
 pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "date", "fromtimestamp"]
+            matches!(call_path.as_slice(), ["datetime", "date", "fromtimestamp"])
         })
     {
         checker

@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
+/// - [Python documentation: `logger.Logger.warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
 #[violation]
 pub struct DeprecatedLogWarn;
 
@@ -44,10 +44,10 @@ impl Violation for DeprecatedLogWarn {
 /// PGH002
 pub(crate) fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["logging", "warn"]
+            matches!(call_path.as_slice(), ["logging", "warn"])
         })
     {
         checker

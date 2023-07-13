@@ -3,7 +3,7 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::autofix::edits::delete_stmt;
@@ -50,8 +50,9 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         returns,
         args,
         ..
-    }) = stmt else {
-        return
+    }) = stmt
+    else {
+        return;
     };
 
     let Some(returns) = returns else {
@@ -62,7 +63,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if !checker.semantic_model().scope().kind.is_class() {
+    if !checker.semantic().scope().kind.is_class() {
         return;
     }
 
@@ -72,12 +73,12 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if is_abstract(checker.semantic_model(), decorator_list) {
+    if is_abstract(decorator_list, checker.semantic()) {
         return;
     }
 
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(returns)
         .map_or(true, |call_path| {
             !matches!(call_path.as_slice(), ["" | "builtins", "str"])
@@ -90,20 +91,14 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         StrOrReprDefinedInStub {
             name: name.to_string(),
         },
-        identifier_range(stmt, checker.locator),
+        stmt.identifier(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic_model().stmt();
-        let parent = checker.semantic_model().stmt_parent();
-        let edit = delete_stmt(
-            stmt,
-            parent,
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        );
+        let stmt = checker.semantic().stmt();
+        let parent = checker.semantic().stmt_parent();
+        let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
         diagnostic.set_fix(
-            Fix::automatic(edit).isolate(checker.isolation(checker.semantic_model().stmt_parent())),
+            Fix::automatic(edit).isolate(checker.isolation(checker.semantic().stmt_parent())),
         );
     }
     checker.diagnostics.push(diagnostic);

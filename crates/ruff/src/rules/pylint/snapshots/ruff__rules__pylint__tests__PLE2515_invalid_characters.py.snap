@@ -12,7 +12,7 @@ invalid_characters.py:34:13: PLE2515 [*] Invalid unescaped character zero-width-
    |
    = help: Replace with escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 31 31 | 
 32 32 | nul_ok = '\0'
 33 33 | 
@@ -32,7 +32,7 @@ invalid_characters.py:38:36: PLE2515 [*] Invalid unescaped character zero-width-
    |
    = help: Replace with escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 35 35 | 
 36 36 | zwsp_ok = '\u200b'
 37 37 | 
@@ -48,7 +48,7 @@ invalid_characters.py:39:60: PLE2515 [*] Invalid unescaped character zero-width-
    |
    = help: Replace with escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 36 36 | zwsp_ok = '\u200b'
 37 37 | 
 38 38 | zwsp_after_multibyte_character = "ಫ​"
@@ -63,7 +63,7 @@ invalid_characters.py:39:61: PLE2515 [*] Invalid unescaped character zero-width-
    |
    = help: Replace with escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 36 36 | zwsp_ok = '\u200b'
 37 37 | 
 38 38 | zwsp_after_multibyte_character = "ಫ​"

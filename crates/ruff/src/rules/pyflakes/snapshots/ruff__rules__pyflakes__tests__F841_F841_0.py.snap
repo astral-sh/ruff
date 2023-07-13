@@ -11,7 +11,7 @@ F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
   |
   = help: Remove assignment to unused variable `e`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | try:
 2 2 |     1 / 0
 3   |-except ValueError as e:

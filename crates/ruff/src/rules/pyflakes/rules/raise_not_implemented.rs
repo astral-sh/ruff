@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{self, Expr, Ranged};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -37,14 +37,16 @@ use crate::registry::AsRule;
 #[violation]
 pub struct RaiseNotImplemented;
 
-impl AlwaysAutofixableViolation for RaiseNotImplemented {
+impl Violation for RaiseNotImplemented {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`raise NotImplemented` should be `raise NotImplementedError`")
     }
 
-    fn autofix_title(&self) -> String {
-        "Use `raise NotImplementedError`".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Use `raise NotImplementedError`".to_string())
     }
 }
 
@@ -74,11 +76,12 @@ pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     };
     let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            "NotImplementedError".to_string(),
-            expr.range(),
-        )));
+        if checker.semantic().is_builtin("NotImplementedError") {
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                "NotImplementedError".to_string(),
+                expr.range(),
+            )));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

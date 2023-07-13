@@ -20,7 +20,7 @@ use crate::rules::pep8_naming::helpers;
 /// > Modules that are designed for use via from M import * should use the
 /// __all__ mechanism to prevent exporting globals, or use the older
 /// convention of prefixing such globals with an underscore (which you might
-///want to do to indicate these globals are “module non-public”).
+/// want to do to indicate these globals are “module non-public”).
 /// >
 /// > ### Function and Variable Names
 /// > Function names should be lowercase, with words separated by underscores
@@ -71,12 +71,11 @@ pub(crate) fn mixed_case_variable_in_global_scope(
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name == name)
+        .any(|ignore_name| ignore_name.matches(name))
     {
         return;
     }
-    if helpers::is_mixed_case(name)
-        && !helpers::is_named_tuple_assignment(checker.semantic_model(), stmt)
+    if helpers::is_mixed_case(name) && !helpers::is_named_tuple_assignment(stmt, checker.semantic())
     {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInGlobalScope {

@@ -1,22 +1,19 @@
 use crate::comments::Comments;
-use ruff_formatter::{FormatContext, SimpleFormatOptions, SourceCode};
+use crate::PyFormatOptions;
+use ruff_formatter::{FormatContext, GroupId, SourceCode};
 use ruff_python_ast::source_code::Locator;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
 pub struct PyFormatContext<'a> {
-    options: SimpleFormatOptions,
+    options: PyFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
     node_level: NodeLevel,
 }
 
 impl<'a> PyFormatContext<'a> {
-    pub(crate) fn new(
-        options: SimpleFormatOptions,
-        contents: &'a str,
-        comments: Comments<'a>,
-    ) -> Self {
+    pub(crate) fn new(options: PyFormatOptions, contents: &'a str, comments: Comments<'a>) -> Self {
         Self {
             options,
             contents,
@@ -25,7 +22,7 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    pub(crate) fn contents(&self) -> &'a str {
+    pub(crate) fn source(&self) -> &'a str {
         self.contents
     }
 
@@ -48,7 +45,7 @@ impl<'a> PyFormatContext<'a> {
 }
 
 impl FormatContext for PyFormatContext<'_> {
-    type Options = SimpleFormatOptions;
+    type Options = PyFormatOptions;
 
     fn options(&self) -> &Self::Options {
         &self.options
@@ -81,6 +78,9 @@ pub(crate) enum NodeLevel {
     /// (`if`, `while`, `match`, etc.).
     CompoundStatement,
 
-    /// Formatting nodes that are enclosed in a parenthesized expression.
-    Expression,
+    /// The root or any sub-expression.
+    Expression(Option<GroupId>),
+
+    /// Formatting nodes that are enclosed by a parenthesized (any `[]`, `{}` or `()`) expression.
+    ParenthesizedExpression,
 }

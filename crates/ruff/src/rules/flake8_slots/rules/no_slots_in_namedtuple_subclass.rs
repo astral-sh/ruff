@@ -3,8 +3,8 @@ use rustpython_parser::ast::{Expr, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::prelude::Stmt;
+use ruff_python_ast::identifier::Identifier;
+use rustpython_parser::ast::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -46,7 +46,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `__slots__`](https://docs.python.org/3.7/reference/datamodel.html#slots)
+/// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[violation]
 pub struct NoSlotsInNamedtupleSubclass;
 
@@ -68,7 +68,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
             return false;
         };
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(func)
             .map_or(false, |call_path| {
                 matches!(call_path.as_slice(), ["collections", "namedtuple"])
@@ -77,7 +77,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
         if !has_slots(&class.body) {
             checker.diagnostics.push(Diagnostic::new(
                 NoSlotsInNamedtupleSubclass,
-                identifier_range(stmt, checker.locator),
+                stmt.identifier(),
             ));
         }
     }

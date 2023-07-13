@@ -11,7 +11,7 @@ F541.py:6:5: F541 [*] f-string without any placeholders
   |
   = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | b = f"ghi{'jkl'}"
 4 4 | 
 5 5 | # Errors
@@ -32,7 +32,7 @@ F541.py:7:5: F541 [*] f-string without any placeholders
   |
   = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 4 4 | 
 5 5 | # Errors
 6 6 | c = f"def"
@@ -53,7 +53,7 @@ F541.py:9:5: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 6  6  | c = f"def"
 7  7  | d = f"def" + "ghi"
 8  8  | e = (
@@ -74,7 +74,7 @@ F541.py:13:5: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 10 10 |     "ghi"
 11 11 | )
 12 12 | f = (
@@ -95,7 +95,7 @@ F541.py:14:5: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 11 11 | )
 12 12 | f = (
 13 13 |     f"a"
@@ -116,7 +116,7 @@ F541.py:16:5: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 13 13 |     f"a"
 14 14 |     F"b"
 15 15 |     "c"
@@ -137,7 +137,7 @@ F541.py:17:5: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 14 14 |     F"b"
 15 15 |     "c"
 16 16 |     rf"d"
@@ -158,7 +158,7 @@ F541.py:19:5: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 16 16 |     rf"d"
 17 17 |     fr"e"
 18 18 | )
@@ -178,7 +178,7 @@ F541.py:25:13: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 22 22 | g = f"ghi{123:{45}}"
 23 23 | 
 24 24 | # Error
@@ -198,7 +198,7 @@ F541.py:34:7: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 31 31 | f"{f'{v:0.2f}'}"
 32 32 | 
 33 33 | # Errors
@@ -219,7 +219,7 @@ F541.py:35:4: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 32 32 | 
 33 33 | # Errors
 34 34 | f"{v:{f'0.2f'}}"
@@ -240,7 +240,7 @@ F541.py:36:1: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 33 33 | # Errors
 34 34 | f"{v:{f'0.2f'}}"
 35 35 | f"{f''}"
@@ -261,7 +261,7 @@ F541.py:37:1: F541 [*] f-string without any placeholders
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 34 34 | f"{v:{f'0.2f'}}"
 35 35 | f"{f''}"
 36 36 | f"{{test}}"
@@ -269,7 +269,7 @@ F541.py:37:1: F541 [*] f-string without any placeholders
    37 |+'{ 40 }'
 38 38 | f"{{a {{x}}"
 39 39 | f"{{{{x}}}}"
-40 40 | 
+40 40 | ""f""
 
 F541.py:38:1: F541 [*] f-string without any placeholders
    |
@@ -278,18 +278,19 @@ F541.py:38:1: F541 [*] f-string without any placeholders
 38 | f"{{a {{x}}"
    | ^^^^^^^^^^^^ F541
 39 | f"{{{{x}}}}"
+40 | ""f""
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 35 35 | f"{f''}"
 36 36 | f"{{test}}"
 37 37 | f'{{ 40 }}'
 38    |-f"{{a {{x}}"
    38 |+"{a {x}"
 39 39 | f"{{{{x}}}}"
-40 40 | 
-41 41 | # To be fixed
+40 40 | ""f""
+41 41 | ''f""
 
 F541.py:39:1: F541 [*] f-string without any placeholders
    |
@@ -297,19 +298,81 @@ F541.py:39:1: F541 [*] f-string without any placeholders
 38 | f"{{a {{x}}"
 39 | f"{{{{x}}}}"
    | ^^^^^^^^^^^^ F541
-40 | 
-41 | # To be fixed
+40 | ""f""
+41 | ''f""
    |
    = help: Remove extraneous `f` prefix
 
-ℹ Suggested fix
+ℹ Fix
 36 36 | f"{{test}}"
 37 37 | f'{{ 40 }}'
 38 38 | f"{{a {{x}}"
 39    |-f"{{{{x}}}}"
    39 |+"{{x}}"
-40 40 | 
-41 41 | # To be fixed
-42 42 | # Error: f-string: single '}' is not allowed at line 41 column 8
+40 40 | ""f""
+41 41 | ''f""
+42 42 | (""f""r"")
+
+F541.py:40:3: F541 [*] f-string without any placeholders
+   |
+38 | f"{{a {{x}}"
+39 | f"{{{{x}}}}"
+40 | ""f""
+   |   ^^^ F541
+41 | ''f""
+42 | (""f""r"")
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Fix
+37 37 | f'{{ 40 }}'
+38 38 | f"{{a {{x}}"
+39 39 | f"{{{{x}}}}"
+40    |-""f""
+   40 |+"" ""
+41 41 | ''f""
+42 42 | (""f""r"")
+43 43 | 
+
+F541.py:41:3: F541 [*] f-string without any placeholders
+   |
+39 | f"{{{{x}}}}"
+40 | ""f""
+41 | ''f""
+   |   ^^^ F541
+42 | (""f""r"")
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Fix
+38 38 | f"{{a {{x}}"
+39 39 | f"{{{{x}}}}"
+40 40 | ""f""
+41    |-''f""
+   41 |+''""
+42 42 | (""f""r"")
+43 43 | 
+44 44 | # To be fixed
+
+F541.py:42:4: F541 [*] f-string without any placeholders
+   |
+40 | ""f""
+41 | ''f""
+42 | (""f""r"")
+   |    ^^^ F541
+43 | 
+44 | # To be fixed
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Fix
+39 39 | f"{{{{x}}}}"
+40 40 | ""f""
+41 41 | ''f""
+42    |-(""f""r"")
+   42 |+("" ""r"")
+43 43 | 
+44 44 | # To be fixed
+45 45 | # Error: f-string: single '}' is not allowed at line 41 column 8
 
 

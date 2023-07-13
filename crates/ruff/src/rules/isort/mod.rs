@@ -74,6 +74,7 @@ pub(crate) fn format_imports(
     combine_as_imports: bool,
     force_single_line: bool,
     force_sort_within_sections: bool,
+    case_sensitive: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
@@ -114,6 +115,7 @@ pub(crate) fn format_imports(
             src,
             package,
             force_sort_within_sections,
+            case_sensitive,
             force_wrap_aliases,
             force_to_top,
             known_modules,
@@ -171,6 +173,7 @@ fn format_import_block(
     src: &[PathBuf],
     package: Option<&Path>,
     force_sort_within_sections: bool,
+    case_sensitive: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
@@ -206,6 +209,7 @@ fn format_import_block(
         let imports = order_imports(
             import_block,
             order_by_type,
+            case_sensitive,
             relative_imports_order,
             classes,
             constants,
@@ -222,7 +226,13 @@ fn format_import_block(
                 .collect::<Vec<EitherImport>>();
             if force_sort_within_sections {
                 imports.sort_by(|import1, import2| {
-                    cmp_either_import(import1, import2, relative_imports_order, force_to_top)
+                    cmp_either_import(
+                        import1,
+                        import2,
+                        relative_imports_order,
+                        force_to_top,
+                        case_sensitive,
+                    )
                 });
             };
             imports
@@ -359,6 +369,10 @@ mod tests {
         Ok(())
     }
 
+    fn pattern(pattern: &str) -> glob::Pattern {
+        glob::Pattern::new(pattern).unwrap()
+    }
+
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
     fn separate_modules(path: &Path) -> Result<()> {
         let snapshot = format!("1_{}", path.to_string_lossy());
@@ -367,8 +381,32 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["foo.bar".to_string(), "baz".to_string()],
-                        vec!["foo".to_string(), "__future__".to_string()],
+                        vec![pattern("foo.bar"), pattern("baz")],
+                        vec![pattern("foo"), pattern("__future__")],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules_glob(path: &Path) -> Result<()> {
+        let snapshot = format!("glob_1_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![pattern("foo.*"), pattern("baz")],
+                        vec![pattern("foo"), pattern("__future__")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -391,8 +429,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["foo".to_string()],
-                        vec!["foo.bar".to_string()],
+                        vec![pattern("foo")],
+                        vec![pattern("foo.bar")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -435,10 +473,28 @@ mod tests {
                     known_modules: KnownModules::new(
                         vec![],
                         vec![],
-                        vec!["ruff".to_string()],
+                        vec![pattern("ruff")],
                         vec![],
                         FxHashMap::default(),
                     ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("case_sensitive.py"))]
+    fn case_sensitive(path: &Path) -> Result<()> {
+        let snapshot = format!("case_sensitive_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    case_sensitive: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -933,7 +989,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
@@ -962,11 +1018,11 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["library".to_string()],
+                        vec![pattern("library")],
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),

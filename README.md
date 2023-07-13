@@ -14,9 +14,9 @@ An extremely fast Python linter, written in Rust.
 
 <p align="center">
   <picture align="center">
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
-    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/232603514-c95e9b0f-6b31-43de-9a80-9e844173fd6a.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/232603516-4fb4892d-585c-4b20-b810-3db9161831e4.svg">
+    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/232603516-4fb4892d-585c-4b20-b810-3db9161831e4.svg">
   </picture>
 </p>
 
@@ -34,7 +34,8 @@ An extremely fast Python linter, written in Rust.
 - ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
   built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
+- ⌨️ First-party [editor integrations](https://beta.ruff.rs/docs/editor-integrations/) for
+  [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -139,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.272
+  rev: v0.0.278
   hooks:
     - id: ruff
 ```
@@ -261,6 +262,7 @@ quality tools, including:
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-copyright/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)
@@ -329,8 +331,10 @@ We're grateful to the maintainers of these tools for their work, and for all
 the value they've provided to the Python community.
 
 Ruff's autoformatter is built on a fork of Rome's [`rome_formatter`](https://github.com/rome/tools/tree/main/crates/rome_formatter),
-and again draws on both the APIs and implementation details of [Rome](https://github.com/rome/tools),
+and again draws on both API and implementation details from [Rome](https://github.com/rome/tools),
 [Prettier](https://github.com/prettier/prettier), and [Black](https://github.com/psf/black).
+
+Ruff's import resolver is based on the import resolution algorithm from [Pyright](https://github.com/microsoft/pyright).
 
 Ruff is also influenced by a number of tools outside the Python ecosystem, like
 [Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).
@@ -344,6 +348,7 @@ Ruff is released under the MIT license.
 Ruff is used by a number of major open-source projects and companies, including:
 
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
+- Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
 - AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
 - Benchling ([Refac](https://github.com/benchling/refac))
@@ -353,26 +358,30 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [DVC](https://github.com/iterative/dvc)
 - [Dagger](https://github.com/dagger/dagger)
 - [Dagster](https://github.com/dagster-io/dagster)
+- Databricks ([MLflow](https://github.com/mlflow/mlflow))
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
+- [HTTPX](https://github.com/encode/httpx)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
   [Datasets](https://github.com/huggingface/datasets),
   [Diffusers](https://github.com/huggingface/diffusers))
 - [Hatch](https://github.com/pypa/hatch)
 - [Home Assistant](https://github.com/home-assistant/core)
+- ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [LangChain](https://github.com/hwchase17/langchain)
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
 - Matrix ([Synapse](https://github.com/matrix-org/synapse))
-- Meltano ([Meltano CLI](https://github.com/meltano/meltano), [Singer SDK](https://github.com/meltano/sdk))
-- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
-- Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
+- Meltano ([Meltano CLI](https://github.com/meltano/meltano), [Singer SDK](https://github.com/meltano/sdk))
 - Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
   [ONNX Runtime](https://github.com/microsoft/onnxruntime),
   [LightGBM](https://github.com/microsoft/LightGBM))
+- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
+- Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
+- [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [ONNX](https://github.com/onnx/onnx)
@@ -408,6 +417,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [featuretools](https://github.com/alteryx/featuretools)
 - [meson-python](https://github.com/mesonbuild/meson-python)
 - [nox](https://github.com/wntrblm/nox)
+- [pip](https://github.com/pypa/pip)
 
 ### Show Your Support
 

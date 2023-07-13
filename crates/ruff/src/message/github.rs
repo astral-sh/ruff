@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = GithubEmitter::default();
+        let mut emitter = GithubEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

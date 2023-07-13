@@ -8,7 +8,7 @@ EXE004_1.py:1:1: EXE004 [*] Avoid whitespace before shebang
   |
   = help: Remove whitespace before shebang
 
-ℹ Suggested fix
+ℹ Fix
 1   |-    #!/usr/bin/python
   1 |+#!/usr/bin/python
 

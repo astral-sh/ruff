@@ -5,7 +5,7 @@ use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
-use ruff_python_whitespace::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_python_whitespace::{Line, UniversalNewlineIterator, UniversalNewlines};
 
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};
@@ -144,15 +144,13 @@ impl<'a> SectionContexts<'a> {
 
         let mut contexts = Vec::new();
         let mut last: Option<SectionContextData> = None;
-        let mut previous_line = None;
 
-        for line in contents.universal_newlines() {
-            if previous_line.is_none() {
-                // skip the first line
-                previous_line = Some(line.as_str());
-                continue;
-            }
+        let mut lines = contents.universal_newlines().peekable();
 
+        // Skip the first line, which is the summary.
+        let mut previous_line = lines.next();
+
+        while let Some(line) = lines.next() {
             if let Some(section_kind) = suspected_as_section(&line, style) {
                 let indent = leading_space(&line);
                 let section_name = leading_words(&line);
@@ -162,7 +160,8 @@ impl<'a> SectionContexts<'a> {
                 if is_docstring_section(
                     &line,
                     section_name_range,
-                    previous_line.unwrap_or_default(),
+                    previous_line.as_ref(),
+                    lines.peek(),
                 ) {
                     if let Some(mut last) = last.take() {
                         last.range = TextRange::new(last.range.start(), line.start());
@@ -178,7 +177,7 @@ impl<'a> SectionContexts<'a> {
                 }
             }
 
-            previous_line = Some(line.as_str());
+            previous_line = Some(line);
         }
 
         if let Some(mut last) = last.take() {
@@ -205,8 +204,8 @@ impl<'a> SectionContexts<'a> {
 }
 
 impl<'a> IntoIterator for &'a SectionContexts<'a> {
-    type Item = SectionContext<'a>;
     type IntoIter = SectionContextsIter<'a>;
+    type Item = SectionContext<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -388,7 +387,13 @@ fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> 
 }
 
 /// Check if the suspected context is really a section header.
-fn is_docstring_section(line: &str, section_name_range: TextRange, previous_lines: &str) -> bool {
+fn is_docstring_section(
+    line: &Line,
+    section_name_range: TextRange,
+    previous_line: Option<&Line>,
+    next_line: Option<&Line>,
+) -> bool {
+    // Determine whether the current line looks like a section header, e.g., "Args:".
     let section_name_suffix = line[usize::from(section_name_range.end())..].trim();
     let this_looks_like_a_section_name =
         section_name_suffix == ":" || section_name_suffix.is_empty();
@@ -396,13 +401,29 @@ fn is_docstring_section(line: &str, section_name_range: TextRange, previous_line
         return false;
     }
 
-    let prev_line = previous_lines.trim();
-    let prev_line_ends_with_punctuation = [',', ';', '.', '-', '\\', '/', ']', '}', ')']
-        .into_iter()
-        .any(|char| prev_line.ends_with(char));
-    let prev_line_looks_like_end_of_paragraph =
-        prev_line_ends_with_punctuation || prev_line.is_empty();
-    if !prev_line_looks_like_end_of_paragraph {
+    // Determine whether the next line is an underline, e.g., "-----".
+    let next_line_is_underline = next_line.map_or(false, |next_line| {
+        let next_line = next_line.trim();
+        if next_line.is_empty() {
+            false
+        } else {
+            let next_line_is_underline = next_line.chars().all(|char| matches!(char, '-' | '='));
+            next_line_is_underline
+        }
+    });
+    if next_line_is_underline {
+        return true;
+    }
+
+    // Determine whether the previous line looks like the end of a paragraph.
+    let previous_line_looks_like_end_of_paragraph = previous_line.map_or(true, |previous_line| {
+        let previous_line = previous_line.trim();
+        let previous_line_ends_with_punctuation = [',', ';', '.', '-', '\\', '/', ']', '}', ')']
+            .into_iter()
+            .any(|char| previous_line.ends_with(char));
+        previous_line_ends_with_punctuation || previous_line.is_empty()
+    });
+    if !previous_line_looks_like_end_of_paragraph {
         return false;
     }
 

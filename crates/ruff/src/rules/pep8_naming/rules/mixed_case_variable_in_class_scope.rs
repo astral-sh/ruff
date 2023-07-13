@@ -62,13 +62,13 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name == name)
+        .any(|ignore_name| ignore_name.matches(name))
     {
         return;
     }
     if helpers::is_mixed_case(name)
-        && !helpers::is_named_tuple_assignment(checker.semantic_model(), stmt)
-        && !helpers::is_typed_dict_class(checker.semantic_model(), bases)
+        && !helpers::is_named_tuple_assignment(stmt, checker.semantic())
+        && !helpers::is_typed_dict_class(bases, checker.semantic())
     {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInClassScope {

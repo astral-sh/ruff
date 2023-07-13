@@ -1,17 +1,50 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::source_code::Generator;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `NamedTuple` declarations that use functional syntax.
+///
+/// ## Why is this bad?
+/// `NamedTuple` subclasses can be defined either through a functional syntax
+/// (`Foo = NamedTuple(...)`) or a class syntax (`class Foo(NamedTuple): ...`).
+///
+/// The class syntax is more readable and generally preferred over the
+/// functional syntax, which exists primarily for backwards compatibility
+/// with `collections.namedtuple`.
+///
+/// ## Example
+/// ```python
+/// from typing import NamedTuple
+///
+/// Foo = NamedTuple("Foo", [("a", int), ("b", str)])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import NamedTuple
+///
+///
+/// class Foo(NamedTuple):
+///     a: int
+///     b: str
+/// ```
+///
+/// ## References
+/// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[violation]
 pub struct ConvertNamedTupleFunctionalToClass {
     name: String,
@@ -35,9 +68,9 @@ impl Violation for ConvertNamedTupleFunctionalToClass {
 
 /// Return the typename, args, keywords, and base class.
 fn match_named_tuple_assign<'a>(
-    model: &SemanticModel,
     targets: &'a [Expr],
     value: &'a Expr,
+    semantic: &SemanticModel,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
     let Expr::Name(ast::ExprName { id: typename, .. }) = target else {
@@ -48,12 +81,11 @@ fn match_named_tuple_assign<'a>(
         args,
         keywords,
         range: _,
-    }) = value else {
+    }) = value
+    else {
         return None;
     };
-    if !model.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "NamedTuple"]
-    }) {
+    if !semantic.match_typing_expr(func, "NamedTuple") {
         return None;
     }
     Some((typename, args, keywords, func))
@@ -66,19 +98,21 @@ fn create_property_assignment_stmt(
     annotation: &Expr,
     value: Option<&Expr>,
 ) -> Stmt {
-    let node = ast::ExprName {
-        id: property.into(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-    };
-    let node1 = ast::StmtAnnAssign {
-        target: Box::new(node.into()),
+    ast::StmtAnnAssign {
+        target: Box::new(
+            ast::ExprName {
+                id: property.into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }
+            .into(),
+        ),
         annotation: Box::new(annotation.clone()),
         value: value.map(|value| Box::new(value.clone())),
         simple: true,
         range: TextRange::default(),
-    };
-    node1.into()
+    }
+    .into()
 }
 
 /// Match the `defaults` keyword in a `NamedTuple(...)` call.
@@ -103,10 +137,12 @@ fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
 /// Create a list of property assignments from the `NamedTuple` arguments.
 fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
     let Some(fields) = args.get(1) else {
-        let node = Stmt::Pass(ast::StmtPass { range: TextRange::default()});
+        let node = Stmt::Pass(ast::StmtPass {
+            range: TextRange::default(),
+        });
         return Ok(vec![node]);
     };
-    let Expr::List(ast::ExprList { elts, .. } )= &fields else {
+    let Expr::List(ast::ExprList { elts, .. }) = &fields else {
         bail!("Expected argument to be `Expr::List`");
     };
     if elts.is_empty() {
@@ -134,11 +170,15 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
             let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(property),
                 ..
-            }) = &field_name else {
+            }) = &field_name
+            else {
                 bail!("Expected `field_name` to be `Constant::Str`")
             };
             if !is_identifier(property) {
                 bail!("Invalid property name: {}", property)
+            }
+            if is_dunder(property) {
+                bail!("Cannot use dunder property name: {}", property)
             }
             Ok(create_property_assignment_stmt(
                 property, annotation, default,
@@ -150,15 +190,15 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
-    let node = ast::StmtClassDef {
-        name: typename.into(),
+    ast::StmtClassDef {
+        name: Identifier::new(typename.to_string(), TextRange::default()),
         bases: vec![base_class.clone()],
         keywords: vec![],
         body,
         decorator_list: vec![],
         range: TextRange::default(),
-    };
-    node.into()
+    }
+    .into()
 }
 
 /// Generate a `Fix` to convert a `NamedTuple` assignment to a class definition.
@@ -169,8 +209,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    #[allow(deprecated)]
-    Fix::unspecified(Edit::range_replacement(
+    Fix::suggested(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(typename, body, base_class)),
         stmt.range(),
     ))
@@ -184,8 +223,8 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     value: &Expr,
 ) {
     let Some((typename, args, keywords, base_class)) =
-        match_named_tuple_assign(checker.semantic_model(), targets, value) else
-    {
+        match_named_tuple_assign(targets, value, checker.semantic())
+    else {
         return;
     };
 

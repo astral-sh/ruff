@@ -1,9 +1,11 @@
-"""Testing that multiple submodule imports are handled correctly."""
+"""Test that straight `__future__` imports are considered unused."""
 
-# The logic goes through each of the shadowed bindings upwards to get all the unused
-# imports. It should only detect imports, not any other kind of binding.
-multiprocessing = None
 
-import multiprocessing.connection
-import multiprocessing.pool
-import multiprocessing.queues
+def f():
+    import __future__
+
+
+def f():
+    import __future__
+
+    print(__future__.absolute_import)

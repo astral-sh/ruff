@@ -1,0 +1,22 @@
+[package]
+name = "ruff_python_resolver"
+version = "0.0.0"
+description = "A Python module resolver for Ruff"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+
+[dependencies]
+log = { workspace = true }
+
+[dev-dependencies]
+env_logger = "0.10.0"
+tempfile = "3.6.0"
+insta = { workspace = true }

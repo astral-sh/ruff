@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_formatter/src/trivia.rs
-expression: tokens
+expression: test_case.tokens()
 ---
 [
     Token {

@@ -1,7 +1,7 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,7 +9,7 @@ use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, Comparable
 use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
@@ -300,7 +300,15 @@ fn is_main_check(expr: &Expr) -> bool {
 ///         ...
 /// ```
 fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
-    let [Stmt::If(ast::StmtIf { test, body: inner_body, orelse, .. })] = body else { return None };
+    let [Stmt::If(ast::StmtIf {
+        test,
+        body: inner_body,
+        orelse,
+        ..
+    })] = body
+    else {
+        return None;
+    };
     if !orelse.is_empty() {
         return None;
     }
@@ -385,8 +393,7 @@ pub(crate) fn nested_if_statements(
                                 <= checker.settings.line_length
                         })
                     {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(edit));
+                        diagnostic.set_fix(Fix::suggested(edit));
                     }
                 }
                 Err(err) => error!("Failed to fix nested if: {err}"),
@@ -430,10 +437,19 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 
 /// SIM103
 pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ }) = stmt else {
+    let Stmt::If(ast::StmtIf {
+        test,
+        body,
+        orelse,
+        range: _,
+    }) = stmt
+    else {
         return;
     };
-    let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(body), is_one_line_return_bool(orelse)) else {
+    let (Some(if_return), Some(else_return)) = (
+        is_one_line_return_bool(body),
+        is_one_line_return_bool(orelse),
+    ) else {
         return;
     };
 
@@ -449,7 +465,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
             && !has_comments(stmt, checker.locator)
-            && (test.is_compare_expr() || checker.semantic_model().is_builtin("bool"))
+            && (test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
             if test.is_compare_expr() {
                 // If the condition is a comparison, we can replace it with the condition.
@@ -457,8 +473,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(test.clone()),
                     range: TextRange::default(),
                 };
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node.into()),
                     stmt.range(),
                 )));
@@ -480,8 +495,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     value: Some(Box::new(node1.into())),
                     range: TextRange::default(),
                 };
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node2.into()),
                     stmt.range(),
                 )));
@@ -508,9 +522,9 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-fn contains_call_path(model: &SemanticModel, expr: &Expr, target: &[&str]) -> bool {
+fn contains_call_path(expr: &Expr, target: &[&str], semantic: &SemanticModel) -> bool {
     any_over_expr(expr, &|expr| {
-        model
+        semantic
             .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == target)
     })
@@ -518,25 +532,41 @@ fn contains_call_path(model: &SemanticModel, expr: &Expr, target: &[&str]) -> bo
 
 /// SIM108
 pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
-    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ } )= stmt else {
+    let Stmt::If(ast::StmtIf {
+        test,
+        body,
+        orelse,
+        range: _,
+    }) = stmt
+    else {
         return;
     };
     if body.len() != 1 || orelse.len() != 1 {
         return;
     }
-    let Stmt::Assign(ast::StmtAssign { targets: body_targets, value: body_value, .. } )= &body[0] else {
+    let Stmt::Assign(ast::StmtAssign {
+        targets: body_targets,
+        value: body_value,
+        ..
+    }) = &body[0]
+    else {
         return;
     };
-    let Stmt::Assign(ast::StmtAssign { targets: orelse_targets, value: orelse_value, .. } )= &orelse[0] else {
+    let Stmt::Assign(ast::StmtAssign {
+        targets: orelse_targets,
+        value: orelse_value,
+        ..
+    }) = &orelse[0]
+    else {
         return;
     };
     if body_targets.len() != 1 || orelse_targets.len() != 1 {
         return;
     }
-    let Expr::Name(ast::ExprName { id: body_id, .. } )= &body_targets[0] else {
+    let Expr::Name(ast::ExprName { id: body_id, .. }) = &body_targets[0] else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: orelse_id, .. } )= &orelse_targets[0] else {
+    let Expr::Name(ast::ExprName { id: orelse_id, .. }) = &orelse_targets[0] else {
         return;
     };
     if body_id != orelse_id {
@@ -544,13 +574,13 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(checker.semantic_model(), test, &["sys", "version_info"]) {
+    if contains_call_path(test, &["sys", "version_info"], checker.semantic()) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(checker.semantic_model(), test, &["sys", "platform"]) {
+    if contains_call_path(test, &["sys", "platform"], checker.semantic()) {
         return;
     }
 
@@ -621,8 +651,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !has_comments(stmt, checker.locator) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));
@@ -642,7 +671,13 @@ fn get_if_body_pairs<'a>(
         if orelse.len() != 1 {
             break;
         }
-        let Stmt::If(ast::StmtIf { test, body, orelse: orelse_orelse, range: _ }) = &orelse[0] else {
+        let Stmt::If(ast::StmtIf {
+            test,
+            body,
+            orelse: orelse_orelse,
+            range: _,
+        }) = &orelse[0]
+        else {
             break;
         };
         pairs.push((test, body));
@@ -653,7 +688,13 @@ fn get_if_body_pairs<'a>(
 
 /// SIM114
 pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
-    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ }) = stmt else {
+    let Stmt::If(ast::StmtIf {
+        test,
+        body,
+        orelse,
+        range: _,
+    }) = stmt
+    else {
         return;
     };
 
@@ -722,7 +763,8 @@ pub(crate) fn manual_dict_lookup(
         ops,
         comparators,
         range: _,
-    })= &test else {
+    }) = &test
+    else {
         return;
     };
     let Expr::Name(ast::ExprName { id: target, .. }) = left.as_ref() else {
@@ -734,20 +776,23 @@ pub(crate) fn manual_dict_lookup(
     if orelse.len() != 1 {
         return;
     }
-    if !(ops.len() == 1 && ops[0] == Cmpop::Eq) {
+    if !(ops.len() == 1 && ops[0] == CmpOp::Eq) {
         return;
     }
     if comparators.len() != 1 {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value: constant, .. }) = &comparators[0] else {
+    let Expr::Constant(ast::ExprConstant {
+        value: constant, ..
+    }) = &comparators[0]
+    else {
         return;
     };
     let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
         return;
     };
     if value.as_ref().map_or(false, |value| {
-        contains_effect(value, |id| checker.semantic_model().is_builtin(id))
+        contains_effect(value, |id| checker.semantic().is_builtin(id))
     }) {
         return;
     }
@@ -787,7 +832,13 @@ pub(crate) fn manual_dict_lookup(
 
     let mut child: Option<&Stmt> = orelse.get(0);
     while let Some(current) = child.take() {
-        let Stmt::If(ast::StmtIf { test, body, orelse, range: _ }) = &current else {
+        let Stmt::If(ast::StmtIf {
+            test,
+            body,
+            orelse,
+            range: _,
+        }) = &current
+        else {
             return;
         };
         if body.len() != 1 {
@@ -800,27 +851,31 @@ pub(crate) fn manual_dict_lookup(
             left,
             ops,
             comparators,
-            range: _
-        } )= test.as_ref() else {
+            range: _,
+        }) = test.as_ref()
+        else {
             return;
         };
         let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
             return;
         };
-        if !(id == target && ops.len() == 1 && ops[0] == Cmpop::Eq) {
+        if !(id == target && ops.len() == 1 && ops[0] == CmpOp::Eq) {
             return;
         }
         if comparators.len() != 1 {
             return;
         }
-        let Expr::Constant(ast::ExprConstant { value: constant, .. } )= &comparators[0] else {
+        let Expr::Constant(ast::ExprConstant {
+            value: constant, ..
+        }) = &comparators[0]
+        else {
             return;
         };
-        let Stmt::Return(ast::StmtReturn { value, range: _ } )= &body[0] else {
+        let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
             return;
         };
         if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.semantic_model().is_builtin(id))
+            contains_effect(value, |id| checker.semantic().is_builtin(id))
         }) {
             return;
         };
@@ -863,33 +918,54 @@ pub(crate) fn use_dict_get_with_default(
     if body.len() != 1 || orelse.len() != 1 {
         return;
     }
-    let Stmt::Assign(ast::StmtAssign { targets: body_var, value: body_value, ..}) = &body[0] else {
+    let Stmt::Assign(ast::StmtAssign {
+        targets: body_var,
+        value: body_value,
+        ..
+    }) = &body[0]
+    else {
         return;
     };
     if body_var.len() != 1 {
         return;
     };
-    let Stmt::Assign(ast::StmtAssign { targets: orelse_var, value: orelse_value, .. }) = &orelse[0] else {
+    let Stmt::Assign(ast::StmtAssign {
+        targets: orelse_var,
+        value: orelse_value,
+        ..
+    }) = &orelse[0]
+    else {
         return;
     };
     if orelse_var.len() != 1 {
         return;
     };
-    let Expr::Compare(ast::ExprCompare { left: test_key, ops , comparators: test_dict, range: _ }) = &test else {
+    let Expr::Compare(ast::ExprCompare {
+        left: test_key,
+        ops,
+        comparators: test_dict,
+        range: _,
+    }) = &test
+    else {
         return;
     };
     if test_dict.len() != 1 {
         return;
     }
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [Cmpop::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
-        [Cmpop::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
+        [CmpOp::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
+        [CmpOp::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
         _ => {
             return;
         }
     };
     let test_dict = &test_dict[0];
-    let Expr::Subscript(ast::ExprSubscript { value: expected_subscript, slice: expected_slice, .. } ) =  expected_value.as_ref() else {
+    let Expr::Subscript(ast::ExprSubscript {
+        value: expected_subscript,
+        slice: expected_slice,
+        ..
+    }) = expected_value.as_ref()
+    else {
         return;
     };
 
@@ -903,7 +979,7 @@ pub(crate) fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic_model().is_builtin(id)) {
+    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
         return;
     }
 
@@ -941,7 +1017,7 @@ pub(crate) fn use_dict_get_with_default(
     let node1 = *test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
-        attr: "get".into(),
+        attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };
@@ -978,8 +1054,7 @@ pub(crate) fn use_dict_get_with_default(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if !has_comments(stmt, checker.locator) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
             )));

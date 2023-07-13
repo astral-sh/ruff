@@ -1,16 +1,16 @@
 use std::ops::Add;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::helpers::{elif_else_range, is_const_false, is_const_true};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::autofix::edits;
 use crate::checkers::ast::Checker;
@@ -339,13 +339,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
         };
-        if !matches!(
-            expr,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            })
-        ) {
+        if !is_const_none(expr) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range);
@@ -376,34 +370,17 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
-const NORETURN_FUNCS: &[&[&str]] = &[
-    // builtins
-    &["", "exit"],
-    &["", "quit"],
-    // stdlib
-    &["builtins", "exit"],
-    &["builtins", "quit"],
-    &["os", "_exit"],
-    &["os", "abort"],
-    &["posix", "_exit"],
-    &["posix", "abort"],
-    &["sys", "exit"],
-    &["_thread", "exit"],
-    &["_winapi", "ExitProcess"],
-    // third-party modules
-    &["pytest", "exit"],
-    &["pytest", "fail"],
-    &["pytest", "skip"],
-    &["pytest", "xfail"],
-];
-
 /// Return `true` if the `func` is a known function that never returns.
-fn is_noreturn_func(model: &SemanticModel, func: &Expr) -> bool {
-    model.resolve_call_path(func).map_or(false, |call_path| {
-        NORETURN_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-            || model.match_typing_call_path(&call_path, "assert_never")
+fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
+                | ["" | "builtins", "quit"]
+                | ["os" | "posix", "_exit" | "abort"]
+                | ["_winapi", "ExitProcess"]
+                | ["pytest", "fail" | "skip" | "xfail"]
+        ) || semantic.match_typing_call_path(&call_path, "assert_never")
     })
 }
 
@@ -433,22 +410,8 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        Stmt::Assert(ast::StmtAssert { test, .. })
-            if matches!(
-                test.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(false),
-                    ..
-                })
-            ) => {}
-        Stmt::While(ast::StmtWhile { test, .. })
-            if matches!(
-                test.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(true),
-                    ..
-                })
-            ) => {}
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
         Stmt::For(ast::StmtFor { orelse, .. })
         | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
         | Stmt::While(ast::StmtWhile { orelse, .. }) => {
@@ -489,7 +452,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
-                    if is_noreturn_func(checker.semantic_model(), func)
+                    if is_noreturn_func(func, checker.semantic())
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
@@ -518,7 +481,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         };
 
-        let Expr::Name(ast::ExprName { id: returned_id, .. }) = value.as_ref() else {
+        let Expr::Name(ast::ExprName {
+            id: returned_id, ..
+        }) = value.as_ref()
+        else {
             continue;
         };
 
@@ -531,7 +497,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         };
 
-        let Expr::Name(ast::ExprName { id: assigned_id, .. }) = target else {
+        let Expr::Name(ast::ExprName {
+            id: assigned_id, ..
+        }) = target
+        else {
             continue;
         };
 
@@ -554,13 +523,8 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                 // Delete the `return` statement. There's no need to treat this as an isolated
                 // edit, since we're editing the preceding statement, so no conflicting edit would
                 // be allowed to remove that preceding statement.
-                let delete_return = edits::delete_stmt(
-                    stmt,
-                    None,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                );
+                let delete_return =
+                    edits::delete_stmt(stmt, None, checker.locator, checker.indexer);
 
                 // Replace the `x = 1` statement with `return 1`.
                 let content = checker.locator.slice(assign.range());

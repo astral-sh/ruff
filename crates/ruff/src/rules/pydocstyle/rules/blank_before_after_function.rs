@@ -5,13 +5,38 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_whitespace::{PythonWhitespace, UniversalNewlineIterator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for docstrings on functions that are separated by one or more blank
+/// lines from the function definition.
+///
+/// ## Why is this bad?
+/// Remove any blank lines between the function definition and its docstring,
+/// for consistency.
+///
+/// ## Example
+/// ```python
+/// def average(values: list[float]) -> float:
+///
+///     """Return the mean of the given values."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct NoBlankLineBeforeFunction {
     num_lines: usize,
@@ -29,6 +54,33 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
     }
 }
 
+/// ## What it does
+/// Checks for docstrings on functions that are separated by one or more blank
+/// lines from the function body.
+///
+/// ## Why is this bad?
+/// Remove any blank lines between the function body and the function
+/// docstring, for consistency.
+///
+/// ## Example
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+///
+///     return sum(values) / len(values)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+///     return sum(values) / len(values)
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct NoBlankLineAfterFunction {
     num_lines: usize,
@@ -55,7 +107,8 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
-    }) = docstring.definition else {
+    }) = docstring.definition
+    else {
         return;
     };
 
@@ -86,8 +139,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line before the docstring.
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                diagnostic.set_fix(Fix::automatic(Edit::deletion(
                     blank_lines_start,
                     docstring.start() - docstring.indentation.text_len(),
                 )));
@@ -143,8 +195,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line after the docstring.
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                diagnostic.set_fix(Fix::automatic(Edit::deletion(
                     first_line_end,
                     blank_lines_end,
                 )));

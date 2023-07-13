@@ -11,7 +11,7 @@ UP024_4.py:9:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 6  6  |     conn = Connection(settings.CELERY_BROKER_URL)
 7  7  |     conn.ensure_connection(max_retries=2)
 8  8  |     conn._close()

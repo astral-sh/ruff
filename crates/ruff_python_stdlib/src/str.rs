@@ -1,14 +1,67 @@
-/// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
-pub const TRIPLE_QUOTE_PREFIXES: &[&str] = &[
-    "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
-];
-pub const SINGLE_QUOTE_PREFIXES: &[&str] = &[
-    "u\"", "u'", "r\"", "r'", "U\"", "U'", "R\"", "R'", "\"", "'",
-];
-pub const TRIPLE_QUOTE_SUFFIXES: &[&str] = &["\"\"\"", "'''"];
-pub const SINGLE_QUOTE_SUFFIXES: &[&str] = &["\"", "'"];
+/// Return `true` if a string is lowercase.
+///
+/// A string is lowercase if all alphabetic characters in the string are lowercase.
+///
+/// ## Examples
+///
+/// ```rust
+/// use ruff_python_stdlib::str::is_lowercase;
+///
+/// assert!(is_lowercase("abc"));
+/// assert!(is_lowercase("a_b_c"));
+/// assert!(is_lowercase("a2c"));
+/// assert!(!is_lowercase("aBc"));
+/// assert!(!is_lowercase("ABC"));
+/// assert!(is_lowercase(""));
+/// assert!(is_lowercase("_"));
+/// ```
+pub fn is_lowercase(s: &str) -> bool {
+    s.chars().all(|c| !c.is_alphabetic() || c.is_lowercase())
+}
 
-pub fn is_lower(s: &str) -> bool {
+/// Return `true` if a string is uppercase.
+///
+/// A string is uppercase if all alphabetic characters in the string are uppercase.
+///
+/// ## Examples
+///
+/// ```rust
+/// use ruff_python_stdlib::str::is_uppercase;
+///
+/// assert!(is_uppercase("ABC"));
+/// assert!(is_uppercase("A_B_C"));
+/// assert!(is_uppercase("A2C"));
+/// assert!(!is_uppercase("aBc"));
+/// assert!(!is_uppercase("abc"));
+/// assert!(is_uppercase(""));
+/// assert!(is_uppercase("_"));
+/// ```
+pub fn is_uppercase(s: &str) -> bool {
+    s.chars().all(|c| !c.is_alphabetic() || c.is_uppercase())
+}
+
+/// Return `true` if a string is _cased_ as lowercase.
+///
+/// A string is cased as lowercase if it contains at least one lowercase character and no uppercase
+/// characters.
+///
+/// This differs from `str::is_lowercase` in that it returns `false` for empty strings and strings
+/// that contain only underscores or other non-alphabetic characters.
+///
+/// ## Examples
+///
+/// ```rust
+/// use ruff_python_stdlib::str::is_cased_lowercase;
+///
+/// assert!(is_cased_lowercase("abc"));
+/// assert!(is_cased_lowercase("a_b_c"));
+/// assert!(is_cased_lowercase("a2c"));
+/// assert!(!is_cased_lowercase("aBc"));
+/// assert!(!is_cased_lowercase("ABC"));
+/// assert!(!is_cased_lowercase(""));
+/// assert!(!is_cased_lowercase("_"));
+/// ```
+pub fn is_cased_lowercase(s: &str) -> bool {
     let mut cased = false;
     for c in s.chars() {
         if c.is_uppercase() {
@@ -20,7 +73,28 @@ pub fn is_lower(s: &str) -> bool {
     cased
 }
 
-pub fn is_upper(s: &str) -> bool {
+/// Return `true` if a string is _cased_ as uppercase.
+///
+/// A string is cased as uppercase if it contains at least one uppercase character and no lowercase
+/// characters.
+///
+/// This differs from `str::is_uppercase` in that it returns `false` for empty strings and strings
+/// that contain only underscores or other non-alphabetic characters.
+///
+/// ## Examples
+///
+/// ```rust
+/// use ruff_python_stdlib::str::is_cased_uppercase;
+///
+/// assert!(is_cased_uppercase("ABC"));
+/// assert!(is_cased_uppercase("A_B_C"));
+/// assert!(is_cased_uppercase("A2C"));
+/// assert!(!is_cased_uppercase("aBc"));
+/// assert!(!is_cased_uppercase("abc"));
+/// assert!(!is_cased_uppercase(""));
+/// assert!(!is_cased_uppercase("_"));
+/// ```
+pub fn is_cased_uppercase(s: &str) -> bool {
     let mut cased = false;
     for c in s.chars() {
         if c.is_lowercase() {
@@ -30,31 +104,4 @@ pub fn is_upper(s: &str) -> bool {
         }
     }
     cased
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::str::{is_lower, is_upper};
-
-    #[test]
-    fn test_is_lower() {
-        assert!(is_lower("abc"));
-        assert!(is_lower("a_b_c"));
-        assert!(is_lower("a2c"));
-        assert!(!is_lower("aBc"));
-        assert!(!is_lower("ABC"));
-        assert!(!is_lower(""));
-        assert!(!is_lower("_"));
-    }
-
-    #[test]
-    fn test_is_upper() {
-        assert!(is_upper("ABC"));
-        assert!(is_upper("A_B_C"));
-        assert!(is_upper("A2C"));
-        assert!(!is_upper("aBc"));
-        assert!(!is_upper("abc"));
-        assert!(!is_upper(""));
-        assert!(!is_upper("_"));
-    }
 }

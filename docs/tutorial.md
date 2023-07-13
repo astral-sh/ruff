@@ -26,7 +26,7 @@ def sum_even_numbers(numbers: List[int]) -> int:
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-To start, we'll install Ruff through PyPI (or with our [preferred package manager](installation.md)):
+To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
 
 ```shell
 > pip install ruff
@@ -46,7 +46,7 @@ Ruff identified an unused import, which is a common error in Python code. Ruff c
 
 ```shell
 ❯ ruff check --fix .
-Found 1 error (1 fixed, 0 renumbersing).
+Found 1 error (1 fixed, 0 remaining).
 ```
 
 Running `git diff` shows the following:
@@ -242,7 +242,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.272
+  rev: v0.0.278
   hooks:
     - id: ruff
 ```

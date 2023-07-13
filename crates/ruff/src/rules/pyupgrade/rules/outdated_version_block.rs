@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use num_bigint::{BigInt, Sign};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -16,6 +16,37 @@ use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
 
+/// ## What it does
+/// Checks for conditional blocks gated on `sys.version_info` comparisons
+/// that are outdated for the minimum supported Python version.
+///
+/// ## Why is this bad?
+/// In Python, code can be conditionally executed based on the active
+/// Python version by comparing against the `sys.version_info` tuple.
+///
+/// If a code block is only executed for Python versions older than the
+/// minimum supported version, it should be removed.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// if sys.version_info < (3, 0):
+///     print("py2")
+/// else:
+///     print("py3")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("py3")
+/// ```
+///
+/// ## Options
+/// - `target-version`
+///
+/// ## References
+/// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[violation]
 pub struct OutdatedVersionBlock;
 
@@ -188,14 +219,17 @@ fn fix_py2_block(
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
-        let stmt = checker.semantic_model().stmt();
-        let parent = checker.semantic_model().stmt_parent();
+        let stmt = checker.semantic().stmt();
+        let parent = checker.semantic().stmt_parent();
         let edit = delete_stmt(
             stmt,
-            if matches!(block.leading_token.tok, StartTok::If) { parent } else { None },
+            if matches!(block.leading_token.tok, StartTok::If) {
+                parent
+            } else {
+                None
+            },
             checker.locator,
             checker.indexer,
-            checker.stylist,
         );
         return Some(Fix::suggested(edit));
     };
@@ -207,8 +241,7 @@ fn fix_py2_block(
             let end = orelse.last()?;
             if indentation(checker.locator, start).is_none() {
                 // Inline `else` block (e.g., `else: x = 1`).
-                #[allow(deprecated)]
-                Some(Fix::unspecified(Edit::range_replacement(
+                Some(Fix::suggested(Edit::range_replacement(
                     checker
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
@@ -227,8 +260,7 @@ fn fix_py2_block(
                         .ok()
                     })
                     .map(|contents| {
-                        #[allow(deprecated)]
-                        Fix::unspecified(Edit::replacement(
+                        Fix::suggested(Edit::replacement(
                             contents,
                             checker.locator.line_start(stmt.start()),
                             stmt.end(),
@@ -240,21 +272,13 @@ fn fix_py2_block(
             // If we have an `if` and an `elif`, turn the `elif` into an `if`.
             let start_location = leading_token.range.start();
             let end_location = trailing_token.range.start() + TextSize::from(2);
-            #[allow(deprecated)]
-            Some(Fix::unspecified(Edit::deletion(
-                start_location,
-                end_location,
-            )))
+            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
         }
         (StartTok::Elif, _) => {
             // If we have an `elif`, delete up to the `else` or the end of the statement.
             let start_location = leading_token.range.start();
             let end_location = trailing_token.range.start();
-            #[allow(deprecated)]
-            Some(Fix::unspecified(Edit::deletion(
-                start_location,
-                end_location,
-            )))
+            Some(Fix::suggested(Edit::deletion(start_location, end_location)))
         }
     }
 }
@@ -275,8 +299,7 @@ fn fix_py3_block(
             let end = body.last()?;
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
-                #[allow(deprecated)]
-                Some(Fix::unspecified(Edit::range_replacement(
+                Some(Fix::suggested(Edit::range_replacement(
                     checker
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
@@ -295,8 +318,7 @@ fn fix_py3_block(
                         .ok()
                     })
                     .map(|contents| {
-                        #[allow(deprecated)]
-                        Fix::unspecified(Edit::replacement(
+                        Fix::suggested(Edit::replacement(
                             contents,
                             checker.locator.line_start(stmt.start()),
                             stmt.end(),
@@ -309,8 +331,7 @@ fn fix_py3_block(
             // the rest.
             let end = body.last()?;
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
-            #[allow(deprecated)]
-            Some(Fix::unspecified(Edit::range_replacement(
+            Some(Fix::suggested(Edit::range_replacement(
                 format!("else{text}"),
                 stmt.range(),
             )))
@@ -331,15 +352,16 @@ pub(crate) fn outdated_version_block(
         ops,
         comparators,
         range: _,
-    }) = &test else {
+    }) = &test
+    else {
         return;
     };
 
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(left)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["sys", "version_info"]
+            matches!(call_path.as_slice(), ["sys", "version_info"])
         })
     {
         return;
@@ -352,8 +374,8 @@ pub(crate) fn outdated_version_block(
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let version = extract_version(elts);
                 let target = checker.settings.target_version;
-                if op == &Cmpop::Lt || op == &Cmpop::LtE {
-                    if compare_version(&version, target, op == &Cmpop::LtE) {
+                if op == &CmpOp::Lt || op == &CmpOp::LtE {
+                    if compare_version(&version, target, op == &CmpOp::LtE) {
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt, body) {
@@ -364,8 +386,8 @@ pub(crate) fn outdated_version_block(
                         }
                         checker.diagnostics.push(diagnostic);
                     }
-                } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
-                    if compare_version(&version, target, op == &Cmpop::GtE) {
+                } else if op == &CmpOp::Gt || op == &CmpOp::GtE {
+                    if compare_version(&version, target, op == &CmpOp::GtE) {
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt, body) {
@@ -384,7 +406,7 @@ pub(crate) fn outdated_version_block(
                 ..
             }) => {
                 let version_number = bigint_to_u32(number);
-                if version_number == 2 && op == &Cmpop::Eq {
+                if version_number == 2 && op == &CmpOp::Eq {
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt, body) {
@@ -394,7 +416,7 @@ pub(crate) fn outdated_version_block(
                         }
                     }
                     checker.diagnostics.push(diagnostic);
-                } else if version_number == 3 && op == &Cmpop::Eq {
+                } else if version_number == 3 && op == &CmpOp::Eq {
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt, body) {

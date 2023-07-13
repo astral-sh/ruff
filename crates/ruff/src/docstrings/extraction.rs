@@ -2,7 +2,7 @@
 
 use rustpython_parser::ast::{self, Constant, Expr, Stmt};
 
-use ruff_python_semantic::definition::{Definition, DefinitionId, Definitions, Member, MemberKind};
+use ruff_python_semantic::{Definition, DefinitionId, Definitions, Member, MemberKind};
 
 /// Extract a docstring from a function or class body.
 pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {

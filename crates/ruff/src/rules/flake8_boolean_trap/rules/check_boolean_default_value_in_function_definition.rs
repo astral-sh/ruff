@@ -1,14 +1,11 @@
-use rustpython_parser::ast::{Arguments, Decorator};
+use rustpython_parser::ast::{ArgWithDefault, Arguments, Decorator};
 
 use ruff_diagnostics::Violation;
-
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_boolean_trap::helpers::add_if_boolean;
-
-use super::super::helpers::FUNC_DEF_NAME_ALLOWLIST;
+use crate::rules::flake8_boolean_trap::helpers::{add_if_boolean, is_allowed_func_def};
 
 /// ## What it does
 /// Checks for the use of booleans as default values in function definitions.
@@ -46,7 +43,7 @@ use super::super::helpers::FUNC_DEF_NAME_ALLOWLIST;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[violation]
 pub struct BooleanDefaultValueInFunctionDefinition;
@@ -64,7 +61,7 @@ pub(crate) fn check_boolean_default_value_in_function_definition(
     decorator_list: &[Decorator],
     arguments: &Arguments,
 ) {
-    if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
+    if is_allowed_func_def(name) {
         return;
     }
 
@@ -75,7 +72,19 @@ pub(crate) fn check_boolean_default_value_in_function_definition(
         return;
     }
 
-    for arg in &arguments.defaults {
-        add_if_boolean(checker, arg, BooleanDefaultValueInFunctionDefinition.into());
+    for ArgWithDefault {
+        def: _,
+        default,
+        range: _,
+    } in arguments.args.iter().chain(&arguments.posonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        add_if_boolean(
+            checker,
+            default,
+            BooleanDefaultValueInFunctionDefinition.into(),
+        );
     }
 }

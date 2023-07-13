@@ -31,6 +31,21 @@ with None as i:
     with None as j:  # ok
         pass
 
+# Async with -> with, variable reused
+async with None as i:
+    with None as i:  # error
+        pass
+
+# Async with -> with, different variable
+async with None as i:
+    with None as j:  # ok
+        pass
+
+# Async for -> for, variable reused
+async for i in []:
+    for i in []:  # error
+        pass
+
 # For -> for -> for, doubly nested variable reuse
 for i in []:
     for j in []:

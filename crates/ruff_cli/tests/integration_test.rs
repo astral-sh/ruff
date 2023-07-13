@@ -91,34 +91,35 @@ fn stdin_json() -> Result<()> {
             r#"[
   {{
     "code": "F401",
-    "message": "`os` imported but unused",
+    "end_location": {{
+      "column": 10,
+      "row": 1
+    }},
+    "filename": "{file_path}",
     "fix": {{
       "applicability": "Automatic",
-      "message": "Remove unused import: `os`",
       "edits": [
         {{
           "content": "",
-          "location": {{
-            "row": 1,
-            "column": 1
-          }},
           "end_location": {{
-            "row": 2,
-            "column": 1
+            "column": 1,
+            "row": 2
+          }},
+          "location": {{
+            "column": 1,
+            "row": 1
           }}
         }}
-      ]
+      ],
+      "message": "Remove unused import: `os`"
     }},
     "location": {{
-      "row": 1,
-      "column": 8
+      "column": 8,
+      "row": 1
     }},
-    "end_location": {{
-      "row": 1,
-      "column": 10
-    }},
-    "filename": "{file_path}",
-    "noqa_row": 1
+    "message": "`os` imported but unused",
+    "noqa_row": 1,
+    "url": "https://beta.ruff.rs/docs/rules/unused-import"
   }}
 ]"#
         )

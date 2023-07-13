@@ -164,3 +164,11 @@ def f():
     )
 
     x: DataFrame = 2
+
+
+def f():
+    global Member
+
+    from module import Member
+
+    x: Member = 1

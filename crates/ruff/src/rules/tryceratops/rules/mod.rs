@@ -1,15 +1,13 @@
-pub(crate) use error_instead_of_exception::{error_instead_of_exception, ErrorInsteadOfException};
-pub(crate) use raise_vanilla_args::{raise_vanilla_args, RaiseVanillaArgs};
-pub(crate) use raise_vanilla_class::{raise_vanilla_class, RaiseVanillaClass};
-pub(crate) use raise_within_try::{raise_within_try, RaiseWithinTry};
-pub(crate) use reraise_no_cause::{reraise_no_cause, ReraiseNoCause};
-pub(crate) use try_consider_else::{try_consider_else, TryConsiderElse};
-pub(crate) use type_check_without_type_error::{
-    type_check_without_type_error, TypeCheckWithoutTypeError,
-};
-pub(crate) use useless_try_except::{useless_try_except, UselessTryExcept};
-pub(crate) use verbose_log_message::{verbose_log_message, VerboseLogMessage};
-pub(crate) use verbose_raise::{verbose_raise, VerboseRaise};
+pub(crate) use error_instead_of_exception::*;
+pub(crate) use raise_vanilla_args::*;
+pub(crate) use raise_vanilla_class::*;
+pub(crate) use raise_within_try::*;
+pub(crate) use reraise_no_cause::*;
+pub(crate) use try_consider_else::*;
+pub(crate) use type_check_without_type_error::*;
+pub(crate) use useless_try_except::*;
+pub(crate) use verbose_log_message::*;
+pub(crate) use verbose_raise::*;
 
 mod error_instead_of_exception;
 mod raise_vanilla_args;

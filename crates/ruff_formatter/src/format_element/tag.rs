@@ -1,8 +1,5 @@
 use crate::format_element::PrintMode;
 use crate::{GroupId, TextSize};
-#[cfg(debug_assertions)]
-use std::any::type_name;
-use std::any::TypeId;
 use std::cell::Cell;
 use std::num::NonZeroU8;
 
@@ -35,6 +32,16 @@ pub enum Tag {
     /// See [crate::builders::group] for documentation and examples.
     StartGroup(Group),
     EndGroup,
+
+    /// Creates a logical group similar to [`Tag::StartGroup`] but only if the condition is met.
+    /// This is an optimized representation for (assuming the content should only be grouped if another group fits):
+    ///
+    /// ```text
+    /// if_group_breaks(content, other_group_id),
+    /// if_group_fits_on_line(group(&content), other_group_id)
+    /// ```
+    StartConditionalGroup(ConditionalGroup),
+    EndConditionalGroup,
 
     /// Allows to specify content that gets printed depending on whatever the enclosing group
     /// is printed on a single line or multiple lines. See [crate::builders::if_group_breaks] for examples.
@@ -70,6 +77,9 @@ pub enum Tag {
     /// See [crate::builders::labelled] for documentation.
     StartLabelled(LabelId),
     EndLabelled,
+
+    StartFitsExpanded(FitsExpanded),
+    EndFitsExpanded,
 }
 
 impl Tag {
@@ -80,7 +90,8 @@ impl Tag {
             Tag::StartIndent
                 | Tag::StartAlign(_)
                 | Tag::StartDedent(_)
-                | Tag::StartGroup { .. }
+                | Tag::StartGroup(_)
+                | Tag::StartConditionalGroup(_)
                 | Tag::StartConditionalContent(_)
                 | Tag::StartIndentIfGroupBreaks(_)
                 | Tag::StartFill
@@ -88,6 +99,7 @@ impl Tag {
                 | Tag::StartLineSuffix
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
+                | Tag::StartFitsExpanded(_)
         )
     }
 
@@ -104,6 +116,7 @@ impl Tag {
             StartAlign(_) | EndAlign => TagKind::Align,
             StartDedent(_) | EndDedent => TagKind::Dedent,
             StartGroup(_) | EndGroup => TagKind::Group,
+            StartConditionalGroup(_) | EndConditionalGroup => TagKind::ConditionalGroup,
             StartConditionalContent(_) | EndConditionalContent => TagKind::ConditionalContent,
             StartIndentIfGroupBreaks(_) | EndIndentIfGroupBreaks => TagKind::IndentIfGroupBreaks,
             StartFill | EndFill => TagKind::Fill,
@@ -111,6 +124,7 @@ impl Tag {
             StartLineSuffix | EndLineSuffix => TagKind::LineSuffix,
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
+            StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
         }
     }
 }
@@ -125,6 +139,7 @@ pub enum TagKind {
     Align,
     Dedent,
     Group,
+    ConditionalGroup,
     ConditionalContent,
     IndentIfGroupBreaks,
     Fill,
@@ -132,6 +147,7 @@ pub enum TagKind {
     LineSuffix,
     Verbatim,
     Labelled,
+    FitsExpanded,
 }
 
 #[derive(Debug, Copy, Default, Clone, Eq, PartialEq)]
@@ -150,6 +166,27 @@ pub enum GroupMode {
 impl GroupMode {
     pub const fn is_flat(&self) -> bool {
         matches!(self, GroupMode::Flat)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct FitsExpanded {
+    pub(crate) condition: Option<Condition>,
+    pub(crate) propagate_expand: Cell<bool>,
+}
+
+impl FitsExpanded {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_condition(mut self, condition: Option<Condition>) -> Self {
+        self.condition = condition;
+        self
+    }
+
+    pub fn propagate_expand(&self) {
+        self.propagate_expand.set(true)
     }
 }
 
@@ -192,6 +229,33 @@ impl Group {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ConditionalGroup {
+    mode: Cell<GroupMode>,
+    condition: Condition,
+}
+
+impl ConditionalGroup {
+    pub fn new(condition: Condition) -> Self {
+        Self {
+            mode: Cell::new(GroupMode::Flat),
+            condition,
+        }
+    }
+
+    pub fn condition(&self) -> Condition {
+        self.condition
+    }
+
+    pub fn propagate_expand(&self) {
+        self.mode.set(GroupMode::Propagated)
+    }
+
+    pub fn mode(&self) -> GroupMode {
+        self.mode.get()
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DedentMode {
     /// Reduces the indent by a level (if the current indent is > 0)
@@ -201,10 +265,10 @@ pub enum DedentMode {
     Root,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Condition {
-    /// - Flat -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
-    /// - Multiline -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
+    /// - `Flat` -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
+    /// - `Expanded` -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
     pub(crate) mode: PrintMode,
 
     /// The id of the group for which it should check if it breaks or not. The group must appear in the document
@@ -213,20 +277,44 @@ pub struct Condition {
 }
 
 impl Condition {
-    pub fn new(mode: PrintMode) -> Self {
+    pub(crate) fn new(mode: PrintMode) -> Self {
         Self {
             mode,
             group_id: None,
         }
     }
 
+    pub fn if_fits_on_line() -> Self {
+        Self {
+            mode: PrintMode::Flat,
+            group_id: None,
+        }
+    }
+
+    pub fn if_group_fits_on_line(group_id: GroupId) -> Self {
+        Self {
+            mode: PrintMode::Flat,
+            group_id: Some(group_id),
+        }
+    }
+
+    pub fn if_breaks() -> Self {
+        Self {
+            mode: PrintMode::Expanded,
+            group_id: None,
+        }
+    }
+
+    pub fn if_group_breaks(group_id: GroupId) -> Self {
+        Self {
+            mode: PrintMode::Expanded,
+            group_id: Some(group_id),
+        }
+    }
+
     pub fn with_group_id(mut self, id: Option<GroupId>) -> Self {
         self.group_id = id;
         self
-    }
-
-    pub fn mode(&self) -> PrintMode {
-        self.mode
     }
 }
 
@@ -239,35 +327,46 @@ impl Align {
     }
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, Copy, Clone)]
 pub struct LabelId {
-    id: TypeId,
+    value: u64,
     #[cfg(debug_assertions)]
-    label: &'static str,
+    name: &'static str,
 }
 
-#[cfg(debug_assertions)]
-impl std::fmt::Debug for LabelId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.label)
-    }
-}
+impl PartialEq for LabelId {
+    fn eq(&self, other: &Self) -> bool {
+        let is_equal = self.value == other.value;
 
-#[cfg(not(debug_assertions))]
-impl std::fmt::Debug for LabelId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "#{:?}", self.id)
+        #[cfg(debug_assertions)]
+        {
+            if is_equal {
+                assert_eq!(self.name, other.name, "Two `LabelId`s with different names have the same `value`. Are you mixing labels of two different `LabelDefinition` or are the values returned by the `LabelDefinition` not unique?");
+            }
+        }
+
+        is_equal
     }
 }
 
 impl LabelId {
-    pub fn of<T: ?Sized + 'static>() -> Self {
+    pub fn of<T: LabelDefinition>(label: T) -> Self {
         Self {
-            id: TypeId::of::<T>(),
+            value: label.value(),
             #[cfg(debug_assertions)]
-            label: type_name::<T>(),
+            name: label.name(),
         }
     }
+}
+
+/// Defines the valid labels of a language. You want to have at most one implementation per formatter
+/// project.
+pub trait LabelDefinition {
+    /// Returns the `u64` uniquely identifying this specific label.
+    fn value(&self) -> u64;
+
+    /// Returns the name of the label that is shown in debug builds.
+    fn name(&self) -> &'static str;
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]

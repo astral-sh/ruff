@@ -12,7 +12,7 @@ invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, u
    |
    = help: Replace with escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 12 12 | #        (Pylint, "C0414") => Rule::UselessImportAlias,
 13 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
 14 14 | #foo = 'hi'

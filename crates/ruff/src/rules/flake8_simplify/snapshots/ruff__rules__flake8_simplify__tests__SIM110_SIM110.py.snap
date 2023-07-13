@@ -294,4 +294,27 @@ SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ
 167 164 | 
 168 165 | def f():
 
+SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+    |
+182 |   async def f():
+183 |       # SIM110
+184 |       for x in iterable:
+    |  _____^
+185 | |         if check(x):
+186 | |             return True
+187 | |     return False
+    | |________________^ SIM110
+    |
+    = help: Replace with `return any(check(x) for x in iterable)`
+
+ℹ Suggested fix
+181 181 | 
+182 182 | async def f():
+183 183 |     # SIM110
+184     |-    for x in iterable:
+185     |-        if check(x):
+186     |-            return True
+187     |-    return False
+    184 |+    return any(check(x) for x in iterable)
+
 

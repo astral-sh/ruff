@@ -10,7 +10,7 @@ UP011.py:5:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
   |
   = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | from functools import lru_cache
 3 3 | 
 4 4 | 
@@ -29,7 +29,7 @@ UP011.py:10:11: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 7  7  |     pass
 8  8  | 
 9  9  | 
@@ -49,7 +49,7 @@ UP011.py:16:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 13 13 | 
 14 14 | 
 15 15 | @other_decorator
@@ -68,7 +68,7 @@ UP011.py:21:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
    = help: Remove unnecessary parentheses
 
-ℹ Suggested fix
+ℹ Fix
 18 18 |     pass
 19 19 | 
 20 20 | 

@@ -2,16 +2,37 @@
 
 use std::path::Path;
 
+use wsl;
+
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::comments::shebang::ShebangDirective;
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
-use crate::rules::flake8_executable::helpers::ShebangDirective;
 
+/// ## What it does
+/// Checks for a shebang directive in a file that is not executable.
+///
+/// ## Why is this bad?
+/// In Python, a shebang (also known as a hashbang) is the first line of a
+/// script, which specifies the interpreter that should be used to run the
+/// script.
+///
+/// The presence of a shebang suggests that a file is intended to be
+/// executable. If a file contains a shebang but is not executable, then the
+/// shebang is misleading, or the file is missing the executable bit.
+///
+/// If the file is meant to be executable, add a shebang; otherwise, remove the
+/// executable bit from the file.
+///
+/// _This rule is only available on Unix-like systems._
+///
+/// ## References
+/// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[violation]
 pub struct ShebangNotExecutable;
 
@@ -29,15 +50,21 @@ pub(crate) fn shebang_not_executable(
     range: TextRange,
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, content) = shebang {
-        if let Ok(false) = is_executable(filepath) {
-            let diagnostic = Diagnostic::new(
-                ShebangNotExecutable,
-                TextRange::at(range.start() + start, content.text_len()),
-            );
-            return Some(diagnostic);
-        }
+    // WSL supports Windows file systems, which do not have executable bits.
+    // Instead, everything is executable. Therefore, we skip this rule on WSL.
+    if wsl::is_wsl() {
+        return None;
     }
+    let ShebangDirective { offset, contents } = shebang;
+
+    if let Ok(false) = is_executable(filepath) {
+        let diagnostic = Diagnostic::new(
+            ShebangNotExecutable,
+            TextRange::at(range.start() + offset, contents.text_len()),
+        );
+        return Some(diagnostic);
+    }
+
     None
 }
 

@@ -42,7 +42,7 @@ pub trait MemoizeFormat<Context> {
     /// # fn main() -> FormatResult<()> {
     /// let normal = MyFormat::new();
     ///
-    /// // Calls `format` for everytime the object gets formatted
+    /// // Calls `format` every time the object gets formatted
     /// assert_eq!(
     ///     "Formatted 1 times. Formatted 2 times.",
     ///     format!(SimpleFormatContext::default(), [normal, space(), normal])?.print()?.as_code()
@@ -57,7 +57,6 @@ pub trait MemoizeFormat<Context> {
     /// # Ok(())
     /// # }
     /// ```
-    ///
     fn memoized(self) -> Memoized<Self, Context>
     where
         Self: Sized + Format<Context>,
@@ -142,7 +141,6 @@ where
     /// assert_eq!("Counter:\n\tCount: 0\nCount: 0\n", formatted.print()?.as_code());
     /// # Ok(())
     /// # }
-    ///
     /// ```
     pub fn inspect(&mut self, f: &mut Formatter<Context>) -> FormatResult<&[FormatElement]> {
         let result = self

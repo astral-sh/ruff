@@ -4,12 +4,14 @@ By default, we assume that our README.md will be rendered on GitHub. However, di
 targets have different strategies for rendering light- and dark-mode images. This script
 adjusts the images in the README.md to support the given target.
 """
+from __future__ import annotations
+
 import argparse
 from pathlib import Path
 
 URL = "https://user-images.githubusercontent.com/1309177/{}.svg"
-URL_LIGHT = URL.format("212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928")
-URL_DARK = URL.format("212613422-7faaf278-706b-4294-ad92-236ffcab3430")
+URL_LIGHT = URL.format("232603516-4fb4892d-585c-4b20-b810-3db9161831e4")
+URL_DARK = URL.format("232603514-c95e9b0f-6b31-43de-9a80-9e844173fd6a")
 
 # https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#specifying-the-theme-an-image-is-shown-to
 GITHUB = f"""

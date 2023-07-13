@@ -1,50 +1,24 @@
-use bitflags::bitflags;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
+pub(crate) use extraneous_whitespace::*;
+pub(crate) use indentation::*;
+pub(crate) use missing_whitespace::*;
+pub(crate) use missing_whitespace_after_keyword::*;
+pub(crate) use missing_whitespace_around_operator::*;
+pub(crate) use space_around_operator::*;
+pub(crate) use whitespace_around_keywords::*;
+pub(crate) use whitespace_around_named_parameter_equals::*;
+pub(crate) use whitespace_before_comment::*;
+pub(crate) use whitespace_before_parameters::*;
+
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
+use bitflags::bitflags;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::lexer::LexResult;
+
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-
-pub(crate) use extraneous_whitespace::{
-    extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,
-    WhitespaceBeforePunctuation,
-};
-pub(crate) use indentation::{
-    indentation, IndentationWithInvalidMultiple, IndentationWithInvalidMultipleComment,
-    NoIndentedBlock, NoIndentedBlockComment, OverIndented, UnexpectedIndentation,
-    UnexpectedIndentationComment,
-};
-pub(crate) use missing_whitespace::{missing_whitespace, MissingWhitespace};
-pub(crate) use missing_whitespace_after_keyword::{
-    missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
-};
-pub(crate) use missing_whitespace_around_operator::{
-    missing_whitespace_around_operator, MissingWhitespaceAroundArithmeticOperator,
-    MissingWhitespaceAroundBitwiseOrShiftOperator, MissingWhitespaceAroundModuloOperator,
-    MissingWhitespaceAroundOperator,
-};
 use ruff_python_whitespace::is_python_whitespace;
-pub(crate) use space_around_operator::{
-    space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
-    TabAfterOperator, TabBeforeOperator,
-};
-pub(crate) use whitespace_around_keywords::{
-    whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
-    TabAfterKeyword, TabBeforeKeyword,
-};
-pub(crate) use whitespace_around_named_parameter_equals::{
-    whitespace_around_named_parameter_equals, MissingWhitespaceAroundParameterEquals,
-    UnexpectedSpacesAroundKeywordParameterEquals,
-};
-pub(crate) use whitespace_before_comment::{
-    whitespace_before_comment, MultipleLeadingHashesForBlockComment, NoSpaceAfterBlockComment,
-    NoSpaceAfterInlineComment, TooFewSpacesBeforeInlineComment,
-};
-pub(crate) use whitespace_before_parameters::{
-    whitespace_before_parameters, WhitespaceBeforeParameters,
-};
 
 mod extraneous_whitespace;
 mod indentation;
@@ -121,8 +95,8 @@ impl Debug for LogicalLines<'_> {
 }
 
 impl<'a> IntoIterator for &'a LogicalLines<'a> {
-    type Item = LogicalLine<'a>;
     type IntoIter = LogicalLinesIter<'a>;
+    type Item = LogicalLine<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         LogicalLinesIter {

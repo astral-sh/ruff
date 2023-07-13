@@ -3,17 +3,17 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Stmt};
+use rustpython_parser::ast::{self, ArgWithDefault, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
-use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_whitespace::NewlineWithTrailingNewline;
+use ruff_python_semantic::{Definition, Member, MemberKind};
+use ruff_python_whitespace::{NewlineWithTrailingNewline, PythonWhitespace};
 use ruff_textwrap::dedent;
 
 use crate::checkers::ast::Checker;
@@ -23,6 +23,68 @@ use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pydocstyle::settings::Convention;
 
+/// ## What it does
+/// Checks for over-indented sections in docstrings.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Each section should use consistent indentation, with the section headers
+/// matching the indentation of the docstring's opening quotes, and the
+/// section bodies being indented one level further.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///         Args:
+///             distance: Distance traveled.
+///             time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct SectionNotOverIndented {
     name: String,
@@ -41,6 +103,86 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
     }
 }
 
+/// ## What it does
+/// Checks for over-indented section underlines in docstrings.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
+///
+/// Avoid over-indenting the section underlines, as this can cause syntax
+/// errors in reStructuredText.
+///
+/// By default, this rule is enabled when using the `numpy` convention, and
+/// disabled when using the `google` or `pep257` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///         ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[violation]
 pub struct SectionUnderlineNotOverIndented {
     name: String,
@@ -59,6 +201,67 @@ impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
     }
 }
 
+/// ## What it does
+/// Checks for section headers in docstrings that do not begin with capital
+/// letters.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Section headers should be capitalized, for consistency.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     returns:
+///         Speed as distance divided by time.
+///
+///     raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct CapitalizeSectionName {
     name: String,
@@ -77,6 +280,84 @@ impl AlwaysAutofixableViolation for CapitalizeSectionName {
     }
 }
 
+/// ## What it does
+/// Checks that section headers in docstrings that are not followed by a
+/// newline.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Section headers should be followed by a newline, and not by another
+/// character (like a colon), for consistency.
+///
+/// This rule is enabled when using the `numpy` convention, and disabled
+/// when using the `google` or `pep257` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters:
+///     -----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns:
+///     --------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises:
+///     -------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[violation]
 pub struct NewLineAfterSectionName {
     name: String,
@@ -95,6 +376,84 @@ impl AlwaysAutofixableViolation for NewLineAfterSectionName {
     }
 }
 
+/// ## What it does
+/// Checks for section headers in docstrings that are not followed by
+/// underlines.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
+///
+/// This rule is enabled when using the `numpy` convention, and disabled
+/// when using the `google` or `pep257` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[violation]
 pub struct DashedUnderlineAfterSection {
     name: String,
@@ -113,6 +472,90 @@ impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
     }
 }
 
+/// ## What it does
+/// Checks for section underlines in docstrings that are not on the line
+/// immediately following the section name.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
+///
+/// When present, section underlines should be positioned on the line
+/// immediately following the section header.
+///
+/// This rule is enabled when using the `numpy` convention, and disabled
+/// when using the `google` or `pep257` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[violation]
 pub struct SectionUnderlineAfterName {
     name: String,
@@ -131,6 +574,87 @@ impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
     }
 }
 
+/// ## What it does
+/// Checks for section underlines in docstrings that do not match the length of
+/// the corresponding section header.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Some docstring formats (like reStructuredText) use underlines to separate
+/// section bodies from section headers.
+///
+/// When present, section underlines should match the length of the
+/// corresponding section header.
+///
+/// This rule is enabled when using the `numpy` convention, and disabled
+/// when using the `google` or `pep257` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ---
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     ---
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ---
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[violation]
 pub struct SectionUnderlineMatchesSectionLength {
     name: String,
@@ -149,6 +673,83 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
     }
 }
 
+/// ## What it does
+/// Checks for docstring sections that are not separated by a single blank
+/// line.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Docstring sections should be separated by a blank line, for consistency and
+/// compatibility with documentation tooling.
+///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct NoBlankLineAfterSection {
     name: String,
@@ -167,6 +768,81 @@ impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
     }
 }
 
+/// ## What it does
+/// Checks for docstring sections that are separated by a blank line.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Docstring sections should be separated by a blank line, for consistency and
+/// compatibility with documentation tooling.
+///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[violation]
 pub struct NoBlankLineBeforeSection {
     name: String,
@@ -185,6 +861,81 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
     }
 }
 
+/// ## What it does
+/// Checks for missing blank lines after the last section of a multi-line
+/// docstring.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// The last section in a docstring should be separated by a blank line, for
+/// consistency and compatibility with documentation tooling.
+///
+/// This rule is enabled when using the `numpy` convention, and disabled when
+/// using the `pep257` and `google` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light."""
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[violation]
 pub struct BlankLineAfterLastSection {
     name: String,
@@ -203,6 +954,79 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
     }
 }
 
+/// ## What it does
+/// Checks for docstrings that contain empty sections.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Empty docstring sections are indicative of missing documentation. Empty
+/// sections should either be removed or filled in with relevant documentation.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Parameters
+///     ----------
+///     distance : float
+///         Distance traveled.
+///     time : float
+///         Time spent traveling.
+///
+///     Returns
+///     -------
+///     float
+///         Speed as distance divided by time.
+///
+///     Raises
+///     ------
+///     FasterThanLightError
+///         If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct EmptyDocstringSection {
     name: String,
@@ -216,6 +1040,69 @@ impl Violation for EmptyDocstringSection {
     }
 }
 
+/// ## What it does
+/// Checks for docstring section headers that do not end with a colon.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// In a docstring, each section header should end with a colon, for
+/// consistency.
+///
+/// This rule is enabled when using the `google` convention, and disabled when
+/// using the `pep257` and `numpy` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns
+///         Speed as distance divided by time.
+///
+///     Raises
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct SectionNameEndsInColon {
     name: String,
@@ -234,6 +1121,70 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
     }
 }
 
+/// ## What it does
+/// Checks for function docstrings that do not include documentation for all
+/// parameters in the function.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Function docstrings often include a section for function arguments, which
+/// should include documentation for every argument. Undocumented arguments are
+/// indicative of missing documentation.
+///
+/// This rule is enabled when using the `google` convention, and disabled when
+/// using the `pep257` and `numpy` conventions.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedParam {
     pub names: Vec<String>,
@@ -253,6 +1204,69 @@ impl Violation for UndocumentedParam {
     }
 }
 
+/// ## What it does
+/// Checks for docstring sections that contain blank lines between the section
+/// header and the section body.
+///
+/// ## Why is this bad?
+/// Multi-line docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body.
+///
+/// Docstring sections should not contain blank lines between the section header
+/// and the section body, for consistency.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///
+///     Raises:
+///         FasterThanLightError: If speed is greater than the speed of light.
+///     """
+///     try:
+///         return distance / time
+///     except ZeroDivisionError as exc:
+///         raise FasterThanLightError from exc
+/// ```
+///
+/// ## Options
+/// - `pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct BlankLinesBetweenHeaderAndContent {
     name: String,
@@ -376,8 +1390,7 @@ fn blanks_and_section_underline(
                         let range =
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and the underline.
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
+                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(range)));
                     }
                     checker.diagnostics.push(diagnostic);
                 }
@@ -405,8 +1418,7 @@ fn blanks_and_section_underline(
                             "-".repeat(context.section_name().len()),
                             checker.stylist.line_ending().as_str()
                         );
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                        diagnostic.set_fix(Fix::automatic(Edit::replacement(
                             content,
                             blank_lines_end,
                             non_blank_line.full_end(),
@@ -432,8 +1444,7 @@ fn blanks_and_section_underline(
                         );
 
                         // Replace the existing indentation with whitespace of the appropriate length.
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                             clean_space(docstring.indentation),
                             range,
                         )));
@@ -472,8 +1483,7 @@ fn blanks_and_section_underline(
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             // Delete any blank lines between the header and content.
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                            diagnostic.set_fix(Fix::automatic(Edit::deletion(
                                 line_after_dashes.start(),
                                 blank_lines_after_dashes_end,
                             )));
@@ -492,6 +1502,10 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
+            let equal_line_found = non_blank_line
+                .chars()
+                .all(|char| char.is_whitespace() || char == '=');
+
             if checker.enabled(Rule::DashedUnderlineAfterSection) {
                 let mut diagnostic = Diagnostic::new(
                     DashedUnderlineAfterSection {
@@ -507,11 +1521,23 @@ fn blanks_and_section_underline(
                         clean_space(docstring.indentation),
                         "-".repeat(context.section_name().len()),
                     );
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::insertion(
-                        content,
-                        context.summary_range().end(),
-                    )));
+                    if equal_line_found
+                        && non_blank_line.trim_whitespace().len() == context.section_name().len()
+                    {
+                        // If an existing underline is an equal sign line of the appropriate length,
+                        // replace it with a dashed line.
+                        diagnostic.set_fix(Fix::automatic(Edit::replacement(
+                            content,
+                            context.summary_range().end(),
+                            non_blank_line.end(),
+                        )));
+                    } else {
+                        // Otherwise, insert a dashed line after the section header.
+                        diagnostic.set_fix(Fix::automatic(Edit::insertion(
+                            content,
+                            context.summary_range().end(),
+                        )));
+                    }
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -527,8 +1553,7 @@ fn blanks_and_section_underline(
                         let range =
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
+                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(range)));
                     }
                     checker.diagnostics.push(diagnostic);
                 }
@@ -553,8 +1578,7 @@ fn blanks_and_section_underline(
                     "-".repeat(context.section_name().len()),
                 );
 
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     content,
                     context.summary_range().end(),
                 )));
@@ -591,8 +1615,7 @@ fn common_section(
                 // Replace the section title with the capitalized variant. This requires
                 // locating the start and end of the section name.
                 let section_range = context.section_name_range();
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     capitalized_section_name.to_string(),
                     section_range,
                 )));
@@ -615,8 +1638,7 @@ fn common_section(
                 let content = clean_space(docstring.indentation);
                 let fix_range = TextRange::at(context.range().start(), leading_space.text_len());
 
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(if content.is_empty() {
+                diagnostic.set_fix(Fix::automatic(if content.is_empty() {
                     Edit::range_deletion(fix_range)
                 } else {
                     Edit::range_replacement(content, fix_range)
@@ -639,8 +1661,7 @@ fn common_section(
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline at the beginning of the next section.
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                    diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         line_end.to_string(),
                         next.range().start(),
                     )));
@@ -657,8 +1678,7 @@ fn common_section(
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                    diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         format!("{}{}", line_end, docstring.indentation),
                         context.range().end(),
                     )));
@@ -678,8 +1698,7 @@ fn common_section(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a blank line before the section.
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     line_end.to_string(),
                     context.range().start(),
                 )));
@@ -696,37 +1715,41 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
-    }) = docstring.definition else {
+    }) = docstring.definition
+    else {
         return;
     };
 
-    let (
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            args: arguments, ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            args: arguments, ..
-        })
-    ) = stmt else {
+    let (Stmt::FunctionDef(ast::StmtFunctionDef {
+        args: arguments, ..
+    })
+    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+        args: arguments, ..
+    })) = stmt
+    else {
         return;
     };
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
-    for arg in arguments
+    for ArgWithDefault {
+        def,
+        default: _,
+        range: _,
+    } in arguments
         .posonlyargs
         .iter()
-        .chain(arguments.args.iter())
-        .chain(arguments.kwonlyargs.iter())
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 docstring.definition.is_method()
-                    && !is_staticmethod(checker.semantic_model(), cast::decorator_list(stmt)),
+                    && !is_staticmethod(cast::decorator_list(stmt), checker.semantic()),
             ),
         )
     {
-        let arg_name = arg.arg.as_str();
+        let arg_name = def.arg.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -759,7 +1782,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
             UndocumentedParam { names },
-            identifier_range(stmt, checker.locator),
+            stmt.identifier(),
         ));
     }
 }
@@ -878,8 +1901,7 @@ fn numpy_section(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 let section_range = context.section_name_range();
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::at(
+                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::at(
                     section_range.end(),
                     suffix.text_len(),
                 ))));
@@ -916,8 +1938,7 @@ fn google_section(
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the suffix.
                 let section_name_range = context.section_name_range();
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     ":".to_string(),
                     TextRange::at(section_name_range.end(), suffix.text_len()),
                 )));

@@ -1,14 +1,15 @@
 //! Lint rules based on checking physical lines.
+use std::path::Path;
 
 use ruff_text_size::TextSize;
-use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_whitespace::UniversalNewlines;
 
+use crate::comments::shebang::ShebangDirective;
 use crate::registry::Rule;
-use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
+use crate::rules::flake8_copyright::rules::missing_copyright_notice;
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
@@ -49,6 +50,7 @@ pub(crate) fn check_physical_lines(
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
+    let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
 
     let fix_unnecessary_coding_comment = settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace = settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
@@ -85,33 +87,35 @@ pub(crate) fn check_physical_lines(
                 || enforce_shebang_newline
                 || enforce_shebang_python
             {
-                let shebang = extract_shebang(&line);
-                if enforce_shebang_not_executable {
-                    if let Some(diagnostic) = shebang_not_executable(path, line.range(), &shebang) {
-                        diagnostics.push(diagnostic);
+                if let Some(shebang) = ShebangDirective::try_extract(&line) {
+                    has_any_shebang = true;
+                    if enforce_shebang_not_executable {
+                        if let Some(diagnostic) =
+                            shebang_not_executable(path, line.range(), &shebang)
+                        {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_missing {
-                    if !has_any_shebang && matches!(shebang, ShebangDirective::Match(..)) {
-                        has_any_shebang = true;
+                    if enforce_shebang_whitespace {
+                        if let Some(diagnostic) =
+                            shebang_whitespace(line.range(), &shebang, fix_shebang_whitespace)
+                        {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_whitespace {
-                    if let Some(diagnostic) =
-                        shebang_whitespace(line.range(), &shebang, fix_shebang_whitespace)
-                    {
-                        diagnostics.push(diagnostic);
+                    if enforce_shebang_newline {
+                        if let Some(diagnostic) =
+                            shebang_newline(line.range(), &shebang, index == 0)
+                        {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_newline {
-                    if let Some(diagnostic) = shebang_newline(line.range(), &shebang, index == 0) {
-                        diagnostics.push(diagnostic);
+                    if enforce_shebang_python {
+                        if let Some(diagnostic) = shebang_python(line.range(), &shebang) {
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if enforce_shebang_python {
-                    if let Some(diagnostic) = shebang_python(line.range(), &shebang) {
-                        diagnostics.push(diagnostic);
-                    }
+                } else {
                 }
             }
         }
@@ -144,7 +148,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, settings) {
+            if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -172,14 +176,21 @@ pub(crate) fn check_physical_lines(
         }
     }
 
+    if enforce_copyright_notice {
+        if let Some(diagnostic) = missing_copyright_notice(locator, settings) {
+            diagnostics.push(diagnostic);
+        }
+    }
+
     diagnostics
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
-    use std::path::Path;
 
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 

@@ -84,13 +84,13 @@ pub(crate) fn unnecessary_double_cast_or_process(
     let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Call(ast::ExprCall { func, ..} )= arg else {
+    let Expr::Call(ast::ExprCall { func, .. }) = arg else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {
         return;
     };
-    if !checker.semantic_model().is_builtin(inner) || !checker.semantic_model().is_builtin(outer) {
+    if !checker.semantic().is_builtin(inner) || !checker.semantic().is_builtin(outer) {
         return;
     }
 

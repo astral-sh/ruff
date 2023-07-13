@@ -14,6 +14,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::autofix::codemods::CodegenStylist;
+use crate::rules::flake8_comprehensions::rules::ObjectType;
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
@@ -109,7 +110,8 @@ pub(crate) fn fix_unnecessary_generator_dict(
     // Extract the (k, v) from `(k, v) for ...`.
     let generator_exp = match_generator_exp(&arg.value)?;
     let tuple = match_tuple(&generator_exp.elt)?;
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..] else {
+    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    else {
         bail!("Expected tuple to contain two elements");
     };
 
@@ -188,9 +190,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
 
     let tuple = match_tuple(&list_comp.elt)?;
 
-    let [Element::Simple {
-            value: key, ..
-        }, Element::Simple { value, .. }] = &tuple.elements[..] else { bail!("Expected tuple with two elements"); };
+    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    else {
+        bail!("Expected tuple with two elements");
+    };
 
     tree = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
@@ -502,14 +505,14 @@ pub(crate) fn fix_unnecessary_collection_call(
 /// this method will pad the start and end of an expression as needed to
 /// avoid producing invalid syntax.
 fn pad_expression(content: String, range: TextRange, checker: &Checker) -> String {
-    if !checker.semantic_model().in_f_string() {
+    if !checker.semantic().in_f_string() {
         return content;
     }
 
     // If the expression is immediately preceded by an opening brace, then
     // we need to add a space before the expression.
     let prefix = checker.locator.up_to(range.start());
-    let left_pad = matches!(prefix.chars().rev().next(), Some('{'));
+    let left_pad = matches!(prefix.chars().next_back(), Some('{'));
 
     // If the expression is immediately preceded by an opening brace, then
     // we need to add a space before the expression.
@@ -886,7 +889,7 @@ pub(crate) fn fix_unnecessary_map(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
     parent: Option<&rustpython_parser::ast::Expr>,
-    kind: &str,
+    object_type: ObjectType,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -946,8 +949,8 @@ pub(crate) fn fix_unnecessary_map(
             whitespace_after_in: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
         });
 
-        match kind {
-            "generator" => {
+        match object_type {
+            ObjectType::Generator => {
                 tree = Expression::GeneratorExp(Box::new(GeneratorExp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
@@ -955,7 +958,7 @@ pub(crate) fn fix_unnecessary_map(
                     rpar: vec![RightParen::default()],
                 }));
             }
-            "list" => {
+            ObjectType::List => {
                 tree = Expression::ListComp(Box::new(ListComp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
@@ -965,7 +968,7 @@ pub(crate) fn fix_unnecessary_map(
                     rpar: vec![],
                 }));
             }
-            "set" => {
+            ObjectType::Set => {
                 tree = Expression::SetComp(Box::new(SetComp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
@@ -975,21 +978,17 @@ pub(crate) fn fix_unnecessary_map(
                     rbrace: RightCurlyBrace::default(),
                 }));
             }
-            "dict" => {
+            ObjectType::Dict => {
                 let (key, value) = if let Expression::Tuple(tuple) = func_body.body.as_ref() {
                     if tuple.elements.len() != 2 {
                         bail!("Expected two elements")
                     }
 
                     let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
-                        bail!(
-                            "Expected tuple to contain a key as the first element"
-                        );
+                        bail!("Expected tuple to contain a key as the first element");
                     };
                     let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) else {
-                        bail!(
-                            "Expected tuple to contain a key as the second element"
-                        );
+                        bail!("Expected tuple to contain a key as the second element");
                     };
 
                     (key, value)
@@ -1011,17 +1010,14 @@ pub(crate) fn fix_unnecessary_map(
                     ),
                 }));
             }
-            _ => {
-                bail!("Expected generator, list, set or dict");
-            }
         }
 
         let mut content = tree.codegen_stylist(stylist);
 
         // If the expression is embedded in an f-string, surround it with spaces to avoid
         // syntax errors.
-        if kind == "set" || kind == "dict" {
-            if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
+        if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
+            if parent.map_or(false, rustpython_parser::ast::Expr::is_formatted_value_expr) {
                 content = format!(" {content} ");
             }
         }
@@ -1063,9 +1059,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
     let call = match_call_mut(&mut tree)?;
 
     let Expression::ListComp(list_comp) = &call.args[0].value else {
-        bail!(
-            "Expected Expression::ListComp"
-        );
+        bail!("Expected Expression::ListComp");
     };
 
     let mut new_empty_lines = vec![];

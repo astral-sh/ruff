@@ -1,19 +1,8 @@
-#[derive(Debug, Copy, Clone, Hash)]
+#[derive(Debug, Copy, Clone, Hash, is_macro::Is)]
 pub enum FixMode {
     Generate,
     Apply,
     Diff,
-    None,
-}
-
-impl From<bool> for FixMode {
-    fn from(value: bool) -> Self {
-        if value {
-            Self::Apply
-        } else {
-            Self::None
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]

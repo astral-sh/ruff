@@ -1,0 +1,55 @@
+---
+source: crates/ruff_python_resolver/src/lib.rs
+expression: result
+---
+ImportResult {
+    is_relative: false,
+    is_import_found: true,
+    is_partly_resolved: false,
+    is_namespace_package: false,
+    is_init_file_present: true,
+    is_stub_package: false,
+    import_type: ThirdParty,
+    resolved_paths: [
+        "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/__init__.py",
+        "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/__init__.py",
+    ],
+    search_path: Some(
+        "./resources/test/airflow/venv/lib/python3.11/site-packages",
+    ),
+    is_stub_file: false,
+    is_native_lib: false,
+    is_stdlib_typeshed_file: false,
+    is_third_party_typeshed_file: false,
+    is_local_typings_file: false,
+    implicit_imports: ImplicitImports(
+        {
+            "base": ImplicitImport {
+                is_stub_file: false,
+                is_native_lib: false,
+                path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/base.py",
+                py_typed: None,
+            },
+            "dependency": ImplicitImport {
+                is_stub_file: false,
+                is_native_lib: false,
+                path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/dependency.py",
+                py_typed: None,
+            },
+            "query": ImplicitImport {
+                is_stub_file: false,
+                is_native_lib: false,
+                path: "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py",
+                py_typed: None,
+            },
+        },
+    ),
+    filtered_implicit_imports: ImplicitImports(
+        {},
+    ),
+    non_stub_import_result: None,
+    py_typed_info: None,
+    package_directory: Some(
+        "./resources/test/airflow/venv/lib/python3.11/site-packages/sqlalchemy",
+    ),
+}

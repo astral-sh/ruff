@@ -4,12 +4,12 @@ use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::scope::ScopeKind;
+use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum DeferralKeyword {
+enum DeferralKeyword {
     Yield,
     YieldFrom,
     Await,
@@ -55,7 +55,7 @@ impl Violation for YieldOutsideFunction {
 
 pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
     if matches!(
-        checker.semantic_model().scope().kind,
+        checker.semantic().scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         let keyword = match expr {

@@ -1,12 +1,13 @@
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
+
+use ruff_formatter::{format_args, write, FormatError, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{lines_after, lines_before, skip_trailing_trivia};
-use ruff_formatter::{format_args, write, FormatError, SourceCode};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::prelude::AstNode;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -42,7 +43,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
         {
             let slice = comment.slice();
 
-            let lines_after_comment = lines_after(slice.end(), f.context().contents());
+            let lines_after_comment = lines_after(slice.end(), f.context().source());
             write!(
                 f,
                 [format_comment(comment), empty_lines(lines_after_comment)]
@@ -69,7 +70,7 @@ where
 {
     FormatLeadingAlternateBranchComments {
         comments,
-        last_node: last_node.map(std::convert::Into::into),
+        last_node: last_node.map(Into::into),
     }
 }
 
@@ -83,16 +84,16 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
         if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
-            if lines_before(first_leading.slice().start(), f.context().contents()) > 1 {
+            if lines_before(first_leading.slice().start(), f.context().source()) > 1 {
                 write!(f, [empty_line()])?;
             }
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
-            let full_end = skip_trailing_trivia(last_preceding.end(), f.context().contents());
+            let full_end = skip_trailing_trivia(last_preceding.end(), f.context().source());
             // The leading comments formatting ensures that it preserves the right amount of lines after
             // We need to take care of this ourselves, if there's no leading `else` comment.
-            if lines_after(full_end, f.context().contents()) > 1 {
+            if lines_after(full_end, f.context().source()) > 1 {
                 write!(f, [empty_line()])?;
             }
         }
@@ -136,10 +137,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
         {
             let slice = trailing.slice();
 
-            has_trailing_own_line_comment |= trailing.position().is_own_line();
+            has_trailing_own_line_comment |= trailing.line_position().is_own_line();
 
             if has_trailing_own_line_comment {
-                let lines_before_comment = lines_before(slice.start(), f.context().contents());
+                let lines_before_comment = lines_before(slice.start(), f.context().source());
 
                 // A trailing comment at the end of a body or list
                 // ```python
@@ -208,7 +209,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
             .iter()
             .filter(|comment| comment.is_unformatted())
         {
-            if first && comment.position().is_end_of_line() {
+            if first && comment.line_position().is_end_of_line() {
                 write!(f, [space(), space()])?;
             }
 
@@ -216,7 +217,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
                 f,
                 [
                     format_comment(comment),
-                    empty_lines(lines_after(comment.slice().end(), f.context().contents()))
+                    empty_lines(lines_after(comment.slice().end(), f.context().source()))
                 ]
             )?;
 
@@ -244,7 +245,7 @@ struct FormatComment<'a> {
 impl Format<PyFormatContext<'_>> for FormatComment<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let slice = self.comment.slice();
-        let comment_text = slice.text(SourceCode::new(f.context().contents()));
+        let comment_text = slice.text(SourceCode::new(f.context().source()));
 
         let trimmed = comment_text.trim_end();
         let trailing_whitespace_len = comment_text.text_len() - trimmed.text_len();
@@ -317,7 +318,9 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
             },
 
             // Remove all whitespace in parenthesized expressions
-            NodeLevel::Expression => write!(f, [hard_line_break()]),
+            NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
+                write!(f, [hard_line_break()])
+            }
         }
     }
 }

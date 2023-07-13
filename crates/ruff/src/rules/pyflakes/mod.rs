@@ -45,6 +45,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_17.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_18.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_19.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_20.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"))]
@@ -283,7 +284,7 @@ mod tests {
             import os
 
             # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
-            # import. (This is a false negative.)
+            # import.
             del os
     "#,
         "del_shadowed_global_import_in_local_scope"
@@ -313,8 +314,185 @@ mod tests {
     "#,
         "del_shadowed_local_import_in_local_scope"
     )]
+    #[test_case(
+        r#"
+        import os
+
+        def f():
+            os = 1
+            print(os)
+
+            del os
+
+            def g():
+                # `import os` doesn't need to be flagged as shadowing an import.
+                os = 1
+                print(os)
+        "#,
+        "del_shadowed_import_shadow_in_local_scope"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def foo():
+            x = 2
+            del x
+            # Flake8 treats this as an F823 error, because it removes the binding
+            # entirely after the `del` statement. However, it should be an F821
+            # error, because the name is defined in the scope, but unbound.
+            x += 1
+    "#,
+        "augmented_assignment_after_del"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            x = 1
+
+            try:
+                1 / 0
+            except Exception as x:
+                pass
+
+            # No error here, though it should arguably be an F821 error. `x` will
+            # be unbound after the `except` block (assuming an exception is raised
+            # and caught).
+            print(x)
+            "#,
+        "print_in_body_after_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            x = 1
+
+            try:
+                1 / 0
+            except ValueError as x:
+                pass
+            except ImportError as x:
+                pass
+
+            # No error here, though it should arguably be an F821 error. `x` will
+            # be unbound after the `except` block (assuming an exception is raised
+            # and caught).
+            print(x)
+            "#,
+        "print_in_body_after_double_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            try:
+                x = 3
+            except ImportError as x:
+                print(x)
+            else:
+                print(x)
+            "#,
+        "print_in_try_else_after_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            list = [1, 2, 3]
+
+            for e in list:
+                if e % 2 == 0:
+                    try:
+                        pass
+                    except Exception as e:
+                        print(e)
+                else:
+                    print(e)
+            "#,
+        "print_in_if_else_after_shadowing_except"
+    )]
+    #[test_case(
+        r#"
+        def f():
+            x = 1
+            del x
+            del x
+            "#,
+        "double_del"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def f():
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            # This should resolve to the `x` in `x = 1`.
+            print(x)
+            "#,
+        "load_after_unbind_from_module_scope"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def f():
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            # This should resolve to the `x` in `x = 1`.
+            print(x)
+            "#,
+        "load_after_multiple_unbinds_from_module_scope"
+    )]
+    #[test_case(
+        r#"
+        x = 1
+
+        def f():
+            try:
+                pass
+            except ValueError as x:
+                pass
+
+            def g():
+                try:
+                    pass
+                except ValueError as x:
+                    pass
+
+                # This should resolve to the `x` in `x = 1`.
+                print(x)
+            "#,
+        "load_after_unbind_from_nested_module_scope"
+    )]
+    #[test_case(
+        r#"
+        class C:
+            x = 1
+
+            def f():
+                try:
+                    pass
+                except ValueError as x:
+                    pass
+
+                # This should raise an F821 error, rather than resolving to the
+                # `x` in `x = 1`.
+                print(x)
+            "#,
+        "load_after_unbind_from_class_scope"
+    )]
     fn contents(contents: &str, snapshot: &str) {
-        let diagnostics = test_snippet(contents, &Settings::for_rules(&Linter::Pyflakes));
+        let diagnostics = test_snippet(contents, &Settings::for_rules(Linter::Pyflakes.rules()));
         assert_messages!(snapshot, diagnostics);
     }
 
@@ -322,7 +500,7 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
-        let settings = Settings::for_rules(&Linter::Pyflakes);
+        let settings = Settings::for_rules(Linter::Pyflakes.rules());
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -346,6 +524,7 @@ mod tests {
             &directives,
             &settings,
             flags::Noqa::Enabled,
+            None,
         );
         diagnostics.sort_by_key(Diagnostic::start);
         let actual = diagnostics
@@ -1937,7 +2116,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
+            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
         );
     }
 
@@ -3147,6 +3326,20 @@ mod tests {
         T: object
         def g(t: 'T'): pass
         "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        T = object
+        def f(t: T): pass
+        "#,
+            &[],
+        );
+        flakes(
+            r#"
+        T = object
+        def g(t: 'T'): pass
+        "#,
             &[],
         );
         flakes(
@@ -3335,6 +3528,16 @@ mod tests {
             r#"
         from __future__ import annotations
         T: object
+        def f(t: T): pass
+        def g(t: 'T'): pass
+        "#,
+            &[Rule::UndefinedName, Rule::UndefinedName],
+        );
+
+        flakes(
+            r#"
+        from __future__ import annotations
+        T = object
         def f(t: T): pass
         def g(t: 'T'): pass
         "#,

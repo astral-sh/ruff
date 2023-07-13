@@ -12,7 +12,7 @@ constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
   |
   = help: Replace `is` with `==`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | ###
 2 2 | # Errors
 3 3 | ###
@@ -33,7 +33,7 @@ constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
   |
   = help: Replace `is` with `==`
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | ###
 4 4 | if "abc" is "def":  # F632 (fix)
 5 5 |     pass
@@ -54,7 +54,7 @@ constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Suggested fix
+ℹ Fix
 5 5 |     pass
 6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
 7 7 |     pass
@@ -75,7 +75,7 @@ constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Suggested fix
+ℹ Fix
 7  7  |     pass
 8  8  | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
 9  9  |     pass
@@ -96,7 +96,7 @@ constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Suggested fix
+ℹ Fix
 9  9  |     pass
 10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 11 11 |     pass

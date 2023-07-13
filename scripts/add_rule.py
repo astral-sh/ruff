@@ -9,6 +9,7 @@ Example usage:
         --code 807 \
         --linter flake8-pie
 """
+from __future__ import annotations
 
 import argparse
 import subprocess
@@ -70,7 +71,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
 
-    new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
+    new_pub_use = f"pub(crate) use {rule_name_snake}::*"
     new_mod = f"mod {rule_name_snake};"
 
     if len(parts) == 2:
@@ -97,6 +98,17 @@ use ruff_macros::{{derive_message_formats, violation}};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+///
+/// ## Why is this bad?
+///
+/// ## Example
+/// ```python
+/// ```
+///
+/// Use instead:
+/// ```python
+/// ```
 #[violation]
 pub struct {name};
 

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
+use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -54,18 +54,18 @@ impl Violation for ErrorInsteadOfException {
 }
 
 /// TRY400
-pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::new(checker.semantic_model());
+            let mut visitor = LoggerCandidateVisitor::new(checker.semantic());
             visitor.visit_body(body);
             visitor.calls
         };
         for expr in calls {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr.func.as_ref() {
                 if attr == "error" {
-                    if exc_info(&expr.keywords, checker.semantic_model()).is_none() {
+                    if exc_info(&expr.keywords, checker.semantic()).is_none() {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));

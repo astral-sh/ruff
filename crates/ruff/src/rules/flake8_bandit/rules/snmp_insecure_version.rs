@@ -25,10 +25,10 @@ pub(crate) fn snmp_insecure_version(
     keywords: &[Keyword],
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["pysnmp", "hlapi", "CommunityData"]
+            matches!(call_path.as_slice(), ["pysnmp", "hlapi", "CommunityData"])
         })
     {
         let call_args = SimpleCallArgs::new(args, keywords);

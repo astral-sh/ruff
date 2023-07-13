@@ -6,6 +6,25 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of the `xml.etree.cElementTree` module.
+///
+/// ## Why is this bad?
+/// In Python 3.3, `xml.etree.cElementTree` was deprecated in favor of
+/// `xml.etree.ElementTree`.
+///
+/// ## Example
+/// ```python
+/// from xml.etree import cElementTree
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from xml.etree import ElementTree
+/// ```
+///
+/// ## References
+/// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
 #[violation]
 pub struct DeprecatedCElementTree;
 
@@ -27,8 +46,7 @@ where
     let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
     if checker.patch(diagnostic.kind.rule()) {
         let contents = checker.locator.slice(node.range());
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents.replacen("cElementTree", "ElementTree", 1),
             node.range(),
         )));

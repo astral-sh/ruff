@@ -84,15 +84,22 @@ pub(crate) fn invalid_envvar_default(
     keywords: &[Keyword],
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["os", "getenv"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["os", "getenv"])
+        })
     {
         // Find the `default` argument, if it exists.
         let Some(expr) = args.get(1).or_else(|| {
             keywords
                 .iter()
-                .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg .as_str()== "default"))
+                .find(|keyword| {
+                    keyword
+                        .arg
+                        .as_ref()
+                        .map_or(false, |arg| arg.as_str() == "default")
+                })
                 .map(|keyword| &keyword.value)
         }) else {
             return;

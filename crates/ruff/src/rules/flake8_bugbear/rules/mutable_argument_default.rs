@@ -1,12 +1,51 @@
-use rustpython_parser::ast::{self, Arguments, Expr, Ranged};
+use rustpython_parser::ast::{ArgWithDefault, Arguments, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::analyze::typing::is_immutable_annotation;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of mutable objects as function argument defaults.
+///
+/// ## Why is this bad?
+/// Function defaults are evaluated once, when the function is defined.
+///
+/// The same mutable object is then shared across all calls to the function.
+/// If the object is modified, those modifications will persist across calls,
+/// which can lead to unexpected behavior.
+///
+/// Instead, prefer to use immutable data structures, or take `None` as a
+/// default, and initialize a new mutable object inside the function body
+/// for each call.
+///
+/// ## Example
+/// ```python
+/// def add_to_list(item, some_list=[]):
+///     some_list.append(item)
+///     return some_list
+///
+///
+/// l1 = add_to_list(0)  # [0]
+/// l2 = add_to_list(1)  # [0, 1]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def add_to_list(item, some_list=None):
+///     if some_list is None:
+///         some_list = []
+///     some_list.append(item)
+///     return some_list
+///
+///
+/// l1 = add_to_list(0)  # [0]
+/// l2 = add_to_list(1)  # [1]
+/// ```
+///
+/// ## References
+/// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[violation]
 pub struct MutableArgumentDefault;
 
@@ -16,57 +55,27 @@ impl Violation for MutableArgumentDefault {
         format!("Do not use mutable data structures for argument defaults")
     }
 }
-const MUTABLE_FUNCS: &[&[&str]] = &[
-    &["", "dict"],
-    &["", "list"],
-    &["", "set"],
-    &["collections", "Counter"],
-    &["collections", "OrderedDict"],
-    &["collections", "defaultdict"],
-    &["collections", "deque"],
-];
-
-pub(crate) fn is_mutable_func(model: &SemanticModel, func: &Expr) -> bool {
-    model.resolve_call_path(func).map_or(false, |call_path| {
-        MUTABLE_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-    })
-}
-
-fn is_mutable_expr(model: &SemanticModel, expr: &Expr) -> bool {
-    match expr {
-        Expr::List(_)
-        | Expr::Dict(_)
-        | Expr::Set(_)
-        | Expr::ListComp(_)
-        | Expr::DictComp(_)
-        | Expr::SetComp(_) => true,
-        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(model, func),
-        _ => false,
-    }
-}
 
 /// B006
 pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Scan in reverse order to right-align zip().
-    for (arg, default) in arguments
-        .kwonlyargs
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
         .iter()
-        .rev()
-        .zip(arguments.kw_defaults.iter().rev())
-        .chain(
-            arguments
-                .args
-                .iter()
-                .rev()
-                .chain(arguments.posonlyargs.iter().rev())
-                .zip(arguments.defaults.iter().rev()),
-        )
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
     {
-        if is_mutable_expr(checker.semantic_model(), default)
-            && !arg.annotation.as_ref().map_or(false, |expr| {
-                is_immutable_annotation(checker.semantic_model(), expr)
+        let Some(default) = default else {
+            continue;
+        };
+
+        if is_mutable_expr(default, checker.semantic())
+            && !def.annotation.as_ref().map_or(false, |expr| {
+                is_immutable_annotation(expr, checker.semantic())
             })
         {
             checker

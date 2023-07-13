@@ -198,6 +198,17 @@
         }
       ]
     },
+    "flake8-copyright": {
+      "description": "Options for the `flake8-copyright` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8CopyrightOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
@@ -344,7 +355,7 @@
       ]
     },
     "include": {
-      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is included here not for configuration but because we lint whether e.g. the `[project]` matches the schema.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -458,6 +469,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/PylintOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pyupgrade": {
+      "description": "Options for the `pyupgrade` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PyUpgradeOptions"
         },
         {
           "type": "null"
@@ -733,6 +755,35 @@
           "description": "Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).",
           "type": [
             "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8CopyrightOptions": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Author to enforce within the copyright notice. If provided, the author must be present immediately following the copyright notice.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "min-file-size": {
+          "description": "A minimum file size (in bytes) required for a copyright notice to be enforced. By default, all files are validated.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "notice-rgx": {
+          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+(\\(C\\)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
+          "type": [
+            "string",
             "null"
           ]
         }
@@ -1084,6 +1135,13 @@
     "IsortOptions": {
       "type": "object",
       "properties": {
+        "case-sensitive": {
+          "description": "Sort imports taking into account case sensitivity.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "classes": {
           "description": "An override list of tokens to always recognize as a Class for `order-by-type` regardless of casing.",
           "type": [
@@ -1112,7 +1170,7 @@
           }
         },
         "extra-standard-library": {
-          "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
+          "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1163,7 +1221,7 @@
           }
         },
         "known-first-party": {
-          "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1173,7 +1231,7 @@
           }
         },
         "known-local-folder": {
-          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).",
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1183,7 +1241,7 @@
           }
         },
         "known-third-party": {
-          "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1357,7 +1415,7 @@
           }
         },
         "ignore-names": {
-          "description": "A list of names to ignore when considering `pep8-naming` violations.",
+          "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.",
           "type": [
             "array",
             "null"
@@ -1375,6 +1433,19 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PyUpgradeOptions": {
+      "type": "object",
+      "properties": {
+        "keep-runtime-typing": {
+          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Union[str, int]` -> `str | int`) rewrites even if a file imports `from __future__ import annotations`.\n\nThis setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and is most commonly used when working with libraries like Pydantic and FastAPI, which rely on the ability to parse type annotations at runtime. The use of `from __future__ import annotations` causes Python to treat the type annotations as strings, which typically allows for the use of language features that appear in later Python versions but are not yet supported by the current version (e.g., `str | int`). However, libraries that rely on runtime type annotations will break if the annotations are incompatible with the current Python version.\n\nFor example, while the following is valid Python 3.8 code due to the presence of `from __future__ import annotations`, the use of `str| int` prior to Python 3.10 will cause Pydantic to raise a `TypeError` at runtime:\n\n```python from __future__ import annotations\n\nimport pydantic\n\nclass Foo(pydantic.BaseModel): bar: str | int ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1515,23 +1586,24 @@
         "py38",
         "py39",
         "py310",
-        "py311"
+        "py311",
+        "py312"
       ]
     },
     "Quote": {
       "oneOf": [
         {
-          "description": "Use single quotes.",
-          "type": "string",
-          "enum": [
-            "single"
-          ]
-        },
-        {
           "description": "Use double quotes.",
           "type": "string",
           "enum": [
             "double"
+          ]
+        },
+        {
+          "description": "Use single quotes.",
+          "type": "string",
+          "enum": [
+            "single"
           ]
         }
       ]
@@ -1640,6 +1712,7 @@
         "B031",
         "B032",
         "B033",
+        "B034",
         "B9",
         "B90",
         "B904",
@@ -1679,6 +1752,8 @@
         "COM812",
         "COM818",
         "COM819",
+        "CPY",
+        "CPY001",
         "D",
         "D1",
         "D10",
@@ -1999,6 +2074,7 @@
         "NPY00",
         "NPY001",
         "NPY002",
+        "NPY003",
         "PD",
         "PD0",
         "PD00",
@@ -2017,6 +2093,18 @@
         "PD9",
         "PD90",
         "PD901",
+        "PERF",
+        "PERF1",
+        "PERF10",
+        "PERF101",
+        "PERF102",
+        "PERF2",
+        "PERF20",
+        "PERF203",
+        "PERF4",
+        "PERF40",
+        "PERF401",
+        "PERF402",
         "PGH",
         "PGH0",
         "PGH00",
@@ -2041,15 +2129,19 @@
         "PL",
         "PLC",
         "PLC0",
+        "PLC01",
+        "PLC010",
+        "PLC0105",
+        "PLC013",
+        "PLC0131",
+        "PLC0132",
         "PLC02",
         "PLC020",
+        "PLC0205",
         "PLC0208",
         "PLC04",
         "PLC041",
         "PLC0414",
-        "PLC1",
-        "PLC19",
-        "PLC190",
         "PLC1901",
         "PLC3",
         "PLC30",
@@ -2130,6 +2222,7 @@
         "PLR1701",
         "PLR171",
         "PLR1711",
+        "PLR1714",
         "PLR172",
         "PLR1722",
         "PLR2",
@@ -2234,6 +2327,10 @@
         "PYI0",
         "PYI00",
         "PYI001",
+        "PYI002",
+        "PYI003",
+        "PYI004",
+        "PYI005",
         "PYI006",
         "PYI007",
         "PYI008",
@@ -2253,13 +2350,16 @@
         "PYI025",
         "PYI029",
         "PYI03",
+        "PYI030",
         "PYI032",
         "PYI033",
         "PYI034",
         "PYI035",
+        "PYI036",
         "PYI04",
         "PYI042",
         "PYI043",
+        "PYI044",
         "PYI045",
         "PYI048",
         "PYI05",
@@ -2303,6 +2403,11 @@
         "RUF01",
         "RUF010",
         "RUF011",
+        "RUF012",
+        "RUF013",
+        "RUF014",
+        "RUF015",
+        "RUF016",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -2515,6 +2620,7 @@
         "UP036",
         "UP037",
         "UP038",
+        "UP039",
         "W",
         "W1",
         "W19",
@@ -2554,6 +2660,7 @@
       "enum": [
         "text",
         "json",
+        "json-lines",
         "junit",
         "grouped",
         "github",

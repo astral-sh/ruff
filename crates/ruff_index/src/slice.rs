@@ -41,6 +41,11 @@ impl<I: Idx, T> IndexSlice<I, T> {
     }
 
     #[inline]
+    pub const fn first(&self) -> Option<&T> {
+        self.raw.first()
+    }
+
+    #[inline]
     pub const fn len(&self) -> usize {
         self.raw.len()
     }
@@ -61,6 +66,13 @@ impl<I: Idx, T> IndexSlice<I, T> {
         &self,
     ) -> impl DoubleEndedIterator<Item = I> + ExactSizeIterator + Clone + 'static {
         (0..self.len()).map(|n| I::new(n))
+    }
+
+    #[inline]
+    pub fn iter_enumerated(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (I, &T)> + ExactSizeIterator + '_ {
+        self.raw.iter().enumerate().map(|(n, t)| (I::new(n), t))
     }
 
     #[inline]
@@ -127,8 +139,8 @@ impl<I: Idx, T> IndexMut<I> for IndexSlice<I, T> {
 }
 
 impl<'a, I: Idx, T> IntoIterator for &'a IndexSlice<I, T> {
-    type Item = &'a T;
     type IntoIter = std::slice::Iter<'a, T>;
+    type Item = &'a T;
 
     #[inline]
     fn into_iter(self) -> std::slice::Iter<'a, T> {
@@ -137,8 +149,8 @@ impl<'a, I: Idx, T> IntoIterator for &'a IndexSlice<I, T> {
 }
 
 impl<'a, I: Idx, T> IntoIterator for &'a mut IndexSlice<I, T> {
-    type Item = &'a mut T;
     type IntoIter = std::slice::IterMut<'a, T>;
+    type Item = &'a mut T;
 
     #[inline]
     fn into_iter(self) -> std::slice::IterMut<'a, T> {

@@ -7,6 +7,8 @@ use ruff_python_ast::helpers::{has_non_none_keyword, is_const_none};
 
 use crate::checkers::ast::Checker;
 
+use super::helpers;
+
 #[violation]
 pub struct CallDatetimeNowWithoutTzinfo;
 
@@ -26,12 +28,16 @@ pub(crate) fn call_datetime_now_without_tzinfo(
     location: TextRange,
 ) {
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "now"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "now"])
         })
     {
+        return;
+    }
+
+    if helpers::parent_expr_is_astimezone(checker) {
         return;
     }
 

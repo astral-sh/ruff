@@ -60,14 +60,14 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             op: Operator::Add | Operator::Mod,
             ..
         }) => {
-            let Some(parent) = checker.semantic_model().expr_parent() else {
+            let Some(parent) = checker.semantic().expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
                     return Some(checker.generator().expr(expr));
                 }
                 return None;
             };
             // Only evaluate the full BinOp, not the nested components.
-            let Expr::BinOp(_ )= parent else {
+            let Expr::BinOp(_) = parent else {
                 if any_over_expr(expr, &has_string_literal) {
                     return Some(checker.generator().expr(expr));
                 }

@@ -10,7 +10,7 @@ PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
    |
    = help: Replace `yield` with `return`
 
-ℹ Suggested fix
+ℹ Fix
 14 14 | @pytest.fixture()
 15 15 | def error():
 16 16 |     resource = acquire_resource()

@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arguments, Expr, Ranged};
+use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -7,11 +7,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPath};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_semantic::analyze::typing::is_immutable_func;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_func};
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -20,9 +19,6 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// Any function call that's used in a default argument will only be performed
 /// once, at definition time. The returned value will then be reused by all
 /// calls to the function, which can lead to unexpected behaviour.
-///
-/// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
 ///
 /// ## Example
 /// ```python
@@ -45,16 +41,8 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 ///     return arg
 /// ```
 ///
-/// Alternatively, if shared behavior is desirable, clarify the intent by
-/// assigning to a module-level variable:
-/// ```python
-/// I_KNOW_THIS_IS_SHARED_STATE = create_list()
-///
-///
-/// def mutable_default(arg: list[int] = I_KNOW_THIS_IS_SHARED_STATE) -> list[int]:
-///     arg.append(4)
-///     return arg
-/// ```
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDefaultArgument {
     pub name: Option<String>,
@@ -73,7 +61,7 @@ impl Violation for FunctionCallInDefaultArgument {
 }
 
 struct ArgumentDefaultVisitor<'a> {
-    model: &'a SemanticModel<'a>,
+    semantic: &'a SemanticModel<'a>,
     extend_immutable_calls: Vec<CallPath<'a>>,
     diagnostics: Vec<(DiagnosticKind, TextRange)>,
 }
@@ -81,7 +69,7 @@ struct ArgumentDefaultVisitor<'a> {
 impl<'a> ArgumentDefaultVisitor<'a> {
     fn new(model: &'a SemanticModel<'a>, extend_immutable_calls: Vec<CallPath<'a>>) -> Self {
         Self {
-            model,
+            semantic: model,
             extend_immutable_calls,
             diagnostics: Vec::new(),
         }
@@ -95,8 +83,8 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if !is_mutable_func(self.model, func)
-                    && !is_immutable_func(self.model, func, &self.extend_immutable_calls)
+                if !is_mutable_func(func, self.semantic)
+                    && !is_immutable_func(func, self.semantic, &self.extend_immutable_calls)
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
@@ -125,14 +113,20 @@ pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &
         .map(|target| from_qualified_name(target))
         .collect();
     let diagnostics = {
-        let mut visitor =
-            ArgumentDefaultVisitor::new(checker.semantic_model(), extend_immutable_calls);
-        for expr in arguments
-            .defaults
+        let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), extend_immutable_calls);
+        for ArgWithDefault {
+            default,
+            def: _,
+            range: _,
+        } in arguments
+            .posonlyargs
             .iter()
-            .chain(arguments.kw_defaults.iter())
+            .chain(&arguments.args)
+            .chain(&arguments.kwonlyargs)
         {
-            visitor.visit_expr(expr);
+            if let Some(expr) = &default {
+                visitor.visit_expr(expr);
+            }
         }
         visitor.diagnostics
     };

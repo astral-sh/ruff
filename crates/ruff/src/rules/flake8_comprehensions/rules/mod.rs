@@ -1,43 +1,21 @@
-pub(crate) use unnecessary_call_around_sorted::{
-    unnecessary_call_around_sorted, UnnecessaryCallAroundSorted,
-};
-pub(crate) use unnecessary_collection_call::{
-    unnecessary_collection_call, UnnecessaryCollectionCall,
-};
-pub(crate) use unnecessary_comprehension::{
-    unnecessary_dict_comprehension, unnecessary_list_set_comprehension, UnnecessaryComprehension,
-};
-pub(crate) use unnecessary_comprehension_any_all::{
-    unnecessary_comprehension_any_all, UnnecessaryComprehensionAnyAll,
-};
-pub(crate) use unnecessary_double_cast_or_process::{
-    unnecessary_double_cast_or_process, UnnecessaryDoubleCastOrProcess,
-};
-pub(crate) use unnecessary_generator_dict::{unnecessary_generator_dict, UnnecessaryGeneratorDict};
-pub(crate) use unnecessary_generator_list::{unnecessary_generator_list, UnnecessaryGeneratorList};
-pub(crate) use unnecessary_generator_set::{unnecessary_generator_set, UnnecessaryGeneratorSet};
-pub(crate) use unnecessary_list_call::{unnecessary_list_call, UnnecessaryListCall};
-pub(crate) use unnecessary_list_comprehension_dict::{
-    unnecessary_list_comprehension_dict, UnnecessaryListComprehensionDict,
-};
-pub(crate) use unnecessary_list_comprehension_set::{
-    unnecessary_list_comprehension_set, UnnecessaryListComprehensionSet,
-};
-pub(crate) use unnecessary_literal_dict::{unnecessary_literal_dict, UnnecessaryLiteralDict};
-pub(crate) use unnecessary_literal_set::{unnecessary_literal_set, UnnecessaryLiteralSet};
-pub(crate) use unnecessary_literal_within_dict_call::{
-    unnecessary_literal_within_dict_call, UnnecessaryLiteralWithinDictCall,
-};
-pub(crate) use unnecessary_literal_within_list_call::{
-    unnecessary_literal_within_list_call, UnnecessaryLiteralWithinListCall,
-};
-pub(crate) use unnecessary_literal_within_tuple_call::{
-    unnecessary_literal_within_tuple_call, UnnecessaryLiteralWithinTupleCall,
-};
-pub(crate) use unnecessary_map::{unnecessary_map, UnnecessaryMap};
-pub(crate) use unnecessary_subscript_reversal::{
-    unnecessary_subscript_reversal, UnnecessarySubscriptReversal,
-};
+pub(crate) use unnecessary_call_around_sorted::*;
+pub(crate) use unnecessary_collection_call::*;
+pub(crate) use unnecessary_comprehension::*;
+pub(crate) use unnecessary_comprehension_any_all::*;
+pub(crate) use unnecessary_double_cast_or_process::*;
+pub(crate) use unnecessary_generator_dict::*;
+pub(crate) use unnecessary_generator_list::*;
+pub(crate) use unnecessary_generator_set::*;
+pub(crate) use unnecessary_list_call::*;
+pub(crate) use unnecessary_list_comprehension_dict::*;
+pub(crate) use unnecessary_list_comprehension_set::*;
+pub(crate) use unnecessary_literal_dict::*;
+pub(crate) use unnecessary_literal_set::*;
+pub(crate) use unnecessary_literal_within_dict_call::*;
+pub(crate) use unnecessary_literal_within_list_call::*;
+pub(crate) use unnecessary_literal_within_tuple_call::*;
+pub(crate) use unnecessary_map::*;
+pub(crate) use unnecessary_subscript_reversal::*;
 
 mod helpers;
 mod unnecessary_call_around_sorted;

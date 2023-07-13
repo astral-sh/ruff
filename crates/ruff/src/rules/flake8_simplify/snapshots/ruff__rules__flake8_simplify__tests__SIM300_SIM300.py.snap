@@ -11,7 +11,7 @@ SIM300.py:2:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda
   |
   = help: Replace Yoda condition with `compare == "yoda"`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # Errors
 2   |-"yoda" == compare  # SIM300
   2 |+compare == "yoda"  # SIM300
@@ -30,7 +30,7 @@ SIM300.py:3:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda
   |
   = help: Replace Yoda condition with `compare == "yoda"`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # Errors
 2 2 | "yoda" == compare  # SIM300
 3   |-"yoda" == compare  # SIM300
@@ -50,7 +50,7 @@ SIM300.py:4:1: SIM300 [*] Yoda conditions are discouraged, use `age == 42` inste
   |
   = help: Replace Yoda condition with `age == 42`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # Errors
 2 2 | "yoda" == compare  # SIM300
 3 3 | "yoda" == compare  # SIM300
@@ -71,7 +71,7 @@ SIM300.py:5:1: SIM300 [*] Yoda conditions are discouraged, use `compare == ("a",
   |
   = help: Replace Yoda condition with `compare == ("a", "b")`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | "yoda" == compare  # SIM300
 3 3 | "yoda" == compare  # SIM300
 4 4 | 42 == age  # SIM300
@@ -92,7 +92,7 @@ SIM300.py:6:1: SIM300 [*] Yoda conditions are discouraged, use `compare >= "yoda
   |
   = help: Replace Yoda condition with `compare >= "yoda"`
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | "yoda" == compare  # SIM300
 4 4 | 42 == age  # SIM300
 5 5 | ("a", "b") == compare  # SIM300
@@ -113,7 +113,7 @@ SIM300.py:7:1: SIM300 [*] Yoda conditions are discouraged, use `compare > "yoda"
   |
   = help: Replace Yoda condition with `compare > "yoda"`
 
-ℹ Suggested fix
+ℹ Fix
 4 4 | 42 == age  # SIM300
 5 5 | ("a", "b") == compare  # SIM300
 6 6 | "yoda" <= compare  # SIM300
@@ -134,7 +134,7 @@ SIM300.py:8:1: SIM300 [*] Yoda conditions are discouraged, use `age < 42` instea
    |
    = help: Replace Yoda condition with `age < 42`
 
-ℹ Suggested fix
+ℹ Fix
 5 5 | ("a", "b") == compare  # SIM300
 6 6 | "yoda" <= compare  # SIM300
 7 7 | "yoda" < compare  # SIM300
@@ -155,7 +155,7 @@ SIM300.py:9:1: SIM300 [*] Yoda conditions are discouraged, use `age < -42` inste
    |
    = help: Replace Yoda condition with `age < -42`
 
-ℹ Suggested fix
+ℹ Fix
 6  6  | "yoda" <= compare  # SIM300
 7  7  | "yoda" < compare  # SIM300
 8  8  | 42 > age  # SIM300
@@ -176,7 +176,7 @@ SIM300.py:10:1: SIM300 [*] Yoda conditions are discouraged, use `age < +42` inst
    |
    = help: Replace Yoda condition with `age < +42`
 
-ℹ Suggested fix
+ℹ Fix
 7  7  | "yoda" < compare  # SIM300
 8  8  | 42 > age  # SIM300
 9  9  | -42 > age  # SIM300
@@ -197,7 +197,7 @@ SIM300.py:11:1: SIM300 [*] Yoda conditions are discouraged, use `age == YODA` in
    |
    = help: Replace Yoda condition with `age == YODA`
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | 42 > age  # SIM300
 9  9  | -42 > age  # SIM300
 10 10 | +42 > age  # SIM300
@@ -218,7 +218,7 @@ SIM300.py:12:1: SIM300 [*] Yoda conditions are discouraged, use `age < YODA` ins
    |
    = help: Replace Yoda condition with `age < YODA`
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | -42 > age  # SIM300
 10 10 | +42 > age  # SIM300
 11 11 | YODA == age  # SIM300
@@ -239,7 +239,7 @@ SIM300.py:13:1: SIM300 [*] Yoda conditions are discouraged, use `age <= YODA` in
    |
    = help: Replace Yoda condition with `age <= YODA`
 
-ℹ Suggested fix
+ℹ Fix
 10 10 | +42 > age  # SIM300
 11 11 | YODA == age  # SIM300
 12 12 | YODA > age  # SIM300
@@ -260,7 +260,7 @@ SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrde
    |
    = help: Replace Yoda condition with `age == JediOrder.YODA`
 
-ℹ Suggested fix
+ℹ Fix
 11 11 | YODA == age  # SIM300
 12 12 | YODA > age  # SIM300
 13 13 | YODA >= age  # SIM300
@@ -280,7 +280,7 @@ SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) 
    |
    = help: Replace Yoda condition with `(number - 100) > 0`
 
-ℹ Suggested fix
+ℹ Fix
 12 12 | YODA > age  # SIM300
 13 13 | YODA >= age  # SIM300
 14 14 | JediOrder.YODA == age  # SIM300
@@ -301,7 +301,7 @@ SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < Som
    |
    = help: Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`
 
-ℹ Suggested fix
+ℹ Fix
 13 13 | YODA >= age  # SIM300
 14 14 | JediOrder.YODA == age  # SIM300
 15 15 | 0 < (number - 100)  # SIM300

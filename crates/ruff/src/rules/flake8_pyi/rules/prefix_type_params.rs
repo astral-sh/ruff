@@ -70,17 +70,30 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
     };
 
     if let Expr::Call(ast::ExprCall { func, .. }) = value {
-        let Some(kind) = checker.semantic_model().resolve_call_path(func).and_then(|call_path| {
-            if checker.semantic_model().match_typing_call_path(&call_path, "ParamSpec") {
-                Some(VarKind::ParamSpec)
-            } else if checker.semantic_model().match_typing_call_path(&call_path, "TypeVar") {
-                Some(VarKind::TypeVar)
-            } else if checker.semantic_model().match_typing_call_path(&call_path, "TypeVarTuple") {
-                Some(VarKind::TypeVarTuple)
-            } else {
-                None
-            }
-        }) else {
+        let Some(kind) = checker
+            .semantic()
+            .resolve_call_path(func)
+            .and_then(|call_path| {
+                if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "ParamSpec")
+                {
+                    Some(VarKind::ParamSpec)
+                } else if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "TypeVar")
+                {
+                    Some(VarKind::TypeVar)
+                } else if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "TypeVarTuple")
+                {
+                    Some(VarKind::TypeVarTuple)
+                } else {
+                    None
+                }
+            })
+        else {
             return;
         };
         checker

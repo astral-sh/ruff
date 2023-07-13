@@ -2,9 +2,10 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::scope::{Scope, ScopeKind};
+use ruff_python_ast::identifier::Identifier;
+use ruff_python_semantic::{Scope, ScopeKind};
+
+use crate::settings::types::IdentifierPattern;
 
 /// ## What it does
 /// Checks for functions with "dunder" names (that is, names with two
@@ -45,7 +46,7 @@ pub(crate) fn dunder_function_name(
     scope: &Scope,
     stmt: &Stmt,
     name: &str,
-    locator: &Locator,
+    ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
@@ -57,9 +58,12 @@ pub(crate) fn dunder_function_name(
     if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
         return None;
     }
+    if ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name.matches(name))
+    {
+        return None;
+    }
 
-    Some(Diagnostic::new(
-        DunderFunctionName,
-        identifier_range(stmt, locator),
-    ))
+    Some(Diagnostic::new(DunderFunctionName, stmt.identifier()))
 }

@@ -1,13 +1,39 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
+use itertools::Either::{Left, Right};
+use itertools::Itertools;
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Check for type annotations that can be rewritten based on [PEP 604] syntax.
+///
+/// ## Why is this bad?
+/// [PEP 604] introduced a new syntax for union type annotations based on the
+/// `|` operator. This syntax is more concise and readable than the previous
+/// `typing.Union` and `typing.Optional` syntaxes.
+///
+/// ## Example
+/// ```python
+/// from typing import Union
+///
+/// foo: Union[int, str] = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: int | str = 1
+/// ```
+///
+/// ## Options
+/// - `target-version`
+///
+/// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
 pub struct NonPEP604Annotation;
 
@@ -24,32 +50,6 @@ impl Violation for NonPEP604Annotation {
     }
 }
 
-fn optional(expr: &Expr) -> Expr {
-    Expr::BinOp(ast::ExprBinOp {
-        left: Box::new(expr.clone()),
-        op: Operator::BitOr,
-        right: Box::new(Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            kind: None,
-            range: TextRange::default(),
-        })),
-        range: TextRange::default(),
-    })
-}
-
-fn union(elts: &[Expr]) -> Expr {
-    if elts.len() == 1 {
-        elts[0].clone()
-    } else {
-        Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(&elts[..elts.len() - 1])),
-            op: Operator::BitOr,
-            right: Box::new(elts[elts.len() - 1].clone()),
-            range: TextRange::default(),
-        })
-    }
-}
-
 /// UP007
 pub(crate) fn use_pep604_annotation(
     checker: &mut Checker,
@@ -58,15 +58,15 @@ pub(crate) fn use_pep604_annotation(
     operator: Pep604Operator,
 ) {
     // Avoid fixing forward references, or types not in an annotation.
-    let fixable = checker.semantic_model().in_type_definition()
-        && !checker.semantic_model().in_complex_string_type_definition();
+    let fixable = checker.semantic().in_type_definition()
+        && !checker.semantic().in_complex_string_type_definition();
+
     match operator {
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    checker.generator().expr(&optional(slice)),
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                    optional(slice, checker.locator),
                     expr.range(),
                 )));
             }
@@ -80,17 +80,15 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            checker.generator().expr(&union(elts)),
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            union(elts, checker.locator),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            checker.generator().expr(slice),
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            checker.locator.slice(slice.range()).to_string(),
                             expr.range(),
                         )));
                     }
@@ -98,5 +96,26 @@ pub(crate) fn use_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+/// Format the expression as a PEP 604-style optional.
+fn optional(expr: &Expr, locator: &Locator) -> String {
+    format!("{} | None", locator.slice(expr.range()))
+}
+
+/// Format the expressions as a PEP 604-style union.
+fn union(elts: &[Expr], locator: &Locator) -> String {
+    let mut elts = elts
+        .iter()
+        .flat_map(|expr| match expr {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => Left(elts.iter()),
+            _ => Right(std::iter::once(expr)),
+        })
+        .peekable();
+    if elts.peek().is_none() {
+        "()".to_string()
+    } else {
+        elts.map(|expr| locator.slice(expr.range())).join(" | ")
     }
 }
