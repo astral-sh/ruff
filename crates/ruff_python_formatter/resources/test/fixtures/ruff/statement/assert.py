@@ -7,6 +7,7 @@ assert (  # Dangle1
     # Dangle2
 )
 
+# TODO: https://github.com/astral-sh/ruff/pull/5168#issuecomment-1630767421
 # Leading assert
 assert (
     # Leading test value
@@ -17,6 +18,7 @@ assert (
 
 # Random dangler
 
+# TODO: https://github.com/astral-sh/ruff/pull/5168#issuecomment-1630767421
 # Leading assert
 assert (
     # Leading test value

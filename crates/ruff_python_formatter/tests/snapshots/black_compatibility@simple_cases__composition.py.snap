@@ -203,7 +203,18 @@ class C:
                          print(i)
          xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
              push_manager=context.request.resource_manager,
-@@ -153,7 +153,8 @@
+@@ -120,9 +120,7 @@
+             key7: value7,
+             key8: value8,
+             key9: value9,
+-        } == expected, (
+-            "Not what we expected and the message is too long to fit in one line"
+-        )
++        } == expected, "Not what we expected and the message is too long to fit in one line"
+ 
+         assert expected(
+             value, is_going_to_be="too long to fit in a single line", srsly=True
+@@ -153,7 +151,8 @@
              " because it's too long"
          )
  
@@ -213,7 +224,7 @@ class C:
          %3d           0 LOAD_FAST                1 (x)
                        2 LOAD_CONST               1 (1)
                        4 COMPARE_OP               2 (==)
-@@ -161,8 +162,8 @@
+@@ -161,8 +160,8 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
@@ -351,9 +362,7 @@ class C:
             key7: value7,
             key8: value8,
             key9: value9,
-        } == expected, (
-            "Not what we expected and the message is too long to fit in one line"
-        )
+        } == expected, "Not what we expected and the message is too long to fit in one line"
 
         assert expected(
             value, is_going_to_be="too long to fit in a single line", srsly=True

@@ -398,11 +398,10 @@ last_call()
  (*starred,)
  {
      "id": "1",
-@@ -207,25 +207,15 @@
- )
+@@ -208,24 +208,14 @@
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -410,7 +409,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -447,11 +446,7 @@ last_call()
  
  
  async def f():
-<<<<<<< HEAD
 @@ -248,8 +238,12 @@
-=======
-@@ -248,18 +238,20 @@
->>>>>>> main
  
  
  print(*[] or [1])
@@ -466,7 +461,7 @@ last_call()
  assert not Test, "Short message"
  assert this is ComplexTest and not requirements.fit_in_a_single_line(
      force=False
-@@ -259,7 +253,9 @@
+@@ -259,7 +253,7 @@
      ...
  for y in ():
      ...
@@ -475,11 +470,7 @@ last_call()
      ...
  for i in call():
      ...
-<<<<<<< HEAD
-@@ -328,13 +324,18 @@
-=======
-@@ -328,13 +320,18 @@
->>>>>>> main
+@@ -328,13 +322,18 @@
  ):
      return True
  if (
@@ -501,11 +492,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-<<<<<<< HEAD
-@@ -342,7 +343,8 @@
-=======
-@@ -342,7 +339,8 @@
->>>>>>> main
+@@ -342,7 +341,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
