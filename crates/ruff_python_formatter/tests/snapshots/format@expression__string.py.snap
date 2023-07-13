@@ -203,20 +203,7 @@ String \"\"\"
 
 "Let's" "start" "with" "a" "simple" "example"
 
-(
-    "Let's"
-    "start"
-    "with"
-    "a"
-    "simple"
-    "example"
-    "now repeat after me:"
-    "I am confident"
-    "I am confident"
-    "I am confident"
-    "I am confident"
-    "I am confident"
-)
+"Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am confident" "I am confident" "I am confident" "I am confident" "I am confident"
 
 (
     "Let's"
@@ -364,20 +351,7 @@ String \"\"\"
 
 "Let's" 'start' 'with' 'a' 'simple' 'example'
 
-(
-    "Let's"
-    'start'
-    'with'
-    'a'
-    'simple'
-    'example'
-    'now repeat after me:'
-    'I am confident'
-    'I am confident'
-    'I am confident'
-    'I am confident'
-    'I am confident'
-)
+"Let's" 'start' 'with' 'a' 'simple' 'example' 'now repeat after me:' 'I am confident' 'I am confident' 'I am confident' 'I am confident' 'I am confident'
 
 (
     "Let's"

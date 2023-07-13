@@ -1,6 +1,7 @@
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
+    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
+    OptionalParentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -28,12 +29,12 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
             f,
             [in_parentheses_only_group(&format_args![
                 body.format(),
-                soft_line_break_or_space(),
+                in_parentheses_only_soft_line_break_or_space(),
                 leading_comments(comments.leading_comments(test.as_ref())),
                 text("if"),
                 space(),
                 test.format(),
-                soft_line_break_or_space(),
+                in_parentheses_only_soft_line_break_or_space(),
                 leading_comments(comments.leading_comments(orelse.as_ref())),
                 text("else"),
                 space(),

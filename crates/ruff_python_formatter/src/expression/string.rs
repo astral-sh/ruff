@@ -10,7 +10,9 @@ use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::in_parentheses_only_group;
+use crate::expression::parentheses::{
+    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space,
+};
 use crate::prelude::*;
 use crate::QuoteStyle;
 
@@ -64,7 +66,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // because this is a black preview style.
         let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
 
-        let mut joiner = f.join_with(soft_line_break_or_space());
+        let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for token in lexer {
             let (token, token_range) = match token {

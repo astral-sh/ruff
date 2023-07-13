@@ -2,7 +2,7 @@ use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, first_non_trivia_token_rev, Token, TokenKind};
 use ruff_formatter::prelude::tag::Condition;
-use ruff_formatter::{format_args, Argument, Arguments};
+use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::Ranged;
 
@@ -178,6 +178,55 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
     }
 }
 
+/// Creates a [`soft_line_break`] if the expression is enclosed by (optional) parentheses (`()`, `[]`, or `{}`).
+/// Prints nothing if the expression is not parenthesized.
+pub(crate) const fn in_parentheses_only_soft_line_break() -> InParenthesesOnlyLineBreak {
+    InParenthesesOnlyLineBreak::SoftLineBreak
+}
+
+/// Creates a [`soft_line_break_or_space`] if the expression is enclosed by (optional) parentheses (`()`, `[]`, or `{}`).
+/// Prints a [`space`] if the expression is not parenthesized.
+pub(crate) const fn in_parentheses_only_soft_line_break_or_space() -> InParenthesesOnlyLineBreak {
+    InParenthesesOnlyLineBreak::SoftLineBreakOrSpace
+}
+
+pub(crate) enum InParenthesesOnlyLineBreak {
+    SoftLineBreak,
+    SoftLineBreakOrSpace,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        match f.context().node_level() {
+            NodeLevel::TopLevel | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+                match self {
+                    InParenthesesOnlyLineBreak::SoftLineBreak => Ok(()),
+                    InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => space().fmt(f),
+                }
+            }
+            NodeLevel::Expression(Some(parentheses_id)) => match self {
+                InParenthesesOnlyLineBreak::SoftLineBreak => if_group_breaks(&soft_line_break())
+                    .with_group_id(Some(parentheses_id))
+                    .fmt(f),
+                InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => write!(
+                    f,
+                    [
+                        if_group_breaks(&soft_line_break_or_space())
+                            .with_group_id(Some(parentheses_id)),
+                        if_group_fits_on_line(&space()).with_group_id(Some(parentheses_id))
+                    ]
+                ),
+            },
+            NodeLevel::ParenthesizedExpression => {
+                f.write_element(FormatElement::Line(match self {
+                    InParenthesesOnlyLineBreak::SoftLineBreak => LineMode::Soft,
+                    InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => LineMode::SoftOrSpace,
+                }))
+            }
+        }
+    }
+}
+
 /// Makes `content` a group, but only if the outer expression is parenthesized (a list, parenthesized expression, dict, ...)
 /// or if the expression gets parenthesized because it expands over multiple lines.
 pub(crate) fn in_parentheses_only_group<'content, 'ast, Content>(
@@ -197,17 +246,23 @@ pub(crate) struct FormatInParenthesesOnlyGroup<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
-            // If this content is enclosed by a group that adds the optional parentheses, then *disable*
-            // this group *except* if the optional parentheses are shown.
-            conditional_group(
-                &Arguments::from(&self.content),
-                Condition::if_group_breaks(group_id),
-            )
-            .fmt(f)
-        } else {
-            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
-            group(&Arguments::from(&self.content)).fmt(f)
+        match f.context().node_level() {
+            NodeLevel::Expression(Some(parentheses_id)) => {
+                // If this content is enclosed by a group that adds the optional parentheses, then *disable*
+                // this group *except* if the optional parentheses are shown.
+                conditional_group(
+                    &Arguments::from(&self.content),
+                    Condition::if_group_breaks(parentheses_id),
+                )
+                .fmt(f)
+            }
+            NodeLevel::ParenthesizedExpression => {
+                // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+                group(&Arguments::from(&self.content)).fmt(f)
+            }
+            NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+                Arguments::from(&self.content).fmt(f)
+            }
         }
     }
 }
