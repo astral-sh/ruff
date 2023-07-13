@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use wsl;
+
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -48,6 +50,9 @@ pub(crate) fn shebang_not_executable(
     range: TextRange,
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
+    if wsl::is_wsl() {
+        return None;
+    }
     let ShebangDirective { offset, contents } = shebang;
 
     if let Ok(false) = is_executable(filepath) {

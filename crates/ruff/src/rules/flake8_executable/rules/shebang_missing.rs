@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use wsl;
+
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -42,6 +44,9 @@ impl Violation for ShebangMissingExecutableFile {
 /// EXE002
 #[cfg(target_family = "unix")]
 pub(crate) fn shebang_missing(filepath: &Path) -> Option<Diagnostic> {
+    if wsl::is_wsl() {
+        return None;
+    }
     if let Ok(true) = is_executable(filepath) {
         let diagnostic = Diagnostic::new(ShebangMissingExecutableFile, TextRange::default());
         return Some(diagnostic);
