@@ -304,7 +304,7 @@ fn minimization_step(
         }
     }
 
-    // Try all strategies in order, including the last successfull one without skipping inputs
+    // Try all strategies in order, including the last successful one without skipping inputs
     for strategy in STRATEGIES {
         let iter = strategy.candidates(input, &ast)?;
         println!("Trying {} {} candidates", iter.len(), strategy.name());
