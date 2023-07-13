@@ -1,4 +1,5 @@
-# Regression test from https://github.com/pypa/build/blob/5800521541e5e749d4429617420d1ef8cdb40b46/src/build/_importlib.py
+# Regression test for branch detection from
+# https://github.com/pypa/build/blob/5800521541e5e749d4429617420d1ef8cdb40b46/src/build/_importlib.py
 import sys
 
 if sys.version_info < (3, 8):
