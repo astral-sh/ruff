@@ -19,24 +19,20 @@ use crate::model::SemanticModel;
 /// ```
 pub fn is_logger_candidate(func: &Expr, semantic: &SemanticModel) -> bool {
     if let Expr::Attribute(ast::ExprAttribute { value, .. }) = func {
-        let Some(call_path) = (if let Some(call_path) = semantic.resolve_call_path(value) {
-            if call_path
-                .first()
-                .map_or(false, |module| *module == "logging")
-                || call_path.as_slice() == ["flask", "current_app", "logger"]
-            {
-                Some(call_path)
-            } else {
-                None
+        if let Some(call_path) = semantic
+            .resolve_call_path(value)
+            .or_else(|| collect_call_path(value))
+        {
+            // Avoid some false positives.
+            if matches!(call_path.as_slice(), ["distutils", "log"]) {
+                return false;
             }
-        } else {
-            collect_call_path(value)
-        }) else {
-            return false;
-        };
-        if let Some(tail) = call_path.last() {
-            if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
-                return true;
+
+            if let Some(tail) = call_path.last() {
+                if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging")
+                {
+                    return true;
+                }
             }
         }
     }
