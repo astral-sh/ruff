@@ -1,3 +1,4 @@
+use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use rustpython_parser::ast::{self, Expr, Ranged};
 
@@ -63,7 +64,7 @@ pub(crate) fn use_pep604_annotation(
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::manual(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     optional(slice, checker.locator),
                     expr.range(),
                 )));
@@ -78,14 +79,14 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::manual(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                             union(elts, checker.locator),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.set_fix(Fix::manual(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                             checker.locator.slice(slice.range()).to_string(),
                             expr.range(),
                         )));
@@ -97,12 +98,23 @@ pub(crate) fn use_pep604_annotation(
     }
 }
 
+/// Format the expression as a PEP 604-style optional.
 fn optional(expr: &Expr, locator: &Locator) -> String {
     format!("{} | None", locator.slice(expr.range()))
 }
 
+/// Format the expressions as a PEP 604-style union.
 fn union(elts: &[Expr], locator: &Locator) -> String {
-    elts.iter()
-        .map(|expr| locator.slice(expr.range()))
-        .join(" | ")
+    let mut elts = elts
+        .iter()
+        .flat_map(|expr| match expr {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => Left(elts.iter()),
+            _ => Right(std::iter::once(expr)),
+        })
+        .peekable();
+    if elts.peek().is_none() {
+        "()".to_string()
+    } else {
+        elts.map(|expr| locator.slice(expr.range())).join(" | ")
+    }
 }
