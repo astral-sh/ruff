@@ -1,4 +1,3 @@
-import builtins
 from typing import (
     Union,
 )
@@ -36,4 +35,4 @@ async def f4(**kwargs: int | int | float) -> None: ...  # PYI041
 class Foo:
     def good(self, arg: int) -> None: ...
 
-    def bad(self, arg: int | builtins.float | complex) -> None: ...  # PYI041
+    def bad(self, arg: int | float | complex) -> None: ...  # PYI041

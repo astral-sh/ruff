@@ -6,31 +6,35 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pyi::helpers::traverse_union;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum Redundancy {
-    FloatComplex,
-    IntComplex,
-    IntFloat,
-}
-
 /// ## What it does
-/// Checks for unions in function parameter annotations that contain redundant numeric types.
-/// See PEP 3141 for details on the "numeric tower".
+/// Checks for union annotations that contain redundant numeric types (e.g.,
+/// `int | float`).
 ///
 /// ## Why is this bad?
+/// In Python, `int` is a subtype of `float`, and `float` is a subtype of
+/// `complex`. As such, a union that includes both `int` and `float` is
+/// redundant, as it is equivalent to a union that only includes `float`.
+///
+/// For more, see [PEP 3141], which defines Python's "numeric tower".
+///
 /// Unions with redundant elements are less readable than unions without them.
 ///
 /// ## Example
 /// ```python
-/// def foo(arg: float | int) -> None:
+/// def foo(x: float | int) -> None:
 ///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(arg: float) -> None:
+/// def foo(x: float) -> None:
 ///     ...
 /// ```
+///
+/// ## References
+/// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
+///
+/// [PEP 3141]: https://peps.python.org/pep-3141/
 #[violation]
 pub struct RedundantNumericUnion {
     redundancy: Redundancy,
@@ -44,17 +48,48 @@ impl Violation for RedundantNumericUnion {
             Redundancy::IntComplex => ("int", "complex"),
             Redundancy::IntFloat => ("int", "float"),
         };
-
-        format!("`{subtype}` is redundant in a union with `{supertype}`.")
+        format!("Use `{supertype}` instead of `{subtype} | {supertype}`")
     }
 }
 
-fn check_annotation(annotation: &Expr, checker: &mut Checker) {
+/// PYI041
+pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Arguments) {
+    for annotation in args
+        .args
+        .iter()
+        .chain(args.posonlyargs.iter())
+        .chain(args.kwonlyargs.iter())
+        .filter_map(|arg| arg.def.annotation.as_ref())
+    {
+        check_annotation(checker, annotation);
+    }
+
+    // If annotations on `args` or `kwargs` are flagged by this rule, the annotations themselves
+    // are not accurate, but check them anyway. It's possible that flagging them will help the user
+    // realize they're incorrect.
+    for annotation in args
+        .vararg
+        .iter()
+        .chain(args.kwarg.iter())
+        .filter_map(|arg| arg.annotation.as_ref())
+    {
+        check_annotation(checker, annotation);
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum Redundancy {
+    FloatComplex,
+    IntComplex,
+    IntFloat,
+}
+
+fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_float = false;
     let mut has_complex = false;
     let mut has_int = false;
 
-    let mut eval_element = |expr: &Expr, _parent: Option<&Expr>| {
+    let mut func = |expr: &Expr, _parent: Option<&Expr>| {
         let Some(call_path) = checker.semantic().resolve_call_path(expr) else {
             return;
         };
@@ -67,7 +102,7 @@ fn check_annotation(annotation: &Expr, checker: &mut Checker) {
         }
     };
 
-    traverse_union(&mut eval_element, checker.semantic(), annotation, None);
+    traverse_union(&mut func, checker.semantic(), annotation, None);
 
     if has_complex {
         if has_float {
@@ -94,32 +129,5 @@ fn check_annotation(annotation: &Expr, checker: &mut Checker) {
             },
             annotation.range(),
         ));
-    }
-}
-
-/// PYI041
-pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Arguments) {
-    let annotations = args
-        .args
-        .iter()
-        .chain(args.posonlyargs.iter())
-        .chain(args.kwonlyargs.iter())
-        .filter_map(|arg| arg.def.annotation.as_ref());
-
-    for annotation in annotations {
-        check_annotation(annotation, checker);
-    }
-
-    // If annotations on `args` or `kwargs` are flagged by this rule, the annotations themselves
-    // are not accurate, but check them anyway. It's possible that flagging them will help the user
-    // realize they're incorrect.
-    let args_kwargs_annotations = args
-        .vararg
-        .iter()
-        .chain(args.kwarg.iter())
-        .filter_map(|arg| arg.annotation.as_ref());
-
-    for annotation in args_kwargs_annotations {
-        check_annotation(annotation, checker);
     }
 }
