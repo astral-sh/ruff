@@ -443,6 +443,10 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
 }
 
 fn has_parentheses(expr: &Expr, source: &str) -> bool {
+    has_own_parentheses(expr) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
+}
+
+pub(crate) const fn has_own_parentheses(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::Dict(_)
@@ -454,7 +458,7 @@ fn has_parentheses(expr: &Expr, source: &str) -> bool {
             | Expr::DictComp(_)
             | Expr::Call(_)
             | Expr::Subscript(_)
-    ) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
+    )
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
