@@ -3897,7 +3897,7 @@ where
                     }
                 }
                 if self.enabled(Rule::RaiseWithoutFromInsideExcept) {
-                    flake8_bugbear::rules::raise_without_from_inside_except(self, body);
+                    flake8_bugbear::rules::raise_without_from_inside_except(self, name, body);
                 }
                 if self.enabled(Rule::BlindExcept) {
                     flake8_blind_except::rules::blind_except(self, type_.as_deref(), name, body);
