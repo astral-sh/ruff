@@ -38,7 +38,7 @@ def docstring_multiline():
  name = "Łukasz"
 -(f"hello {name}", f"hello {name}")
 -(b"", b"")
-+(NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
++(f"NOT_YET_IMPLEMENTED_ExprJoinedStr", f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 +(b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
  ("", "")
  (r"", R"")
@@ -46,14 +46,14 @@ def docstring_multiline():
 -(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
 -(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
 +(
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-+    NOT_YET_IMPLEMENTED_ExprJoinedStr,
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
++    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
 +)
 +(
 +    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
@@ -76,20 +76,20 @@ def docstring_multiline():
 #!/usr/bin/env python3
 
 name = "Łukasz"
-(NOT_YET_IMPLEMENTED_ExprJoinedStr, NOT_YET_IMPLEMENTED_ExprJoinedStr)
+(f"NOT_YET_IMPLEMENTED_ExprJoinedStr", f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 (b"NOT_YET_IMPLEMENTED_BYTE_STRING", b"NOT_YET_IMPLEMENTED_BYTE_STRING")
 ("", "")
 (r"", R"")
 
 (
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
-    NOT_YET_IMPLEMENTED_ExprJoinedStr,
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr",
 )
 (
     b"NOT_YET_IMPLEMENTED_BYTE_STRING",
