@@ -37,42 +37,6 @@ RUF013_0.py:25:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 27 27 | 
 28 28 | 
 
-RUF013_0.py:29:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
-   |
-29 | def f(arg: typing.List[str] = None):  # RUF013
-   |            ^^^^^^^^^^^^^^^^ RUF013
-30 |     pass
-   |
-   = help: Convert to `T | None`
-
-ℹ Suggested fix
-26 26 |     pass
-27 27 | 
-28 28 | 
-29    |-def f(arg: typing.List[str] = None):  # RUF013
-   29 |+def f(arg: typing.List[str] | None = None):  # RUF013
-30 30 |     pass
-31 31 | 
-32 32 | 
-
-RUF013_0.py:33:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
-   |
-33 | def f(arg: Tuple[str] = None):  # RUF013
-   |            ^^^^^^^^^^ RUF013
-34 |     pass
-   |
-   = help: Convert to `T | None`
-
-ℹ Suggested fix
-30 30 |     pass
-31 31 | 
-32 32 | 
-33    |-def f(arg: Tuple[str] = None):  # RUF013
-   33 |+def f(arg: Tuple[str] | None = None):  # RUF013
-34 34 |     pass
-35 35 | 
-36 36 | 
-
 RUF013_0.py:67:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 67 | def f(arg: Union = None):  # RUF013
