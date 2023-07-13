@@ -48,12 +48,12 @@ Taking `UP006` (rewrite `List[int]` to `list[int]`) as an example, the setting n
 follows:
 
 - On Python 3.7 and Python 3.8, setting `keep-runtime-typing = true` will cause Ruff to ignore
-  `UP006` violations, even if `from __future__ import annotations` is present in the file.
-  While such annotations are valid in Python 3.7 and Python 3.8 when combined with
-  `from __future__ import annotations`, they aren't supported by libraries like Pydantic and
-  FastAPI, which rely on runtime type checking.
+    `UP006` violations, even if `from __future__ import annotations` is present in the file.
+    While such annotations are valid in Python 3.7 and Python 3.8 when combined with
+    `from __future__ import annotations`, they aren't supported by libraries like Pydantic and
+    FastAPI, which rely on runtime type checking.
 - On Python 3.9 and above, the setting has no effect, as `list[int]` is a valid type annotation,
-  and libraries like Pydantic and FastAPI support it without issue.
+    and libraries like Pydantic and FastAPI support it without issue.
 
 In short: `keep-runtime-typing` can be used to ensure that Ruff doesn't introduce type annotations
 that are not supported at runtime by the current Python version, which are unsupported by libraries
@@ -203,25 +203,25 @@ This change is largely backwards compatible -- most users should experience
 no change in behavior. However, please note the following exceptions:
 
 - Subcommands will now fail when invoked with unsupported arguments, instead
-  of silently ignoring them. For example, the following will now fail:
+    of silently ignoring them. For example, the following will now fail:
 
-  ```console
-  ruff --clean --respect-gitignore
-  ```
+    ```console
+    ruff --clean --respect-gitignore
+    ```
 
-  (the `clean` command doesn't support `--respect-gitignore`.)
+    (the `clean` command doesn't support `--respect-gitignore`.)
 
 - The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand.
-  For example, prior to this release, running `ruff rule` would run `ruff` over a file or
-  directory called `rule`. Now, `ruff rule` would invoke the `rule` subcommand. This should
-  only impact projects with files or directories named `rule`, `check`, `explain`, `clean`,
-  or `generate-shell-completion`.
+    For example, prior to this release, running `ruff rule` would run `ruff` over a file or
+    directory called `rule`. Now, `ruff rule` would invoke the `rule` subcommand. This should
+    only impact projects with files or directories named `rule`, `check`, `explain`, `clean`,
+    or `generate-shell-completion`.
 
 - Scripts that invoke ruff should supply `--` before any positional arguments.
-  (The semantics of `ruff -- <arg>` have not changed.)
+    (The semantics of `ruff -- <arg>` have not changed.)
 
 - `--explain` previously treated `--format grouped` as a synonym for `--format text`.
-  This is no longer supported; instead, use `--format text`.
+    This is no longer supported; instead, use `--format text`.
 
 ## 0.0.226
 

@@ -32,10 +32,10 @@ An extremely fast Python linter, written in Rust.
 - 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
 - ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
-  built-in Flake8 rule set
+    built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
 - ⌨️ First-party [editor integrations](https://beta.ruff.rs/docs/editor-integrations/) for
-  [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
+    [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -364,8 +364,8 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [HTTPX](https://github.com/encode/httpx)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
-  [Datasets](https://github.com/huggingface/datasets),
-  [Diffusers](https://github.com/huggingface/diffusers))
+    [Datasets](https://github.com/huggingface/datasets),
+    [Diffusers](https://github.com/huggingface/diffusers))
 - [Hatch](https://github.com/pypa/hatch)
 - [Home Assistant](https://github.com/home-assistant/core)
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
@@ -377,8 +377,8 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
 - Meltano ([Meltano CLI](https://github.com/meltano/meltano), [Singer SDK](https://github.com/meltano/sdk))
 - Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
-  [ONNX Runtime](https://github.com/microsoft/onnxruntime),
-  [LightGBM](https://github.com/microsoft/LightGBM))
+    [ONNX Runtime](https://github.com/microsoft/onnxruntime),
+    [LightGBM](https://github.com/microsoft/LightGBM))
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [Mypy](https://github.com/python/mypy)
