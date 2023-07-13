@@ -12,7 +12,20 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
     - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
 - [MkDocs](#mkdocs)
 - [Release Process](#release-process)
-- [Benchmarks](#benchmarking-and-profiling)
+    - [Creating a new release](#creating-a-new-release)
+- [Ecosystem CI](#ecosystem-ci)
+- [Benchmarking and Profiling](#benchmarking-and-profiling)
+    - [CPython Benchmark](#cpython-benchmark)
+    - [Microbenchmarks](#microbenchmarks)
+        - [Benchmark-driven Development](#benchmark-driven-development)
+        - [PR Summary](#pr-summary)
+        - [Tips](#tips)
+    - [Profiling Projects](#profiling-projects)
+        - [Linux](#linux)
+        - [Mac](#mac)
+- [`cargo dev`](#cargo-dev)
+- [Subsystems](#subsystems)
+    - [Compilation Pipeline](#compilation-pipeline)
 
 ## The Basics
 
