@@ -443,6 +443,9 @@ where
                             args,
                         );
                     }
+                    if self.enabled(Rule::RedundantNumericUnion) {
+                        flake8_pyi::rules::redundant_numeric_union(self, args);
+                    }
                 }
                 if self.enabled(Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
