@@ -1,3 +1,5 @@
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
@@ -22,7 +24,15 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
         )?;
 
         if let Some(value) = value {
-            write!(f, [space(), text("="), space(), value.format()])?;
+            write!(
+                f,
+                [
+                    space(),
+                    text("="),
+                    space(),
+                    maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
+                ]
+            )?;
         }
 
         Ok(())

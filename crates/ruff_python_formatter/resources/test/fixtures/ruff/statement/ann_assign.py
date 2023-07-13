@@ -1,5 +1,3 @@
-tree_depth += 1
+# Regression test: Don't forget the parentheses when breaking
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: int = a + 1 * a
 
-greeting += "This is very long, formal greeting for whomever is name here. Dear %s, it will break the line" % len(
-    name
-)
