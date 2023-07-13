@@ -32,6 +32,7 @@ use crate::registry::AsRule;
 ///
 /// ## Options
 /// - `target-version`
+/// - `pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
