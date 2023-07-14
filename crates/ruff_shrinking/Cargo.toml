@@ -1,5 +1,5 @@
 [package]
-name = "ruff_minimizer"
+name = "shrinking"
 version = "0.1.0"
 edition = "2021"
 

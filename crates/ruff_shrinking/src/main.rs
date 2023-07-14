@@ -1,10 +1,10 @@
-//! Minimize a failing python file.
+//! Minimize a failing python file, a process known as [shrinking](https://www.educative.io/answers/what-is-shrinking)
 //!
 //! See `--help` (or the [Args] docs) for usage.
 //!
 //! ## Example
 //!
-//! Minimize a file with unstable formatting
+//! Shrink a file with unstable formatting
 //! ```shell
 //! cargo run --bin ruff-minimizer -- target/cpython/Lib/test/inspect_fodder.py target/minirepo/a.py "Unstable formatting" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
 //! ```
@@ -17,9 +17,9 @@
 //! );
 //! ```
 //!
-//! Minimize a file with a syntax error
+//! Shrink a file with a syntax error
 //! ```shell
-//! cargo run --bin ruff_minimizer -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/code.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
+//! cargo run --bin ruff_shrinking -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/code.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
 //! ```
 //! This could emit
 //! ```python
@@ -354,7 +354,7 @@ fn is_failing(
 ///
 /// ## Example
 ///  ```shell
-/// cargo run --bin ruff_minimizer -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/code.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
+/// cargo run --bin ruff_shrinking -- target/checkouts/jhnnsrs:mikro-napari/mikro_napari/models/representation.py target/minirepo/code.py "invalid syntax" "target/debug/ruff_dev format-dev --stability-check target/minirepo"
 /// ```
 /// This could emit (if it wasn't fixed):
 /// ```python
@@ -376,7 +376,7 @@ struct Args {
 }
 
 fn run() -> Result<()> {
-    // e.g. `RUST_LOG=ruff_minimizer=debug`
+    // e.g. `RUST_LOG=ruff_shrinking=debug`
     tracing_subscriber::fmt::init();
 
     let args: Args = Args::parse();

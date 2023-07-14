@@ -2111,22 +2111,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_minimizer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "fs-err",
- "regex",
- "ruff_python_ast",
- "ruff_rustpython",
- "rustpython-ast",
- "shlex",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
@@ -2578,6 +2562,22 @@ name = "shlex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
+
+[[package]]
+name = "shrinking"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fs-err",
+ "regex",
+ "ruff_python_ast",
+ "ruff_rustpython",
+ "rustpython-ast",
+ "shlex",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "similar"
