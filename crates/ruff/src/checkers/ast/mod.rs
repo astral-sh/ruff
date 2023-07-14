@@ -1497,7 +1497,8 @@ where
                 orelse,
                 ..
             }) => {
-                if self.enabled(Rule::UnusedLoopControlVariable) {
+                if self.any_enabled(&[Rule::UnusedLoopControlVariable, Rule::IncorrectDictIterator])
+                {
                     self.deferred.for_loops.push(self.semantic.snapshot());
                 }
                 if self.enabled(Rule::LoopVariableOverridesIterator) {
@@ -1532,9 +1533,6 @@ where
                     if self.enabled(Rule::TryExceptInLoop) {
                         perflint::rules::try_except_in_loop(self, body);
                     }
-                }
-                if self.enabled(Rule::IncorrectDictIterator) {
-                    perflint::rules::incorrect_dict_iterator(self, target, iter);
                 }
                 if self.enabled(Rule::ManualListComprehension) {
                     perflint::rules::manual_list_comprehension(self, target, body);
@@ -4265,7 +4263,7 @@ impl<'a> Checker<'a> {
             let shadowed = &self.semantic.bindings[shadowed_id];
             if !matches!(
                 shadowed.kind,
-                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_),
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_)
             ) {
                 let references = shadowed.references.clone();
                 let is_global = shadowed.is_global();
@@ -4705,11 +4703,18 @@ impl<'a> Checker<'a> {
             for snapshot in for_loops {
                 self.semantic.restore(snapshot);
 
-                if let Stmt::For(ast::StmtFor { target, body, .. })
-                | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) = &self.semantic.stmt()
+                if let Stmt::For(ast::StmtFor {
+                    target, iter, body, ..
+                })
+                | Stmt::AsyncFor(ast::StmtAsyncFor {
+                    target, iter, body, ..
+                }) = &self.semantic.stmt()
                 {
                     if self.enabled(Rule::UnusedLoopControlVariable) {
                         flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
+                    }
+                    if self.enabled(Rule::IncorrectDictIterator) {
+                        perflint::rules::incorrect_dict_iterator(self, target, iter);
                     }
                 } else {
                     unreachable!("Expected Expr::For | Expr::AsyncFor");
