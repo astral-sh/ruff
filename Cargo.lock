@@ -2208,6 +2208,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_shrinking"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fs-err",
+ "regex",
+ "ruff_python_ast",
+ "ruff_rustpython",
+ "rustpython-ast",
+ "shlex",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ruff_text_size"
 version = "0.0.0"
 source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=b996b21ffca562ecb2086f632a6a0b05c245c24a#b996b21ffca562ecb2086f632a6a0b05c245c24a"
@@ -2562,22 +2578,6 @@ name = "shlex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
-
-[[package]]
-name = "shrinking"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "fs-err",
- "regex",
- "ruff_python_ast",
- "ruff_rustpython",
- "rustpython-ast",
- "shlex",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "similar"
