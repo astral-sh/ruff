@@ -100,12 +100,7 @@ pub(crate) fn not_tests(
                             let mut diagnostic = Diagnostic::new(NotInTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
                                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                                    compare(
-                                        left,
-                                        &[CmpOp::NotIn],
-                                        comparators,
-                                        checker.generator(),
-                                    ),
+                                    compare(left, &[CmpOp::NotIn], comparators, checker.locator),
                                     expr.range(),
                                 )));
                             }
@@ -117,12 +112,7 @@ pub(crate) fn not_tests(
                             let mut diagnostic = Diagnostic::new(NotIsTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
                                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                                    compare(
-                                        left,
-                                        &[CmpOp::IsNot],
-                                        comparators,
-                                        checker.generator(),
-                                    ),
+                                    compare(left, &[CmpOp::IsNot], comparators, checker.locator),
                                     expr.range(),
                                 )));
                             }
