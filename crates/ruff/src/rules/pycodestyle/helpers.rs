@@ -1,29 +1,49 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{self, CmpOp, Expr};
+use rustpython_parser::ast::{CmpOp, Expr, Ranged};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_python_ast::source_code::Generator;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_whitespace::Line;
 
 use crate::line_width::{LineLength, LineWidth, TabSize};
 
-pub(crate) fn is_ambiguous_name(name: &str) -> bool {
+pub(super) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
 
-pub(crate) fn compare(
+pub(super) fn compare(
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
-    generator: Generator,
+    locator: &Locator,
 ) -> String {
-    let node = ast::ExprCompare {
-        left: Box::new(left.clone()),
-        ops: ops.to_vec(),
-        comparators: comparators.to_vec(),
-        range: TextRange::default(),
-    };
-    generator.expr(&node.into())
+    let start = left.start();
+    let end = comparators.last().map_or_else(|| left.end(), Ranged::end);
+    let mut contents = String::with_capacity(usize::from(end - start));
+
+    // Add the left side of the comparison.
+    contents.push_str(locator.slice(left.range()));
+
+    for (op, comparator) in ops.iter().zip(comparators) {
+        // Add the operator.
+        contents.push_str(match op {
+            CmpOp::Eq => " == ",
+            CmpOp::NotEq => " != ",
+            CmpOp::Lt => " < ",
+            CmpOp::LtE => " <= ",
+            CmpOp::Gt => " > ",
+            CmpOp::GtE => " >= ",
+            CmpOp::In => " in ",
+            CmpOp::NotIn => " not in ",
+            CmpOp::Is => " is ",
+            CmpOp::IsNot => " is not ",
+        });
+
+        // Add the right side of the comparison.
+        contents.push_str(locator.slice(comparator.range()));
+    }
+
+    contents
 }
 
 pub(super) fn is_overlong(
