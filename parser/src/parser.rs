@@ -663,6 +663,33 @@ class Foo[X, Y: str, *U, **P]():
 ";
         insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
     }
+    #[test]
+    #[cfg(feature = "all-nodes-with-ranges")]
+    fn test_parse_function_definition() {
+        let source = "\
+def func(a):
+    ...
+
+def func[T](a: T) -> T:
+    ...
+
+def func[T: str](a: T) -> T:
+    ...
+
+def func[T: (str, bytes)](a: T) -> T:
+    ...
+
+def func[*Ts](*a: *Ts):
+    ...
+
+def func[**P](*args: P.args, **kwargs: P.kwargs):
+    ...
+
+def func[T, U: str, *Ts, **P]():
+    pass
+  ";
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
 
     #[test]
     fn test_parse_dict_comprehension() {

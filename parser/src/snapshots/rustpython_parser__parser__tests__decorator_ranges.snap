@@ -5,7 +5,7 @@ expression: parse_ast
 [
     FunctionDef(
         StmtFunctionDef {
-            range: 0..34,
+            range: 14..34,
             name: Identifier {
                 id: "test",
                 range: 18..22,

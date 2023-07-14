@@ -965,16 +965,15 @@ WithItem<Goal>: ast::WithItem = {
 };
 
 FuncDef: ast::Stmt = {
-    <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
+    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParamList?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
         let args = Box::new(args);
         let returns = r.map(|x| Box::new(x));
         let end_location = body.last().unwrap().end();
         let type_comment = None;
-        let type_params = Vec::new();
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params, range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params, range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         }
     },
 };
