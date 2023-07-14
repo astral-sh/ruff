@@ -7,7 +7,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "ayu-accent": "#fa8d3e",
+        "ayu-accent": "#ffac2f",
         "ayu-background": {
           DEFAULT: "#f8f9fa",
           dark: "#0b0e14",
