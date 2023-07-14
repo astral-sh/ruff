@@ -1,7 +1,10 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use itertools::Itertools;
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use smallvec::SmallVec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableKeyword;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -69,6 +72,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    outer_kw: &[Keyword],
 ) {
     let Some(outer) = helpers::expr_name(func) else {
         return;
@@ -84,7 +88,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
     let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = arg else {
+    let Expr::Call(ast::ExprCall { func, keywords: inner_kw, .. }) = arg else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {
@@ -92,6 +96,26 @@ pub(crate) fn unnecessary_double_cast_or_process(
     };
     if !checker.semantic().is_builtin(inner) || !checker.semantic().is_builtin(outer) {
         return;
+    }
+
+    // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
+    // (i.e., `key`, `reverse`)
+    if inner == "sorted" && outer == "sorted" {
+        if inner_kw.len() != outer_kw.len() {
+            return;
+        }
+
+        let inner_comparables: SmallVec<[ComparableKeyword; 2]> =
+            inner_kw.iter().map(ComparableKeyword::from).collect();
+
+        if !outer_kw
+            .iter()
+            .map(ComparableKeyword::from)
+            .into_iter()
+            .all(|kw| inner_comparables.contains(&kw))
+        {
+            return;
+        }
     }
 
     // Ex) set(tuple(...))
