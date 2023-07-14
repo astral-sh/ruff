@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 use smallvec::SmallVec;
 
@@ -88,7 +87,12 @@ pub(crate) fn unnecessary_double_cast_or_process(
     let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Call(ast::ExprCall { func, keywords: inner_kw, .. }) = arg else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        keywords: inner_kw,
+        ..
+    }) = arg
+    else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {
@@ -111,7 +115,6 @@ pub(crate) fn unnecessary_double_cast_or_process(
         if !outer_kw
             .iter()
             .map(ComparableKeyword::from)
-            .into_iter()
             .all(|kw| inner_comparables.contains(&kw))
         {
             return;
