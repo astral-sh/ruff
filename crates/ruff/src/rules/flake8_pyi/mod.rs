@@ -1,4 +1,5 @@
 //! Rules from [flake8-pyi](https://pypi.org/project/flake8-pyi/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -18,6 +19,8 @@ mod tests {
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.pyi"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.py"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.pyi"))]
+    #[test_case(Rule::BadExitAnnotation, Path::new("PYI036.py"))]
+    #[test_case(Rule::BadExitAnnotation, Path::new("PYI036.pyi"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.py"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.py"))]
@@ -46,12 +49,16 @@ mod tests {
     #[test_case(Rule::PassStatementStubBody, Path::new("PYI009.pyi"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.py"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.pyi"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.pyi"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
     #[test_case(Rule::UnassignedSpecialVariableInStub, Path::new("PYI035.py"))]
     #[test_case(Rule::UnassignedSpecialVariableInStub, Path::new("PYI035.pyi"))]
     #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.py"))]
     #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.pyi"))]
+    #[test_case(Rule::UnnecessaryLiteralUnion, Path::new("PYI030.py"))]
+    #[test_case(Rule::UnnecessaryLiteralUnion, Path::new("PYI030.pyi"))]
     #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.py"))]
     #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.pyi"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]

@@ -4,7 +4,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_format::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use rustpython_parser::ast::{self, Constant, Expr, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
+use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -128,10 +128,9 @@ fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> boo
     let formats = collect_specs(formats);
     // If there is more than one format, this is not valid python and we should
     // return true so that no error is reported
-    if formats.len() != 1 {
+    let [format] = formats.as_slice() else {
         return true;
-    }
-    let format = formats[0];
+    };
     equivalent(format, value)
 }
 
@@ -205,9 +204,9 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     let content = checker.locator.slice(expr.range());
     let mut strings: Vec<TextRange> = vec![];
     for (tok, range) in lexer::lex_starts_at(content, Mode::Module, expr.start()).flatten() {
-        if matches!(tok, Tok::String { .. }) {
+        if tok.is_string() {
             strings.push(range);
-        } else if matches!(tok, Tok::Percent) {
+        } else if tok.is_percent() {
             // Break as soon as we find the modulo symbol.
             break;
         }

@@ -304,154 +304,46 @@ long_unmergable_string_with_pragma = (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,6 @@
- x = "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
- 
--x += "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
-+NOT_YET_IMPLEMENTED_StmtAugAssign
- 
- y = "Short string"
- 
-@@ -70,8 +70,8 @@
- bad_split3 = (
-     "What if we have inline comments on "  # First Comment
-     "each line of a bad split? In that "  # Second Comment
--    "case, we should just leave it alone."  # Third Comment
--)
-+    "case, we should just leave it alone."
-+)  # Third Comment
- 
- bad_split_func1(
-     "But what should happen when code has already "
-@@ -96,15 +96,13 @@
- )
- 
- bad_split_func3(
--    (
--        "But what should happen when code has already "
--        r"been formatted but in the wrong way? Like "
--        "with a space at the end instead of the "
--        r"beginning. Or what about when it is split too "
--        r"soon? In the case of a split that is too "
--        "short, black will try to honer the custom "
--        "split."
--    ),
-+    "But what should happen when code has already "
-+    r"been formatted but in the wrong way? Like "
-+    "with a space at the end instead of the "
-+    r"beginning. Or what about when it is split too "
-+    r"soon? In the case of a split that is too "
-+    "short, black will try to honer the custom "
-+    "split.",
-     xxx,
-     yyy,
-     zzz,
-@@ -143,9 +141,9 @@
+@@ -143,9 +143,9 @@
      )
  )
  
 -fstring = f"f-strings definitely make things more {difficult} than they need to be for {{black}}. But boy they sure are handy. The problem is that some lines will need to have the 'f' whereas others do not. This {line}, for example, needs one."
-+fstring = NOT_YET_IMPLEMENTED_ExprJoinedStr
++fstring = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
 -fstring_with_no_fexprs = f"Some regular string that needs to get split certainly but is NOT an fstring by any means whatsoever."
-+fstring_with_no_fexprs = NOT_YET_IMPLEMENTED_ExprJoinedStr
++fstring_with_no_fexprs = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
  
-@@ -165,25 +163,13 @@
+@@ -165,13 +165,9 @@
  
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
 -assert (
 -    some_type_of_boolean_expression
 -), "Followed by a really really really long string that is used to provide context to the AssertionError exception."
-+NOT_YET_IMPLEMENTED_StmtAssert
++assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
  
 -assert (
 -    some_type_of_boolean_expression
 -), "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
--    "formatting"
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
--assert some_type_of_boolean_expression, (
--    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
--    % "formatting"
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
--assert some_type_of_boolean_expression, (
--    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
--    % ("string", "formatting")
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
- some_function_call(
-     "With a reallly generic name and with a really really long string that is, at some point down the line, "
-@@ -212,29 +198,25 @@
++assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+     "formatting"
  )
  
+@@ -221,8 +217,8 @@
  func_with_bad_comma(
--    (
--        "This is a really long string argument to a function that has a trailing comma"
--        " which should NOT be there."
--    ),
-+    "This is a really long string argument to a function that has a trailing comma"
-+    " which should NOT be there."
- )
- 
- func_with_bad_comma(
--    (
--        "This is a really long string argument to a function that has a trailing comma"
+     (
+         "This is a really long string argument to a function that has a trailing comma"
 -        " which should NOT be there."
 -    ),  # comment after comma
-+    "This is a really long string argument to a function that has a trailing comma"
-+    " which should NOT be there."  # comment after comma
++        " which should NOT be there."  # comment after comma
++    ),
  )
  
  func_with_bad_parens_that_wont_fit_in_one_line(
--    ("short string that should have parens stripped"), x, y, z
-+    "short string that should have parens stripped", x, y, z
- )
- 
- func_with_bad_parens_that_wont_fit_in_one_line(
--    x, y, ("short string that should have parens stripped"), z
-+    x, y, "short string that should have parens stripped", z
- )
- 
- func_with_bad_parens(
--    ("short string that should have parens stripped"),
-+    "short string that should have parens stripped",
-     x,
-     y,
-     z,
-@@ -243,21 +225,13 @@
- func_with_bad_parens(
-     x,
-     y,
--    ("short string that should have parens stripped"),
-+    "short string that should have parens stripped",
-     z,
- )
- 
--annotated_variable: Final = (
--    "This is a large "
--    + STRING
--    + " that has been "
--    + CONCATENATED
--    + "using the '+' operator."
--)
--annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
--annotated_variable: Literal[
--    "fakse_literal"
--] = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
- 
- backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\"
- backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
-@@ -271,10 +245,10 @@
+@@ -271,10 +267,10 @@
  
  
  def foo():
@@ -460,7 +352,7 @@ long_unmergable_string_with_pragma = (
  
  
 -x = f"This is a {{really}} long string that needs to be split without a doubt (i.e. most definitely). In short, this {string} that can't possibly be {{expected}} to fit all together on one line. In {fact} it may even take up three or more lines... like four or five... but probably just four."
-+x = NOT_YET_IMPLEMENTED_ExprJoinedStr
++x = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  long_unmergable_string_with_pragma = (
      "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
@@ -471,7 +363,7 @@ long_unmergable_string_with_pragma = (
 ```py
 x = "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
 
-NOT_YET_IMPLEMENTED_StmtAugAssign
+x += "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
 
 y = "Short string"
 
@@ -541,8 +433,8 @@ bad_split2 = (
 bad_split3 = (
     "What if we have inline comments on "  # First Comment
     "each line of a bad split? In that "  # Second Comment
-    "case, we should just leave it alone."
-)  # Third Comment
+    "case, we should just leave it alone."  # Third Comment
+)
 
 bad_split_func1(
     "But what should happen when code has already "
@@ -567,13 +459,15 @@ bad_split_func2(
 )
 
 bad_split_func3(
-    "But what should happen when code has already "
-    r"been formatted but in the wrong way? Like "
-    "with a space at the end instead of the "
-    r"beginning. Or what about when it is split too "
-    r"soon? In the case of a split that is too "
-    "short, black will try to honer the custom "
-    "split.",
+    (
+        "But what should happen when code has already "
+        r"been formatted but in the wrong way? Like "
+        "with a space at the end instead of the "
+        r"beginning. Or what about when it is split too "
+        r"soon? In the case of a split that is too "
+        "short, black will try to honer the custom "
+        "split."
+    ),
     xxx,
     yyy,
     zzz,
@@ -612,9 +506,9 @@ old_fmt_string3 = (
     )
 )
 
-fstring = NOT_YET_IMPLEMENTED_ExprJoinedStr
+fstring = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
-fstring_with_no_fexprs = NOT_YET_IMPLEMENTED_ExprJoinedStr
+fstring_with_no_fexprs = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
 
@@ -634,13 +528,21 @@ pragma_comment_string2 = "Lines which end with an inline pragma comment of the f
 
 triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+    "formatting"
+)
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
+    % "formatting"
+)
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
+    % ("string", "formatting")
+)
 
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "
@@ -669,25 +571,29 @@ func_with_bad_comma(
 )
 
 func_with_bad_comma(
-    "This is a really long string argument to a function that has a trailing comma"
-    " which should NOT be there."
+    (
+        "This is a really long string argument to a function that has a trailing comma"
+        " which should NOT be there."
+    ),
 )
 
 func_with_bad_comma(
-    "This is a really long string argument to a function that has a trailing comma"
-    " which should NOT be there."  # comment after comma
+    (
+        "This is a really long string argument to a function that has a trailing comma"
+        " which should NOT be there."  # comment after comma
+    ),
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    "short string that should have parens stripped", x, y, z
+    ("short string that should have parens stripped"), x, y, z
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    x, y, "short string that should have parens stripped", z
+    x, y, ("short string that should have parens stripped"), z
 )
 
 func_with_bad_parens(
-    "short string that should have parens stripped",
+    ("short string that should have parens stripped"),
     x,
     y,
     z,
@@ -696,13 +602,21 @@ func_with_bad_parens(
 func_with_bad_parens(
     x,
     y,
-    "short string that should have parens stripped",
+    ("short string that should have parens stripped"),
     z,
 )
 
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
+annotated_variable: Final = (
+    "This is a large "
+    + STRING
+    + " that has been "
+    + CONCATENATED
+    + "using the '+' operator."
+)
+annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
+annotated_variable: Literal[
+    "fakse_literal"
+] = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
 
 backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\"
 backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
@@ -719,7 +633,7 @@ def foo():
     NOT_YET_IMPLEMENTED_ExprYield
 
 
-x = NOT_YET_IMPLEMENTED_ExprJoinedStr
+x = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 long_unmergable_string_with_pragma = (
     "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore

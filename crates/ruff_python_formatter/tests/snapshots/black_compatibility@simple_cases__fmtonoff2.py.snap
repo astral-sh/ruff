@@ -52,12 +52,7 @@ def test_calculate_fades():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,40 +1,44 @@
--import pytest
-+NOT_YET_IMPLEMENTED_StmtImport
- 
- TmSt = 1
- TmEx = 2
+@@ -5,36 +5,40 @@
  
  # fmt: off
  
@@ -82,10 +77,10 @@ def test_calculate_fades():
  
 +
  def check_fader(test):
-+    pass
+-
+     pass
  
--    pass
- 
++
  def verify_fader(test):
 -  # misaligned comment
 +    # misaligned comment
@@ -94,10 +89,9 @@ def test_calculate_fades():
 +
  def verify_fader(test):
      """Hey, ho."""
--    assert test.passed()
-+    NOT_YET_IMPLEMENTED_StmtAssert
-+
+     assert test.passed()
  
++
  def test_calculate_fades():
      calcs = [
          # one is zero/none
@@ -113,7 +107,7 @@ def test_calculate_fades():
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImport
+import pytest
 
 TmSt = 1
 TmEx = 2
@@ -146,7 +140,7 @@ def verify_fader(test):
 
 def verify_fader(test):
     """Hey, ho."""
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert test.passed()
 
 
 def test_calculate_fades():

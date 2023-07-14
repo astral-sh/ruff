@@ -1,7 +1,9 @@
+use rustpython_parser::ast::StmtAsyncFunctionDef;
+
+use ruff_python_ast::function::AnyFunctionDefinition;
+
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_python_ast::function::AnyFunctionDefinition;
-use rustpython_parser::ast::StmtAsyncFunctionDef;
 
 #[derive(Default)]
 pub struct FormatStmtAsyncFunctionDef;

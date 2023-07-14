@@ -274,7 +274,7 @@ last_call()
  Name
  None
  True
-@@ -31,33 +31,39 @@
+@@ -31,18 +31,15 @@
  -1
  ~int and not v1 ^ 123 + v2 | True
  (~int) and (not ((v1 ^ (123 + v2)) | True))
@@ -291,42 +291,21 @@ last_call()
 -    "port1": port1_resource,
 -    "port2": port2_resource,
 -}[port_id]
--1 if True else 2
--str or None if True else str or bytes or None
--(str or None) if True else (str or bytes or None)
--str or None if (1 if True else 2) else str or bytes or None
--(str or None) if (1 if True else 2) else (str or bytes or None)
--(
--    (super_long_variable_name or None)
--    if (1 if super_long_test_name else 2)
--    else (str or bytes or None)
--)
-+lambda x: True
-+lambda x: True
-+lambda x: True
-+lambda x: True
-+lambda x: True
-+manylambdas = lambda x: True
-+foo = lambda x: True
-+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-+(NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
- {"2.7": dead, "3.7": (long_live or die_hard)}
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda NOT_YET_IMPLEMENTED_lambda: True
++manylambdas = lambda NOT_YET_IMPLEMENTED_lambda: True
++foo = lambda NOT_YET_IMPLEMENTED_lambda: True
+ 1 if True else 2
+ str or None if True else str or bytes or None
+ (str or None) if True else (str or bytes or None)
+@@ -57,7 +54,13 @@
  {"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
  {**a, **b, **c}
--{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
+ {"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
 -({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
-+{
-+    "2.7",
-+    "3.6",
-+    "3.7",
-+    "3.8",
-+    "3.9",
-+    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
-+}
 +(
 +    {"a": "b"},
 +    (True or False),
@@ -337,41 +316,22 @@ last_call()
  ()
  (1,)
  (1, 2)
-@@ -69,40 +75,37 @@
-     2,
-     3,
- ]
--[*a]
--[*range(10)]
-+[*NOT_YET_IMPLEMENTED_ExprStarred]
-+[*NOT_YET_IMPLEMENTED_ExprStarred]
- [
--    *a,
-+    *NOT_YET_IMPLEMENTED_ExprStarred,
-     4,
-     5,
- ]
- [
-     4,
--    *a,
-+    *NOT_YET_IMPLEMENTED_ExprStarred,
-     5,
- ]
- [
-     this_is_a_very_long_variable_which_will_force_a_delimiter_split,
-     element,
+@@ -87,22 +90,19 @@
      another,
--    *more,
-+    *NOT_YET_IMPLEMENTED_ExprStarred,
+     *more,
  ]
 -{i for i in (1, 2, 3)}
 -{(i**2) for i in (1, 2, 3)}
 -{(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))}
 -{((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)}
--[i for i in (1, 2, 3)]
--[(i**2) for i in (1, 2, 3)]
--[(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
--[((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
++{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+ [i for i in (1, 2, 3)]
+ [(i**2) for i in (1, 2, 3)]
+ [(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
+ [((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
 -{i: 0 for i in (1, 2, 3)}
 -{i: j for i, j in ((1, "a"), (2, "b"), (3, "c"))}
 -{a: b * 2 for a, b in dictionary.items()}
@@ -380,14 +340,6 @@ last_call()
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 -}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-+[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
@@ -396,52 +348,16 @@ last_call()
  Python3 > Python2 > COBOL
  Life is Life
  call()
-@@ -115,10 +118,10 @@
+@@ -115,7 +115,7 @@
      arg,
      another,
      kwarg="hey",
 -    **kwargs
 +    **kwargs,
  )  # note: no trailing comma pre-3.6
--call(*gidgets[:2])
--call(a, *gidgets[:2])
-+call(*NOT_YET_IMPLEMENTED_ExprStarred)
-+call(a, *NOT_YET_IMPLEMENTED_ExprStarred)
- call(**self.screen_kwargs)
- call(b, **self.screen_kwargs)
- lukasz.langa.pl
-@@ -131,34 +134,28 @@
- tuple[str, ...]
- tuple[str, int, float, dict[str, int]]
- tuple[
--    str,
--    int,
--    float,
--    dict[str, int],
-+    (
-+        str,
-+        int,
-+        float,
-+        dict[str, int],
-+    )
- ]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
--]
--xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)
--xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)
--xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
--    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
--)  # type: ignore
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
- slice[0]
+ call(*gidgets[:2])
+ call(a, *gidgets[:2])
+@@ -152,13 +152,13 @@
  slice[0:1]
  slice[0:1:2]
  slice[:]
@@ -458,26 +374,16 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -172,20 +169,27 @@
+@@ -172,7 +172,7 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
 -numpy[:, ::-1]
 +numpy[:,  :: -1]
  numpy[np.newaxis, :]
--(str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
-+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+ (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
  {"2.7": dead, "3.7": long_live or die_hard}
--{"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
-+{
-+    "2.7",
-+    "3.6",
-+    "3.7",
-+    "3.8",
-+    "3.9",
-+    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+}
- [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
+@@ -181,10 +181,10 @@
  (SomeName)
  SomeName
  (Good, Bad, Ugly)
@@ -485,26 +391,14 @@ last_call()
 -((i**2) for i in (1, 2, 3))
 -((i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c")))
 -(((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3))
--(*starred,)
 +(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 +(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 +(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 +(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-+(*NOT_YET_IMPLEMENTED_ExprStarred,)
+ (*starred,)
  {
      "id": "1",
-     "type": "type",
-@@ -200,32 +204,22 @@
- c = 1
- d = (1,) + a + (2,)
- e = (1,).count(1)
--f = 1, *range(10)
--g = 1, *"ten"
-+f = 1, *NOT_YET_IMPLEMENTED_ExprStarred
-+g = 1, *NOT_YET_IMPLEMENTED_ExprStarred
- what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
-     vars_to_remove
- )
+@@ -208,24 +208,14 @@
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
  )
@@ -537,7 +431,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,29 +231,29 @@
+@@ -237,10 +227,10 @@
  
  
  def gen():
@@ -552,31 +446,27 @@ last_call()
  
  
  async def f():
-     await some.complicated[0].call(with_args=(True or (1 is not 1)))
+@@ -248,8 +238,12 @@
  
  
--print(*[] or [1])
+ print(*[] or [1])
 -print(**{1: 3} if False else {x: x for x in range(3)})
 -print(*lambda x: x)
--assert not Test, "Short message"
--assert this is ComplexTest and not requirements.fit_in_a_single_line(
--    force=False
--), "Short message"
--assert parens is TooMany
-+print(*NOT_YET_IMPLEMENTED_ExprStarred)
-+print(**NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-+print(*NOT_YET_IMPLEMENTED_ExprStarred)
-+NOT_YET_IMPLEMENTED_StmtAssert
-+NOT_YET_IMPLEMENTED_StmtAssert
-+NOT_YET_IMPLEMENTED_StmtAssert
- for (x,) in (1,), (2,), (3,):
++print(
++    **{1: 3}
++    if False
++    else {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++)
++print(*lambda NOT_YET_IMPLEMENTED_lambda: True)
+ assert not Test, "Short message"
+ assert this is ComplexTest and not requirements.fit_in_a_single_line(
+     force=False
+@@ -259,7 +253,7 @@
      ...
  for y in ():
      ...
 -for z in (i for i in (1, 2, 3)):
-+for (
-+    z
-+) in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
++for z in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
      ...
  for i in call():
      ...
@@ -652,30 +542,27 @@ not great
 (~int) and (not ((v1 ^ (123 + v2)) | True))
 +really ** -confusing ** ~operator**-precedence
 flags & ~select.EPOLLIN and waiters.write_task is not None
-lambda x: True
-lambda x: True
-lambda x: True
-lambda x: True
-lambda x: True
-manylambdas = lambda x: True
-foo = lambda x: True
-NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
-(NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda NOT_YET_IMPLEMENTED_lambda: True
+manylambdas = lambda NOT_YET_IMPLEMENTED_lambda: True
+foo = lambda NOT_YET_IMPLEMENTED_lambda: True
+1 if True else 2
+str or None if True else str or bytes or None
+(str or None) if True else (str or bytes or None)
+str or None if (1 if True else 2) else str or bytes or None
+(str or None) if (1 if True else 2) else (str or bytes or None)
+(
+    (super_long_variable_name or None)
+    if (1 if super_long_test_name else 2)
+    else (str or bytes or None)
+)
 {"2.7": dead, "3.7": (long_live or die_hard)}
 {"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
 {**a, **b, **c}
-{
-    "2.7",
-    "3.6",
-    "3.7",
-    "3.8",
-    "3.9",
-    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
-}
+{"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
 (
     {"a": "b"},
     (True or False),
@@ -694,32 +581,32 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
     2,
     3,
 ]
-[*NOT_YET_IMPLEMENTED_ExprStarred]
-[*NOT_YET_IMPLEMENTED_ExprStarred]
+[*a]
+[*range(10)]
 [
-    *NOT_YET_IMPLEMENTED_ExprStarred,
+    *a,
     4,
     5,
 ]
 [
     4,
-    *NOT_YET_IMPLEMENTED_ExprStarred,
+    *a,
     5,
 ]
 [
     this_is_a_very_long_variable_which_will_force_a_delimiter_split,
     element,
     another,
-    *NOT_YET_IMPLEMENTED_ExprStarred,
+    *more,
 ]
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
-[NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []]
+[i for i in (1, 2, 3)]
+[(i**2) for i in (1, 2, 3)]
+[(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
+[((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
@@ -739,8 +626,8 @@ call(
     kwarg="hey",
     **kwargs,
 )  # note: no trailing comma pre-3.6
-call(*NOT_YET_IMPLEMENTED_ExprStarred)
-call(a, *NOT_YET_IMPLEMENTED_ExprStarred)
+call(*gidgets[:2])
+call(a, *gidgets[:2])
 call(**self.screen_kwargs)
 call(b, **self.screen_kwargs)
 lukasz.langa.pl
@@ -753,17 +640,23 @@ dict[str, int]
 tuple[str, ...]
 tuple[str, int, float, dict[str, int]]
 tuple[
-    (
-        str,
-        int,
-        float,
-        dict[str, int],
-    )
+    str,
+    int,
+    float,
+    dict[str, int],
 ]
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
+very_long_variable_name_filters: t.List[
+    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
+]
+xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)
+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)
+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
+    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
+)  # type: ignore
 slice[0]
 slice[0:1]
 slice[0:1:2]
@@ -790,16 +683,9 @@ numpy[-(c + 1) :, d]
 numpy[:, l[-2]]
 numpy[:,  :: -1]
 numpy[np.newaxis, :]
-NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+(str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
 {"2.7": dead, "3.7": long_live or die_hard}
-{
-    "2.7",
-    "3.6",
-    "3.7",
-    "3.8",
-    "3.9",
-    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-}
+{"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
 (SomeName)
 SomeName
@@ -808,7 +694,7 @@ SomeName
 (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-(*NOT_YET_IMPLEMENTED_ExprStarred,)
+(*starred,)
 {
     "id": "1",
     "type": "type",
@@ -823,8 +709,8 @@ b = (1,)
 c = 1
 d = (1,) + a + (2,)
 e = (1,).count(1)
-f = 1, *NOT_YET_IMPLEMENTED_ExprStarred
-g = 1, *NOT_YET_IMPLEMENTED_ExprStarred
+f = 1, *range(10)
+g = 1, *"ten"
 what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
     vars_to_remove
 )
@@ -860,19 +746,23 @@ async def f():
     await some.complicated[0].call(with_args=(True or (1 is not 1)))
 
 
-print(*NOT_YET_IMPLEMENTED_ExprStarred)
-print(**NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
-print(*NOT_YET_IMPLEMENTED_ExprStarred)
-NOT_YET_IMPLEMENTED_StmtAssert
-NOT_YET_IMPLEMENTED_StmtAssert
-NOT_YET_IMPLEMENTED_StmtAssert
+print(*[] or [1])
+print(
+    **{1: 3}
+    if False
+    else {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+)
+print(*lambda NOT_YET_IMPLEMENTED_lambda: True)
+assert not Test, "Short message"
+assert this is ComplexTest and not requirements.fit_in_a_single_line(
+    force=False
+), "Short message"
+assert parens is TooMany
 for (x,) in (1,), (2,), (3,):
     ...
 for y in ():
     ...
-for (
-    z
-) in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
+for z in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
     ...
 for i in call():
     ...

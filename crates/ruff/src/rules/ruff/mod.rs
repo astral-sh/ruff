@@ -1,6 +1,7 @@
 //! Ruff-specific rules.
 
 pub(crate) mod rules;
+pub(crate) mod typing;
 
 #[cfg(test)]
 mod tests {
@@ -30,6 +31,15 @@ mod tests {
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
+    #[test_case(
+        Rule::UnnecessaryIterableAllocationForFirstElement,
+        Path::new("RUF015.py")
+    )]
+    #[test_case(Rule::InvalidIndexType, Path::new("RUF016.py"))]
+    #[cfg_attr(
+        feature = "unreachable-code",
+        test_case(Rule::UnreachableCode, Path::new("RUF014.py"))
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -199,7 +209,10 @@ mod tests {
             .join("pyproject.toml");
         let contents = fs::read_to_string(path)?;
         let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
-        let messages = lint_pyproject_toml(source_file)?;
+        let messages = lint_pyproject_toml(
+            source_file,
+            &settings::Settings::for_rule(Rule::InvalidPyprojectToml),
+        )?;
         assert_messages!(snapshot, messages);
         Ok(())
     }

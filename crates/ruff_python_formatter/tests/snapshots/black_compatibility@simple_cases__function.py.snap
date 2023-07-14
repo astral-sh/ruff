@@ -107,34 +107,17 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,12 +1,11 @@
- #!/usr/bin/env python3
--import asyncio
--import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
+@@ -5,8 +5,7 @@
+ from third_party import X, Y, Z
  
--from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
--from library import some_connection, some_decorator
+ from library import some_connection, some_decorator
 -
 -f"trigger 3.6 mode"
-+NOT_YET_IMPLEMENTED_StmtImportFrom
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
  
  def func_no_args():
-@@ -14,7 +13,7 @@
-     b
-     c
-     if True:
--        raise RuntimeError
-+        NOT_YET_IMPLEMENTED_StmtRaise
-     if False:
-         ...
-     for i in range(10):
-@@ -41,12 +40,22 @@
+@@ -41,12 +40,12 @@
      debug: bool = False,
      **kwargs,
  ) -> str:
@@ -142,40 +125,18 @@ def __await__(): return (yield)
 +    return text[number : -1]
  
  
--def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
+ def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
-+def spaces(
-+    a=1,
-+    b=(),
-+    c=[],
-+    d={},
-+    e=True,
-+    f=-1,
-+    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h="",
-+    i=r"",
-+):
-+    offset = attr.ib(default=attr.Factory(lambda x: True))
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
++    assert task._cancel_stack[ : len(old_stack)] == old_stack
  
  
  def spaces_types(
-@@ -56,7 +65,7 @@
-     d: dict = {},
-     e: bool = True,
-     f: int = -1,
--    g: int = 1 if False else 2,
-+    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-     h: str = "",
-     i: str = r"",
- ):
-@@ -64,19 +73,17 @@
- 
+@@ -65,18 +64,14 @@
  
  def spaces2(result=_core.Value(None)):
--    assert fut is self._read_fut, (fut, self._read_fut)
-+    NOT_YET_IMPLEMENTED_StmtAssert
+     assert fut is self._read_fut, (fut, self._read_fut)
 +    # EMPTY LINE WITH WHITESPACE (this comment will be removed)
  
  
@@ -190,15 +151,13 @@ def __await__(): return (yield)
 -        .all()
 -    )
 +    result = session.query(models.Customer.id).filter(
-+        models.Customer.account_id
-+        == account_id,
-+        models.Customer.email
-+        == email_address,
++        models.Customer.account_id == account_id,
++        models.Customer.email == email_address,
 +    ).order_by(models.Customer.id.asc()).all()
  
  
  def long_lines():
-@@ -135,14 +142,8 @@
+@@ -135,14 +130,8 @@
      a,
      **kwargs,
  ) -> A:
@@ -221,13 +180,13 @@ def __await__(): return (yield)
 
 ```py
 #!/usr/bin/env python3
-NOT_YET_IMPLEMENTED_StmtImport
-NOT_YET_IMPLEMENTED_StmtImport
+import asyncio
+import sys
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from third_party import X, Y, Z
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
-NOT_YET_IMPLEMENTED_ExprJoinedStr
+from library import some_connection, some_decorator
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
 
 def func_no_args():
@@ -235,7 +194,7 @@ def func_no_args():
     b
     c
     if True:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise RuntimeError
     if False:
         ...
     for i in range(10):
@@ -265,19 +224,9 @@ def function_signature_stress_test(
     return text[number : -1]
 
 
-def spaces(
-    a=1,
-    b=(),
-    c=[],
-    d={},
-    e=True,
-    f=-1,
-    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h="",
-    i=r"",
-):
-    offset = attr.ib(default=attr.Factory(lambda x: True))
-    NOT_YET_IMPLEMENTED_StmtAssert
+def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
+    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
+    assert task._cancel_stack[ : len(old_stack)] == old_stack
 
 
 def spaces_types(
@@ -287,7 +236,7 @@ def spaces_types(
     d: dict = {},
     e: bool = True,
     f: int = -1,
-    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
 ):
@@ -295,16 +244,14 @@ def spaces_types(
 
 
 def spaces2(result=_core.Value(None)):
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert fut is self._read_fut, (fut, self._read_fut)
     # EMPTY LINE WITH WHITESPACE (this comment will be removed)
 
 
 def example(session):
     result = session.query(models.Customer.id).filter(
-        models.Customer.account_id
-        == account_id,
-        models.Customer.email
-        == email_address,
+        models.Customer.account_id == account_id,
+        models.Customer.email == email_address,
     ).order_by(models.Customer.id.asc()).all()
 
 

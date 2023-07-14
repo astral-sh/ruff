@@ -22,8 +22,8 @@ use crate::settings::Settings;
 /// characters), and lines that end with a URL (as long as the URL starts
 /// before the line-length threshold).
 ///
-/// If `pycodestyle.ignore_overlong_task_comments` is `true`, this rule will
-/// also ignore comments that start with any of the specified `task-tags`
+/// If [`pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
+/// also ignore comments that start with any of the specified [`task-tags`]
 /// (e.g., `# TODO:`).
 ///
 /// ## Example
@@ -40,7 +40,6 @@ use crate::settings::Settings;
 ///     Duis auctor purus ut ex fermentum, at maximus est hendrerit.
 ///     """
 /// ```
-///
 ///
 /// ## Options
 /// - `task-tags`

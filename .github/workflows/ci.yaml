@@ -16,7 +16,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.7" # to build abi3 wheels
+  PYTHON_VERSION: "3.11" # to build abi3 wheels
 
 jobs:
   cargo-fmt:
@@ -36,20 +36,12 @@ jobs:
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-  cargo-clippy-wasm:
-    name: "cargo clippy (wasm)"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
-        run: |
-          rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
+      - name: "Clippy"
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: "Clippy (wasm)"
+        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
   cargo-test:
     strategy:
@@ -62,21 +54,19 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-insta
+      # cargo insta 1.30.0 fails for some reason (https://github.com/mitsuhiko/insta/issues/392)
+      - run: cargo install cargo-insta@=1.29.0
       - run: pip install black[d]==23.1.0
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          cargo insta test --all --all-features --delete-unreferenced-snapshots
-          git diff --exit-code
+        run: cargo insta test --all --all-features --unreferenced reject
       - name: "Run tests (Windows)"
         if: ${{ matrix.os == 'windows-latest' }}
         shell: bash
-        run: |
-          cargo insta test --all --all-features
-          git diff --exit-code
+        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
+        run: cargo insta test --all --all-features
       - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
-        # Skipped as it's currently broken. The resource were moved from the
+        # TODO: Skipped as it's currently broken. The resource were moved from the
         # ruff_cli to ruff crate, but this test was not updated.
         if: false
       # Check for broken links in the documentation.
@@ -152,7 +142,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/download-artifact@v3
         name: Download Ruff binary
@@ -236,7 +226,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -260,13 +250,24 @@ jobs:
   docs:
     name: "mkdocs"
     runs-on: ubuntu-latest
+    env:
+      MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
+      - name: "Add SSH key"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
+      - name: "Install Insiders dependencies"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
+        run: pip install -r docs/requirements-insiders.txt
       - name: "Install dependencies"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: pip install -r docs/requirements.txt
       - name: "Update README File"
         run: python scripts/transform_readme.py --target mkdocs
@@ -274,5 +275,23 @@ jobs:
         run: python scripts/generate_mkdocs.py
       - name: "Check docs formatting"
         run: python scripts/check_docs_formatted.py
+      - name: "Build Insiders docs"
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
+        run: mkdocs build --strict -f mkdocs.insiders.yml
       - name: "Build docs"
-        run: mkdocs build --strict
+        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
+        run: mkdocs build --strict -f mkdocs.generated.yml
+
+  check-formatter-stability:
+    name: "Check formatter stability"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Cache rust"
+        uses: Swatinem/rust-cache@v2
+      - name: "Clone CPython 3.10"
+        run: git clone --branch 3.10 --depth 1 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
+      - name: "Check stability"
+        run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython

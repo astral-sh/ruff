@@ -74,7 +74,7 @@ def example8():
 -                data = (
 -                    f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -                ).encode()
-+                data = (NOT_YET_IMPLEMENTED_ExprJoinedStr).encode()
++                data = (f"NOT_YET_IMPLEMENTED_ExprJoinedStr").encode()
          except Exception as e:
              pass
  
@@ -151,7 +151,7 @@ async def show_status():
     while True:
         try:
             if report_host:
-                data = (NOT_YET_IMPLEMENTED_ExprJoinedStr).encode()
+                data = (f"NOT_YET_IMPLEMENTED_ExprJoinedStr").encode()
         except Exception as e:
             pass
 

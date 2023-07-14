@@ -258,7 +258,8 @@ impl Settings {
                 .unwrap_or_default(),
             isort: config
                 .isort
-                .map(isort::settings::Settings::from)
+                .map(isort::settings::Settings::try_from)
+                .transpose()?
                 .unwrap_or_default(),
             mccabe: config
                 .mccabe

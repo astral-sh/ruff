@@ -1,4 +1,4 @@
-//! Rules from [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/).
+//! Rules from [flake8-logging-format](https://pypi.org/project/flake8-logging-format/).
 pub(crate) mod rules;
 pub(crate) mod violations;
 

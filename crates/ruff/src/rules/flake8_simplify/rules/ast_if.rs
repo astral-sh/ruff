@@ -420,10 +420,10 @@ impl From<bool> for Bool {
 }
 
 fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
-    if stmts.len() != 1 {
+    let [stmt] = stmts else {
         return None;
-    }
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &stmts[0] else {
+    };
+    let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt else {
         return None;
     };
     let Some(Expr::Constant(ast::ExprConstant { value, .. })) = value.as_deref() else {
@@ -859,15 +859,12 @@ pub(crate) fn manual_dict_lookup(
         let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
             return;
         };
-        if !(id == target && ops.len() == 1 && ops[0] == CmpOp::Eq) {
+        if !(id == target && matches!(ops.as_slice(), [CmpOp::Eq])) {
             return;
         }
-        if comparators.len() != 1 {
-            return;
-        }
-        let Expr::Constant(ast::ExprConstant {
+        let [Expr::Constant(ast::ExprConstant {
             value: constant, ..
-        }) = &comparators[0]
+        })] = comparators.as_slice()
         else {
             return;
         };

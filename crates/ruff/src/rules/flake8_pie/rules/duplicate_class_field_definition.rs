@@ -61,10 +61,7 @@ pub(crate) fn duplicate_class_field_definition<'a, 'b>(
         // Extract the property name from the assignment statement.
         let target = match stmt {
             Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                if targets.len() != 1 {
-                    continue;
-                }
-                if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+                if let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() {
                     id
                 } else {
                     continue;

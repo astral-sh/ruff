@@ -454,6 +454,13 @@ impl<'a> DecoratedComment<'a> {
     }
 }
 
+impl Ranged for DecoratedComment<'_> {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.slice.range()
+    }
+}
+
 impl From<DecoratedComment<'_>> for SourceComment {
     fn from(decorated: DecoratedComment) -> Self {
         Self::new(decorated.slice, decorated.line_position)

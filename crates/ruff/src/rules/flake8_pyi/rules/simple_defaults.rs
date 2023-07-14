@@ -399,10 +399,9 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Argume
 
 /// PYI015
 pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     if !target.is_name_expr() {
         return;
     }
@@ -471,10 +470,9 @@ pub(crate) fn unannotated_assignment_in_stub(
     targets: &[Expr],
     value: &Expr,
 ) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };

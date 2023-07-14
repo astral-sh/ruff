@@ -1,9 +1,11 @@
+use std::ops::Sub;
+
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::rules::flake8_executable::helpers::ShebangDirective;
+use crate::comments::shebang::ShebangDirective;
 
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
@@ -49,22 +51,25 @@ pub(crate) fn shebang_whitespace(
     shebang: &ShebangDirective,
     autofix: bool,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(n_spaces, start, ..) = shebang {
-        if *n_spaces > TextSize::from(0) && *start == n_spaces + TextSize::from(2) {
-            let mut diagnostic = Diagnostic::new(
-                ShebangLeadingWhitespace,
-                TextRange::at(range.start(), *n_spaces),
-            );
-            if autofix {
-                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::at(
-                    range.start(),
-                    *n_spaces,
-                ))));
-            }
-            Some(diagnostic)
-        } else {
-            None
+    let ShebangDirective {
+        offset,
+        contents: _,
+    } = shebang;
+
+    if *offset > TextSize::from(2) {
+        let leading_space_start = range.start();
+        let leading_space_len = offset.sub(TextSize::new(2));
+        let mut diagnostic = Diagnostic::new(
+            ShebangLeadingWhitespace,
+            TextRange::at(leading_space_start, leading_space_len),
+        );
+        if autofix {
+            diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::at(
+                leading_space_start,
+                leading_space_len,
+            ))));
         }
+        Some(diagnostic)
     } else {
         None
     }

@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = AzureEmitter::default();
+        let mut emitter = AzureEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

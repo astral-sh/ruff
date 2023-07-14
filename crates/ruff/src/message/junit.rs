@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = JunitEmitter::default();
+        let mut emitter = JunitEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

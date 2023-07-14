@@ -80,3 +80,6 @@ e200 = "e"[a() :: ]
 e201 = "e"[a() :: 1]
 e202 = "e"[a() :: a()]
 e210 = "e"[a() : 1 :]
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5605
+f = "f"[:,]

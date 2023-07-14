@@ -3,16 +3,29 @@
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
 - [The Basics](#the-basics)
-  - [Prerequisites](#prerequisites)
-  - [Development](#development)
-  - [Project Structure](#project-structure)
-  - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
-    - [Rule naming convention](#rule-naming-convention)
-    - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
-  - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
+    - [Prerequisites](#prerequisites)
+    - [Development](#development)
+    - [Project Structure](#project-structure)
+    - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
+        - [Rule naming convention](#rule-naming-convention)
+        - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
+    - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
 - [MkDocs](#mkdocs)
 - [Release Process](#release-process)
-- [Benchmarks](#benchmarking-and-profiling)
+    - [Creating a new release](#creating-a-new-release)
+- [Ecosystem CI](#ecosystem-ci)
+- [Benchmarking and Profiling](#benchmarking-and-profiling)
+    - [CPython Benchmark](#cpython-benchmark)
+    - [Microbenchmarks](#microbenchmarks)
+        - [Benchmark-driven Development](#benchmark-driven-development)
+        - [PR Summary](#pr-summary)
+        - [Tips](#tips)
+    - [Profiling Projects](#profiling-projects)
+        - [Linux](#linux)
+        - [Mac](#mac)
+- [`cargo dev`](#cargo-dev)
+- [Subsystems](#subsystems)
+    - [Compilation Pipeline](#compilation-pipeline)
 
 ## The Basics
 
@@ -23,7 +36,10 @@ For small changes (e.g., bug fixes), feel free to submit a PR.
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
 You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
-community.
+community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
+and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
+that are ready for contributions.
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:
 [_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
@@ -33,6 +49,8 @@ existing Python plugins, which can be used as a reference implementation.
 As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/astral-sh/ruff/issues/848)
 plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi) for
 guidance.
+
+If you have suggestions on how we might improve the contributing documentation, [let us know](https://github.com/astral-sh/ruff/discussions/5693)!
 
 ### Prerequisites
 
@@ -96,19 +114,19 @@ At time of writing, the repository includes the following crates:
 - `crates/ruff_cache`: library crate for caching lint results.
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
 - `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
-  `cargo dev generate-all`).
+    `cargo dev generate-all`).
 - `crates/ruff_diagnostics`: library crate for the lint diagnostics APIs.
 - `crates/ruff_formatter`: library crate for generic code formatting logic based on an intermediate
-  representation.
+    representation.
 - `crates/ruff_index`: library crate inspired by `rustc_index`.
 - `crates/ruff_macros`: library crate containing macros used by Ruff.
 - `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
 - `crates/ruff_python_formatter`: library crate containing Python-specific code formatting logic.
 - `crates/ruff_python_semantic`: library crate containing Python-specific semantic analysis logic,
-  including Ruff's semantic model.
+    including Ruff's semantic model.
 - `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data.
 - `crates/ruff_python_whitespace`: library crate containing Python-specific whitespace analysis
-  logic.
+    logic.
 - `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
 - `crates/ruff_testing_macros`: library crate containing macros used for testing Ruff.
 - `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
@@ -119,21 +137,21 @@ At time of writing, the repository includes the following crates:
 At a high level, the steps involved in adding a new lint rule are as follows:
 
 1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
-   (e.g., `AssertFalse`, as in, "allow `assert False`").
+    (e.g., `AssertFalse`, as in, "allow `assert False`").
 
 1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-   `#[violation]` to see examples.
+    `#[violation]` to see examples.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
-   (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
-   an `ast::StmtAssert` node).
+    (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
+    an `ast::StmtAssert` node).
 
 1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for
-   AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
-   `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
-   `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
+    AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
+    `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
+    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
 
 1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `B011`).
 
@@ -166,13 +184,13 @@ suppression comment would be framed as "allow `assert False`".
 As such, rule names should...
 
 - Highlight the pattern that is being linted against, rather than the preferred alternative.
-  For example, `AssertFalse` guards against `assert False` statements.
+    For example, `AssertFalse` guards against `assert False` statements.
 
 - _Not_ contain instructions on how to fix the violation, which instead belong in the rule
-  documentation and the `autofix_title`.
+    documentation and the `autofix_title`.
 
 - _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
-  convention.
+    convention.
 
 When re-implementing rules from other linters, we prioritize adhering to this convention over
 preserving the original rule name.
@@ -187,25 +205,25 @@ Ruff's output for each fixture, which you can then commit alongside your changes
 Once you've completed the code for the rule itself, you can define tests with the following steps:
 
 1. Add a Python file to `crates/ruff/resources/test/fixtures/[linter]` that contains the code you
-   want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
-   examples of both violations and non-violations.
+    want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
+    examples of both violations and non-violations.
 
 1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
-   with the output (you see the violations you expect, and no others), proceed to the next step.
-   For example, if you're adding a new rule named `E402`, you would run:
+    with the output (you see the violations you expect, and no others), proceed to the next step.
+    For example, if you're adding a new rule named `E402`, you would run:
 
-   ```shell
-   cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
-   ```
+    ```shell
+    cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
+    ```
 
 1. Add the test to the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. If you're contributing
-   a rule to a pre-existing set, you should be able to find a similar example to pattern-match
-   against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
-   e.g., `crates/ruff/src/rules/flake8_bugbear/mod.rs`)
+    a rule to a pre-existing set, you should be able to find a similar example to pattern-match
+    against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
+    e.g., `crates/ruff/src/rules/flake8_bugbear/mod.rs`)
 
 1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
-   with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
-   then commit the snapshot file alongside the rest of your changes.
+    with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
+    then commit the snapshot file alongside the rest of your changes.
 
 1. Run `cargo test` again to ensure that your test passes.
 
@@ -243,21 +261,25 @@ To preview any changes to the documentation locally:
 
 1. Install MkDocs and Material for MkDocs with:
 
-   ```shell
-   pip install -r docs/requirements.txt
-   ```
+    ```shell
+    pip install -r docs/requirements.txt
+    ```
 
 1. Generate the MkDocs site with:
 
-   ```shell
-   python scripts/generate_mkdocs.py
-   ```
+    ```shell
+    python scripts/generate_mkdocs.py
+    ```
 
 1. Run the development server with:
 
-   ```shell
-   mkdocs serve
-   ```
+    ```shell
+    # For contributors.
+    mkdocs serve -f mkdocs.generated.yml
+
+    # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
+    mkdocs serve -f mkdocs.insiders.yml
+    ```
 
 The documentation should then be available locally at
 [http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
@@ -278,20 +300,19 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 1. Create a PR with the version and `BREAKING_CHANGES.md` updated
 1. Merge the PR
 1. Run the release workflow with the version number (without starting `v`) as input. Make sure
-   main has your merged PR as last commit
+    main has your merged PR as last commit
 1. The release workflow will do the following:
-   1. Build all the assets. If this fails (even though we tested in step 4), we haven’t tagged or
-      uploaded anything, you can restart after pushing a fix
-   1. Upload to pypi
-   1. Create and push the git tag (from pyproject.toml). We create the git tag only here
-      because we can't change it ([#4468](https://github.com/charliermarsh/ruff/issues/4468)), so
-      we want to make sure everything up to and including publishing to pypi worked.
-   1. Attach artifacts to draft GitHub release
-   1. Trigger downstream repositories. This can fail without causing fallout, it is possible (if
-      inconvenient) to trigger the downstream jobs manually
-1. Create release notes in GitHub UI and promote from draft to proper release(<https://github.com/charliermarsh/ruff/releases/new>)
+    1. Build all the assets. If this fails (even though we tested in step 4), we haven’t tagged or
+        uploaded anything, you can restart after pushing a fix.
+    1. Upload to PyPI.
+    1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
+        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/charliermarsh/ruff/issues/4468)).
+    1. Attach artifacts to draft GitHub release
+    1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
+        downstream jobs manually if needed.
+1. Create release notes in GitHub UI and promote from draft.
 1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py)
-1. If needed, update ruff-lsp and ruff-vscode
+1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
 
 ## Ecosystem CI
 
@@ -434,7 +455,7 @@ Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
   Range (min … max):   29.813 s … 30.356 s    10 runs
 ```
 
-## Microbenchmarks
+### Microbenchmarks
 
 The `ruff_benchmark` crate benchmarks the linter and the formatter on individual files.
 
@@ -444,7 +465,7 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
-### Benchmark driven Development
+#### Benchmark-driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
 `--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
@@ -459,7 +480,7 @@ cargo benchmark --save-baseline=main
 cargo benchmark --baseline=main
 ```
 
-### PR Summary
+#### PR Summary
 
 You can use `--save-baseline` and `critcmp` to get a pretty comparison between two recordings.
 This is useful to illustrate the improvements of a PR.
@@ -480,21 +501,21 @@ You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comp
 cargo install critcmp
 ```
 
-### Tips
+#### Tips
 
 - Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
-  to only run the pydantic tests.
+    to only run the pydantic tests.
 - Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo benchmark --quick` to get faster results (more prone to noise)
 
-## Profiling Projects
+### Profiling Projects
 
 You can either use the microbenchmarks from above or a project directory for benchmarking. There
 are a lot of profiling tools out there,
 [The Rust Performance Book](https://nnethercote.github.io/perf-book/profiling.html) lists some
 examples.
 
-### Linux
+#### Linux
 
 Install `perf` and build `ruff_benchmark` with the `release-debug` profile and then run it with perf
 
@@ -527,7 +548,7 @@ An alternative is to convert the perf data to `flamegraph.svg` using
 flamegraph --perfdata perf.data
 ```
 
-### Mac
+#### Mac
 
 Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
 
@@ -542,7 +563,179 @@ cargo instruments -t time --bench linter --profile release-debug -p ruff_benchma
 ```
 
 - `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc`
-  for profiling the allocations.
+    for profiling the allocations.
 - You may want to pass an additional filter to run a single test file
 
 Otherwise, follow the instructions from the linux section.
+
+## `cargo dev`
+
+`cargo dev` is a shortcut for `cargo run --package ruff_dev --bin ruff_dev`. You can run some useful
+utils with it:
+
+- `cargo dev print-ast <file>`: Print the AST of a python file using the
+    [RustPython parser](https://github.com/astral-sh/RustPython-Parser/tree/main/parser) that is
+    mainly used in Ruff. For `if True: pass # comment`, you can see the syntax tree, the byte offsets
+    for start and stop of each node and also how the `:` token, the comment and whitespace are not
+    represented anymore:
+
+```text
+[
+    If(
+        StmtIf {
+            range: 0..13,
+            test: Constant(
+                ExprConstant {
+                    range: 3..7,
+                    value: Bool(
+                        true,
+                    ),
+                    kind: None,
+                },
+            ),
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 9..13,
+                    },
+                ),
+            ],
+            orelse: [],
+        },
+    ),
+]
+```
+
+- `cargo dev print-tokens <file>`: Print the tokens that the AST is built upon. Again for
+    `if True: pass # comment`:
+
+```text
+0 If 2
+3 True 7
+7 Colon 8
+9 Pass 13
+14 Comment(
+    "# comment",
+) 23
+23 Newline 24
+```
+
+- `cargo dev print-cst <file>`: Print the CST of a python file using
+    [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
+    in Ruff. E.g. for `if True: pass # comment` everything including the whitespace is represented:
+
+```text
+Module {
+    body: [
+        Compound(
+            If(
+                If {
+                    test: Name(
+                        Name {
+                            value: "True",
+                            lpar: [],
+                            rpar: [],
+                        },
+                    ),
+                    body: SimpleStatementSuite(
+                        SimpleStatementSuite {
+                            body: [
+                                Pass(
+                                    Pass {
+                                        semicolon: None,
+                                    },
+                                ),
+                            ],
+                            leading_whitespace: SimpleWhitespace(
+                                " ",
+                            ),
+                            trailing_whitespace: TrailingWhitespace {
+                                whitespace: SimpleWhitespace(
+                                    " ",
+                                ),
+                                comment: Some(
+                                    Comment(
+                                        "# comment",
+                                    ),
+                                ),
+                                newline: Newline(
+                                    None,
+                                    Real,
+                                ),
+                            },
+                        },
+                    ),
+                    orelse: None,
+                    leading_lines: [],
+                    whitespace_before_test: SimpleWhitespace(
+                        " ",
+                    ),
+                    whitespace_after_test: SimpleWhitespace(
+                        "",
+                    ),
+                    is_elif: false,
+                },
+            ),
+        ),
+    ],
+    header: [],
+    footer: [],
+    default_indent: "    ",
+    default_newline: "\n",
+    has_trailing_newline: true,
+    encoding: "utf-8",
+}
+```
+
+- `cargo dev generate-all`: Update `ruff.schema.json`, `docs/configuration.md` and `docs/rules`.
+    You can also set `RUFF_UPDATE_SCHEMA=1` to update `ruff.schema.json` during `cargo test`.
+- `cargo dev generate-cli-help`, `cargo dev generate-docs` and `cargo dev generate-json-schema`:
+    Update just `docs/configuration.md`, `docs/rules` and `ruff.schema.json` respectively.
+- `cargo dev generate-options`: Generate a markdown-compatible table of all `pyproject.toml`
+    options. Used for <https://beta.ruff.rs/docs/settings/>
+- `cargo dev generate-rules-table`: Generate a markdown-compatible table of all rules. Used for <https://beta.ruff.rs/docs/rules/>
+- `cargo dev round-trip <python file or jupyter notebook>`: Read a Python file or Jupyter Notebook,
+    parse it, serialize the parsed representation and write it back. Used to check how good our
+    representation is so that fixes don't rewrite irrelevant parts of a file.
+- `cargo dev format_dev`: See ruff_python_formatter README.md
+
+## Subsystems
+
+### Compilation Pipeline
+
+If we view Ruff as a compiler, in which the inputs are paths to Python files and the outputs are
+diagnostics, then our current compilation pipeline proceeds as follows:
+
+1. **File discovery**: Given paths like `foo/`, locate all Python files in any specified subdirectories, taking into account our hierarchical settings system and any `exclude` options.
+
+1. **Package resolution**: Determine the “package root” for every file by traversing over its parent directories and looking for `__init__.py` files.
+
+1. **Cache initialization**: For every “package root”, initialize an empty cache.
+
+1. **Analysis**: For every file, in parallel:
+
+    1. **Cache read**: If the file is cached (i.e., its modification timestamp hasn't changed since it was last analyzed), short-circuit, and return the cached diagnostics.
+
+    1. **Tokenization**: Run the lexer over the file to generate a token stream.
+
+    1. **Indexing**: Extract metadata from the token stream, such as: comment ranges, `# noqa` locations, `# isort: off` locations, “doc lines”, etc.
+
+    1. **Token-based rule evaluation**: Run any lint rules that are based on the contents of the token stream (e.g., commented-out code).
+
+    1. **Filesystem-based rule evaluation**: Run any lint rules that are based on the contents of the filesystem (e.g., lack of `__init__.py` file in a package).
+
+    1. **Logical line-based rule evaluation**: Run any lint rules that are based on logical lines (e.g., stylistic rules).
+
+    1. **Parsing**: Run the parser over the token stream to produce an AST. (This consumes the token stream, so anything that relies on the token stream needs to happen before parsing.)
+
+    1. **AST-based rule evaluation**: Run any lint rules that are based on the AST. This includes the vast majority of lint rules. As part of this step, we also build the semantic model for the current file as we traverse over the AST. Some lint rules are evaluated eagerly, as we iterate over the AST, while others are evaluated in a deferred manner (e.g., unused imports, since we can’t determine whether an import is unused until we’ve finished analyzing the entire file), after we’ve finished the initial traversal.
+
+    1. **Import-based rule evaluation**: Run any lint rules that are based on the module’s imports (e.g., import sorting). These could, in theory, be included in the AST-based rule evaluation phase — they’re just separated for simplicity.
+
+    1. **Physical line-based rule evaluation**: Run any lint rules that are based on physical lines (e.g., line-length).
+
+    1. **Suppression enforcement**: Remove any violations that are suppressed via `# noqa` directives or `per-file-ignores`.
+
+    1. **Cache write**: Write the generated diagnostics to the package cache using the file as a key.
+
+1. **Reporting**: Print diagnostics in the specified format (text, JSON, etc.), to the specified output channel (stdout, a file, etc.).

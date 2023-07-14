@@ -4,9 +4,18 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
-// By default, ignore the `namedtuple` methods and attributes, which are underscore-prefixed to
-// prevent conflicts with field names.
-const IGNORE_NAMES: [&str; 5] = ["_make", "_asdict", "_replace", "_fields", "_field_defaults"];
+// By default, ignore the `namedtuple` methods and attributes, as well as the
+// _sunder_ names in Enum, which are underscore-prefixed to prevent conflicts
+// with field names.
+const IGNORE_NAMES: [&str; 7] = [
+    "_make",
+    "_asdict",
+    "_replace",
+    "_fields",
+    "_field_defaults",
+    "_name_",
+    "_value_",
+];
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
@@ -19,7 +28,7 @@ const IGNORE_NAMES: [&str; 5] = ["_make", "_asdict", "_replace", "_fields", "_fi
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
-        default = r#"["_make", "_asdict", "_replace", "_fields", "_field_defaults"]"#,
+        default = r#"["_make", "_asdict", "_replace", "_fields", "_field_defaults", "_name_", "_value_"]"#,
         value_type = "list[str]",
         example = r#"
             ignore-names = ["_new"]

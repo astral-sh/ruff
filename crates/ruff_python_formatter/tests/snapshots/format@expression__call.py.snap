@@ -96,7 +96,7 @@ f(
 
 ## Output
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from unittest.mock import MagicMock
 
 
 def f(*args, **kwargs):
@@ -154,10 +154,8 @@ f(
 
 # TODO(konstin): Call chains/fluent interface (https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#call-chains)
 result = session.query(models.Customer.id).filter(
-    models.Customer.account_id
-    == 10000,
-    models.Customer.email
-    == "user@example.org",
+    models.Customer.account_id == 10000,
+    models.Customer.email == "user@example.org",
 ).order_by(models.Customer.id.asc()).all()
 # TODO(konstin): Black has this special case for comment placement where everything stays in one line
 f("aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa")

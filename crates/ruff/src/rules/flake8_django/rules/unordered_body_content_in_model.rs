@@ -156,7 +156,7 @@ pub(crate) fn unordered_body_content_in_model(
     // Track all the element types we've seen so far.
     let mut element_types = Vec::new();
     let mut prev_element_type = None;
-    for element in body.iter() {
+    for element in body {
         let Some(element_type) = get_element_type(element, checker.semantic()) else {
             continue;
         };

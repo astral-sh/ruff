@@ -45,12 +45,14 @@ strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 syn = { version = "2.0.15" }
 test-case = { version = "3.0.0" }
+thiserror = { version = "1.0.43" }
 toml = { version = "0.7.2" }
+wsl = { version = "0.1.0" }
 
-# v0.0.1
-libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e5beb532fdd1e209ad2dbb470438" }
+# v1.0.1
+libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "3cacca1a1029f05707e50703b49fe3dd860aa839", default-features = false }
 
-# Please tag the RustPython version everytime you update its revision here and in fuzz/Cargo.toml
+# Please tag the RustPython version every time you update its revision here and in fuzz/Cargo.toml
 # Tagging the version ensures that older ruff versions continue to build from source even when we rebase our RustPython fork.
 # Current tag: v0.0.7
 ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "c174bbf1f29527edd43d432326327f16f47ab9e0" }

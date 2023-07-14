@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
+use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
 
 use log::debug;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -210,20 +211,20 @@ pub(crate) fn categorize_imports<'a>(
 #[derive(Debug, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
-    known: FxHashMap<String, ImportSection>,
+    known: Vec<(glob::Pattern, ImportSection)>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
 
 impl KnownModules {
     pub(crate) fn new(
-        first_party: Vec<String>,
-        third_party: Vec<String>,
-        local_folder: Vec<String>,
-        standard_library: Vec<String>,
-        user_defined: FxHashMap<String, Vec<String>>,
+        first_party: Vec<glob::Pattern>,
+        third_party: Vec<glob::Pattern>,
+        local_folder: Vec<glob::Pattern>,
+        standard_library: Vec<glob::Pattern>,
+        user_defined: FxHashMap<String, Vec<glob::Pattern>>,
     ) -> Self {
-        let modules = user_defined
+        let known: Vec<(glob::Pattern, ImportSection)> = user_defined
             .into_iter()
             .flat_map(|(section, modules)| {
                 modules
@@ -249,19 +250,23 @@ impl KnownModules {
                 standard_library
                     .into_iter()
                     .map(|module| (module, ImportSection::Known(ImportType::StandardLibrary))),
-            );
+            )
+            .collect();
 
-        let mut known = FxHashMap::with_capacity_and_hasher(
-            modules.size_hint().0,
-            std::hash::BuildHasherDefault::default(),
-        );
-        modules.for_each(|(module, section)| {
-            if known.insert(module, section).is_some() {
-                warn_user_once!("One or more modules are part of multiple import sections.");
+        // Warn in the case of duplicate modules.
+        let mut seen =
+            FxHashSet::with_capacity_and_hasher(known.len(), BuildHasherDefault::default());
+        for (module, _) in &known {
+            if !seen.insert(module) {
+                warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");
+                break;
             }
-        });
+        }
 
-        let has_submodules = known.keys().any(|module| module.contains('.'));
+        // Check if any of the known modules are submodules.
+        let has_submodules = known
+            .iter()
+            .any(|(module, _)| module.as_str().contains('.'));
 
         Self {
             known,
@@ -296,31 +301,37 @@ impl KnownModules {
     }
 
     fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason)> {
-        if let Some(section) = self.known.get(submodule) {
-            let reason = match section {
-                ImportSection::UserDefined(_) => Reason::UserDefinedSection,
-                ImportSection::Known(ImportType::FirstParty) => Reason::KnownFirstParty,
-                ImportSection::Known(ImportType::ThirdParty) => Reason::KnownThirdParty,
-                ImportSection::Known(ImportType::LocalFolder) => Reason::KnownLocalFolder,
-                ImportSection::Known(ImportType::StandardLibrary) => Reason::ExtraStandardLibrary,
-                ImportSection::Known(ImportType::Future) => {
-                    unreachable!("__future__ imports are not known")
-                }
-            };
-            Some((section, reason))
-        } else {
-            None
-        }
+        let section = self.known.iter().find_map(|(pattern, section)| {
+            if pattern.matches(submodule) {
+                Some(section)
+            } else {
+                None
+            }
+        })?;
+        let reason = match section {
+            ImportSection::UserDefined(_) => Reason::UserDefinedSection,
+            ImportSection::Known(ImportType::FirstParty) => Reason::KnownFirstParty,
+            ImportSection::Known(ImportType::ThirdParty) => Reason::KnownThirdParty,
+            ImportSection::Known(ImportType::LocalFolder) => Reason::KnownLocalFolder,
+            ImportSection::Known(ImportType::StandardLibrary) => Reason::ExtraStandardLibrary,
+            ImportSection::Known(ImportType::Future) => {
+                unreachable!("__future__ imports are not known")
+            }
+        };
+        Some((section, reason))
     }
 
     /// Return the list of modules that are known to be of a given type.
-    pub(crate) fn modules_for_known_type(&self, import_type: ImportType) -> Vec<String> {
+    pub(crate) fn modules_for_known_type(
+        &self,
+        import_type: ImportType,
+    ) -> impl Iterator<Item = &glob::Pattern> {
         self.known
             .iter()
-            .filter_map(|(module, known_section)| {
+            .filter_map(move |(module, known_section)| {
                 if let ImportSection::Known(section) = known_section {
                     if *section == import_type {
-                        Some(module.clone())
+                        Some(module)
                     } else {
                         None
                     }
@@ -328,18 +339,17 @@ impl KnownModules {
                     None
                 }
             })
-            .collect()
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub(crate) fn user_defined(&self) -> FxHashMap<String, Vec<String>> {
-        let mut user_defined: FxHashMap<String, Vec<String>> = FxHashMap::default();
+    pub(crate) fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
+        let mut user_defined: FxHashMap<&str, Vec<&glob::Pattern>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined
-                    .entry(section_name.clone())
+                    .entry(section_name.as_str())
                     .or_default()
-                    .push(module.clone());
+                    .push(module);
             }
         }
         user_defined

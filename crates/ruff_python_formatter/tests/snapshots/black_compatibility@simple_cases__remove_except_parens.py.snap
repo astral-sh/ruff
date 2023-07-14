@@ -47,55 +47,17 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 ```diff
 --- Black
 +++ Ruff
-@@ -2,7 +2,7 @@
- try:
-     a.something
- except AttributeError as err:
--    raise err
-+    NOT_YET_IMPLEMENTED_StmtRaise
- 
- # This is tuple of exceptions.
- # Although this could be replaced with just the exception,
-@@ -10,28 +10,26 @@
- try:
-     a.something
- except (AttributeError,) as err:
--    raise err
-+    NOT_YET_IMPLEMENTED_StmtRaise
- 
- # This is a tuple of exceptions. Do not remove brackets.
- try:
-     a.something
- except (AttributeError, ValueError) as err:
--    raise err
-+    NOT_YET_IMPLEMENTED_StmtRaise
- 
+@@ -21,9 +21,7 @@
  # Test long variants.
  try:
      a.something
 -except (
 -    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error
 -) as err:
--    raise err
 +except some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error as err:
-+    NOT_YET_IMPLEMENTED_StmtRaise
+     raise err
  
  try:
-     a.something
- except (
-     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
- ) as err:
--    raise err
-+    NOT_YET_IMPLEMENTED_StmtRaise
- 
- try:
-     a.something
-@@ -39,4 +37,4 @@
-     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
- ) as err:
--    raise err
-+    NOT_YET_IMPLEMENTED_StmtRaise
 ```
 
 ## Ruff Output
@@ -105,7 +67,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 try:
     a.something
 except AttributeError as err:
-    NOT_YET_IMPLEMENTED_StmtRaise
+    raise err
 
 # This is tuple of exceptions.
 # Although this could be replaced with just the exception,
@@ -113,26 +75,26 @@ except AttributeError as err:
 try:
     a.something
 except (AttributeError,) as err:
-    NOT_YET_IMPLEMENTED_StmtRaise
+    raise err
 
 # This is a tuple of exceptions. Do not remove brackets.
 try:
     a.something
 except (AttributeError, ValueError) as err:
-    NOT_YET_IMPLEMENTED_StmtRaise
+    raise err
 
 # Test long variants.
 try:
     a.something
 except some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error as err:
-    NOT_YET_IMPLEMENTED_StmtRaise
+    raise err
 
 try:
     a.something
 except (
     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
 ) as err:
-    NOT_YET_IMPLEMENTED_StmtRaise
+    raise err
 
 try:
     a.something
@@ -140,7 +102,7 @@ except (
     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
 ) as err:
-    NOT_YET_IMPLEMENTED_StmtRaise
+    raise err
 ```
 
 ## Black Output

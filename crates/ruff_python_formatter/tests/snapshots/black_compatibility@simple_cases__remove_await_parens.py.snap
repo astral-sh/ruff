@@ -93,13 +93,7 @@ async def main():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,4 @@
--import asyncio
-+NOT_YET_IMPLEMENTED_StmtImport
- 
- 
- # Control example
-@@ -8,59 +8,70 @@
+@@ -8,28 +8,33 @@
  
  # Remove brackets for short coroutine/task
  async def main():
@@ -128,10 +122,8 @@ async def main():
  
  async def main():
 -    await asyncio.sleep(1)  # Hello
-+    (
-+        await (
-+            asyncio.sleep(1)  # Hello
-+        )
++    await (
++        asyncio.sleep(1)  # Hello
 +    )
  
  
@@ -141,50 +133,7 @@ async def main():
  
  
  # Long lines
- async def main():
--    await asyncio.gather(
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
-+    (
-+        await asyncio.gather(
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+        )
-     )
- 
- 
- # Same as above but with magic trailing comma in function
- async def main():
--    await asyncio.gather(
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
--        asyncio.sleep(1),
-+    (
-+        await asyncio.gather(
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+            asyncio.sleep(1),
-+        )
-     )
- 
+@@ -60,7 +65,7 @@
  
  # Cr@zY Br@ck3Tz
  async def main():
@@ -193,7 +142,7 @@ async def main():
  
  
  # Keep brackets around non power operations and nested awaits
-@@ -78,16 +89,16 @@
+@@ -78,16 +83,16 @@
  
  
  async def main():
@@ -219,7 +168,7 @@ async def main():
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImport
+import asyncio
 
 
 # Control example
@@ -249,10 +198,8 @@ async def main():
 
 
 async def main():
-    (
-        await (
-            asyncio.sleep(1)  # Hello
-        )
+    await (
+        asyncio.sleep(1)  # Hello
     )
 
 
@@ -262,31 +209,27 @@ async def main():
 
 # Long lines
 async def main():
-    (
-        await asyncio.gather(
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-        )
+    await asyncio.gather(
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
     )
 
 
 # Same as above but with magic trailing comma in function
 async def main():
-    (
-        await asyncio.gather(
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-            asyncio.sleep(1),
-        )
+    await asyncio.gather(
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
+        asyncio.sleep(1),
     )
 
 

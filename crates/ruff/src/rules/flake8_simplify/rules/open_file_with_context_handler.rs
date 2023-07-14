@@ -107,32 +107,34 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
 
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
-    if checker
-        .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["", "open"])
-        })
-    {
-        if checker.semantic().is_builtin("open") {
-            // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.semantic().stmt(), Stmt::With(_)) {
-                return;
-            }
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
+        return;
+    };
 
-            // Ex) `with contextlib.ExitStack() as exit_stack: ...`
-            if match_exit_stack(checker.semantic()) {
-                return;
-            }
-
-            // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
-            if match_async_exit_stack(checker.semantic()) {
-                return;
-            }
-
-            checker
-                .diagnostics
-                .push(Diagnostic::new(OpenFileWithContextHandler, func.range()));
-        }
+    if id.as_str() != "open" {
+        return;
     }
+
+    // Ex) `with open("foo.txt") as f: ...`
+    if checker.semantic().stmt().is_with_stmt() {
+        return;
+    }
+
+    if !checker.semantic().is_builtin("open") {
+        return;
+    }
+
+    // Ex) `with contextlib.ExitStack() as exit_stack: ...`
+    if match_exit_stack(checker.semantic()) {
+        return;
+    }
+
+    // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
+    if match_async_exit_stack(checker.semantic()) {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(OpenFileWithContextHandler, func.range()));
 }

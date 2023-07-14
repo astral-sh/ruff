@@ -3,12 +3,13 @@ use std::str::FromStr;
 use anyhow::{anyhow, Result};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
+use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -36,7 +37,7 @@ use crate::registry::Rule;
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct RedundantOpenModes {
-    pub replacement: Option<String>,
+    replacement: Option<String>,
 }
 
 impl AlwaysAutofixableViolation for RedundantOpenModes {
@@ -62,10 +63,78 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
     }
 }
 
+/// UP015
+pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
+    let Some((mode_param, keywords)) = match_open(expr, checker.semantic()) else {
+        return;
+    };
+    match mode_param {
+        None => {
+            if !keywords.is_empty() {
+                if let Some(keyword) = find_keyword(keywords, MODE_KEYWORD_ARGUMENT) {
+                    if let Expr::Constant(ast::ExprConstant {
+                        value: Constant::Str(mode_param_value),
+                        ..
+                    }) = &keyword.value
+                    {
+                        if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
+                            checker.diagnostics.push(create_check(
+                                expr,
+                                &keyword.value,
+                                mode.replacement_value(),
+                                checker.locator,
+                                checker.patch(Rule::RedundantOpenModes),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        Some(mode_param) => {
+            if let Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(value),
+                ..
+            }) = &mode_param
+            {
+                if let Ok(mode) = OpenMode::from_str(value.as_str()) {
+                    checker.diagnostics.push(create_check(
+                        expr,
+                        mode_param,
+                        mode.replacement_value(),
+                        checker.locator,
+                        checker.patch(Rule::RedundantOpenModes),
+                    ));
+                }
+            }
+        }
+    }
+}
+
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
 
-#[derive(Copy, Clone)]
+fn match_open<'a>(
+    expr: &'a Expr,
+    model: &SemanticModel,
+) -> Option<(Option<&'a Expr>, &'a [Keyword])> {
+    let ast::ExprCall {
+        func,
+        args,
+        keywords,
+        range: _,
+    } = expr.as_call_expr()?;
+
+    let ast::ExprName { id, .. } = func.as_name_expr()?;
+
+    if id.as_str() == OPEN_FUNC_NAME && model.is_builtin(id) {
+        // Return the "open mode" parameter and keywords.
+        Some((args.get(1), keywords))
+    } else {
+        None
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 enum OpenMode {
     U,
     Ur,
@@ -105,22 +174,6 @@ impl OpenMode {
             Self::Wt => Some("\"w\""),
         }
     }
-}
-
-fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
-    if let Expr::Call(ast::ExprCall {
-        func,
-        args,
-        keywords,
-        range: _,
-    }) = expr
-    {
-        if matches!(func.as_ref(), Expr::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
-            // Return the "open mode" parameter and keywords.
-            return (args.get(1), keywords.clone());
-        }
-    }
-    (None, vec![])
 }
 
 fn create_check(
@@ -168,15 +221,15 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
             fix_end = Some(range.end());
             break;
         }
-        if delete_first_arg && matches!(tok, Tok::Name { .. }) {
+        if delete_first_arg && tok.is_name() {
             fix_end = Some(range.start());
             break;
         }
-        if matches!(tok, Tok::Lpar) {
+        if tok.is_lpar() {
             is_first_arg = true;
             fix_start = Some(range.end());
         }
-        if matches!(tok, Tok::Comma) {
+        if tok.is_comma() {
             is_first_arg = false;
             if !delete_first_arg {
                 fix_start = Some(range.start());
@@ -188,49 +241,5 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
         _ => Err(anyhow::anyhow!(
             "Failed to locate start and end parentheses"
         )),
-    }
-}
-
-/// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
-    // If `open` has been rebound, skip this check entirely.
-    if !checker.semantic().is_builtin(OPEN_FUNC_NAME) {
-        return;
-    }
-    let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
-    if mode_param.is_none() && !keywords.is_empty() {
-        if let Some(keyword) = find_keyword(&keywords, MODE_KEYWORD_ARGUMENT) {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(mode_param_value),
-                ..
-            }) = &keyword.value
-            {
-                if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                    checker.diagnostics.push(create_check(
-                        expr,
-                        &keyword.value,
-                        mode.replacement_value(),
-                        checker.locator,
-                        checker.patch(Rule::RedundantOpenModes),
-                    ));
-                }
-            }
-        }
-    } else if let Some(mode_param) = mode_param {
-        if let Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(mode_param_value),
-            ..
-        }) = &mode_param
-        {
-            if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                checker.diagnostics.push(create_check(
-                    expr,
-                    mode_param,
-                    mode.replacement_value(),
-                    checker.locator,
-                    checker.patch(Rule::RedundantOpenModes),
-                ));
-            }
-        }
     }
 }

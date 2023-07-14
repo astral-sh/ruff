@@ -130,12 +130,6 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,4 @@
--from typing import Any, Tuple
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
- 
- def f(
 @@ -49,9 +49,7 @@
      element = 0  # type: int
      another_element = 1  # type: float
@@ -147,7 +141,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
  
      tup = (
-@@ -100,19 +98,32 @@
+@@ -100,19 +98,30 @@
      )
  
      c = call(
@@ -183,16 +177,13 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +    ],  # type: ignore
  )
  
--aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-+aaaaaaaaaaaaa, bbbbbbbbb = map(
-+    list, map(itertools.chain.from_iterable, zip(*NOT_YET_IMPLEMENTED_ExprStarred))
-+)  # type: ignore[arg-type]
+ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from typing import Any, Tuple
 
 
 def f(
@@ -318,9 +309,7 @@ call_to_some_function_asdf(
     ],  # type: ignore
 )
 
-aaaaaaaaaaaaa, bbbbbbbbb = map(
-    list, map(itertools.chain.from_iterable, zip(*NOT_YET_IMPLEMENTED_ExprStarred))
-)  # type: ignore[arg-type]
+aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 ```
 
 ## Black Output

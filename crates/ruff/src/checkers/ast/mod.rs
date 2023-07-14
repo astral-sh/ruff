@@ -18,7 +18,7 @@ use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
-use ruff_python_ast::{cast, helpers, identifier, str, visitor};
+use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
@@ -251,9 +251,8 @@ where
         // Pre-visit.
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
-                    for (name, range) in names.iter().zip(ranges.iter()) {
+                    for name in names {
                         if let Some(binding_id) = self.semantic.global_scope().get(name) {
                             // Mark the binding in the global scope as "rebound" in the current scope.
                             self.semantic
@@ -262,7 +261,7 @@ where
 
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
-                            *range,
+                            name.range(),
                             BindingKind::Global,
                             BindingFlags::GLOBAL,
                         );
@@ -272,21 +271,19 @@ where
                 }
 
                 if self.enabled(Rule::AmbiguousVariableName) {
-                    self.diagnostics
-                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            pycodestyle::rules::ambiguous_variable_name(name, *range)
-                        }));
+                    self.diagnostics.extend(names.iter().filter_map(|name| {
+                        pycodestyle::rules::ambiguous_variable_name(name, name.range())
+                    }));
                 }
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
-                    for (name, range) in names.iter().zip(ranges.iter()) {
+                    for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
                             // Mark the binding as "used".
                             self.semantic.add_local_reference(
                                 binding_id,
-                                *range,
+                                name.range(),
                                 ExecutionContext::Runtime,
                             );
 
@@ -297,7 +294,7 @@ where
 
                             // Add a binding to the current scope.
                             let binding_id = self.semantic.push_binding(
-                                *range,
+                                name.range(),
                                 BindingKind::Nonlocal(scope_id),
                                 BindingFlags::NONLOCAL,
                             );
@@ -309,17 +306,16 @@ where
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
                                     },
-                                    *range,
+                                    name.range(),
                                 ));
                             }
                         }
                     }
                 }
                 if self.enabled(Rule::AmbiguousVariableName) {
-                    self.diagnostics
-                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            pycodestyle::rules::ambiguous_variable_name(name, *range)
-                        }));
+                    self.diagnostics.extend(names.iter().filter_map(|name| {
+                        pycodestyle::rules::ambiguous_variable_name(name, name.range())
+                    }));
                 }
             }
             Stmt::Break(_) => {
@@ -438,6 +434,17 @@ where
                     }
                     if self.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                         flake8_pyi::rules::no_return_argument_annotation(self, args);
+                    }
+                    if self.enabled(Rule::BadExitAnnotation) {
+                        flake8_pyi::rules::bad_exit_annotation(
+                            self,
+                            stmt.is_async_function_def_stmt(),
+                            name,
+                            args,
+                        );
+                    }
+                    if self.enabled(Rule::RedundantNumericUnion) {
+                        flake8_pyi::rules::redundant_numeric_union(self, args);
                     }
                 }
                 if self.enabled(Rule::DunderFunctionName) {
@@ -619,6 +626,11 @@ where
                         );
                     }
                 }
+                #[cfg(feature = "unreachable-code")]
+                if self.enabled(Rule::UnreachableCode) {
+                    self.diagnostics
+                        .extend(ruff::rules::unreachable::in_function(name, body));
+                }
             }
             Stmt::Return(_) => {
                 if self.enabled(Rule::ReturnOutsideFunction) {
@@ -771,7 +783,7 @@ where
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt, self.locator);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for name in names.iter() {
+                    for name in names {
                         if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
@@ -967,7 +979,7 @@ where
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt, self.locator);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for name in names.iter() {
+                    for name in names {
                         if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
@@ -1612,7 +1624,7 @@ where
                     flake8_bandit::rules::assign_hardcoded_password_string(self, value, targets);
                 }
                 if self.enabled(Rule::GlobalStatement) {
-                    for target in targets.iter() {
+                    for target in targets {
                         if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
@@ -1649,6 +1661,15 @@ where
                     {
                         self.diagnostics.push(diagnostic);
                     }
+                }
+                if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
+                    pylint::rules::type_param_name_mismatch(self, value, targets);
+                }
+                if self.settings.rules.enabled(Rule::TypeNameIncorrectVariance) {
+                    pylint::rules::type_name_incorrect_variance(self, value);
+                }
+                if self.settings.rules.enabled(Rule::TypeBivariance) {
+                    pylint::rules::type_bivariance(self, value);
                 }
                 if self.is_stub {
                     if self.any_enabled(&[
@@ -1735,7 +1756,7 @@ where
             }
             Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 if self.enabled(Rule::GlobalStatement) {
-                    for target in targets.iter() {
+                    for target in targets {
                         if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
@@ -1770,7 +1791,6 @@ where
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
-                name,
                 args,
                 decorator_list,
                 returns,
@@ -1778,7 +1798,6 @@ where
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 body,
-                name,
                 args,
                 decorator_list,
                 returns,
@@ -1802,7 +1821,7 @@ where
                 {
                     if let Some(expr) = &arg_with_default.def.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1814,7 +1833,7 @@ where
                 if let Some(arg) = &args.vararg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1823,7 +1842,7 @@ where
                 if let Some(arg) = &args.kwarg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_type_definition(expr);
+                            self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1831,18 +1850,11 @@ where
                 }
                 for expr in returns {
                     if runtime_annotation {
-                        self.visit_type_definition(expr);
+                        self.visit_runtime_annotation(expr);
                     } else {
                         self.visit_annotation(expr);
                     };
                 }
-
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::FunctionDefinition,
-                    BindingFlags::empty(),
-                );
 
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Function,
@@ -1990,7 +2002,7 @@ where
                 };
 
                 if runtime_annotation {
-                    self.visit_type_definition(annotation);
+                    self.visit_runtime_annotation(annotation);
                 } else {
                     self.visit_annotation(annotation);
                 }
@@ -2053,19 +2065,28 @@ where
 
         // Post-visit.
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
-                self.deferred.scopes.push(self.semantic.scope_id);
-                self.semantic.pop_scope();
-                self.semantic.pop_definition();
-            }
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                self.deferred.scopes.push(self.semantic.scope_id);
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
                 self.add_binding(
                     name,
                     stmt.identifier(),
-                    BindingKind::ClassDefinition,
+                    BindingKind::FunctionDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
+            }
+            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
+                self.semantic.pop_scope();
+                self.semantic.pop_definition();
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::ClassDefinition(scope_id),
                     BindingFlags::empty(),
                 );
             }
@@ -2078,7 +2099,7 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let flags_snapshot = self.semantic.flags;
-        self.semantic.flags |= SemanticModelFlags::ANNOTATION;
+        self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
     }
@@ -2128,7 +2149,7 @@ where
 
         // Pre-visit.
         match expr {
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.any_enabled(&[
                     Rule::FutureRewritableTypeAnnotation,
@@ -2137,7 +2158,8 @@ where
                     if let Some(operator) = typing::to_pep604_operator(value, slice, &self.semantic)
                     {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py310
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -2149,7 +2171,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP604Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py310
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2165,7 +2188,8 @@ where
 
                 // Ex) list[...]
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py39
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py39
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                         && typing::is_pep585_generic(value, &self.semantic)
@@ -2175,6 +2199,28 @@ where
                             expr,
                             flake8_future_annotations::rules::Reason::PEP585,
                         );
+                    }
+                }
+
+                // Ex) Union[...]
+                if self.any_enabled(&[Rule::UnnecessaryLiteralUnion, Rule::DuplicateUnionMember]) {
+                    // Determine if the current expression is an union
+                    // Avoid duplicate checks if the parent is an `Union[...]` since these rules traverse nested unions
+                    let is_unchecked_union = self
+                        .semantic
+                        .expr_grandparent()
+                        .and_then(Expr::as_subscript_expr)
+                        .map_or(true, |parent| {
+                            !self.semantic.match_typing_expr(&parent.value, "Union")
+                        });
+
+                    if is_unchecked_union {
+                        if self.enabled(Rule::UnnecessaryLiteralUnion) {
+                            flake8_pyi::rules::unnecessary_literal_union(self, expr);
+                        }
+                        if self.enabled(Rule::DuplicateUnionMember) {
+                            flake8_pyi::rules::duplicate_union_member(self, expr);
+                        }
                     }
                 }
 
@@ -2191,6 +2237,13 @@ where
                 }
                 if self.enabled(Rule::UncapitalizedEnvironmentVariables) {
                     flake8_simplify::rules::use_capital_environment_variables(self, expr);
+                }
+                if self.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
+                    ruff::rules::unnecessary_iterable_allocation_for_first_element(self, subscript);
+                }
+
+                if self.enabled(Rule::InvalidIndexType) {
+                    ruff::rules::invalid_index_type(self, subscript);
                 }
 
                 pandas_vet::rules::subscript(self, value, expr);
@@ -2247,19 +2300,21 @@ where
                                 typing::to_pep585_generic(expr, &self.semantic)
                             {
                                 if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                    if self.settings.target_version < PythonVersion::Py39
+                                    if !self.is_stub
+                                        && self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic.future_annotations()
                                         && self.semantic.in_annotation()
                                         && !self.settings.pyupgrade.keep_runtime_typing
                                     {
                                         flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                            self, expr,
-                                        );
+                                                self, expr,
+                                            );
                                     }
                                 }
                                 if self.enabled(Rule::NonPEP585Annotation) {
-                                    if self.settings.target_version >= PythonVersion::Py39
+                                    if self.is_stub
+                                        || self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
                                             && self.semantic.future_annotations()
                                             && self.semantic.in_annotation()
@@ -2324,7 +2379,8 @@ where
                 ]) {
                     if let Some(replacement) = typing::to_pep585_generic(expr, &self.semantic) {
                         if self.enabled(Rule::FutureRewritableTypeAnnotation) {
-                            if self.settings.target_version < PythonVersion::Py39
+                            if !self.is_stub
+                                && self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic.future_annotations()
                                 && self.semantic.in_annotation()
@@ -2336,7 +2392,8 @@ where
                             }
                         }
                         if self.enabled(Rule::NonPEP585Annotation) {
-                            if self.settings.target_version >= PythonVersion::Py39
+                            if self.is_stub
+                                || self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.semantic.future_annotations()
                                     && self.semantic.in_annotation()
@@ -2380,12 +2437,14 @@ where
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords,
-                range: _,
-            }) => {
+            Expr::Call(
+                call @ ast::ExprCall {
+                    func,
+                    args,
+                    keywords,
+                    range: _,
+                },
+            ) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = self.semantic.scope_mut();
@@ -2409,19 +2468,19 @@ where
                     if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                         let attr = attr.as_str();
                         if let Expr::Constant(ast::ExprConstant {
-                            value: Constant::Str(value),
+                            value: Constant::Str(val),
                             ..
                         }) = value.as_ref()
                         {
                             if attr == "join" {
                                 // "...".join(...) call
                                 if self.enabled(Rule::StaticJoinToFString) {
-                                    flynt::rules::static_join_to_fstring(self, expr, value);
+                                    flynt::rules::static_join_to_fstring(self, expr, val);
                                 }
                             } else if attr == "format" {
                                 // "...".format(...) call
                                 let location = expr.range();
-                                match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
+                                match pyflakes::format::FormatSummary::try_from(val.as_ref()) {
                                     Err(e) => {
                                         if self.enabled(Rule::StringDotFormatInvalidFormat) {
                                             self.diagnostics.push(Diagnostic::new(
@@ -2465,7 +2524,13 @@ where
                                         }
 
                                         if self.enabled(Rule::FString) {
-                                            pyupgrade::rules::f_strings(self, &summary, expr);
+                                            pyupgrade::rules::f_strings(
+                                                self,
+                                                &summary,
+                                                expr,
+                                                value,
+                                                self.settings.line_length,
+                                            );
                                         }
                                     }
                                 }
@@ -2503,10 +2568,10 @@ where
                 if self.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);
                 }
-                if self.enabled(Rule::NonPEP604Isinstance)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                if self.enabled(Rule::NonPEP604Isinstance) {
+                    if self.settings.target_version >= PythonVersion::Py310 {
+                        pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                    }
                 }
                 if self.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                     flake8_async::rules::blocking_http_call(self, expr);
@@ -2545,6 +2610,9 @@ where
                 ]) {
                     flake8_bandit::rules::suspicious_function_call(self, expr);
                 }
+                if self.enabled(Rule::ReSubPositionalArgs) {
+                    flake8_bugbear::rules::re_sub_positional_args(self, call);
+                }
                 if self.enabled(Rule::UnreliableCallableCheck) {
                     flake8_bugbear::rules::unreliable_callable_check(self, expr, func, args);
                 }
@@ -2579,9 +2647,7 @@ where
                     flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
                 }
                 if self.enabled(Rule::ExecBuiltin) {
-                    if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_bandit::rules::exec_used(self, func);
                 }
                 if self.enabled(Rule::BadFilePermissions) {
                     flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
@@ -2706,7 +2772,7 @@ where
                 }
                 if self.enabled(Rule::UnnecessaryDoubleCastOrProcess) {
                     flake8_comprehensions::rules::unnecessary_double_cast_or_process(
-                        self, expr, func, args,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.enabled(Rule::UnnecessarySubscriptReversal) {
@@ -3112,7 +3178,8 @@ where
             }) => {
                 // Ex) `str | None`
                 if self.enabled(Rule::FutureRequiredTypeAnnotation) {
-                    if self.settings.target_version < PythonVersion::Py310
+                    if !self.is_stub
+                        && self.settings.target_version < PythonVersion::Py310
                         && !self.semantic.future_annotations()
                         && self.semantic.in_annotation()
                     {
@@ -3123,21 +3190,25 @@ where
                         );
                     }
                 }
-
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic.in_type_definition()
-                        && self.semantic.expr_parent().map_or(true, |parent| {
-                            !matches!(
-                                parent,
-                                Expr::BinOp(ast::ExprBinOp {
-                                    op: Operator::BitOr,
-                                    ..
-                                })
-                            )
-                        })
+                        // Avoid duplicate checks if the parent is an `|`
+                        && !matches!(
+                            self.semantic.expr_parent(),
+                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                        )
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
+                    }
+                    if self.enabled(Rule::UnnecessaryLiteralUnion)
+                        // Avoid duplicate checks if the parent is an `|`
+                        && !matches!(
+                            self.semantic.expr_parent(),
+                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                        )
+                    {
+                        flake8_pyi::rules::unnecessary_literal_union(self, expr);
                     }
                 }
             }
@@ -3424,11 +3495,13 @@ where
                     }
                 }
             }
-            Expr::BoolOp(ast::ExprBoolOp {
-                op,
-                values,
-                range: _,
-            }) => {
+            Expr::BoolOp(
+                bool_op @ ast::ExprBoolOp {
+                    op,
+                    values,
+                    range: _,
+                },
+            ) => {
                 if self.enabled(Rule::RepeatedIsinstanceCalls) {
                     pylint::rules::repeated_isinstance_calls(self, expr, *op, values);
                 }
@@ -3452,6 +3525,9 @@ where
                 }
                 if self.enabled(Rule::ExprAndFalse) {
                     flake8_simplify::rules::expr_and_false(self, expr);
+                }
+                if self.enabled(Rule::RepeatedEqualityComparisonTarget) {
+                    pylint::rules::repeated_equality_comparison_target(self, bool_op);
                 }
             }
             _ => {}
@@ -3878,7 +3954,7 @@ where
                         }
 
                         // Store the existing binding, if any.
-                        let existing_id = self.semantic.lookup(name);
+                        let existing_id = self.semantic.lookup_symbol(name);
 
                         // Add the bound exception name to the scope.
                         let binding_id = self.add_binding(
@@ -4113,6 +4189,14 @@ impl<'a> Checker<'a> {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
+    fn visit_runtime_annotation(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::RUNTIME_ANNOTATION;
+        self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }
 

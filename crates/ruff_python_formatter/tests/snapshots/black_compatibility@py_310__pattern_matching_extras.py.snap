@@ -132,8 +132,7 @@ match bar1:
 --- Black
 +++ Ruff
 @@ -1,119 +1,43 @@
--import match
-+NOT_YET_IMPLEMENTED_StmtImport
+ import match
  
 -match something:
 -    case [a as b]:
@@ -148,8 +147,7 @@ match bar1:
  
  
  match = 1
--case: int = re.match(something)
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
+ case: int = re.match(something)
  
 -match re.match(case):
 -    case type("match", match):
@@ -208,26 +206,26 @@ match bar1:
 -        ),
 -    ):
 -        pass
--
--    case [a as match]:
--        pass
--
--    case case:
--        pass
 +NOT_YET_IMPLEMENTED_StmtMatch
  
+-    case [a as match]:
+-        pass
  
+-    case case:
+-        pass
+-
+-
 -match match:
 -    case case:
 -        pass
 -
--
++NOT_YET_IMPLEMENTED_StmtMatch
+ 
 -match a, *b(), c:
 -    case d, *f, g:
 -        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
  
- 
+-
 -match something:
 -    case {
 -        "key": key as key_1,
@@ -271,13 +269,13 @@ match bar1:
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImport
+import match
 
 NOT_YET_IMPLEMENTED_StmtMatch
 
 
 match = 1
-NOT_YET_IMPLEMENTED_StmtAnnAssign
+case: int = re.match(something)
 
 NOT_YET_IMPLEMENTED_StmtMatch
 

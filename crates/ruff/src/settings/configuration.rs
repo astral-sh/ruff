@@ -258,7 +258,7 @@ impl Configuration {
             rule_selections: config
                 .rule_selections
                 .into_iter()
-                .chain(self.rule_selections.into_iter())
+                .chain(self.rule_selections)
                 .collect(),
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             builtins: self.builtins.or(config.builtins),
@@ -269,17 +269,17 @@ impl Configuration {
             extend_exclude: config
                 .extend_exclude
                 .into_iter()
-                .chain(self.extend_exclude.into_iter())
+                .chain(self.extend_exclude)
                 .collect(),
             extend_include: config
                 .extend_include
                 .into_iter()
-                .chain(self.extend_include.into_iter())
+                .chain(self.extend_include)
                 .collect(),
             extend_per_file_ignores: config
                 .extend_per_file_ignores
                 .into_iter()
-                .chain(self.extend_per_file_ignores.into_iter())
+                .chain(self.extend_per_file_ignores)
                 .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),

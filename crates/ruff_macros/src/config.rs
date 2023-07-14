@@ -19,7 +19,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
         }) => {
             let mut output = vec![];
 
-            for field in fields.named.iter() {
+            for field in &fields.named {
                 let docs: Vec<&Attribute> = field
                     .attrs
                     .iter()

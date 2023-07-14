@@ -109,96 +109,27 @@ def g():
          return DOUBLESPACE
  
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
      prev = leaf.prev_sibling
      if not prev:
-@@ -25,23 +25,31 @@
-             return NO
- 
-         if prevp.type == token.EQUAL:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.argument,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.argument,
-+                }
-+            ):
-                 return NO
- 
-         elif prevp.type == token.DOUBLESTAR:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.dictsetmaker,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.dictsetmaker,
-+                }
-+            ):
-                 return NO
- 
- 
-@@ -49,7 +57,6 @@
+@@ -48,7 +48,6 @@
+ ###############################################################################
  # SECTION BECAUSE SECTIONS
  ###############################################################################
- 
 -
+ 
  def g():
      NO = ""
-     SPACE = " "
-@@ -67,7 +74,7 @@
+@@ -67,7 +66,7 @@
          return DOUBLESPACE
  
      # Another comment because more comments
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
      prev = leaf.prev_sibling
      if not prev:
-@@ -79,11 +86,15 @@
-             return NO
- 
-         if prevp.type == token.EQUAL:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.argument,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.argument,
-+                }
-+            ):
-                 return NO
 ```
 
 ## Ruff Output
@@ -222,7 +153,7 @@ def f():
     if t == token.COMMENT:  # another trailing comment
         return DOUBLESPACE
 
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
     prev = leaf.prev_sibling
     if not prev:
@@ -231,31 +162,23 @@ def f():
             return NO
 
         if prevp.type == token.EQUAL:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.argument,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.argument,
+            }:
                 return NO
 
         elif prevp.type == token.DOUBLESTAR:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.dictsetmaker,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.dictsetmaker,
+            }:
                 return NO
 
 
@@ -280,7 +203,7 @@ def g():
         return DOUBLESPACE
 
     # Another comment because more comments
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
     prev = leaf.prev_sibling
     if not prev:
@@ -292,17 +215,13 @@ def g():
             return NO
 
         if prevp.type == token.EQUAL:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.argument,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.argument,
+            }:
                 return NO
 ```
 

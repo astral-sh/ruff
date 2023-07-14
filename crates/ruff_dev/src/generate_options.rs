@@ -1,4 +1,6 @@
-//! Generate a Markdown-compatible listing of configuration options.
+//! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
+//!
+//! Used for <https://beta.ruff.rs/docs/settings/>.
 use itertools::Itertools;
 
 use ruff::settings::options::Options;
@@ -58,7 +60,7 @@ pub(crate) fn generate() -> String {
         let OptionEntry::Group(fields) = entry else {
             continue;
         };
-        output.push_str(&format!("### `{group_name}`\n"));
+        output.push_str(&format!("### {group_name}\n"));
         output.push('\n');
         for (name, entry) in fields.iter().sorted_by_key(|(name, _)| name) {
             let OptionEntry::Field(field) = entry else {

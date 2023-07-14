@@ -200,7 +200,7 @@ def f():
 +
 +##
 +
-+@decorator(*NOT_YET_IMPLEMENTED_ExprStarred)
++@decorator(*args)
 +def f():
 +    ...
 +
@@ -216,7 +216,7 @@ def f():
  ##
  
 -@(decorator)
-+@decorator(*NOT_YET_IMPLEMENTED_ExprStarred, **kwargs)
++@decorator(*args, **kwargs)
  def f():
      ...
  
@@ -225,7 +225,7 @@ def f():
  
 -@sequence["decorator"]
 +@decorator(
-+    *NOT_YET_IMPLEMENTED_ExprStarred,
++    *args,
 +    **kwargs,
 +)
  def f():
@@ -257,7 +257,7 @@ def f():
 +
 +##
 +
-+@dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred)
++@dotted.decorator(*args)
 +def f():
 +    ...
 +
@@ -271,7 +271,7 @@ def f():
 +
 +##
 +
-+@dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred, **kwargs)
++@dotted.decorator(*args, **kwargs)
 +def f():
 +    ...
 +
@@ -279,7 +279,7 @@ def f():
 +##
 +
 +@dotted.decorator(
-+    *NOT_YET_IMPLEMENTED_ExprStarred,
++    *args,
 +    **kwargs,
 +)
 +def f():
@@ -309,7 +309,7 @@ def f():
 +
 +##
 +
-+@double.dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred)
++@double.dotted.decorator(*args)
 +def f():
 +    ...
 +
@@ -323,7 +323,7 @@ def f():
 +
 +##
 +
-+@double.dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred, **kwargs)
++@double.dotted.decorator(*args, **kwargs)
 +def f():
 +    ...
 +
@@ -331,7 +331,7 @@ def f():
 +##
 +
 +@double.dotted.decorator(
-+    *NOT_YET_IMPLEMENTED_ExprStarred,
++    *args,
 +    **kwargs,
 +)
 +def f():
@@ -392,7 +392,7 @@ def f():
 
 ##
 
-@decorator(*NOT_YET_IMPLEMENTED_ExprStarred)
+@decorator(*args)
 def f():
     ...
 
@@ -406,7 +406,7 @@ def f():
 
 ##
 
-@decorator(*NOT_YET_IMPLEMENTED_ExprStarred, **kwargs)
+@decorator(*args, **kwargs)
 def f():
     ...
 
@@ -414,7 +414,7 @@ def f():
 ##
 
 @decorator(
-    *NOT_YET_IMPLEMENTED_ExprStarred,
+    *args,
     **kwargs,
 )
 def f():
@@ -444,7 +444,7 @@ def f():
 
 ##
 
-@dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred)
+@dotted.decorator(*args)
 def f():
     ...
 
@@ -458,7 +458,7 @@ def f():
 
 ##
 
-@dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred, **kwargs)
+@dotted.decorator(*args, **kwargs)
 def f():
     ...
 
@@ -466,7 +466,7 @@ def f():
 ##
 
 @dotted.decorator(
-    *NOT_YET_IMPLEMENTED_ExprStarred,
+    *args,
     **kwargs,
 )
 def f():
@@ -496,7 +496,7 @@ def f():
 
 ##
 
-@double.dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred)
+@double.dotted.decorator(*args)
 def f():
     ...
 
@@ -510,7 +510,7 @@ def f():
 
 ##
 
-@double.dotted.decorator(*NOT_YET_IMPLEMENTED_ExprStarred, **kwargs)
+@double.dotted.decorator(*args, **kwargs)
 def f():
     ...
 
@@ -518,7 +518,7 @@ def f():
 ##
 
 @double.dotted.decorator(
-    *NOT_YET_IMPLEMENTED_ExprStarred,
+    *args,
     **kwargs,
 )
 def f():

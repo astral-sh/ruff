@@ -222,12 +222,11 @@ impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
 
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
+    diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     let tokens = tokens
         .iter()
         .flatten()
@@ -387,6 +386,4 @@ pub(crate) fn trailing_commas(
             stack.pop();
         }
     }
-
-    diagnostics
 }

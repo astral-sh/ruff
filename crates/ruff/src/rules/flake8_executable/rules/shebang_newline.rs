@@ -3,7 +3,7 @@ use ruff_text_size::{TextLen, TextRange};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::rules::flake8_executable::helpers::ShebangDirective;
+use crate::comments::shebang::ShebangDirective;
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.
@@ -47,17 +47,14 @@ pub(crate) fn shebang_newline(
     shebang: &ShebangDirective,
     first_line: bool,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, content) = shebang {
-        if first_line {
-            None
-        } else {
-            let diagnostic = Diagnostic::new(
-                ShebangNotFirstLine,
-                TextRange::at(range.start() + start, content.text_len()),
-            );
-            Some(diagnostic)
-        }
-    } else {
+    let ShebangDirective { offset, contents } = shebang;
+
+    if first_line {
         None
+    } else {
+        Some(Diagnostic::new(
+            ShebangNotFirstLine,
+            TextRange::at(range.start() + offset, contents.text_len()),
+        ))
     }
 }

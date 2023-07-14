@@ -120,29 +120,23 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,4 @@
--import random
-+NOT_YET_IMPLEMENTED_StmtImport
- 
- 
- def foo1():
 @@ -27,16 +27,16 @@
  
  
  for i in range(5):
 -    print(f"{i}) The line above me should be removed!")
-+    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
++    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
  
  
  for i in range(5):
 -    print(f"{i}) The lines above me should be removed!")
-+    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
++    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
  
  
  for i in range(5):
      for j in range(7):
 -        print(f"{i}) The lines above me should be removed!")
-+        print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
++        print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
  
  
  if random.randint(0, 3) == 0:
@@ -151,7 +145,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImport
+import random
 
 
 def foo1():
@@ -180,16 +174,16 @@ class Foo:
 
 
 for i in range(5):
-    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
+    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 
 
 for i in range(5):
-    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
+    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 
 
 for i in range(5):
     for j in range(7):
-        print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
+        print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 
 
 if random.randint(0, 3) == 0:

@@ -1,3 +1,4 @@
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
@@ -18,7 +19,11 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         let inner = format_with(|f| {
             write!(
                 f,
-                [context_expr.format().with_options(Parenthesize::IfBreaks)]
+                [maybe_parenthesize_expression(
+                    context_expr,
+                    item,
+                    Parenthesize::IfBreaks
+                )]
             )?;
             if let Some(optional_vars) = optional_vars {
                 write!(f, [space(), text("as"), space(), optional_vars.format()])?;

@@ -14,6 +14,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod autofix;
 mod checkers;
 mod codes;
+mod comments;
 mod cst;
 pub mod directives;
 mod doc_lines;
@@ -38,6 +39,7 @@ mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+pub mod upstream_categories;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;

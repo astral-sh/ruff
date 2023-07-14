@@ -1,4 +1,5 @@
 use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -48,7 +49,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                 [
                     text(current.keyword()),
                     space(),
-                    test.format().with_options(Parenthesize::IfBreaks),
+                    maybe_parenthesize_expression(test, current_statement, Parenthesize::IfBreaks),
                     text(":"),
                     trailing_comments(if_trailing_comments),
                     block_indent(&body.format())

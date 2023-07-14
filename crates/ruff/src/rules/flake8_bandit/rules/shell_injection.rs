@@ -350,7 +350,7 @@ fn is_wildcard_command(expr: &Expr) -> bool {
     if let Expr::List(ast::ExprList { elts, .. }) = expr {
         let mut has_star = false;
         let mut has_command = false;
-        for elt in elts.iter() {
+        for elt in elts {
             if let Some(text) = string_literal(elt) {
                 has_star |= text.contains('*');
                 has_command |= text.contains("chown")

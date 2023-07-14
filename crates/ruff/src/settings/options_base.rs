@@ -153,7 +153,7 @@ impl IntoIterator for OptionGroup {
 
 impl Display for OptionGroup {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for (name, _) in self.iter() {
+        for (name, _) in self {
             writeln!(f, "{name}")?;
         }
 

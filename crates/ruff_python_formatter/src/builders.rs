@@ -1,32 +1,44 @@
-use crate::context::NodeLevel;
-use crate::prelude::*;
-use crate::trivia::{first_non_trivia_token, lines_after, skip_trailing_trivia, Token, TokenKind};
-use ruff_formatter::{format_args, write, Argument, Arguments};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 
+use ruff_formatter::{format_args, write, Argument, Arguments};
+
+use crate::context::NodeLevel;
+use crate::prelude::*;
+use crate::trivia::{lines_after, skip_trailing_trivia, SimpleTokenizer, Token, TokenKind};
+use crate::MagicTrailingComma;
+
 /// Adds parentheses and indents `content` if it doesn't fit on a line.
-pub(crate) fn optional_parentheses<'ast, T>(content: &T) -> OptionalParentheses<'_, 'ast>
+pub(crate) fn parenthesize_if_expands<'ast, T>(content: &T) -> ParenthesizeIfExpands<'_, 'ast>
 where
     T: Format<PyFormatContext<'ast>>,
 {
-    OptionalParentheses {
+    ParenthesizeIfExpands {
         inner: Argument::new(content),
     }
 }
 
-pub(crate) struct OptionalParentheses<'a, 'ast> {
+pub(crate) struct ParenthesizeIfExpands<'a, 'ast> {
     inner: Argument<'a, PyFormatContext<'ast>>,
 }
 
-impl<'ast> Format<PyFormatContext<'ast>> for OptionalParentheses<'_, 'ast> {
+impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        group(&format_args![
+        let saved_level = f.context().node_level();
+
+        f.context_mut()
+            .set_node_level(NodeLevel::ParenthesizedExpression);
+
+        let result = group(&format_args![
             if_group_breaks(&text("(")),
             soft_block_indent(&Arguments::from(&self.inner)),
-            if_group_breaks(&text(")"))
+            if_group_breaks(&text(")")),
         ])
-        .fmt(f)
+        .fmt(f);
+
+        f.context_mut().set_node_level(saved_level);
+
+        result
     }
 }
 
@@ -44,7 +56,10 @@ pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
     /// A builder that separates each element by a `,` and a [`soft_line_break_or_space`].
     /// It emits a trailing `,` that is only shown if the enclosing group expands. It forces the enclosing
     /// group to expand if the last item has a trailing `comma` and the magical comma option is enabled.
-    fn join_comma_separated<'fmt>(&'fmt mut self) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf>;
+    fn join_comma_separated<'fmt>(
+        &'fmt mut self,
+        sequence_end: TextSize,
+    ) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf>;
 }
 
 impl<'buf, 'ast> PyFormatterExtensions<'ast, 'buf> for PyFormatter<'ast, 'buf> {
@@ -52,8 +67,11 @@ impl<'buf, 'ast> PyFormatterExtensions<'ast, 'buf> for PyFormatter<'ast, 'buf> {
         JoinNodesBuilder::new(self, level)
     }
 
-    fn join_comma_separated<'fmt>(&'fmt mut self) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
-        JoinCommaSeparatedBuilder::new(self)
+    fn join_comma_separated<'fmt>(
+        &'fmt mut self,
+        sequence_end: TextSize,
+    ) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+        JoinCommaSeparatedBuilder::new(self, sequence_end)
     }
 }
 
@@ -85,7 +103,7 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
 
         self.result = self.result.and_then(|_| {
             if let Some(last_end) = self.last_end.replace(node.end()) {
-                let source = self.fmt.context().contents();
+                let source = self.fmt.context().source();
                 let count_lines = |offset| {
                     // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
                     // in the node's range
@@ -113,7 +131,9 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
                         0 | 1 => hard_line_break().fmt(self.fmt),
                         _ => empty_line().fmt(self.fmt),
                     },
-                    NodeLevel::Expression => hard_line_break().fmt(self.fmt),
+                    NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
+                        hard_line_break().fmt(self.fmt)
+                    }
                 }?;
             }
 
@@ -183,18 +203,20 @@ pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     result: FormatResult<()>,
     fmt: &'fmt mut PyFormatter<'ast, 'buf>,
     end_of_last_entry: Option<TextSize>,
+    sequence_end: TextSize,
     /// We need to track whether we have more than one entry since a sole entry doesn't get a
     /// magic trailing comma even when expanded
     len: usize,
 }
 
 impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
-    fn new(f: &'fmt mut PyFormatter<'ast, 'buf>) -> Self {
+    fn new(f: &'fmt mut PyFormatter<'ast, 'buf>, sequence_end: TextSize) -> Self {
         Self {
             fmt: f,
             result: Ok(()),
             end_of_last_entry: None,
             len: 0,
+            sequence_end,
         }
     }
 
@@ -225,7 +247,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     where
         T: Ranged,
         F: Format<PyFormatContext<'ast>>,
-        I: Iterator<Item = (T, F)>,
+        I: IntoIterator<Item = (T, F)>,
     {
         for (node, content) in entries {
             self.entry(&node, &content);
@@ -237,7 +259,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     pub(crate) fn nodes<'a, T, I>(&mut self, entries: I) -> &mut Self
     where
         T: Ranged + AsFormat<PyFormatContext<'ast>> + 'a,
-        I: Iterator<Item = &'a T>,
+        I: IntoIterator<Item = &'a T>,
     {
         for node in entries {
             self.entry(node, &node.format());
@@ -249,14 +271,26 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
         self.result.and_then(|_| {
             if let Some(last_end) = self.end_of_last_entry.take() {
-                let magic_trailing_comma = self.fmt.options().magic_trailing_comma().is_respect()
-                    && matches!(
-                        first_non_trivia_token(last_end, self.fmt.context().contents()),
-                        Some(Token {
-                            kind: TokenKind::Comma,
-                            ..
-                        })
-                    );
+                let magic_trailing_comma = match self.fmt.options().magic_trailing_comma() {
+                    MagicTrailingComma::Respect => {
+                        let first_token = SimpleTokenizer::new(
+                            self.fmt.context().source(),
+                            TextRange::new(last_end, self.sequence_end),
+                        )
+                        .skip_trivia()
+                        // Skip over any closing parentheses belonging to the expression
+                        .find(|token| token.kind() != TokenKind::RParen);
+
+                        matches!(
+                            first_token,
+                            Some(Token {
+                                kind: TokenKind::Comma,
+                                ..
+                            })
+                        )
+                    }
+                    MagicTrailingComma::Ignore => false,
+                };
 
                 // If there is a single entry, only keep the magic trailing comma, don't add it if
                 // it wasn't there. If there is more than one entry, always add it.
@@ -276,13 +310,15 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
 #[cfg(test)]
 mod tests {
+    use rustpython_parser::ast::ModModule;
+    use rustpython_parser::Parse;
+
+    use ruff_formatter::format;
+
     use crate::comments::Comments;
     use crate::context::{NodeLevel, PyFormatContext};
     use crate::prelude::*;
     use crate::PyFormatOptions;
-    use ruff_formatter::format;
-    use rustpython_parser::ast::ModModule;
-    use rustpython_parser::Parse;
 
     fn format_ranged(level: NodeLevel) -> String {
         let source = r#"
@@ -353,7 +389,7 @@ no_leading_newline = 30"#
     // Removes all empty lines
     #[test]
     fn ranged_builder_parenthesized_level() {
-        let printed = format_ranged(NodeLevel::Expression);
+        let printed = format_ranged(NodeLevel::Expression(None));
 
         assert_eq!(
             &printed,

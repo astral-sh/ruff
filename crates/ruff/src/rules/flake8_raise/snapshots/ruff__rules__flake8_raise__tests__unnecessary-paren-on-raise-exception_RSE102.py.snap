@@ -118,7 +118,7 @@ RSE102.py:28:16: RSE102 [*] Unnecessary parentheses on raised exception
 30 | | )
    | |_^ RSE102
 31 |   
-32 |   raise AssertionError
+32 |   # OK
    |
    = help: Remove unnecessary parentheses
 
@@ -131,7 +131,7 @@ RSE102.py:28:16: RSE102 [*] Unnecessary parentheses on raised exception
 30    |-)
    28 |+raise TypeError
 31 29 | 
-32 30 | raise AssertionError
-33 31 | 
+32 30 | # OK
+33 31 | raise AssertionError
 
 

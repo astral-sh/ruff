@@ -1,12 +1,14 @@
+use rustpython_parser::ast::{Ranged, StmtFunctionDef};
+
+use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
+use ruff_python_ast::function::AnyFunctionDefinition;
+
 use crate::comments::{leading_comments, trailing_comments};
 use crate::context::NodeLevel;
-use crate::expression::parentheses::Parenthesize;
+use crate::expression::parentheses::{optional_parentheses, Parentheses};
 use crate::prelude::*;
 use crate::trivia::{lines_after, skip_trailing_trivia};
 use crate::FormatNodeRule;
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::function::AnyFunctionDefinition;
-use rustpython_parser::ast::{Ranged, StmtFunctionDef};
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;
@@ -56,9 +58,9 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
                 // while maintaining the right amount of empty lines between the comment
                 // and the last decorator.
                 let decorator_end =
-                    skip_trailing_trivia(last_decorator.end(), f.context().contents());
+                    skip_trailing_trivia(last_decorator.end(), f.context().source());
 
-                let leading_line = if lines_after(decorator_end, f.context().contents()) <= 1 {
+                let leading_line = if lines_after(decorator_end, f.context().source()) <= 1 {
                     hard_line_break()
                 } else {
                     empty_line()
@@ -97,9 +99,9 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
                     space(),
                     text("->"),
                     space(),
-                    return_annotation
-                        .format()
-                        .with_options(Parenthesize::IfBreaks)
+                    optional_parentheses(
+                        &return_annotation.format().with_options(Parentheses::Never)
+                    )
                 ]
             )?;
         }
@@ -124,7 +126,7 @@ impl<'def, 'ast> AsFormat<PyFormatContext<'ast>> for AnyFunctionDefinition<'def>
     > where Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatAnyFunctionDef::default())
+        FormatRefWithRule::new(self, FormatAnyFunctionDef)
     }
 }
 

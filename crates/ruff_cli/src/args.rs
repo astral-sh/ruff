@@ -35,11 +35,17 @@ pub struct Args {
 pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckArgs),
-    /// Explain a rule.
+    /// Explain a rule (or all rules).
     #[clap(alias = "--explain")]
+    #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
-        #[arg(value_parser=Rule::from_code)]
-        rule: Rule,
+        /// Rule to explain
+        #[arg(value_parser=Rule::from_code, group = "selector")]
+        rule: Option<Rule>,
+
+        /// Explain all rules
+        #[arg(long, conflicts_with = "rule", group = "selector")]
+        all: bool,
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
@@ -68,7 +74,8 @@ pub enum Command {
     },
 }
 
-#[derive(Clone, Debug, clap::Args)]
+// The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
+#[derive(Clone, Debug, clap::Parser)]
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
 pub struct CheckArgs {
     /// List of files or directories to check.

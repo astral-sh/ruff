@@ -1,10 +1,9 @@
-use crate::comments::{dangling_node_comments, leading_comments, Comments};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
+use crate::comments::{dangling_node_comments, leading_comments};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::Ranged;
 use rustpython_parser::ast::{Expr, ExprDict};
@@ -76,7 +75,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         }
 
         let format_pairs = format_with(|f| {
-            let mut joiner = f.join_comma_separated();
+            let mut joiner = f.join_comma_separated(item.end());
 
             for (key, value) in keys.iter().zip(values) {
                 let key_value_pair = KeyValuePair { key, value };
@@ -86,14 +85,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             joiner.finish()
         });
 
-        write!(
-            f,
-            [group(&format_args![
-                text("{"),
-                soft_block_indent(&format_pairs),
-                text("}")
-            ])]
-        )
+        parenthesized("{", &format_pairs, "}").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {
@@ -105,13 +97,9 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
 impl NeedsParentheses for ExprDict {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

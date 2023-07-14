@@ -241,18 +241,30 @@ The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/t
 e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
 The Rome repository can be a helpful reference when implementing something in the Ruff formatter
 
-### Checking formatter stability and panics
+### Checking entire projects
 
-There are tree common problems with the formatter: The second formatting pass looks different than
+It's possible to format an entire project:
+
+```shell
+cargo run --bin ruff_dev -- format-dev --write my_project
+```
+
+This will format all files that `ruff check` would lint and computes the similarity index, the
+fraction of changed lines. The similarity index is 1 if there were no changes at all, while 0 means
+we changed every single line. If you run this on a black formatted projects, this tells you how
+similar the ruff formatter is to black for the given project, with our goal being as close to 1 as
+possible.
+
+There are three common problems with the formatter: The second formatting pass looks different than
 the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
 parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
-of these using the `check-formatter-stability` subcommand in `ruff_dev`
+of these using the `--stability-check` option in the `format-dev` subcommand:
 
 The easiest is to check CPython:
 
 ```shell
 git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
-cargo run --bin ruff_dev -- check-formatter-stability crates/ruff/resources/test/cpython
+cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
 ```
 
 It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we
@@ -261,8 +273,16 @@ only do this occasionally:
 ```shell
 curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
 python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
-cargo run --bin ruff_dev -- check-formatter-stability --multi-project target/checkouts
+cargo run --bin ruff_dev -- format-dev --stability-check --multi-project target/checkouts
 ```
+
+Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additional options:
+
+- `--write`: Format the files and write them back to disk
+- `--stability-check`: Format twice (but don't write to disk) and check for differences and crashes
+- `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
+- `--error-file`: Use together with `--multi-project`, this writes all errors (but not status
+    messages) to a file.
 
 ## The orphan rules and trait structure
 

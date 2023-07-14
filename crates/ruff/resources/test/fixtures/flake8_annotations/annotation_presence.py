@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Annotated, Any, Optional, Type, Union
 from typing_extensions import override
 
 # Error
@@ -95,27 +95,27 @@ class Foo:
     def foo(self: "Foo", a: int, *params: str, **options: Any) -> int:
         pass
 
-    # ANN401
+    # OK
     @override
     def foo(self: "Foo", a: Any, *params: str, **options: str) -> int:
         pass
 
-    # ANN401
+    # OK
     @override
     def foo(self: "Foo", a: int, *params: str, **options: str) -> Any:
         pass
 
-    # ANN401
+    # OK
     @override
     def foo(self: "Foo", a: int, *params: Any, **options: Any) -> int:
         pass
 
-    # ANN401
+    # OK
     @override
     def foo(self: "Foo", a: int, *params: Any, **options: str) -> int:
         pass
 
-    # ANN401
+    # OK
     @override
     def foo(self: "Foo", a: int, *params: str, **options: Any) -> int:
         pass
@@ -137,3 +137,18 @@ class Foo:
 
 # OK
 def f(*args: *tuple[int]) -> None: ...
+def f(a: object) -> None: ...
+def f(a: str | bytes) -> None: ...
+def f(a: Union[str, bytes]) -> None: ...
+def f(a: Optional[str]) -> None: ...
+def f(a: Annotated[str, ...]) -> None: ...
+def f(a: "Union[str, bytes]") -> None: ...
+def f(a: int + int) -> None: ...
+
+# ANN401
+def f(a: Any | int) -> None: ...
+def f(a: int | Any) -> None: ...
+def f(a: Union[str, bytes, Any]) -> None: ...
+def f(a: Optional[Any]) -> None: ...
+def f(a: Annotated[Any, ...]) -> None: ...
+def f(a: "Union[str, bytes, Any]") -> None: ...

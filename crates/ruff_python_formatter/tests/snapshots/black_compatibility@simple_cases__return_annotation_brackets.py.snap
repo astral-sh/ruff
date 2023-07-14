@@ -122,37 +122,6 @@ def foo() -> tuple[int, int, int,]:
      return 2
  
  
-@@ -99,22 +103,22 @@
-     return 2
- 
- 
--def foo() -> (
--    tuple[
-+def foo() -> tuple[
-+    (
-         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
--    ]
--):
-+    )
-+]:
-     return 2
- 
- 
- # Magic trailing comma example
--def foo() -> (
--    tuple[
-+def foo() -> tuple[
-+    (
-         int,
-         int,
-         int,
--    ]
--):
-+    )
-+]:
-     return 2
 ```
 
 ## Ruff Output
@@ -263,24 +232,24 @@ def foo() -> tuple[int, int, int]:
     return 2
 
 
-def foo() -> tuple[
-    (
+def foo() -> (
+    tuple[
         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
         loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-    )
-]:
+    ]
+):
     return 2
 
 
 # Magic trailing comma example
-def foo() -> tuple[
-    (
+def foo() -> (
+    tuple[
         int,
         int,
         int,
-    )
-]:
+    ]
+):
     return 2
 ```
 

@@ -1,13 +1,12 @@
-use crate::comments::{dangling_comments, Comments, SourceComment};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
+use crate::comments::{dangling_comments, SourceComment};
+use crate::context::PyFormatContext;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::trivia::Token;
 use crate::trivia::{first_non_trivia_token, TokenKind};
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprSlice;
 use rustpython_parser::ast::{Expr, Ranged};
@@ -27,8 +26,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
             step,
         } = item;
 
-        let (first_colon, second_colon) =
-            find_colons(f.context().contents(), *range, lower, upper)?;
+        let (first_colon, second_colon) = find_colons(f.context().source(), *range, lower, upper)?;
 
         // Handle comment placement
         // In placements.rs, we marked comment for None nodes a dangling and associated all others
@@ -262,10 +260,9 @@ fn leading_comments_spacing(
 impl NeedsParentheses for ExprSlice {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }

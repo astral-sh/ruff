@@ -27,6 +27,8 @@ rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+thiserror = { workspace = true }
+unic-ucd-ident = "0.9.0"
 
 [dev-dependencies]
 ruff_formatter = { path = "../ruff_formatter", features = ["serde"]}
@@ -41,7 +43,6 @@ name = "ruff_python_formatter_fixtures"
 path = "tests/fixtures.rs"
 test = true
 required-features = [ "serde" ]
-
 
 [features]
 serde = ["dep:serde", "ruff_formatter/serde"]

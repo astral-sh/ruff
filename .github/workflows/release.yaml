@@ -9,7 +9,7 @@ on:
       sha:
         description: "Optionally, the full sha of the commit to be released"
         type: string
-  push:
+  pull_request:
     paths:
       # When we change pyproject.toml, we want to ensure that the maturin builds still work
       - pyproject.toml
@@ -20,7 +20,7 @@ concurrency:
 
 env:
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.7" # to build abi3 wheels
+  PYTHON_VERSION: "3.11"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always

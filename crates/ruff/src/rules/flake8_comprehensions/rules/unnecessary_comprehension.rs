@@ -82,10 +82,9 @@ pub(crate) fn unnecessary_dict_comprehension(
     value: &Expr,
     generators: &[Comprehension],
 ) {
-    if generators.len() != 1 {
+    let [generator] = generators else {
         return;
-    }
-    let generator = &generators[0];
+    };
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
@@ -123,10 +122,9 @@ pub(crate) fn unnecessary_list_set_comprehension(
     elt: &Expr,
     generators: &[Comprehension],
 ) {
-    if generators.len() != 1 {
+    let [generator] = generators else {
         return;
-    }
-    let generator = &generators[0];
+    };
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }

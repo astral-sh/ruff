@@ -1,11 +1,10 @@
-use crate::comments::{dangling_comments, CommentLinePosition, Comments};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
+use crate::comments::{dangling_comments, CommentLinePosition};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
-use rustpython_parser::ast::ExprList;
+use ruff_python_ast::node::AnyNodeRef;
+use rustpython_parser::ast::{ExprList, Ranged};
 
 #[derive(Default)]
 pub struct FormatExprList;
@@ -52,16 +51,13 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             "A non-empty expression list has dangling comments"
         );
 
-        let items = format_with(|f| f.join_comma_separated().nodes(elts.iter()).finish());
+        let items = format_with(|f| {
+            f.join_comma_separated(item.end())
+                .nodes(elts.iter())
+                .finish()
+        });
 
-        write!(
-            f,
-            [group(&format_args![
-                text("["),
-                soft_block_indent(&items),
-                text("]")
-            ])]
-        )
+        parenthesized("[", &items, "]").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {
@@ -73,13 +69,9 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 impl NeedsParentheses for ExprList {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

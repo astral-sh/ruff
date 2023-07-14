@@ -43,7 +43,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         };
 
         let comments = f.context().comments().clone();
-        let source = f.context().contents();
+        let source = f.context().source();
 
         let saved_level = f.context().node_level();
         f.context_mut().set_node_level(node_level);

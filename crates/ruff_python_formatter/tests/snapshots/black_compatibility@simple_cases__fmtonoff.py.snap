@@ -198,29 +198,20 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -1,15 +1,14 @@
- #!/usr/bin/env python3
--import asyncio
--import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
+@@ -6,10 +6,9 @@
  
--from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
--from library import some_connection, some_decorator
-+NOT_YET_IMPLEMENTED_StmtImportFrom
+ from library import some_connection, some_decorator
  # fmt: off
 -from third_party import (X,
 -                         Y, Z)
-+NOT_YET_IMPLEMENTED_StmtImportFrom
++from third_party import X, Y, Z
  # fmt: on
 -f"trigger 3.6 mode"
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
++f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  # Comment 1
  
  # Comment 2
-@@ -17,30 +16,54 @@
+@@ -17,30 +16,44 @@
  
  # fmt: off
  def func_no_args():
@@ -236,7 +227,7 @@ d={'a':1,
 +    b
 +    c
 +    if True:
-+        NOT_YET_IMPLEMENTED_StmtRaise
++        raise RuntimeError
 +    if False:
 +        ...
 +    for i in range(10):
@@ -277,35 +268,15 @@ d={'a':1,
 +
 +
  # fmt: on
--def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
+ def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
-+def spaces(
-+    a=1,
-+    b=(),
-+    c=[],
-+    d={},
-+    e=True,
-+    f=-1,
-+    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-+    h="",
-+    i=r"",
-+):
-+    offset = attr.ib(default=attr.Factory(lambda x: True))
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
++    assert task._cancel_stack[ : len(old_stack)] == old_stack
  
  
  def spaces_types(
-@@ -50,7 +73,7 @@
-     d: dict = {},
-     e: bool = True,
-     f: int = -1,
--    g: int = 1 if False else 2,
-+    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-     h: str = "",
-     i: str = r"",
- ):
-@@ -63,55 +86,54 @@
+@@ -63,15 +76,15 @@
  
  something = {
      # fmt: off
@@ -319,24 +290,18 @@ d={'a':1,
          # fmt: off
 -        'some big and',
 -        'complex subscript',
--        # fmt: on
--        goes + here,
--        andhere,
-+        (
-+            "some big and",
-+            "complex subscript",
-+            # fmt: on
-+            goes + here,
-+            andhere,
-+        )
-     ]
- 
++        "some big and",
++        "complex subscript",
+         # fmt: on
+         goes + here,
+         andhere,
+@@ -80,38 +93,35 @@
  
  def import_as_names():
      # fmt: off
 -    from hello import a,        b
 -    'unformatted'
-+    NOT_YET_IMPLEMENTED_StmtImportFrom
++    from hello import a, b
 +    "unformatted"
      # fmt: on
  
@@ -345,7 +310,7 @@ d={'a':1,
      # fmt: off
 -    a , b = *hello
 -    'unformatted'
-+    a, b = *NOT_YET_IMPLEMENTED_ExprStarred
++    a, b = *hello
 +    "unformatted"
      # fmt: on
  
@@ -380,7 +345,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -132,10 +154,10 @@
+@@ -132,10 +142,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -395,7 +360,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -153,9 +175,7 @@
+@@ -153,9 +163,7 @@
              )
          )
          # fmt: off
@@ -406,7 +371,7 @@ d={'a':1,
          # fmt: on
      _type_comment_re = re.compile(
          r"""
-@@ -178,7 +198,7 @@
+@@ -178,7 +186,7 @@
          $
          """,
          # fmt: off
@@ -415,7 +380,7 @@ d={'a':1,
          # fmt: on
      )
  
-@@ -216,8 +236,7 @@
+@@ -216,8 +224,7 @@
      xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
  )
  # fmt: off
@@ -433,16 +398,16 @@ d={'a':1,
 
 ```py
 #!/usr/bin/env python3
-NOT_YET_IMPLEMENTED_StmtImport
-NOT_YET_IMPLEMENTED_StmtImport
+import asyncio
+import sys
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from third_party import X, Y, Z
 
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from library import some_connection, some_decorator
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from third_party import X, Y, Z
 # fmt: on
-NOT_YET_IMPLEMENTED_ExprJoinedStr
+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 # Comment 1
 
 # Comment 2
@@ -454,7 +419,7 @@ def func_no_args():
     b
     c
     if True:
-        NOT_YET_IMPLEMENTED_StmtRaise
+        raise RuntimeError
     if False:
         ...
     for i in range(10):
@@ -485,19 +450,9 @@ def function_signature_stress_test(
 
 
 # fmt: on
-def spaces(
-    a=1,
-    b=(),
-    c=[],
-    d={},
-    e=True,
-    f=-1,
-    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
-    h="",
-    i=r"",
-):
-    offset = attr.ib(default=attr.Factory(lambda x: True))
-    NOT_YET_IMPLEMENTED_StmtAssert
+def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
+    offset = attr.ib(default=attr.Factory(lambda NOT_YET_IMPLEMENTED_lambda: True))
+    assert task._cancel_stack[ : len(old_stack)] == old_stack
 
 
 def spaces_types(
@@ -507,7 +462,7 @@ def spaces_types(
     d: dict = {},
     e: bool = True,
     f: int = -1,
-    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
 ):
@@ -527,26 +482,24 @@ something = {
 def subscriptlist():
     atom[
         # fmt: off
-        (
-            "some big and",
-            "complex subscript",
-            # fmt: on
-            goes + here,
-            andhere,
-        )
+        "some big and",
+        "complex subscript",
+        # fmt: on
+        goes + here,
+        andhere,
     ]
 
 
 def import_as_names():
     # fmt: off
-    NOT_YET_IMPLEMENTED_StmtImportFrom
+    from hello import a, b
     "unformatted"
     # fmt: on
 
 
 def testlist_star_expr():
     # fmt: off
-    a, b = *NOT_YET_IMPLEMENTED_ExprStarred
+    a, b = *hello
     "unformatted"
     # fmt: on
 

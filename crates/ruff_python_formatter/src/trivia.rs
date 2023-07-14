@@ -1,8 +1,7 @@
-use std::str::Chars;
-
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_whitespace::{is_python_whitespace, Cursor};
 
 /// Searches for the first non-trivia character in `range`.
 ///
@@ -92,6 +91,24 @@ pub(crate) fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
     offset
 }
 
+fn is_identifier_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_' || is_non_ascii_identifier_start(c)
+}
+
+// Checks if the character c is a valid continuation character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_identifier_continuation(c: char) -> bool {
+    if c.is_ascii() {
+        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
+    } else {
+        is_xid_continue(c)
+    }
+}
+
+fn is_non_ascii_identifier_start(c: char) -> bool {
+    is_xid_start(c)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
@@ -167,7 +184,19 @@ pub(crate) enum TokenKind {
     /// `.`.
     Dot,
 
-    /// Any other non trivia token. Always has a length of 1
+    /// `else`
+    Else,
+
+    /// `if`
+    If,
+
+    /// `in`
+    In,
+
+    /// `match`
+    Match,
+
+    /// Any other non trivia token.
     Other,
 
     /// Returned for each character after [`TokenKind::Other`] has been returned once.
@@ -215,6 +244,7 @@ pub(crate) struct SimpleTokenizer<'a> {
     /// `true` when it is known that the current `back` line has no comment for sure.
     back_line_has_no_comment: bool,
     bogus: bool,
+    source: &'a str,
     cursor: Cursor<'a>,
 }
 
@@ -225,6 +255,7 @@ impl<'a> SimpleTokenizer<'a> {
             back_offset: range.end(),
             back_line_has_no_comment: false,
             bogus: false,
+            source,
             cursor: Cursor::new(&source[range]),
         }
     }
@@ -236,6 +267,18 @@ impl<'a> SimpleTokenizer<'a> {
 
     pub(crate) fn up_to(offset: TextSize, source: &'a str) -> Self {
         Self::new(source, TextRange::up_to(offset))
+    }
+
+    fn to_keyword_or_other(&self, range: TextRange) -> TokenKind {
+        let source = &self.source[range];
+        match source {
+            "if" => TokenKind::If,
+            "else" => TokenKind::Else,
+            "in" => TokenKind::In,
+            "match" => TokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
+            // ...,
+            _ => TokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+        }
     }
 
     fn next_token(&mut self) -> Token {
@@ -279,12 +322,19 @@ impl<'a> SimpleTokenizer<'a> {
             '\\' => TokenKind::Continuation,
 
             c => {
-                let kind = TokenKind::from_non_trivia_char(c);
+                let kind = if is_identifier_start(c) {
+                    self.cursor.eat_while(is_identifier_continuation);
+                    let token_len = self.cursor.token_len();
+
+                    let range = TextRange::at(self.offset, token_len);
+                    self.to_keyword_or_other(range)
+                } else {
+                    TokenKind::from_non_trivia_char(c)
+                };
 
                 if kind == TokenKind::Other {
                     self.bogus = true;
                 }
-
                 kind
             }
         };
@@ -351,9 +401,7 @@ impl<'a> SimpleTokenizer<'a> {
 
                 // Skip the test whether there's a preceding comment if it has been performed before.
                 if !self.back_line_has_no_comment {
-                    let rest = self.cursor.chars.as_str();
-
-                    for (back_index, c) in rest.chars().rev().enumerate() {
+                    for (back_index, c) in self.cursor.chars().rev().enumerate() {
                         match c {
                             '#' => {
                                 // Potentially a comment
@@ -386,7 +434,29 @@ impl<'a> SimpleTokenizer<'a> {
                 } else if c == '\\' {
                     TokenKind::Continuation
                 } else {
-                    let kind = TokenKind::from_non_trivia_char(c);
+                    let kind = if is_identifier_continuation(c) {
+                        // if we only have identifier continuations but no start (e.g. 555) we
+                        // don't want to consume the chars, so in that case, we want to rewind the
+                        // cursor to here
+                        let savepoint = self.cursor.clone();
+                        self.cursor.eat_back_while(is_identifier_continuation);
+
+                        let token_len = self.cursor.token_len();
+                        let range = TextRange::at(self.back_offset - token_len, token_len);
+
+                        if self.source[range]
+                            .chars()
+                            .next()
+                            .is_some_and(is_identifier_start)
+                        {
+                            self.to_keyword_or_other(range)
+                        } else {
+                            self.cursor = savepoint;
+                            TokenKind::Other
+                        }
+                    } else {
+                        TokenKind::from_non_trivia_char(c)
+                    };
 
                     if kind == TokenKind::Other {
                         self.bogus = true;
@@ -438,100 +508,6 @@ impl DoubleEndedIterator for SimpleTokenizer<'_> {
             None
         } else {
             Some(token)
-        }
-    }
-}
-
-const EOF_CHAR: char = '\0';
-
-#[derive(Debug, Clone)]
-struct Cursor<'a> {
-    chars: Chars<'a>,
-    source_length: TextSize,
-}
-
-impl<'a> Cursor<'a> {
-    fn new(source: &'a str) -> Self {
-        Self {
-            source_length: source.text_len(),
-            chars: source.chars(),
-        }
-    }
-
-    /// Peeks the next character from the input stream without consuming it.
-    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
-    fn first(&self) -> char {
-        self.chars.clone().next().unwrap_or(EOF_CHAR)
-    }
-
-    /// Peeks the next character from the input stream without consuming it.
-    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
-    fn last(&self) -> char {
-        self.chars.clone().next_back().unwrap_or(EOF_CHAR)
-    }
-
-    // SAFETY: THe `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
-    #[allow(clippy::cast_possible_truncation)]
-    fn text_len(&self) -> TextSize {
-        TextSize::new(self.chars.as_str().len() as u32)
-    }
-
-    fn token_len(&self) -> TextSize {
-        self.source_length - self.text_len()
-    }
-
-    fn start_token(&mut self) {
-        self.source_length = self.text_len();
-    }
-
-    /// Returns `true` if the file is at the end of the file.
-    fn is_eof(&self) -> bool {
-        self.chars.as_str().is_empty()
-    }
-
-    /// Consumes the next character
-    fn bump(&mut self) -> Option<char> {
-        self.chars.next()
-    }
-
-    /// Consumes the next character from the back
-    fn bump_back(&mut self) -> Option<char> {
-        self.chars.next_back()
-    }
-
-    fn eat_char(&mut self, c: char) -> bool {
-        if self.first() == c {
-            self.bump();
-            true
-        } else {
-            false
-        }
-    }
-
-    fn eat_char_back(&mut self, c: char) -> bool {
-        if self.last() == c {
-            self.bump_back();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Eats symbols while predicate returns true or until the end of file is reached.
-    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        // It was tried making optimized version of this for eg. line comments, but
-        // LLVM can inline all of this and compile it down to fast iteration over bytes.
-        while predicate(self.first()) && !self.is_eof() {
-            self.bump();
-        }
-    }
-
-    /// Eats symbols from the back while predicate returns true or until the beginning of file is reached.
-    fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        // It was tried making optimized version of this for eg. line comments, but
-        // LLVM can inline all of this and compile it down to fast iteration over bytes.
-        while predicate(self.last()) && !self.is_eof() {
-            self.bump_back();
         }
     }
 }
@@ -617,6 +593,44 @@ mod tests {
     #[test]
     fn tokenize_continuation() {
         let source = "( \\\n )";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tricky_unicode() {
+        let source = "មុ";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn identifier_ending_in_non_start_char() {
+        let source = "i5";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn ignore_word_with_only_id_continuing_chars() {
+        let source = "555";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+
+        // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
+    }
+
+    #[test]
+    fn tokenize_multichar() {
+        let source = "if in else match";
 
         let test_case = tokenize(source);
 

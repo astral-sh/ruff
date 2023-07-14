@@ -351,7 +351,7 @@ pub(crate) fn reuse_of_groupby_generator(
         return;
     }
     let mut finder = GroupNameFinder::new(group_name);
-    for stmt in body.iter() {
+    for stmt in body {
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {

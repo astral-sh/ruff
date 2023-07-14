@@ -106,19 +106,7 @@ def foo3(list_a, list_b):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,5 @@
--from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
--    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
--)
--from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
--    MyLovelyCompanyTeamProjectComponent as component,  # DRY
--)
-+NOT_YET_IMPLEMENTED_StmtImportFrom
-+NOT_YET_IMPLEMENTED_StmtImportFrom
- 
- 
- class C:
-@@ -58,37 +54,28 @@
+@@ -58,37 +58,28 @@
  
  def foo(list_a, list_b):
      results = (
@@ -134,11 +122,10 @@ def foo3(list_a, list_b):
 -        .order_by(User.created_at.desc())
 -        .with_for_update(key_share=True)
 -        .all()
--    )
-+        filter
-+    )(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
-+        User.created_at.desc()
-+    ).with_for_update(key_share=True).all()
++        filter(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
++            User.created_at.desc()
++        ).with_for_update(key_share=True).all()
+     )
      return results
  
  
@@ -172,8 +159,12 @@ def foo3(list_a, list_b):
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
+    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
+)
+from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
+    MyLovelyCompanyTeamProjectComponent as component,  # DRY
+)
 
 
 class C:
@@ -232,10 +223,10 @@ def foo(list_a, list_b):
             db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
         ).filter(User.xyz.is_(None)).
         # Another comment about the filtering on is_quux goes here.
-        filter
-    )(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
-        User.created_at.desc()
-    ).with_for_update(key_share=True).all()
+        filter(db.not_(User.is_pending.astext.cast(db.Boolean).is_(True))).order_by(
+            User.created_at.desc()
+        ).with_for_update(key_share=True).all()
+    )
     return results
 
 
