@@ -1,5 +1,5 @@
 [package]
-name = "shrinking"
+name = "ruff_shrinking"
 version = "0.1.0"
 edition = "2021"
 
