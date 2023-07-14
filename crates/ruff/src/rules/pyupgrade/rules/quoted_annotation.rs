@@ -15,6 +15,11 @@ use crate::registry::Rule;
 /// will always evaluate type annotations in a deferred manner, making
 /// the quotes unnecessary.
 ///
+/// Type annotations can also be unquoted in some other contexts, even
+/// without `from __future__ import annotations`. For example, annotated
+/// assignments within function bodies are not evaluated at runtime, and so can
+/// be unquoted.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
