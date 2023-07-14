@@ -2772,7 +2772,7 @@ where
                 }
                 if self.enabled(Rule::UnnecessaryDoubleCastOrProcess) {
                     flake8_comprehensions::rules::unnecessary_double_cast_or_process(
-                        self, expr, func, args,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.enabled(Rule::UnnecessarySubscriptReversal) {
