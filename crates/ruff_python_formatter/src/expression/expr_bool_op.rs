@@ -1,6 +1,7 @@
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses, Parentheses,
+    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
+    OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
@@ -42,7 +43,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 let leading_value_comments = comments.leading_comments(value);
                 // Format the expressions leading comments **before** the operator
                 if leading_value_comments.is_empty() {
-                    write!(f, [soft_line_break_or_space()])?;
+                    write!(f, [in_parentheses_only_soft_line_break_or_space()])?;
                 } else {
                     write!(
                         f,

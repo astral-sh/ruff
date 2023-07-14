@@ -1,6 +1,7 @@
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses, Parentheses,
+    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
+    OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -41,7 +42,7 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
             for (operator, comparator) in ops.iter().zip(comparators) {
                 let leading_comparator_comments = comments.leading_comments(comparator);
                 if leading_comparator_comments.is_empty() {
-                    write!(f, [soft_line_break_or_space()])?;
+                    write!(f, [in_parentheses_only_soft_line_break_or_space()])?;
                 } else {
                     // Format the expressions leading comments **before** the operator
                     write!(

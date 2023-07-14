@@ -1,9 +1,9 @@
 use crate::comments::trailing_comments;
 
-use crate::expression::parentheses::Parentheses;
+use crate::expression::parentheses::{parenthesized, Parentheses};
 use crate::prelude::*;
 use crate::trivia::{SimpleTokenizer, TokenKind};
-use ruff_formatter::{format_args, write};
+use ruff_formatter::write;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Ranged, StmtClassDef};
 
@@ -32,16 +32,14 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         write!(f, [text("class"), space(), name.format()])?;
 
         if !(bases.is_empty() && keywords.is_empty()) {
-            write!(
-                f,
-                [group(&format_args![
-                    text("("),
-                    soft_block_indent(&FormatInheritanceClause {
-                        class_definition: item
-                    }),
-                    text(")")
-                ])]
-            )?;
+            parenthesized(
+                "(",
+                &FormatInheritanceClause {
+                    class_definition: item,
+                },
+                ")",
+            )
+            .fmt(f)?;
         }
 
         let comments = f.context().comments().clone();

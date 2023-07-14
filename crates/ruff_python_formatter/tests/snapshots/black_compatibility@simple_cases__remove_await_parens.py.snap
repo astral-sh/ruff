@@ -114,8 +114,8 @@ async def main():
  # Check comments
  async def main():
 -    await asyncio.sleep(1)  # Hello
-+    (
-+        await # Hello
++    await (
++        # Hello
 +        asyncio.sleep(1)
 +    )
  
@@ -191,8 +191,8 @@ async def main():
 
 # Check comments
 async def main():
-    (
-        await # Hello
+    await (
+        # Hello
         asyncio.sleep(1)
     )
 

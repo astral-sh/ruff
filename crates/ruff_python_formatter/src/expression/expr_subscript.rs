@@ -7,9 +7,7 @@ use crate::comments::trailing_comments;
 use crate::context::NodeLevel;
 use crate::context::PyFormatContext;
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -64,7 +62,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 
         write!(
             f,
-            [in_parentheses_only_group(&format_args![
+            [group(&format_args![
                 text("["),
                 trailing_comments(dangling_comments),
                 soft_block_indent(&format_slice),

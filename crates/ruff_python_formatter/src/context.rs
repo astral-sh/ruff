@@ -84,3 +84,13 @@ pub(crate) enum NodeLevel {
     /// Formatting nodes that are enclosed by a parenthesized (any `[]`, `{}` or `()`) expression.
     ParenthesizedExpression,
 }
+
+impl NodeLevel {
+    /// Returns `true` if the expression is in a parenthesized context.
+    pub(crate) const fn is_parenthesized(self) -> bool {
+        matches!(
+            self,
+            NodeLevel::Expression(Some(_)) | NodeLevel::ParenthesizedExpression
+        )
+    }
+}

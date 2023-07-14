@@ -1,6 +1,8 @@
 use crate::comments::{trailing_comments, trailing_node_comments};
 use crate::expression::parentheses::{
-    in_parentheses_only_group, is_expression_parenthesized, NeedsParentheses, OptionalParentheses,
+    in_parentheses_only_group, in_parentheses_only_soft_line_break,
+    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized, NeedsParentheses,
+    OptionalParentheses,
 };
 use crate::expression::Parentheses;
 use crate::prelude::*;
@@ -64,9 +66,9 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                 let needs_space = !is_simple_power_expression(current);
 
                 let before_operator_space = if needs_space {
-                    soft_line_break_or_space()
+                    in_parentheses_only_soft_line_break_or_space()
                 } else {
-                    soft_line_break()
+                    in_parentheses_only_soft_line_break()
                 };
 
                 write!(
