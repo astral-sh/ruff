@@ -4329,6 +4329,11 @@ impl<'a> Checker<'a> {
             ResolvedRead::Resolved(_) | ResolvedRead::ImplicitGlobal => {
                 // Nothing to do.
             }
+            ResolvedRead::TypingOnly(binding_id) => {
+                if self.enabled(Rule::UnquotedAnnotation) {
+                    flake8_type_checking::rules::unquoted_annotation(self, binding_id, expr);
+                }
+            }
             ResolvedRead::WildcardImport => {
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {

@@ -275,6 +275,7 @@ impl<'a> SemanticModel<'a> {
 
         let mut seen_function = false;
         let mut import_starred = false;
+        let mut annotation_id = None;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
@@ -293,7 +294,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            if let Some(binding_id) = scope.get(symbol) {
+            for binding_id in scope.get_all(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
                 let reference_id = self.references.push(self.scope_id, range, context);
@@ -303,6 +304,27 @@ impl<'a> SemanticModel<'a> {
                 if let Some(binding_id) = self.resolve_submodule(symbol, scope_id, binding_id) {
                     let reference_id = self.references.push(self.scope_id, range, context);
                     self.bindings[binding_id].references.push(reference_id);
+                }
+
+                // If we're in a runtime context, but the binding is typing-only, don't treat
+                // it as resolved. For example, given:
+                //
+                // ```python
+                // from typing import TYPE_CHECKING
+                //
+                // if TYPE_CHECKING:
+                //     from foo import Foo
+                //
+                // Foo()
+                // ```
+                //
+                // The `Foo` in `Foo()` should be treated as unresolved at runtime, but the `Foo` in
+                // `from foo import Foo` should be treated as used.
+                if self.bindings[binding_id].context.is_typing() {
+                    if self.execution_context().is_runtime() {
+                        annotation_id = Some(binding_id);
+                        continue;
+                    }
                 }
 
                 match self.bindings[binding_id].kind {
@@ -405,7 +427,9 @@ impl<'a> SemanticModel<'a> {
             import_starred = import_starred || scope.uses_star_imports();
         }
 
-        if import_starred {
+        if let Some(annotation_id) = annotation_id {
+            ResolvedRead::TypingOnly(annotation_id)
+        } else if import_starred {
             ResolvedRead::WildcardImport
         } else {
             ResolvedRead::NotFound
@@ -1379,6 +1403,23 @@ pub enum ResolvedRead {
     ///
     /// The `x` in `print(x)` is resolved to the binding of `x` in `x = 1`.
     Resolved(BindingId),
+
+    /// The read reference is resolved to a specific binding, but the binding is only visible
+    /// at type-checking time.
+    ///
+    /// For example, given:
+    /// ```python
+    /// from typing import TYPE_CHECKING
+    ///
+    /// if TYPE_CHECKING:
+    ///     from foo import Foo
+    ///
+    /// Foo()
+    /// ```
+    ///
+    /// The `Foo` in `Foo()` is resolved to the binding of `Foo` in `from foo import Foo`, but
+    /// the binding is only visible at type-checking time.
+    TypingOnly(BindingId),
 
     /// The read reference is resolved to a context-specific, implicit global (e.g., `__class__`
     /// within a class scope).

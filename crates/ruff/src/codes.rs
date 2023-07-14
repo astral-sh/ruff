@@ -707,6 +707,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TypeChecking, "003") => (RuleGroup::Unspecified, rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport),
         (Flake8TypeChecking, "004") => (RuleGroup::Unspecified, rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock),
         (Flake8TypeChecking, "005") => (RuleGroup::Unspecified, rules::flake8_type_checking::rules::EmptyTypeCheckingBlock),
+        (Flake8TypeChecking, "200") => (RuleGroup::Unspecified, rules::flake8_type_checking::rules::UnquotedAnnotation),
 
         // tryceratops
         (Tryceratops, "002") => (RuleGroup::Unspecified, rules::tryceratops::rules::RaiseVanillaClass),
