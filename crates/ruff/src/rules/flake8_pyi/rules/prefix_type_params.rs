@@ -60,10 +60,10 @@ impl Violation for UnprefixedTypeParam {
 
 /// PYI001
 pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+    };
+    if let Expr::Name(ast::ExprName { id, .. }) = target {
         if id.starts_with('_') {
             return;
         }

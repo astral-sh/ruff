@@ -52,10 +52,9 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                 // If the parent node is not a `BinOp` we will not perform a fix
                 if let Some(Expr::BinOp(ast::ExprBinOp { left, right, .. })) = parent {
                     // Replace the parent with its non-duplicate child.
+                    let child = if expr == left.as_ref() { right } else { left };
                     diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        checker
-                            .generator()
-                            .expr(if expr == left.as_ref() { right } else { left }),
+                        checker.locator.slice(child.range()).to_string(),
                         parent.unwrap().range(),
                     )));
                 }

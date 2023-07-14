@@ -55,14 +55,11 @@ pub(crate) fn strip_with_multi_characters(
     if !matches!(attr.as_str(), "strip" | "lstrip" | "rstrip") {
         return;
     }
-    if args.len() != 1 {
-        return;
-    }
 
-    let Expr::Constant(ast::ExprConstant {
+    let [Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    }) = &args[0]
+    })] = args
     else {
         return;
     };

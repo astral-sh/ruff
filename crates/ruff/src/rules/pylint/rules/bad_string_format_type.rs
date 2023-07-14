@@ -128,10 +128,9 @@ fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> boo
     let formats = collect_specs(formats);
     // If there is more than one format, this is not valid python and we should
     // return true so that no error is reported
-    if formats.len() != 1 {
+    let [format] = formats.as_slice() else {
         return true;
-    }
-    let format = formats[0];
+    };
     equivalent(format, value)
 }
 
