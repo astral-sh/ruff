@@ -38,10 +38,9 @@ impl Violation for PandasDfVariableName {
 
 /// PD901
 pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return None;
-    }
-    let target = &targets[0];
+    };
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return None;
     };

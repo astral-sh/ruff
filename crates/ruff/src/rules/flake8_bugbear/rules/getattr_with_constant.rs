@@ -1,5 +1,4 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Identifier, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -47,15 +46,6 @@ impl AlwaysAutofixableViolation for GetAttrWithConstant {
         "Replace `getattr` with attribute access".to_string()
     }
 }
-fn attribute(value: &Expr, attr: &str) -> Expr {
-    ast::ExprAttribute {
-        value: Box::new(value.clone()),
-        attr: Identifier::new(attr.to_string(), TextRange::default()),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-    }
-    .into()
-}
 
 /// B009
 pub(crate) fn getattr_with_constant(
@@ -83,14 +73,14 @@ pub(crate) fn getattr_with_constant(
     if !is_identifier(value) {
         return;
     }
-    if is_mangled_private(value.as_str()) {
+    if is_mangled_private(value) {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            checker.generator().expr(&attribute(obj, value)),
+            format!("{}.{}", checker.locator.slice(obj.range()), value),
             expr.range(),
         )));
     }

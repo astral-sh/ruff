@@ -59,7 +59,6 @@ field18: typing.Union[
     ],
 ]  # Error, newline and comment will not be emitted in message
 
-
 # Should emit in cases with `typing.Union` instead of `|`
 field19: typing.Union[int, int]  # Error
 
@@ -71,3 +70,7 @@ field21: typing.Union[int, int | str]  # Error
 
 # Should emit only once in cases with multiple nested `typing.Union`
 field22: typing.Union[int, typing.Union[int, typing.Union[int, int]]]  # Error
+
+# Should emit in cases with newlines
+field23: set[  # foo
+    int] | set[int]
