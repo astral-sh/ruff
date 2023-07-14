@@ -206,7 +206,7 @@ impl Strategy for StrategyRemoveExpression {
         let mut visitor = ExpressionCollector::default();
         visitor.visit_body(ast);
         let iter = visitor.ranges.into_iter().map(move |range| {
-            input[..range.start().to_usize()].to_string() + &input[range.end().to_usize()..]
+            input[TextRange::up_to(range.start())].to_string() + &input[range.end().to_usize()..]
         });
         Ok(Box::new(iter))
     }
