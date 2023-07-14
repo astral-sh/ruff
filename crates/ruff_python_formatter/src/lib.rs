@@ -280,15 +280,30 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-if a * [
-    bbbbbbbbbbbbbbbbbbbbbb,
-    cccccccccccccccccccccccccccccdddddddddddddddddddddddddd,
-] + a * e * [
-    ffff,
-    gggg,
-    hhhhhhhhhhhhhh,
-] * c:
-    pass
+with (
+    [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccc",
+        dddddddddddddddddddddddddddddddd,
+    ] as example1,
+    aaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    + cccccccccccccccccccccccccccc
+    + ddddddddddddddddd as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+):
+    ...
+
+with [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbb",
+    "cccccccccccccccccccccccccccccccccccccccccc",
+    dddddddddddddddddddddddddddddddd,
+] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
+    ...
 
 "#;
         // Tokenize once

@@ -15,24 +15,27 @@ impl FormatNodeRule<ExprAwait> for FormatExprAwait {
     fn fmt_fields(&self, item: &ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprAwait { range: _, value } = item;
 
-        let format_value = format_with(|f: &mut PyFormatter| {
-            if f.context().node_level().is_parenthesized() {
-                value.format().fmt(f)
-            } else {
-                maybe_parenthesize_expression(value, item, Parenthesize::Optional).fmt(f)
-            }
-        });
-
-        write!(f, [text("await"), space(), format_value])
+        write!(
+            f,
+            [
+                text("await"),
+                space(),
+                maybe_parenthesize_expression(value, item, Parenthesize::IfRequired)
+            ]
+        )
     }
 }
 
 impl NeedsParentheses for ExprAwait {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }

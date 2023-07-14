@@ -159,22 +159,31 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             parenthesize,
         } = self;
 
-        let parenthesize = match parenthesize {
-            Parenthesize::Optional => {
-                is_expression_parenthesized(AnyNodeRef::from(*expression), f.context().source())
+        let comments = f.context().comments();
+        let preserve_parentheses = parenthesize.is_optional()
+            && is_expression_parenthesized(AnyNodeRef::from(*expression), f.context().source());
+
+        let has_comments = comments.has_leading_comments(*expression)
+            || comments.has_trailing_own_line_comments(*expression);
+
+        if preserve_parentheses || has_comments {
+            return expression.format().with_options(Parentheses::Always).fmt(f);
+        }
+
+        let needs_parentheses = expression.needs_parentheses(*parent, f.context());
+        let needs_parentheses = match parenthesize {
+            Parenthesize::IfRequired => {
+                if !needs_parentheses.is_always() && f.context().node_level().is_parenthesized() {
+                    OptionalParentheses::Never
+                } else {
+                    needs_parentheses
+                }
             }
-            Parenthesize::IfBreaks => false,
+            Parenthesize::Optional | Parenthesize::IfBreaks => needs_parentheses,
         };
 
-        let parentheses =
-            if parenthesize || f.context().comments().has_leading_comments(*expression) {
-                OptionalParentheses::Always
-            } else {
-                expression.needs_parentheses(*parent, f.context())
-            };
-
-        match parentheses {
-            OptionalParentheses::Multiline => {
+        match needs_parentheses {
+            OptionalParentheses::Multiline if *parenthesize != Parenthesize::IfRequired => {
                 if can_omit_optional_parentheses(expression, f.context()) {
                     optional_parentheses(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
@@ -186,7 +195,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             OptionalParentheses::Always => {
                 expression.format().with_options(Parentheses::Always).fmt(f)
             }
-            OptionalParentheses::Never => {
+            OptionalParentheses::Never | OptionalParentheses::Multiline => {
                 expression.format().with_options(Parentheses::Never).fmt(f)
             }
         }

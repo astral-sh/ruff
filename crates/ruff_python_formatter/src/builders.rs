@@ -228,9 +228,22 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     where
         T: Ranged,
     {
+        self.entry_with_line_separator(node, content, soft_line_break_or_space())
+    }
+
+    pub(crate) fn entry_with_line_separator<N, Separator>(
+        &mut self,
+        node: &N,
+        content: &dyn Format<PyFormatContext<'ast>>,
+        separator: Separator,
+    ) -> &mut Self
+    where
+        N: Ranged,
+        Separator: Format<PyFormatContext<'ast>>,
+    {
         self.result = self.result.and_then(|_| {
             if self.end_of_last_entry.is_some() {
-                write!(self.fmt, [text(","), soft_line_break_or_space()])?;
+                write!(self.fmt, [text(","), separator])?;
             }
 
             self.end_of_last_entry = Some(node.end());
