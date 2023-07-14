@@ -51,11 +51,9 @@ pub(crate) fn variable_name_task_id(
     value: &Expr,
 ) -> Option<Diagnostic> {
     // If we have more than one target, we can't do anything.
-    if targets.len() != 1 {
+    let [target] = targets else {
         return None;
-    }
-
-    let target = &targets[0];
+    };
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return None;
     };

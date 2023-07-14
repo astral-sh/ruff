@@ -14,16 +14,16 @@ pub(super) fn exactly_one_argument_with_matching_function<'a>(
     args: &'a [Expr],
     keywords: &[Keyword],
 ) -> Option<&'a Expr> {
-    if !keywords.is_empty() {
+    let [arg] = args else {
         return None;
-    }
-    if args.len() != 1 {
+    };
+    if !keywords.is_empty() {
         return None;
     }
     if expr_name(func)? != name {
         return None;
     }
-    Some(&args[0])
+    Some(arg)
 }
 
 pub(super) fn first_argument_with_matching_function<'a>(

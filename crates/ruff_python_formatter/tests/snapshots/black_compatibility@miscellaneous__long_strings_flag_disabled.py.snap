@@ -316,37 +316,23 @@ long_unmergable_string_with_pragma = (
  
  comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
  
-@@ -165,25 +165,13 @@
+@@ -165,13 +165,9 @@
  
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
 -assert (
 -    some_type_of_boolean_expression
 -), "Followed by a really really really long string that is used to provide context to the AssertionError exception."
-+NOT_YET_IMPLEMENTED_StmtAssert
++assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
  
 -assert (
 -    some_type_of_boolean_expression
 -), "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
--    "formatting"
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
++assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+     "formatting"
+ )
  
--assert some_type_of_boolean_expression, (
--    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
--    % "formatting"
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
--assert some_type_of_boolean_expression, (
--    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
--    % ("string", "formatting")
--)
-+NOT_YET_IMPLEMENTED_StmtAssert
- 
- some_function_call(
-     "With a reallly generic name and with a really really long string that is, at some point down the line, "
-@@ -221,8 +209,8 @@
+@@ -221,8 +217,8 @@
  func_with_bad_comma(
      (
          "This is a really long string argument to a function that has a trailing comma"
@@ -357,7 +343,7 @@ long_unmergable_string_with_pragma = (
  )
  
  func_with_bad_parens_that_wont_fit_in_one_line(
-@@ -271,10 +259,10 @@
+@@ -271,10 +267,10 @@
  
  
  def foo():
@@ -542,13 +528,21 @@ pragma_comment_string2 = "Lines which end with an inline pragma comment of the f
 
 triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+    "formatting"
+)
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
+    % "formatting"
+)
 
-NOT_YET_IMPLEMENTED_StmtAssert
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
+    % ("string", "formatting")
+)
 
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "

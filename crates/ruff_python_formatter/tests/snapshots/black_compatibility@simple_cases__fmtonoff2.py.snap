@@ -77,10 +77,10 @@ def test_calculate_fades():
  
 +
  def check_fader(test):
-+    pass
+-
+     pass
  
--    pass
- 
++
  def verify_fader(test):
 -  # misaligned comment
 +    # misaligned comment
@@ -89,10 +89,9 @@ def test_calculate_fades():
 +
  def verify_fader(test):
      """Hey, ho."""
--    assert test.passed()
-+    NOT_YET_IMPLEMENTED_StmtAssert
-+
+     assert test.passed()
  
++
  def test_calculate_fades():
      calcs = [
          # one is zero/none
@@ -141,7 +140,7 @@ def verify_fader(test):
 
 def verify_fader(test):
     """Hey, ho."""
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert test.passed()
 
 
 def test_calculate_fades():

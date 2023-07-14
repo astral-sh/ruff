@@ -136,13 +136,7 @@ fn is_exception_check(stmt: &Stmt) -> bool {
     else {
         return false;
     };
-    if body.len() != 1 {
-        return false;
-    }
-    if matches!(body[0], Stmt::Raise(_)) {
-        return true;
-    }
-    false
+    matches!(body.as_slice(), [Stmt::Raise(_)])
 }
 
 /// SIM201
@@ -287,7 +281,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().in_boolean_test() {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.generator().expr(operand),
+                checker.locator.slice(operand.range()).to_string(),
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {

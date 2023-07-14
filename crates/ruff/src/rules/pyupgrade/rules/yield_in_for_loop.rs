@@ -99,11 +99,10 @@ impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
                     return;
                 }
                 // If there's any logic besides a yield, don't rewrite.
-                if body.len() != 1 {
+                let [body] = body.as_slice() else {
                     return;
-                }
+                };
                 // If the body is not a yield, don't rewrite.
-                let body = &body[0];
                 if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body {
                     if let Expr::Yield(ast::ExprYield {
                         value: Some(value),

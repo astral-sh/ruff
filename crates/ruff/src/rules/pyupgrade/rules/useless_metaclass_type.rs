@@ -48,10 +48,7 @@ pub(crate) fn useless_metaclass_type(
     value: &Expr,
     targets: &[Expr],
 ) {
-    if targets.len() != 1 {
-        return;
-    }
-    let Expr::Name(ast::ExprName { id, .. }) = targets.first().unwrap() else {
+    let [Expr::Name(ast::ExprName { id, .. })] = targets else {
         return;
     };
     if id != "__metaclass__" {

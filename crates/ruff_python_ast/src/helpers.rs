@@ -549,10 +549,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // annotation. This is what pycodestyle (as of 2.9.1) does.
     match stmt {
         Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-            if targets.len() != 1 {
-                return false;
-            }
-            if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+            if let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() {
                 is_dunder(id)
             } else {
                 false
