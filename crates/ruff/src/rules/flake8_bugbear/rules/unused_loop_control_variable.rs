@@ -154,20 +154,23 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
             },
             expr.range(),
         );
-        if let Some(rename) = rename {
-            if certainty.into() && checker.patch(diagnostic.kind.rule()) {
-                // Avoid fixing if the variable, or any future bindings to the variable, are
-                // used _after_ the loop.
-                let scope = checker.semantic().scope();
-                if scope
-                    .get_all(name)
-                    .map(|binding_id| checker.semantic().binding(binding_id))
-                    .all(|binding| !binding.is_used())
-                {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        rename,
-                        expr.range(),
-                    )));
+        if checker.patch(diagnostic.kind.rule()) {
+            if let Some(rename) = rename {
+                if certainty.into() {
+                    // Avoid fixing if the variable, or any future bindings to the variable, are
+                    // used _after_ the loop.
+                    let scope = checker.semantic().scope();
+                    if scope
+                        .get_all(name)
+                        .map(|binding_id| checker.semantic().binding(binding_id))
+                        .filter(|binding| binding.range.start() >= expr.range().start())
+                        .all(|binding| !binding.is_used())
+                    {
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            rename,
+                            expr.range(),
+                        )));
+                    }
                 }
             }
         }

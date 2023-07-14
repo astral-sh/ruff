@@ -1,12 +1,12 @@
 use std::fmt;
 
-use regex::Regex;
 use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
 use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -28,16 +28,16 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
-/// some_dict = {"a": 1, "b": 2}
-/// for _, val in some_dict.items():
-///     print(val)
+/// obj = {"a": 1, "b": 2}
+/// for key, value in obj.items():
+///     print(value)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// some_dict = {"a": 1, "b": 2}
-/// for val in some_dict.values():
-///     print(val)
+/// obj = {"a": 1, "b": 2}
+/// for value in obj.values():
+///     print(value)
 /// ```
 #[violation]
 pub struct IncorrectDictIterator {
@@ -79,8 +79,8 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
     }
 
     match (
-        is_ignored_tuple_or_name(key, &checker.settings.dummy_variable_rgx),
-        is_ignored_tuple_or_name(value, &checker.settings.dummy_variable_rgx),
+        is_unused(key, checker.semantic()),
+        is_unused(value, checker.semantic()),
     ) {
         (true, true) => {
             // Both the key and the value are unused.
@@ -142,13 +142,33 @@ impl fmt::Display for DictSubset {
     }
 }
 
-/// Returns `true` if the given expression is either an ignored value or a tuple of ignored values.
-fn is_ignored_tuple_or_name(expr: &Expr, dummy_variable_rgx: &Regex) -> bool {
+/// Returns `true` if the given expression is either an unused value or a tuple of unused values.
+fn is_unused(expr: &Expr, model: &SemanticModel) -> bool {
     match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
-            .iter()
-            .all(|expr| is_ignored_tuple_or_name(expr, dummy_variable_rgx)),
-        Expr::Name(ast::ExprName { id, .. }) => dummy_variable_rgx.is_match(id.as_str()),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(|expr| is_unused(expr, model)),
+        Expr::Name(ast::ExprName { id, .. }) => {
+            // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
+            // with usages.
+            //
+            // If we don't respect shadowing, we'll incorrectly flag `bar` as unused in:
+            // ```python
+            // from random import random
+            //
+            // for bar in range(10):
+            //     if random() > 0.5:
+            //         break
+            // else:
+            //     bar = 1
+            //
+            // print(bar)
+            // ```
+            let scope = model.scope();
+            scope
+                .get_all(id)
+                .map(|binding_id| model.binding(binding_id))
+                .filter(|binding| binding.range.start() >= expr.range().start())
+                .all(|binding| !binding.is_used())
+        }
         _ => false,
     }
 }
