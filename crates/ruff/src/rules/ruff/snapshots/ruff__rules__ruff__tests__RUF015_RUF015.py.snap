@@ -335,4 +335,172 @@ RUF015.py:19:1: RUF015 [*] Prefer `[next(iter(x))]` over `list(x)[:1]`
 21 21 | # OK (not indexing (solely) the first element)
 22 22 | list(x)
 
+RUF015.py:38:1: RUF015 [*] Prefer `next(iter(i + 1 for i in x))` over `list(i + 1 for i in x)[0]`
+   |
+37 | # RUF015 (doesn't mirror the underlying list)
+38 | [i + 1 for i in x][0]
+   | ^^^^^^^^^^^^^^^^^^^^^ RUF015
+39 | [i for i in x if i > 5][0]
+40 | [(i, i + 1) for i in x][0]
+   |
+   = help: Replace with `next(iter(i + 1 for i in x))`
+
+ℹ Suggested fix
+35 35 | [i for i in x][::]
+36 36 | 
+37 37 | # RUF015 (doesn't mirror the underlying list)
+38    |-[i + 1 for i in x][0]
+   38 |+next(iter(i + 1 for i in x))
+39 39 | [i for i in x if i > 5][0]
+40 40 | [(i, i + 1) for i in x][0]
+41 41 | 
+
+RUF015.py:39:1: RUF015 [*] Prefer `next(iter(i for i in x if i > 5))` over `list(i for i in x if i > 5)[0]`
+   |
+37 | # RUF015 (doesn't mirror the underlying list)
+38 | [i + 1 for i in x][0]
+39 | [i for i in x if i > 5][0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+40 | [(i, i + 1) for i in x][0]
+   |
+   = help: Replace with `next(iter(i for i in x if i > 5))`
+
+ℹ Suggested fix
+36 36 | 
+37 37 | # RUF015 (doesn't mirror the underlying list)
+38 38 | [i + 1 for i in x][0]
+39    |-[i for i in x if i > 5][0]
+   39 |+next(iter(i for i in x if i > 5))
+40 40 | [(i, i + 1) for i in x][0]
+41 41 | 
+42 42 | # RUF015 (multiple generators)
+
+RUF015.py:40:1: RUF015 [*] Prefer `next(iter((i, i + 1) for i in x))` over `list((i, i + 1) for i in x)[0]`
+   |
+38 | [i + 1 for i in x][0]
+39 | [i for i in x if i > 5][0]
+40 | [(i, i + 1) for i in x][0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+41 | 
+42 | # RUF015 (multiple generators)
+   |
+   = help: Replace with `next(iter((i, i + 1) for i in x))`
+
+ℹ Suggested fix
+37 37 | # RUF015 (doesn't mirror the underlying list)
+38 38 | [i + 1 for i in x][0]
+39 39 | [i for i in x if i > 5][0]
+40    |-[(i, i + 1) for i in x][0]
+   40 |+next(iter((i, i + 1) for i in x))
+41 41 | 
+42 42 | # RUF015 (multiple generators)
+43 43 | y = range(10)
+
+RUF015.py:44:1: RUF015 [*] Prefer `next(iter(i + j for i in x for j in y))` over `list(i + j for i in x for j in y)[0]`
+   |
+42 | # RUF015 (multiple generators)
+43 | y = range(10)
+44 | [i + j for i in x for j in y][0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+45 | 
+46 | # RUF015
+   |
+   = help: Replace with `next(iter(i + j for i in x for j in y))`
+
+ℹ Suggested fix
+41 41 | 
+42 42 | # RUF015 (multiple generators)
+43 43 | y = range(10)
+44    |-[i + j for i in x for j in y][0]
+   44 |+next(iter(i + j for i in x for j in y))
+45 45 | 
+46 46 | # RUF015
+47 47 | list(range(10))[0]
+
+RUF015.py:47:1: RUF015 [*] Prefer `next(iter(range(10)))` over `list(range(10))[0]`
+   |
+46 | # RUF015
+47 | list(range(10))[0]
+   | ^^^^^^^^^^^^^^^^^^ RUF015
+48 | list(x.y)[0]
+49 | list(x["y"])[0]
+   |
+   = help: Replace with `next(iter(range(10)))`
+
+ℹ Suggested fix
+44 44 | [i + j for i in x for j in y][0]
+45 45 | 
+46 46 | # RUF015
+47    |-list(range(10))[0]
+   47 |+next(iter(range(10)))
+48 48 | list(x.y)[0]
+49 49 | list(x["y"])[0]
+50 50 | 
+
+RUF015.py:48:1: RUF015 [*] Prefer `next(iter(x.y))` over `list(x.y)[0]`
+   |
+46 | # RUF015
+47 | list(range(10))[0]
+48 | list(x.y)[0]
+   | ^^^^^^^^^^^^ RUF015
+49 | list(x["y"])[0]
+   |
+   = help: Replace with `next(iter(x.y))`
+
+ℹ Suggested fix
+45 45 | 
+46 46 | # RUF015
+47 47 | list(range(10))[0]
+48    |-list(x.y)[0]
+   48 |+next(iter(x.y))
+49 49 | list(x["y"])[0]
+50 50 | 
+51 51 | # RUF015 (multi-line)
+
+RUF015.py:49:1: RUF015 [*] Prefer `next(iter(x["y"]))` over `list(x["y"])[0]`
+   |
+47 | list(range(10))[0]
+48 | list(x.y)[0]
+49 | list(x["y"])[0]
+   | ^^^^^^^^^^^^^^^ RUF015
+50 | 
+51 | # RUF015 (multi-line)
+   |
+   = help: Replace with `next(iter(x["y"]))`
+
+ℹ Suggested fix
+46 46 | # RUF015
+47 47 | list(range(10))[0]
+48 48 | list(x.y)[0]
+49    |-list(x["y"])[0]
+   49 |+next(iter(x["y"]))
+50 50 | 
+51 51 | # RUF015 (multi-line)
+52 52 | revision_heads_map_ast = [
+
+RUF015.py:52:26: RUF015 [*] Prefer `next(iter(...))` over `list(...)[0]`
+   |
+51 |   # RUF015 (multi-line)
+52 |   revision_heads_map_ast = [
+   |  __________________________^
+53 | |     a
+54 | |     for a in revision_heads_map_ast_obj.body
+55 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
+56 | | ][0]
+   | |____^ RUF015
+   |
+   = help: Replace with `next(iter(...))`
+
+ℹ Suggested fix
+49 49 | list(x["y"])[0]
+50 50 | 
+51 51 | # RUF015 (multi-line)
+52    |-revision_heads_map_ast = [
+   52 |+revision_heads_map_ast = next(iter(
+53 53 |     a
+54 54 |     for a in revision_heads_map_ast_obj.body
+55 55 |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
+56    |-][0]
+   56 |+))
+
 

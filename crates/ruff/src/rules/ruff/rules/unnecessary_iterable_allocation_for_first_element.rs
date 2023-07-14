@@ -1,6 +1,7 @@
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use rustpython_parser::ast::{self, Comprehension, Constant, Expr, ExprSubscript};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{self, Comprehension, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -30,12 +31,12 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
-/// head = list(range(1000000000000))[0]
+/// head = list(x)[0]
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// head = next(iter(range(1000000000000)))
+/// head = next(iter(x))
 /// ```
 ///
 /// ## References
@@ -53,6 +54,7 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
             iterable,
             subscript_kind,
         } = self;
+        let iterable = Self::truncate(iterable);
         match subscript_kind {
             HeadSubscriptKind::Index => {
                 format!("Prefer `next(iter({iterable}))` over `list({iterable})[0]`")
@@ -68,6 +70,7 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
             iterable,
             subscript_kind,
         } = self;
+        let iterable = Self::truncate(iterable);
         match subscript_kind {
             HeadSubscriptKind::Index => format!("Replace with `next(iter({iterable}))`"),
             HeadSubscriptKind::Slice => format!("Replace with `[next(iter({iterable}))]"),
@@ -75,10 +78,21 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
     }
 }
 
+impl UnnecessaryIterableAllocationForFirstElement {
+    /// If the iterable is too long, or spans multiple lines, truncate it.
+    fn truncate(iterable: &str) -> &str {
+        if iterable.len() > 40 || iterable.contains(['\r', '\n']) {
+            "..."
+        } else {
+            iterable
+        }
+    }
+}
+
 /// RUF015
 pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     checker: &mut Checker,
-    subscript: &ExprSubscript,
+    subscript: &ast::ExprSubscript,
 ) {
     let ast::ExprSubscript {
         value,
@@ -91,7 +105,9 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         return;
     };
 
-    let Some(iterable) = iterable_name(value, checker.semantic()) else {
+    let Some(iterable) =
+        match_iterable(value, checker.semantic()).map(|range| checker.locator.slice(range))
+    else {
         return;
     };
 
@@ -164,9 +180,15 @@ fn classify_subscript(expr: &Expr) -> Option<HeadSubscriptKind> {
     }
 }
 
-/// Fetch the name of the iterable from an expression if the expression returns an unmodified list
-/// which can be sliced into.
-fn iterable_name<'a>(expr: &'a Expr, model: &SemanticModel) -> Option<&'a str> {
+/// Return the [`TextRange`] of the iterable from an expression, if the expression can be sliced
+/// into (i.e., is a list comprehension, or call to `list` or `tuple`).
+///
+/// For example, given `list(x)`, returns the range of `x`. Given `[x * x for x in y]`, returns the
+/// range of `x * x for x in y`.
+///
+/// As a special-case, given `[x for x in y]`, returns the range of `y` (rather than the
+/// redundant comprehension).
+fn match_iterable(expr: &Expr, model: &SemanticModel) -> Option<TextRange> {
     match expr {
         Expr::Call(ast::ExprCall { func, args, .. }) => {
             let ast::ExprName { id, .. } = func.as_name_expr()?;
@@ -179,43 +201,67 @@ fn iterable_name<'a>(expr: &'a Expr, model: &SemanticModel) -> Option<&'a str> {
                 return None;
             }
 
-            match args.first() {
-                Some(Expr::Name(ast::ExprName { id: arg_name, .. })) => Some(arg_name.as_str()),
-                Some(Expr::GeneratorExp(ast::ExprGeneratorExp {
+            let [arg] = args.as_slice() else {
+                return None;
+            };
+
+            match arg {
+                Expr::GeneratorExp(ast::ExprGeneratorExp {
                     elt, generators, ..
-                })) => generator_iterable(elt, generators),
-                _ => None,
+                }) => match_simple_comprehension(elt, generators).or_else(|| Some(arg.range())),
+                Expr::ListComp(ast::ExprListComp {
+                    elt, generators, ..
+                }) => match_simple_comprehension(elt, generators).or_else(|| {
+                    Some(
+                        arg.range()
+                            // Remove the `[`
+                            .add_start(TextSize::from(1))
+                            // Remove the `]`
+                            .sub_end(TextSize::from(1)),
+                    )
+                }),
+                _ => Some(arg.range()),
             }
         }
         Expr::ListComp(ast::ExprListComp {
             elt, generators, ..
-        }) => generator_iterable(elt, generators),
+        }) => match_simple_comprehension(elt, generators).or_else(|| {
+            Some(
+                expr.range()
+                    // Remove the `[`
+                    .add_start(TextSize::from(1))
+                    // Remove the `]`
+                    .sub_end(TextSize::from(1)),
+            )
+        }),
         _ => None,
     }
 }
 
-/// Given a comprehension, returns the name of the iterable over which it iterates, if it's
-/// a simple comprehension (e.g., `x` for `[i for i in x]`).
-fn generator_iterable<'a>(elt: &'a Expr, generators: &'a Vec<Comprehension>) -> Option<&'a str> {
-    // If the `elt` field is anything other than a [`Expr::Name`], we can't be sure that it
-    // doesn't modify the elements of the underlying iterator (e.g., `[i + 1 for i in x][0]`).
-    if !elt.is_name_expr() {
-        return None;
-    }
-
-    // If there's more than 1 generator, we can't safely say that it fits the diagnostic conditions
-    // (e.g., `[(i, j) for i in x for j in y][0]`).
-    let [generator] = generators.as_slice() else {
+/// Returns the [`Expr`] target for a comprehension, if the comprehension is "simple"
+/// (e.g., `x` for `[i for i in x]`).
+fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Option<TextRange> {
+    let [generator] = generators else {
         return None;
     };
+
+    if generator.is_async {
+        return None;
+    }
 
     // Ignore if there's an `if` statement in the comprehension, since it filters the list.
     if !generator.ifs.is_empty() {
         return None;
     }
 
-    let ast::ExprName { id, .. } = generator.iter.as_name_expr()?;
-    Some(id.as_str())
+    // Verify that the generator is, e.g. `i for i in x`, as opposed to `i for j in x`.
+    let elt = elt.as_name_expr()?;
+    let target = generator.target.as_name_expr()?;
+    if elt.id != target.id {
+        return None;
+    }
+
+    Some(generator.iter.range())
 }
 
 /// If an expression is a constant integer, returns the value of that integer; otherwise,
