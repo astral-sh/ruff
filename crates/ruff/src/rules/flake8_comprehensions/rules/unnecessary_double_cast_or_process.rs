@@ -1,5 +1,4 @@
 use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
-use smallvec::SmallVec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -103,20 +102,16 @@ pub(crate) fn unnecessary_double_cast_or_process(
     }
 
     // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
-    // (i.e., `key`, `reverse`)
+    // (i.e., `key`, `reverse`).
     if inner == "sorted" && outer == "sorted" {
         if inner_kw.len() != outer_kw.len() {
             return;
         }
-
-        let inner_comparables: SmallVec<[ComparableKeyword; 2]> =
-            inner_kw.iter().map(ComparableKeyword::from).collect();
-
-        if !outer_kw
-            .iter()
-            .map(ComparableKeyword::from)
-            .all(|kw| inner_comparables.contains(&kw))
-        {
+        if !inner_kw.iter().all(|inner| {
+            outer_kw
+                .iter()
+                .any(|outer| ComparableKeyword::from(inner) == ComparableKeyword::from(outer))
+        }) {
             return;
         }
     }
