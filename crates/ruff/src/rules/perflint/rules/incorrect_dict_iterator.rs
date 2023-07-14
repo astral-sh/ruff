@@ -1,13 +1,12 @@
 use std::fmt;
 
-use ruff_text_size::{TextRange, TextSize};
+use regex::Regex;
+use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
-use rustpython_parser::{ast, lexer, Mode, Tok};
+use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
-use rustpython_parser::ast::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -63,26 +62,26 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
         return;
     };
-    if elts.len() != 2 {
+    let [key, value] = elts.as_slice() else {
         return;
-    }
+    };
     let Expr::Call(ast::ExprCall { func, args, .. }) = iter else {
         return;
     };
     if !args.is_empty() {
         return;
     }
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return;
     };
     if attr != "items" {
         return;
     }
 
-    let unused_key = is_ignored_tuple_or_name(&elts[0]);
-    let unused_value = is_ignored_tuple_or_name(&elts[1]);
-
-    match (unused_key, unused_value) {
+    match (
+        is_ignored_tuple_or_name(key, &checker.settings.dummy_variable_rgx),
+        is_ignored_tuple_or_name(value, &checker.settings.dummy_variable_rgx),
+    ) {
         (true, true) => {
             // Both the key and the value are unused.
         }
@@ -98,14 +97,12 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                 func.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(range) = attribute_range(value.end(), checker.locator) {
-                    let replace_attribute = Edit::range_replacement("values".to_string(), range);
-                    let replace_target = Edit::range_replacement(
-                        checker.locator.slice(elts[1].range()).to_string(),
-                        target.range(),
-                    );
-                    diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
-                }
+                let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
+                let replace_target = Edit::range_replacement(
+                    checker.locator.slice(value.range()).to_string(),
+                    target.range(),
+                );
+                diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -118,14 +115,12 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                 func.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(range) = attribute_range(value.end(), checker.locator) {
-                    let replace_attribute = Edit::range_replacement("keys".to_string(), range);
-                    let replace_target = Edit::range_replacement(
-                        checker.locator.slice(elts[0].range()).to_string(),
-                        target.range(),
-                    );
-                    diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
-                }
+                let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
+                let replace_target = Edit::range_replacement(
+                    checker.locator.slice(key.range()).to_string(),
+                    target.range(),
+                );
+                diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -148,23 +143,12 @@ impl fmt::Display for DictSubset {
 }
 
 /// Returns `true` if the given expression is either an ignored value or a tuple of ignored values.
-fn is_ignored_tuple_or_name(expr: &Expr) -> bool {
+fn is_ignored_tuple_or_name(expr: &Expr, dummy_variable_rgx: &Regex) -> bool {
     match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_ignored_tuple_or_name),
-        Expr::Name(ast::ExprName { id, .. }) => id == "_",
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .all(|expr| is_ignored_tuple_or_name(expr, dummy_variable_rgx)),
+        Expr::Name(ast::ExprName { id, .. }) => dummy_variable_rgx.is_match(id.as_str()),
         _ => false,
     }
-}
-
-/// Returns the range of the attribute identifier after the given location, if any.
-fn attribute_range(at: TextSize, locator: &Locator) -> Option<TextRange> {
-    lexer::lex_starts_at(locator.after(at), Mode::Expression, at)
-        .flatten()
-        .find_map(|(tok, range)| {
-            if matches!(tok, Tok::Name { .. }) {
-                Some(range)
-            } else {
-                None
-            }
-        })
 }
