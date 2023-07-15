@@ -2271,6 +2271,8 @@ where
             Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 match ctx {
                     ExprContext::Load => {
+                        self.handle_node_load(expr);
+
                         if self.enabled(Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
@@ -2324,10 +2326,10 @@ where
                                 }
                             }
                         }
-
-                        self.handle_node_load(expr);
                     }
                     ExprContext::Store => {
+                        self.handle_node_store(id, expr);
+
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
                                 pycodestyle::rules::ambiguous_variable_name(id, expr.range())
@@ -2354,8 +2356,6 @@ where
                                 );
                             }
                         }
-
-                        self.handle_node_store(id, expr);
                     }
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
