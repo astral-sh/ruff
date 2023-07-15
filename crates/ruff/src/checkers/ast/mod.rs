@@ -5008,18 +5008,26 @@ impl<'a> Checker<'a> {
                         .collect()
                 };
 
-                flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                    self,
-                    scope,
-                    &mut diagnostics,
-                );
+                if self.enabled(Rule::RuntimeImportInTypeCheckingBlock) {
+                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                        self,
+                        scope,
+                        &mut diagnostics,
+                    );
+                }
 
-                flake8_type_checking::rules::typing_only_runtime_import(
-                    self,
-                    scope,
-                    &runtime_imports,
-                    &mut diagnostics,
-                );
+                if self.any_enabled(&[
+                    Rule::TypingOnlyFirstPartyImport,
+                    Rule::TypingOnlyThirdPartyImport,
+                    Rule::TypingOnlyStandardLibraryImport,
+                ]) {
+                    flake8_type_checking::rules::typing_only_runtime_import(
+                        self,
+                        scope,
+                        &runtime_imports,
+                        &mut diagnostics,
+                    );
+                }
             }
 
             if self.enabled(Rule::UnusedImport) {
