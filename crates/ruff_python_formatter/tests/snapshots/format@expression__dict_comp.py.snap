@@ -9,7 +9,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
 {i: i for i in [1,]}
 
 {
-    a  # a
+    a: a  # a
     for # for
     c  # c
     in  # in
@@ -62,7 +62,10 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
     ]
 }
 
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+{
+    a: a  # a
+    for c in e  # for  # c  # in  # e
+}
 
 {
     # above a

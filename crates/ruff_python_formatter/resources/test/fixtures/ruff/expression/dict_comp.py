@@ -3,7 +3,7 @@
 {i: i for i in [1,]}
 
 {
-    a  # a
+    a: a  # a
     for # for
     c  # c
     in  # in
