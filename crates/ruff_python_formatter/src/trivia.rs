@@ -193,8 +193,17 @@ pub(crate) enum TokenKind {
     /// `in`
     In,
 
+    /// `as`
+    As,
+
     /// `match`
     Match,
+
+    /// `with`
+    With,
+
+    /// `async`
+    Async,
 
     /// Any other non trivia token.
     Other,
@@ -272,10 +281,13 @@ impl<'a> SimpleTokenizer<'a> {
     fn to_keyword_or_other(&self, range: TextRange) -> TokenKind {
         let source = &self.source[range];
         match source {
-            "if" => TokenKind::If,
+            "as" => TokenKind::As,
+            "async" => TokenKind::Async,
             "else" => TokenKind::Else,
+            "if" => TokenKind::If,
             "in" => TokenKind::In,
             "match" => TokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
+            "with" => TokenKind::With,
             // ...,
             _ => TokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
         }

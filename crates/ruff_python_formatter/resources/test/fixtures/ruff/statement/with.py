@@ -40,9 +40,6 @@ with (a,):  # magic trailing comma
 with (a):  # should remove brackets
     ...
 
-# TODO: black doesn't wrap this, but maybe we want to anyway?
-# if we do want to wrap, do we prefer to wrap the entire WithItem or to let the
-# WithItem allow the `aa + bb` content expression to be wrapped
 with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c:
     ...
 
@@ -52,3 +49,62 @@ with (name_2 for name_0 in name_4):
     pass
 with (a, *b):
     pass
+
+with (
+    # leading comment
+    a) as b: ...
+
+with (
+    # leading comment
+    a as b
+): ...
+
+
+with (a # trailing same line comment
+    # trailing own line comment
+    ) as b: ...
+
+with (
+    a # trailing same line comment
+    # trailing own line comment
+    as b
+): ...
+
+
+with (a # trailing same line comment
+    # trailing own line comment
+) as b: ...
+
+with (
+    (a
+    # trailing own line comment
+    )
+    as # trailing as same line comment
+    b # trailing b same line comment
+): ...
+
+with (
+    [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccc",
+        dddddddddddddddddddddddddddddddd,
+    ] as example1,
+    aaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    + cccccccccccccccccccccccccccc
+    + ddddddddddddddddd as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+):
+    ...
+
+
+with [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbb",
+    "cccccccccccccccccccccccccccccccccccccccccc",
+    dddddddddddddddddddddddddddddddd,
+] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
+    ...
