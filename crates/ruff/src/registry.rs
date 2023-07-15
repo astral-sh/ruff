@@ -262,6 +262,7 @@ impl Rule {
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
+            | Rule::EmptyComment
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::InvalidCharacterBackspace

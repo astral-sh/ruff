@@ -1,0 +1,79 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+empty_comment_0.py:1:8: PLR2044 [*] Line with empty comment
+  |
+1 | b = 5  #
+  |        ^ PLR2044
+2 | #
+3 | b = '#' + '1'
+  |
+  = help: Remove empty comment
+
+ℹ Fix
+1   |-b = 5  #
+  1 |+b = 5  
+2 2 | #
+3 3 | b = '#' + '1'
+4 4 | print(b)  #
+
+empty_comment_0.py:2:1: PLR2044 [*] Line with empty comment
+  |
+1 | b = 5  #
+2 | #
+  | ^ PLR2044
+3 | b = '#' + '1'
+4 | print(b)  #
+  |
+  = help: Remove empty comment
+
+ℹ Fix
+1 1 | b = 5  #
+2   |-#
+  2 |+
+3 3 | b = '#' + '1'
+4 4 | print(b)  #
+5 5 | print(b)  # this is fine#
+
+empty_comment_0.py:4:11: PLR2044 [*] Line with empty comment
+  |
+2 | #
+3 | b = '#' + '1'
+4 | print(b)  #
+  |           ^ PLR2044
+5 | print(b)  # this is fine#
+6 | b = "#this#is#fine#"  #
+  |
+  = help: Remove empty comment
+
+ℹ Fix
+1 1 | b = 5  #
+2 2 | #
+3 3 | b = '#' + '1'
+4   |-print(b)  #
+  4 |+print(b)  
+5 5 | print(b)  # this is fine#
+6 6 | b = "#this#is#fine#"  #
+7 7 | b = "this#is#fine"  # this'#'''' this#is'''-'#fine'-"is#fine"#
+
+empty_comment_0.py:6:23: PLR2044 [*] Line with empty comment
+  |
+4 | print(b)  #
+5 | print(b)  # this is fine#
+6 | b = "#this#is#fine#"  #
+  |                       ^ PLR2044
+7 | b = "this#is#fine"  # this'#'''' this#is'''-'#fine'-"is#fine"#
+8 | ###########
+  |
+  = help: Remove empty comment
+
+ℹ Fix
+3 3 | b = '#' + '1'
+4 4 | print(b)  #
+5 5 | print(b)  # this is fine#
+6   |-b = "#this#is#fine#"  #
+  6 |+b = "#this#is#fine#"  
+7 7 | b = "this#is#fine"  # this'#'''' this#is'''-'#fine'-"is#fine"#
+8 8 | ###########
+
+

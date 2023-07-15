@@ -30,6 +30,7 @@ pub(crate) fn check_tokens(
         Rule::AmbiguousUnicodeCharacterDocstring,
         Rule::AmbiguousUnicodeCharacterComment,
     ]);
+    let enforce_empty_comment = settings.rules.enabled(Rule::EmptyComment);
     let enforce_invalid_string_character = settings.rules.any_enabled(&[
         Rule::InvalidCharacterBackspace,
         Rule::InvalidCharacterSub,
@@ -111,6 +112,11 @@ pub(crate) fn check_tokens(
     // ERA001
     if enforce_commented_out_code {
         eradicate::rules::commented_out_code(&mut diagnostics, locator, indexer, settings);
+    }
+
+    // R2044
+    if enforce_empty_comment {
+        pylint::rules::empty_comment(&mut diagnostics, locator, indexer, settings);
     }
 
     // W605
