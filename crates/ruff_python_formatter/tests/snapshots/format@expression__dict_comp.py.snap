@@ -95,11 +95,10 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
         dddddddddddddddddd,
         eeeeeeeeeeeeeeeeeee,
     ]: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    for (
-        ccccccccccccccccccccccccccccccccccccccc,
-        ddddddddddddddddddd,
-        [eeeeeeeeeeeeeeeeeeeeee, fffffffffffffffffffffffff],
-    ) in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
+    for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
+        eeeeeeeeeeeeeeeeeeeeee,
+        fffffffffffffffffffffffff,
+    ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
     if fffffffffffffffffffffffffffffffffffffffffff
     < gggggggggggggggggggggggggggggggggggggggggggggg
     < hhhhhhhhhhhhhhhhhhhhhhhhhh
