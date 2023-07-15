@@ -177,6 +177,9 @@ def str_okay(value=str("foo")):
 def bool_okay(value=bool("bar")):
     pass
 
+# Allow immutable bytes() value
+def bytes_okay(value=bytes(1)):
+    pass
 
 # Allow immutable int() value
 def int_okay(value=int("12")):

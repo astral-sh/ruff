@@ -364,7 +364,7 @@ pub fn is_immutable_return_type(call_path: &[&str]) -> bool {
             | ["re", "compile"]
             | [
                 "",
-                "bool" | "complex" | "float" | "frozenset" | "int" | "str" | "tuple"
+                "bool" | "bytes" | "complex" | "float" | "frozenset" | "int" | "str" | "tuple"
             ]
     )
 }
