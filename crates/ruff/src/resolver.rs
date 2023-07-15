@@ -329,7 +329,7 @@ pub fn python_files_in_path(
                 }
             }
 
-            if result.as_ref().map_or(true, |entry| {
+            let should_include = result.as_ref().map_or(true, |entry| {
                 // Ignore directories
                 if entry.file_type().map_or(true, |ft| ft.is_dir()) {
                     return false;
@@ -352,7 +352,8 @@ pub fn python_files_in_path(
                         false
                     }
                 }
-            }) {
+            });
+            if should_include {
                 files.lock().unwrap().push(result);
             }
 
