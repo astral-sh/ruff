@@ -96,44 +96,6 @@ def example8():
  
  
  def example4():
-@@ -50,35 +44,11 @@
- 
- 
- def example6():
--    return {a: a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]}
-+    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
- 
- 
- def example7():
--    return {
--        a: a
--        for a in [
--            1,
--            2,
--            3,
--            4,
--            5,
--            6,
--            7,
--            8,
--            9,
--            10,
--            11,
--            12,
--            13,
--            14,
--            15,
--            16,
--            17,
--            18,
--            19,
--            20000000000000000000,
--        ]
--    }
-+    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
- 
- 
- def example8():
 ```
 
 ## Ruff Output
@@ -185,11 +147,35 @@ def example5():
 
 
 def example6():
-    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+    return {a: a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]}
 
 
 def example7():
-    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+    return {
+        a: a
+        for a in [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20000000000000000000,
+        ]
+    }
 
 
 def example8():

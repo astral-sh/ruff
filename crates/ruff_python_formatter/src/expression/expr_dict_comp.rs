@@ -1,6 +1,10 @@
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::AsFormat;
+use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
+use ruff_formatter::prelude::{
+    format_args, format_with, group, soft_line_break_or_space, space, text,
+};
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::ExprDictComp;
@@ -9,11 +13,33 @@ use rustpython_parser::ast::ExprDictComp;
 pub struct FormatExprDictComp;
 
 impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
-    fn fmt_fields(&self, _item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprDictComp {
+            range: _,
+            key,
+            value,
+            generators,
+        } = item;
+
+        let joined = format_with(|f| {
+            f.join_with(soft_line_break_or_space())
+                .entries(generators.iter().formatted())
+                .finish()
+        });
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}"
+            [parenthesized(
+                "{",
+                &format_args!(
+                    group(&key.format()),
+                    text(":"),
+                    space(),
+                    value.format(),
+                    soft_line_break_or_space(),
+                    group(&joined)
+                ),
+                "}"
             )]
         )
     }
