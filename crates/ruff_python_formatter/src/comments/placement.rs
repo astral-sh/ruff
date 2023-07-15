@@ -40,6 +40,7 @@ pub(super) fn place_comment<'a>(
         handle_expr_if_comment,
         handle_comprehension_comment,
         handle_trailing_expression_starred_star_end_of_line_comment,
+        handle_with_item_comment,
     ];
     for handler in HANDLERS {
         comment = match handler(comment, locator) {
@@ -1230,6 +1231,50 @@ fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
     };
 
     CommentPlacement::leading(starred.as_any_node_ref(), comment)
+}
+
+/// Handles trailing own line comments before the `as` keyword of a with item and
+/// end of line comments that are on the same line as the `as` keyword:
+///
+/// ```python
+/// with (
+///     a
+///     # trailing a own line comment
+///     as # trailing as same line comment
+///     b
+// ): ...
+/// ```
+fn handle_with_item_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if !comment.enclosing_node().is_with_item() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Needs to be a with item with an `as` expression.
+    let (Some(context_expr), Some(optional_vars)) =
+        (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let as_token = find_only_token_in_range(
+        TextRange::new(context_expr.end(), optional_vars.start()),
+        locator,
+        TokenKind::As,
+    );
+
+    // If before the `as` keyword, then it must be a trailing comment of the context expression.
+    if comment.end() < as_token.start() {
+        CommentPlacement::trailing(context_expr, comment)
+    }
+    // Trailing end of line comment coming after the `as` keyword`.
+    else if comment.line_position().is_end_of_line() {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Looks for a token in the range that contains no other tokens except for parentheses outside

@@ -2222,9 +2222,6 @@ where
                     }
                 }
 
-                if self.semantic.match_typing_expr(value, "Literal") {
-                    self.semantic.flags |= SemanticModelFlags::LITERAL;
-                }
                 if self.any_enabled(&[
                     Rule::SysVersionSlice3,
                     Rule::SysVersion2,
@@ -2274,6 +2271,8 @@ where
             Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 match ctx {
                     ExprContext::Load => {
+                        self.handle_node_load(expr);
+
                         if self.enabled(Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
@@ -2327,10 +2326,10 @@ where
                                 }
                             }
                         }
-
-                        self.handle_node_load(expr);
                     }
                     ExprContext::Store => {
+                        self.handle_node_store(id, expr);
+
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
                                 pycodestyle::rules::ambiguous_variable_name(id, expr.range())
@@ -2357,8 +2356,6 @@ where
                                 );
                             }
                         }
-
-                        self.handle_node_store(id, expr);
                     }
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
@@ -3358,7 +3355,7 @@ where
             }
             Expr::Lambda(
                 lambda @ ast::ExprLambda {
-                    args,
+                    args: _,
                     body: _,
                     range: _,
                 },
@@ -3366,24 +3363,6 @@ where
                 if self.enabled(Rule::ReimplementedListBuiltin) {
                     flake8_pie::rules::reimplemented_list_builtin(self, lambda);
                 }
-
-                // Visit the default arguments, but avoid the body, which will be deferred.
-                for ArgWithDefault {
-                    default,
-                    def: _,
-                    range: _,
-                } in args
-                    .posonlyargs
-                    .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
-                {
-                    if let Some(expr) = &default {
-                        self.visit_expr(expr);
-                    }
-                }
-
-                self.semantic.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -3561,7 +3540,30 @@ where
                 self.visit_expr(key);
                 self.visit_expr(value);
             }
-            Expr::Lambda(_) => {
+            Expr::Lambda(
+                lambda @ ast::ExprLambda {
+                    args,
+                    body: _,
+                    range: _,
+                },
+            ) => {
+                // Visit the default arguments, but avoid the body, which will be deferred.
+                for ArgWithDefault {
+                    default,
+                    def: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &default {
+                        self.visit_expr(expr);
+                    }
+                }
+
+                self.semantic.push_scope(ScopeKind::Lambda(lambda));
                 self.deferred.lambdas.push((expr, self.semantic.snapshot()));
             }
             Expr::IfExp(ast::ExprIfExp {
@@ -3580,6 +3582,8 @@ where
                 keywords,
                 range: _,
             }) => {
+                self.visit_expr(func);
+
                 let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
                     if self.semantic.match_typing_call_path(&call_path, "cast") {
                         Some(typing::Callable::Cast)
@@ -3618,7 +3622,6 @@ where
                 });
                 match callable {
                     Some(typing::Callable::Bool) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
@@ -3628,7 +3631,6 @@ where
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
@@ -3638,7 +3640,6 @@ where
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
@@ -3648,7 +3649,6 @@ where
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
@@ -3672,8 +3672,6 @@ where
                         }
                     }
                     Some(typing::Callable::NamedTuple) => {
-                        self.visit_expr(func);
-
                         // Ex) NamedTuple("a", [("a", int)])
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3709,8 +3707,6 @@ where
                         }
                     }
                     Some(typing::Callable::TypedDict) => {
-                        self.visit_expr(func);
-
                         // Ex) TypedDict("a", {"a": int})
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3741,8 +3737,6 @@ where
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
-                        self.visit_expr(func);
-
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
@@ -3775,7 +3769,7 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        self.visit_expr(func);
+
                         for arg in args {
                             self.visit_non_type_definition(arg);
                         }
@@ -3810,14 +3804,21 @@ where
                     ) {
                         Some(subscript) => {
                             match subscript {
+                                // Ex) Literal["Class"]
+                                typing::SubscriptKind::Literal => {
+                                    self.semantic.flags |= SemanticModelFlags::LITERAL;
+                                    self.visit_expr(value);
+                                    self.visit_type_definition(slice);
+                                    self.visit_expr_context(ctx);
+                                }
                                 // Ex) Optional[int]
-                                typing::SubscriptKind::AnnotatedSubscript => {
+                                typing::SubscriptKind::Generic => {
                                     self.visit_expr(value);
                                     self.visit_type_definition(slice);
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
-                                typing::SubscriptKind::PEP593AnnotatedSubscript => {
+                                typing::SubscriptKind::PEP593Annotation => {
                                     // First argument is a type (including forward references); the
                                     // rest are arbitrary Python objects.
                                     self.visit_expr(value);
@@ -3836,8 +3837,7 @@ where
                                         }
                                     } else {
                                         error!(
-                                            "Found non-Expr::Tuple argument to PEP 593 \
-                                             Annotation."
+                                            "Found non-Expr::Tuple argument to PEP 593 Annotation."
                                         );
                                     }
                                 }

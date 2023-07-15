@@ -316,21 +316,6 @@ last_call()
  ()
  (1,)
  (1, 2)
-@@ -87,10 +90,10 @@
-     another,
-     *more,
- ]
--{i for i in (1, 2, 3)}
--{(i**2) for i in (1, 2, 3)}
--{(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))}
--{((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
- [i for i in (1, 2, 3)]
- [(i**2) for i in (1, 2, 3)]
- [(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
 @@ -101,7 +104,10 @@
  {a: b * -2 for a, b in dictionary.items()}
  {
@@ -588,10 +573,10 @@ str or None if (1 if True else 2) else str or bytes or None
     another,
     *more,
 ]
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+{i for i in (1, 2, 3)}
+{(i**2) for i in (1, 2, 3)}
+{(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))}
+{((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)}
 [i for i in (1, 2, 3)]
 [(i**2) for i in (1, 2, 3)]
 [(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]

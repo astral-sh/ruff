@@ -176,9 +176,13 @@ impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
 impl NeedsParentheses for ExprBinOp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if parent.is_expr_await() && !self.op.is_pow() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }
