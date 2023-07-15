@@ -2222,9 +2222,6 @@ where
                     }
                 }
 
-                if self.semantic.match_typing_expr(value, "Literal") {
-                    self.semantic.flags |= SemanticModelFlags::LITERAL;
-                }
                 if self.any_enabled(&[
                     Rule::SysVersionSlice3,
                     Rule::SysVersion2,
@@ -3810,14 +3807,21 @@ where
                     ) {
                         Some(subscript) => {
                             match subscript {
+                                // Ex) Literal["Class"]
+                                typing::SubscriptKind::Literal => {
+                                    self.semantic.flags |= SemanticModelFlags::LITERAL;
+                                    self.visit_expr(value);
+                                    self.visit_type_definition(slice);
+                                    self.visit_expr_context(ctx);
+                                }
                                 // Ex) Optional[int]
-                                typing::SubscriptKind::AnnotatedSubscript => {
+                                typing::SubscriptKind::Generic => {
                                     self.visit_expr(value);
                                     self.visit_type_definition(slice);
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
-                                typing::SubscriptKind::PEP593AnnotatedSubscript => {
+                                typing::SubscriptKind::PEP593Annotation => {
                                     // First argument is a type (including forward references); the
                                     // rest are arbitrary Python objects.
                                     self.visit_expr(value);
@@ -3836,8 +3840,7 @@ where
                                         }
                                     } else {
                                         error!(
-                                            "Found non-Expr::Tuple argument to PEP 593 \
-                                             Annotation."
+                                            "Found non-Expr::Tuple argument to PEP 593 Annotation."
                                         );
                                     }
                                 }
