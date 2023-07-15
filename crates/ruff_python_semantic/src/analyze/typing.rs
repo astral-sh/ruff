@@ -7,9 +7,9 @@ use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, Cal
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
-    is_immutable_non_generic_type, is_immutable_return_type, is_mutable_return_type,
-    is_pep_593_generic_member, is_pep_593_generic_type, is_standard_library_generic,
-    is_standard_library_generic_member,
+    is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
+    is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
+    is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
 };
 
 use crate::model::SemanticModel;
@@ -27,8 +27,12 @@ pub enum Callable {
 
 #[derive(Copy, Clone)]
 pub enum SubscriptKind {
-    AnnotatedSubscript,
-    PEP593AnnotatedSubscript,
+    /// A subscript of the form `typing.Literal["foo", "bar"]`, i.e., a literal.
+    Literal,
+    /// A subscript of the form `typing.List[int]`, i.e., a generic.
+    Generic,
+    /// A subscript of the form `typing.Annotated[int, "foo"]`, i.e., a PEP 593 annotation.
+    PEP593Annotation,
 }
 
 pub fn match_annotated_subscript<'a>(
@@ -38,28 +42,35 @@ pub fn match_annotated_subscript<'a>(
     extend_generics: &[String],
 ) -> Option<SubscriptKind> {
     semantic.resolve_call_path(expr).and_then(|call_path| {
+        if is_standard_library_literal(call_path.as_slice()) {
+            return Some(SubscriptKind::Literal);
+        }
+
         if is_standard_library_generic(call_path.as_slice())
             || extend_generics
                 .iter()
                 .map(|target| from_qualified_name(target))
                 .any(|target| call_path == target)
         {
-            return Some(SubscriptKind::AnnotatedSubscript);
+            return Some(SubscriptKind::Generic);
         }
 
         if is_pep_593_generic_type(call_path.as_slice()) {
-            return Some(SubscriptKind::PEP593AnnotatedSubscript);
+            return Some(SubscriptKind::PEP593Annotation);
         }
 
         for module in typing_modules {
             let module_call_path: CallPath = from_unqualified_name(module);
             if call_path.starts_with(&module_call_path) {
                 if let Some(member) = call_path.last() {
+                    if is_literal_member(member) {
+                        return Some(SubscriptKind::Literal);
+                    }
                     if is_standard_library_generic_member(member) {
-                        return Some(SubscriptKind::AnnotatedSubscript);
+                        return Some(SubscriptKind::Generic);
                     }
                     if is_pep_593_generic_member(member) {
-                        return Some(SubscriptKind::PEP593AnnotatedSubscript);
+                        return Some(SubscriptKind::PEP593Annotation);
                     }
                 }
             }
