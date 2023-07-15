@@ -19,12 +19,8 @@ x[(a := 1), (b := 3)]
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,7 @@
- # Unparenthesized walruses are now allowed in set literals & set comprehensions
- # since Python 3.9
- {x := 1, 2, 3}
--{x4 := x**5 for x in range(7)}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+@@ -4,4 +4,4 @@
+ {x4 := x**5 for x in range(7)}
  # We better not remove the parentheses here (since it's a 3.10 feature)
  x[(a := 1)]
 -x[(a := 1), (b := 3)]
@@ -37,7 +33,7 @@ x[(a := 1), (b := 3)]
 # Unparenthesized walruses are now allowed in set literals & set comprehensions
 # since Python 3.9
 {x := 1, 2, 3}
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+{x4 := x**5 for x in range(7)}
 # We better not remove the parentheses here (since it's a 3.10 feature)
 x[(a := 1)]
 x[((a := 1), (b := 3))]
