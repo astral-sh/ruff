@@ -3796,54 +3796,51 @@ where
                     self.semantic.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
+                    self.visit_expr(value);
+
                     match typing::match_annotated_subscript(
                         value,
                         &self.semantic,
                         self.settings.typing_modules.iter().map(String::as_str),
                         &self.settings.pyflakes.extend_generics,
                     ) {
-                        Some(subscript) => {
-                            match subscript {
-                                // Ex) Literal["Class"]
-                                typing::SubscriptKind::Literal => {
-                                    self.semantic.flags |= SemanticModelFlags::LITERAL;
-                                    self.visit_expr(value);
-                                    self.visit_type_definition(slice);
-                                    self.visit_expr_context(ctx);
-                                }
-                                // Ex) Optional[int]
-                                typing::SubscriptKind::Generic => {
-                                    self.visit_expr(value);
-                                    self.visit_type_definition(slice);
-                                    self.visit_expr_context(ctx);
-                                }
-                                // Ex) Annotated[int, "Hello, world!"]
-                                typing::SubscriptKind::PEP593Annotation => {
-                                    // First argument is a type (including forward references); the
-                                    // rest are arbitrary Python objects.
-                                    self.visit_expr(value);
-                                    if let Expr::Tuple(ast::ExprTuple {
-                                        elts,
-                                        ctx,
-                                        range: _,
-                                    }) = slice.as_ref()
-                                    {
-                                        if let Some(expr) = elts.first() {
-                                            self.visit_expr(expr);
-                                            for expr in elts.iter().skip(1) {
-                                                self.visit_non_type_definition(expr);
-                                            }
-                                            self.visit_expr_context(ctx);
-                                        }
-                                    } else {
-                                        error!(
-                                            "Found non-Expr::Tuple argument to PEP 593 Annotation."
-                                        );
+                        // Ex) Literal["Class"]
+                        Some(typing::SubscriptKind::Literal) => {
+                            self.semantic.flags |= SemanticModelFlags::LITERAL;
+
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Optional[int]
+                        Some(typing::SubscriptKind::Generic) => {
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Annotated[int, "Hello, world!"]
+                        Some(typing::SubscriptKind::PEP593Annotation) => {
+                            // First argument is a type (including forward references); the
+                            // rest are arbitrary Python objects.
+                            if let Expr::Tuple(ast::ExprTuple {
+                                elts,
+                                ctx,
+                                range: _,
+                            }) = slice.as_ref()
+                            {
+                                if let Some(expr) = elts.first() {
+                                    self.visit_expr(expr);
+                                    for expr in elts.iter().skip(1) {
+                                        self.visit_non_type_definition(expr);
                                     }
+                                    self.visit_expr_context(ctx);
                                 }
+                            } else {
+                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
-                        None => visitor::walk_expr(self, expr),
+                        None => {
+                            self.visit_expr(slice);
+                            self.visit_expr_context(ctx);
+                        }
                     }
                 }
             }
