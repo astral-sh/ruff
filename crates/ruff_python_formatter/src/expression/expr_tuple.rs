@@ -120,16 +120,14 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
             _ => match self.parentheses {
-                TupleParentheses::Subscript => group(&ExprSequence::new(item)).fmt(f),
-                _ if self.parentheses != TupleParentheses::Comprehension => {
-                    parenthesize_if_expands(&ExprSequence::new(item)).fmt(f)
-                }
-                _ => {
+                TupleParentheses::Comprehension => {
                     let separator = format_with(|f| write!(f, [text(","), space()]));
                     f.join_with(separator)
                         .entries(item.elts.iter().formatted())
                         .finish()
                 }
+                TupleParentheses::Subscript => group(&ExprSequence::new(item)).fmt(f),
+                _ => parenthesize_if_expands(&ExprSequence::new(item)).fmt(f),
             },
         }
     }
