@@ -10,6 +10,23 @@ pub struct CommentRanges {
     raw: Vec<TextRange>,
 }
 
+impl CommentRanges {
+    /// Returns `true` if the given range includes a comment.
+    pub fn intersects(&self, target: TextRange) -> bool {
+        self.raw
+            .binary_search_by(|range| {
+                if target.contains_range(*range) {
+                    std::cmp::Ordering::Equal
+                } else if range.end() < target.start() {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                }
+            })
+            .is_ok()
+    }
+}
+
 impl Deref for CommentRanges {
     type Target = [TextRange];
 
