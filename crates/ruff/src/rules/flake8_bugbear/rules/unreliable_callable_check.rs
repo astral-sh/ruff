@@ -1,6 +1,7 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprCall, ExprName, Ranged};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -35,12 +36,18 @@ use crate::checkers::ast::Checker;
 pub struct UnreliableCallableCheck;
 
 impl Violation for UnreliableCallableCheck {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use \
              `callable(x)` for consistent results."
         )
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some(format!("Replace with `callable()`"))
     }
 }
 
@@ -70,7 +77,25 @@ pub(crate) fn unreliable_callable_check(
     if s != "__call__" {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UnreliableCallableCheck, expr.range()));
+    let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
+
+    if id == "hasattr" {
+        let new_call = Expr::Call(ExprCall {
+            range: TextRange::default(),
+            func: Box::new(Expr::Name(ExprName {
+                range: TextRange::default(),
+                id: "callable".to_string(),
+                ctx: ast::ExprContext::Load,
+            })),
+            args: args[..1].into(),
+            keywords: vec![],
+        });
+
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            checker.generator().expr(&new_call),
+            expr.range(),
+        )));
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
