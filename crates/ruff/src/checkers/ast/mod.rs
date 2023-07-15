@@ -3355,7 +3355,7 @@ where
             }
             Expr::Lambda(
                 lambda @ ast::ExprLambda {
-                    args,
+                    args: _,
                     body: _,
                     range: _,
                 },
@@ -3363,24 +3363,6 @@ where
                 if self.enabled(Rule::ReimplementedListBuiltin) {
                     flake8_pie::rules::reimplemented_list_builtin(self, lambda);
                 }
-
-                // Visit the default arguments, but avoid the body, which will be deferred.
-                for ArgWithDefault {
-                    default,
-                    def: _,
-                    range: _,
-                } in args
-                    .posonlyargs
-                    .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
-                {
-                    if let Some(expr) = &default {
-                        self.visit_expr(expr);
-                    }
-                }
-
-                self.semantic.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -3558,7 +3540,30 @@ where
                 self.visit_expr(key);
                 self.visit_expr(value);
             }
-            Expr::Lambda(_) => {
+            Expr::Lambda(
+                lambda @ ast::ExprLambda {
+                    args,
+                    body: _,
+                    range: _,
+                },
+            ) => {
+                // Visit the default arguments, but avoid the body, which will be deferred.
+                for ArgWithDefault {
+                    default,
+                    def: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &default {
+                        self.visit_expr(expr);
+                    }
+                }
+
+                self.semantic.push_scope(ScopeKind::Lambda(lambda));
                 self.deferred.lambdas.push((expr, self.semantic.snapshot()));
             }
             Expr::IfExp(ast::ExprIfExp {
