@@ -2479,7 +2479,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Arguments {
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::arguments::FormatArguments)
+        FormatRefWithRule::new(self, crate::other::arguments::FormatArguments::default())
     }
 }
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arguments {
@@ -2489,7 +2489,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arguments {
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, crate::other::arguments::FormatArguments)
+        FormatOwnedWithRule::new(self, crate::other::arguments::FormatArguments::default())
     }
 }
 
