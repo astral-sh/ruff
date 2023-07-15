@@ -3582,6 +3582,8 @@ where
                 keywords,
                 range: _,
             }) => {
+                self.visit_expr(func);
+
                 let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
                     if self.semantic.match_typing_call_path(&call_path, "cast") {
                         Some(typing::Callable::Cast)
@@ -3620,7 +3622,6 @@ where
                 });
                 match callable {
                     Some(typing::Callable::Bool) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
@@ -3630,7 +3631,6 @@ where
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
@@ -3640,7 +3640,6 @@ where
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
@@ -3650,7 +3649,6 @@ where
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
@@ -3674,8 +3672,6 @@ where
                         }
                     }
                     Some(typing::Callable::NamedTuple) => {
-                        self.visit_expr(func);
-
                         // Ex) NamedTuple("a", [("a", int)])
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3711,8 +3707,6 @@ where
                         }
                     }
                     Some(typing::Callable::TypedDict) => {
-                        self.visit_expr(func);
-
                         // Ex) TypedDict("a", {"a": int})
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3743,8 +3737,6 @@ where
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
-                        self.visit_expr(func);
-
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
@@ -3777,7 +3769,7 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        self.visit_expr(func);
+
                         for arg in args {
                             self.visit_non_type_definition(arg);
                         }
