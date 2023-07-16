@@ -29,7 +29,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 [
                     space(),
                     args.format()
-                        .with_options(ArgumentsParentheses::StripInsideLambda),
+                        .with_options(ArgumentsParentheses::SkipInsideLambda),
                     text(":"),
                 ]
             )?;

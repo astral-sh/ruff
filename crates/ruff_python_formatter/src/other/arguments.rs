@@ -22,7 +22,7 @@ pub enum ArgumentsParentheses {
     Default,
 
     /// Arguments should never be inside parentheses for lamda expressions.
-    StripInsideLambda,
+    SkipInsideLambda,
 }
 
 #[derive(Default)]
@@ -190,7 +190,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             + kwonlyargs.len()
             + usize::from(kwarg.is_some());
 
-        if self.parentheses == ArgumentsParentheses::StripInsideLambda {
+        if self.parentheses == ArgumentsParentheses::SkipInsideLambda {
             return group(&format_inner).fmt(f);
         } else if num_arguments == 0 {
             // No arguments, format any dangling comments between `()`
