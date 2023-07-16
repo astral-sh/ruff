@@ -49,7 +49,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             let result = if let Expr::Tuple(tuple) = slice.as_ref() {
                 tuple
                     .format()
-                    .with_options(TupleParentheses::Subscript)
+                    .with_options(TupleParentheses::NeverIntroduce)
                     .fmt(f)
             } else {
                 slice.format().fmt(f)

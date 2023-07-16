@@ -19,14 +19,17 @@ pub enum TupleParentheses {
     Default,
     /// Effectively `Some(Parentheses)` in `Option<Parentheses>`
     Expr(Parentheses),
+    /// TODO(cnpryer): Why not TupleParentheses::Expr(Parentheses::Never)?
+    Never,
 
-    /// Black omits parentheses for tuples inside of subscripts except if the tuple is parenthesized
-    /// in the source code.
-    Subscript,
-
-    /// Handle the special case where we remove parentheses even if they were initially present
+    /// Handle special cases where parentheses are not introduced if they are not already present.
     ///
-    /// Normally, black keeps parentheses, but in the case of loops it formats
+    /// Black omits parentheses for tuples inside subscripts except if the tuple is already
+    /// parenthesized in the source code.
+    NeverIntroduce,
+    /// Handle the special cases where we don't include parentheses if they are not required.
+    ///
+    /// Normally, black keeps parentheses, but in the case of for loops it formats
     /// ```python
     /// for (a, b) in x:
     ///     pass
@@ -36,9 +39,9 @@ pub enum TupleParentheses {
     /// for a, b in x:
     ///     pass
     /// ```
-    /// Black still does use parentheses in this position if the group breaks or magic trailing
+    /// Black still does use parentheses in these positions if the group breaks or magic trailing
     /// comma is used.
-    StripInsideForLoop,
+    NeverWithoutReason,
 }
 
 #[derive(Default)]
@@ -94,7 +97,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 )
             }
             [single] => match self.parentheses {
-                TupleParentheses::Subscript
+                TupleParentheses::NeverIntroduce
                     if !is_parenthesized(*range, elts, f.context().source()) =>
                 {
                     write!(f, [single.format(), text(",")])
@@ -111,12 +114,12 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
             _ if is_parenthesized(*range, elts, f.context().source())
-                && self.parentheses != TupleParentheses::StripInsideForLoop =>
+                && self.parentheses != TupleParentheses::NeverWithoutReason =>
             {
                 parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
             _ => match self.parentheses {
-                TupleParentheses::Subscript => group(&ExprSequence::new(item)).fmt(f),
+                TupleParentheses::NeverIntroduce => group(&ExprSequence::new(item)).fmt(f),
                 _ => parenthesize_if_expands(&ExprSequence::new(item)).fmt(f),
             },
         }
