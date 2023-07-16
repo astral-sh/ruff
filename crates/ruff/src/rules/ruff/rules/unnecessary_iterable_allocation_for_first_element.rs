@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use ruff_text_size::{TextRange, TextSize};
@@ -17,8 +19,8 @@ use crate::registry::AsRule;
 /// ## Why is this bad?
 /// Calling `list(...)` will create a new list of the entire collection, which
 /// can be very expensive for large collections. If you only need the first
-/// element of the collection, you can use `next(iter(...))` to lazily fetch
-/// the first element without creating a new list.
+/// element of the collection, you can use `next(...)` or `next(iter(...)` to
+/// lazily fetch the first element.
 ///
 /// Note that migrating from `list(...)[0]` to `next(iter(...))` can change
 /// the behavior of your program in two ways:
@@ -27,16 +29,18 @@ use crate::registry::AsRule;
 ///    `next(iter(...))` will only evaluate the first element. As such, any
 ///    side effects that occur during iteration will be delayed.
 /// 2. Second, `list(...)[0]` will raise `IndexError` if the collection is
-///   empty, while `next(iter(...))` will raise `StopIteration`.
+///    empty, while `next(iter(...))` will raise `StopIteration`.
 ///
 /// ## Example
 /// ```python
 /// head = list(x)[0]
+/// head = [x * x for x in range(10)][0]
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// head = next(iter(x))
+/// head = next(x * x for x in range(10))
 /// ```
 ///
 /// ## References
@@ -57,10 +61,10 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
         let iterable = Self::truncate(iterable);
         match subscript_kind {
             HeadSubscriptKind::Index => {
-                format!("Prefer `next(iter({iterable}))` over `list({iterable})[0]`")
+                format!("Prefer `next({iterable})` over single element slice")
             }
             HeadSubscriptKind::Slice => {
-                format!("Prefer `[next(iter({iterable}))]` over `list({iterable})[:1]`")
+                format!("Prefer `[next({iterable})]` over single element slice")
             }
         }
     }
@@ -72,8 +76,8 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
         } = self;
         let iterable = Self::truncate(iterable);
         match subscript_kind {
-            HeadSubscriptKind::Index => format!("Replace with `next(iter({iterable}))`"),
-            HeadSubscriptKind::Slice => format!("Replace with `[next(iter({iterable}))]"),
+            HeadSubscriptKind::Index => format!("Replace with `next({iterable})`"),
+            HeadSubscriptKind::Slice => format!("Replace with `[next({iterable})]"),
         }
     }
 }
@@ -105,10 +109,14 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         return;
     };
 
-    let Some(iterable) =
-        match_iterable(value, checker.semantic()).map(|range| checker.locator.slice(range))
-    else {
+    let Some(target) = match_iteration_target(value, checker.semantic()) else {
         return;
+    };
+    let iterable = checker.locator.slice(target.range);
+    let iterable = if target.iterable {
+        Cow::Borrowed(iterable)
+    } else {
+        Cow::Owned(format!("iter({iterable})"))
     };
 
     let mut diagnostic = Diagnostic::new(
@@ -121,8 +129,8 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
 
     if checker.patch(diagnostic.kind.rule()) {
         let replacement = match subscript_kind {
-            HeadSubscriptKind::Index => format!("next(iter({iterable}))"),
-            HeadSubscriptKind::Slice => format!("[next(iter({iterable}))]"),
+            HeadSubscriptKind::Index => format!("next({iterable})"),
+            HeadSubscriptKind::Slice => format!("[next({iterable})]"),
         };
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(replacement, *range)));
     }
@@ -180,15 +188,24 @@ fn classify_subscript(expr: &Expr) -> Option<HeadSubscriptKind> {
     }
 }
 
-/// Return the [`TextRange`] of the iterable from an expression, if the expression can be sliced
-/// into (i.e., is a list comprehension, or call to `list` or `tuple`).
+#[derive(Debug)]
+struct IterationTarget {
+    /// The [`TextRange`] of the target.
+    range: TextRange,
+    /// Whether the target is an iterable (e.g., a generator). If not, the target must be wrapped
+    /// in `iter(...)` prior to calling `next(...)`.
+    iterable: bool,
+}
+
+/// Return the [`IterationTarget`] of an expression, if the expression can be sliced into (i.e.,
+/// is a list comprehension, or call to `list` or `tuple`).
 ///
 /// For example, given `list(x)`, returns the range of `x`. Given `[x * x for x in y]`, returns the
 /// range of `x * x for x in y`.
 ///
 /// As a special-case, given `[x for x in y]`, returns the range of `y` (rather than the
 /// redundant comprehension).
-fn match_iterable(expr: &Expr, model: &SemanticModel) -> Option<TextRange> {
+fn match_iteration_target(expr: &Expr, model: &SemanticModel) -> Option<IterationTarget> {
     match expr {
         Expr::Call(ast::ExprCall { func, args, .. }) => {
             let ast::ExprName { id, .. } = func.as_name_expr()?;
@@ -197,43 +214,70 @@ fn match_iterable(expr: &Expr, model: &SemanticModel) -> Option<TextRange> {
                 return None;
             }
 
-            if !model.is_builtin(id.as_str()) {
-                return None;
-            }
-
             let [arg] = args.as_slice() else {
                 return None;
             };
 
+            if !model.is_builtin(id.as_str()) {
+                return None;
+            }
+
             match arg {
                 Expr::GeneratorExp(ast::ExprGeneratorExp {
                     elt, generators, ..
-                }) => match_simple_comprehension(elt, generators).or_else(|| Some(arg.range())),
+                }) => match_simple_comprehension(elt, generators)
+                    .map(|range| IterationTarget {
+                        range,
+                        iterable: false,
+                    })
+                    .or_else(|| {
+                        Some(IterationTarget {
+                            range: arg.range(),
+                            iterable: true,
+                        })
+                    }),
                 Expr::ListComp(ast::ExprListComp {
                     elt, generators, ..
-                }) => match_simple_comprehension(elt, generators).or_else(|| {
-                    Some(
-                        arg.range()
-                            // Remove the `[`
-                            .add_start(TextSize::from(1))
-                            // Remove the `]`
-                            .sub_end(TextSize::from(1)),
-                    )
+                }) => match_simple_comprehension(elt, generators)
+                    .map(|range| IterationTarget {
+                        range,
+                        iterable: false,
+                    })
+                    .or_else(|| {
+                        Some(IterationTarget {
+                            range: arg
+                                .range()
+                                // Remove the `[`
+                                .add_start(TextSize::from(1))
+                                // Remove the `]`
+                                .sub_end(TextSize::from(1)),
+                            iterable: true,
+                        })
+                    }),
+                _ => Some(IterationTarget {
+                    range: arg.range(),
+                    iterable: false,
                 }),
-                _ => Some(arg.range()),
             }
         }
         Expr::ListComp(ast::ExprListComp {
             elt, generators, ..
-        }) => match_simple_comprehension(elt, generators).or_else(|| {
-            Some(
-                expr.range()
-                    // Remove the `[`
-                    .add_start(TextSize::from(1))
-                    // Remove the `]`
-                    .sub_end(TextSize::from(1)),
-            )
-        }),
+        }) => match_simple_comprehension(elt, generators)
+            .map(|range| IterationTarget {
+                range,
+                iterable: false,
+            })
+            .or_else(|| {
+                Some(IterationTarget {
+                    range: expr
+                        .range()
+                        // Remove the `[`
+                        .add_start(TextSize::from(1))
+                        // Remove the `]`
+                        .sub_end(TextSize::from(1)),
+                    iterable: true,
+                })
+            }),
         _ => None,
     }
 }
