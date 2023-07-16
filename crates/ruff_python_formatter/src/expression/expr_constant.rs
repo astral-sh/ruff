@@ -36,7 +36,7 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
                 not_yet_implemented_custom_text(r#"b"NOT_YET_IMPLEMENTED_BYTE_STRING""#).fmt(f)
             }
             Constant::Tuple(_) => {
-                not_yet_implemented_custom_text("(NOT_YET_IMPLEMENTED_TUPLE,)").fmt(f)
+                unreachable!("Tuple constants are only found in optimised bytecode")
             }
         }
     }
