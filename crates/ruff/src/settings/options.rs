@@ -286,6 +286,8 @@ pub struct Options {
     /// imports will still be flagged, but with a dedicated message suggesting
     /// that the import is either added to the module's `__all__` symbol, or
     /// re-exported with a redundant alias (e.g., `import os as os`).
+    ///
+    /// This option has been **deprecated** and its effect is now the default behavior.
     pub ignore_init_module_imports: Option<bool>,
     #[option(
         default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,

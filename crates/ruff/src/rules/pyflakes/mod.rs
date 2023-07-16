@@ -160,7 +160,11 @@ mod tests {
     fn init() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/__init__.py"),
-            &Settings::for_rules(vec![Rule::UndefinedName, Rule::UndefinedExport]),
+            &Settings::for_rules(vec![
+                Rule::UndefinedName,
+                Rule::UndefinedExport,
+                Rule::UnusedImport,
+            ]),
         )?;
         assert_messages!(diagnostics);
         Ok(())

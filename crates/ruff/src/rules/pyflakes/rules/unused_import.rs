@@ -142,8 +142,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         }
     }
 
-    let in_init =
-        checker.settings.ignore_init_module_imports && checker.path().ends_with("__init__.py");
+    let in_init = checker.path().ends_with("__init__.py");
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
@@ -152,8 +151,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
 
-        let fix = if !in_init && !in_except_handler && checker.patch(Rule::UnusedImport) {
-            fix_imports(checker, stmt_id, &imports).ok()
+        let fix = if !in_except_handler && checker.patch(Rule::UnusedImport) {
+            fix_imports(checker, stmt_id, &imports, in_init).ok()
         } else {
             None
         };
@@ -224,7 +223,12 @@ struct Import<'a> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
+fn fix_imports(
+    checker: &Checker,
+    stmt_id: NodeId,
+    imports: &[Import],
+    in_init: bool,
+) -> Result<Fix> {
     let stmt = checker.semantic().stmts[stmt_id];
     let parent = checker.semantic().stmts.parent(stmt);
     let edit = autofix::edits::remove_unused_imports(
@@ -237,5 +241,9 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         checker.stylist,
         checker.indexer,
     )?;
-    Ok(Fix::automatic(edit).isolate(checker.isolation(parent)))
+    if in_init {
+        Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
+    } else {
+        Ok(Fix::automatic(edit).isolate(checker.isolation(parent)))
+    }
 }
