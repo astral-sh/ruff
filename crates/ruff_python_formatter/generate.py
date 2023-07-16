@@ -105,7 +105,7 @@ for group, group_nodes in nodes_grouped.items():
 # %%
 # Generate `FormatRule`, `AsFormat` and `IntoFormat`
 
-generated = """//! This is a generated file. Don't modify it by hand! Run `scripts/generate.py` to re-generate the file.
+generated = """//! This is a generated file. Don't modify it by hand! Run `crates/ruff_python_formatter/generate.py` to re-generate the file.
 use crate::context::PyFormatContext;
 use crate::{AsFormat, FormatNodeRule, IntoFormat};
 use ruff_formatter::formatter::Formatter;
