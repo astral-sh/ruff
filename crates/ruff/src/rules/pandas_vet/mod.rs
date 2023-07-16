@@ -240,27 +240,6 @@ mod tests {
     #[test_case(
         r#"
         import pandas as pd
-        employees = pd.read_csv(input_file)
-    "#,
-        "PD012_pass_read_csv"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
-        employees = pd.read_table(input_file)
-    "#,
-        "PD012_fail_read_table"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
-        employees = read_table
-    "#,
-        "PD012_node_Name_pass"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
         x = pd.DataFrame()
         y = x.melt(
             id_vars="airline",
@@ -360,6 +339,10 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
     }
 
+    #[test_case(
+        Rule::PandasUseOfDotReadTable,
+        Path::new("pandas_use_of_dot_read_table.py")
+    )]
     #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
     fn paths(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
