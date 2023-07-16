@@ -12,6 +12,7 @@ theme:
     - toc.follow
     - navigation.path
     - navigation.top
+    - navigation.tabs
     - content.code.copy
   palette:
     - media: "(prefers-color-scheme: light)"
