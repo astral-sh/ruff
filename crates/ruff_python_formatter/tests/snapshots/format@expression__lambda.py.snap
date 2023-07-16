@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/lambda.py
+---
+## Input
+```py
+# Leading
+lambda x: x  # Trailing
+# Trailing
+
+# Leading
+lambda x, y: x  # Trailing
+# Trailing
+
+# Leading
+lambda x, y: x, y  # Trailing
+# Trailing
+
+# Leading
+lambda x, /, y: x  # Trailing
+# Trailing
+
+# Leading
+lambda x: lambda y: lambda z: x  # Trailing
+# Trailing
+
+# Leading
+lambda x: lambda y: lambda z: (x, y, z)  # Trailing
+# Trailing
+
+```
+
+## Output
+```py
+# Leading
+lambda x: x  # Trailing
+# Trailing
+
+# Leading
+lambda x, y: x  # Trailing
+# Trailing
+
+# Leading
+lambda x, y: x, y  # Trailing
+# Trailing
+
+# Leading
+lambda x, /, y: x  # Trailing
+# Trailing
+
+# Leading
+lambda x: lambda y: lambda z: x  # Trailing
+# Trailing
+
+# Leading
+lambda x: lambda y: lambda z: (x, y, z)  # Trailing
+# Trailing
+```
+
+
+
