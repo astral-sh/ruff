@@ -111,7 +111,7 @@ fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
     .into()
 }
 
-/// Create a list of property assignments from the `NamedTuple` positional arguments.
+/// Create a list of property assignments from the `NamedTuple` fields argument.
 fn create_properties_from_fields_arg(fields: &Expr) -> Result<Vec<Stmt>> {
     let Expr::List(ast::ExprList { elts, .. }) = &fields else {
         bail!("Expected argument to be `Expr::List`");
