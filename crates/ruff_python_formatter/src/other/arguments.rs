@@ -21,7 +21,7 @@ pub enum ArgumentsParentheses {
     #[default]
     Default,
 
-    /// Arguments should never be inside parentheses for lamda expressions.
+    /// Arguments should never be inside parentheses for lambda expressions.
     SkipInsideLambda,
 }
 
