@@ -93,11 +93,7 @@ fn match_named_tuple_assign<'a>(
 
 /// Generate a `Stmt::AnnAssign` representing the provided property
 /// definition.
-fn create_property_assignment_stmt(
-    property: &str,
-    annotation: &Expr,
-    value: Option<&Expr>,
-) -> Stmt {
+fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
     ast::StmtAnnAssign {
         target: Box::new(
             ast::ExprName {
@@ -108,34 +104,15 @@ fn create_property_assignment_stmt(
             .into(),
         ),
         annotation: Box::new(annotation.clone()),
-        value: value.map(|value| Box::new(value.clone())),
+        value: None,
         simple: true,
         range: TextRange::default(),
     }
     .into()
 }
 
-/// Match the `defaults` keyword in a `NamedTuple(...)` call.
-fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
-    let defaults = keywords.iter().find(|keyword| {
-        if let Some(arg) = &keyword.arg {
-            arg == "defaults"
-        } else {
-            false
-        }
-    });
-    match defaults {
-        Some(defaults) => match &defaults.value {
-            Expr::List(ast::ExprList { elts, .. }) => Ok(elts),
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => Ok(elts),
-            _ => bail!("Expected defaults to be `Expr::List` | `Expr::Tuple`"),
-        },
-        None => Ok(&[]),
-    }
-}
-
 /// Create a list of property assignments from the `NamedTuple` arguments.
-fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
+fn create_properties_from_args(args: &[Expr]) -> Result<Vec<Stmt>> {
     let Some(fields) = args.get(1) else {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
@@ -151,16 +128,8 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
         });
         return Ok(vec![node]);
     }
-    let padded_defaults = if elts.len() >= defaults.len() {
-        std::iter::repeat(None)
-            .take(elts.len() - defaults.len())
-            .chain(defaults.iter().map(Some))
-    } else {
-        bail!("Defaults must be `None` or an iterable of at least the number of fields")
-    };
     elts.iter()
-        .zip(padded_defaults)
-        .map(|(field, default)| {
+        .map(|field| {
             let Expr::Tuple(ast::ExprTuple { elts, .. }) = &field else {
                 bail!("Expected `field` to be `Expr::Tuple`")
             };
@@ -180,9 +149,7 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
             if is_dunder(property) {
                 bail!("Cannot use dunder property name: {}", property)
             }
-            Ok(create_property_assignment_stmt(
-                property, annotation, default,
-            ))
+            Ok(create_property_assignment_stmt(property, annotation))
         })
         .collect()
 }
@@ -228,9 +195,19 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         return;
     };
 
-    let properties = match match_defaults(keywords)
-        .and_then(|defaults| create_properties_from_args(args, defaults))
-    {
+    // Ignore `NamedTuple` calls containing both a list of fields and keywords:
+    // ```
+    // NamedTuple(
+    //     "MyType",
+    //     [("a", int), ("b", str)],
+    //     defaults=[0, ""],
+    // )
+    // ```
+    if args.len() > 1 && !keywords.is_empty() {
+        return;
+    }
+
+    let properties = match create_properties_from_args(args) {
         Ok(properties) => properties,
         Err(err) => {
             debug!("Skipping `NamedTuple` \"{typename}\": {err}");

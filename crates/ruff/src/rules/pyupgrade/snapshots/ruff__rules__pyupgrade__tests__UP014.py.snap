@@ -23,37 +23,6 @@ UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class s
 7 9 | # with default values as list
 8 10 | MyType = NamedTuple(
 
-UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
-   |
- 7 |   # with default values as list
- 8 | / MyType = NamedTuple(
- 9 | |     "MyType",
-10 | |     [("a", int), ("b", str), ("c", list[bool])],
-11 | |     defaults=["foo", [True]],
-12 | | )
-   | |_^ UP014
-13 |   
-14 |   # with namespace
-   |
-   = help: Convert `MyType` to class syntax
-
-ℹ Suggested fix
-5  5  | MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
-6  6  | 
-7  7  | # with default values as list
-8     |-MyType = NamedTuple(
-9     |-    "MyType",
-10    |-    [("a", int), ("b", str), ("c", list[bool])],
-11    |-    defaults=["foo", [True]],
-12    |-)
-   8  |+class MyType(NamedTuple):
-   9  |+    a: int
-   10 |+    b: str = "foo"
-   11 |+    c: list[bool] = [True]
-13 12 | 
-14 13 | # with namespace
-15 14 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
-
 UP014.py:15:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 14 | # with namespace
