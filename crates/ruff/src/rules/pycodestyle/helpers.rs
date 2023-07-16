@@ -83,7 +83,7 @@ pub(super) fn is_overlong(
         }
     }
 
-    // Obtain the start offset of the part of te line that exceeds the limit
+    // Obtain the start offset of the part of the line that exceeds the limit
     let mut start_offset = line.start();
     let mut start_width = LineWidth::new(tab_size);
     for c in line.chars() {
