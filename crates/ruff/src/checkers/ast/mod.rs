@@ -3756,7 +3756,6 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-
                         for arg in args {
                             self.visit_non_type_definition(arg);
                         }
