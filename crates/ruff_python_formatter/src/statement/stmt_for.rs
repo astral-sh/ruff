@@ -16,7 +16,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
         match self.0 {
             Expr::Tuple(expr_tuple) => expr_tuple
                 .format()
-                .with_options(TupleParentheses::NeverWithoutReason)
+                .with_options(TupleParentheses::NeverPreserve)
                 .fmt(f),
             other => maybe_parenthesize_expression(other, self.0, Parenthesize::IfBreaks).fmt(f),
         }

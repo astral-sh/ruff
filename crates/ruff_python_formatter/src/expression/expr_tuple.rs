@@ -41,7 +41,7 @@ pub enum TupleParentheses {
     /// ```
     /// Black still does use parentheses in these positions if the group breaks or magic trailing
     /// comma is used.
-    NeverWithoutReason,
+    NeverPreserve,
 }
 
 #[derive(Default)]
@@ -114,7 +114,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
             _ if is_parenthesized(*range, elts, f.context().source())
-                && self.parentheses != TupleParentheses::NeverWithoutReason =>
+                && self.parentheses != TupleParentheses::NeverPreserve =>
             {
                 parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
