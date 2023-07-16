@@ -138,22 +138,6 @@ impl TryIdentifier for Pattern {
     }
 }
 
-impl TryIdentifier for ExceptHandler {
-    /// Return the [`TextRange`] of a named exception in an [`ExceptHandler`].
-    ///
-    /// For example, return the range of `e` in:
-    /// ```python
-    /// try:
-    ///     ...
-    /// except ValueError as e:
-    ///     ...
-    /// ```
-    fn try_identifier(&self) -> Option<TextRange> {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, .. }) = self;
-        name.as_ref().map(Ranged::range)
-    }
-}
-
 /// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`].
 pub fn except(handler: &ExceptHandler, locator: &Locator) -> TextRange {
     IdentifierTokenizer::new(locator.contents(), handler.range())
