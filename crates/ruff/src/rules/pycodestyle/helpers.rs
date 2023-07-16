@@ -53,16 +53,8 @@ pub(super) fn is_overlong(
     task_tags: &[String],
     tab_size: TabSize,
 ) -> Option<Overlong> {
-    let mut start_offset = line.start();
     let mut width = LineWidth::new(tab_size);
-
-    for c in line.chars() {
-        if width < limit {
-            start_offset += c.text_len();
-        }
-        width = width.add_char(c);
-    }
-
+    width = width.add_str(line.as_str());
     if width <= limit {
         return None;
     }
@@ -91,6 +83,17 @@ pub(super) fn is_overlong(
         }
     }
 
+    // Obtain the start offset of the part of te line that exceeds the limit
+    let mut start_offset = line.start();
+    let mut start_width = LineWidth::new(tab_size);
+    for c in line.chars() {
+        if start_width < limit {
+            start_offset += c.text_len();
+            start_width = start_width.add_char(c);
+        } else {
+            break;
+        }
+    }
     Some(Overlong {
         range: TextRange::new(start_offset, line.end()),
         width: width.get(),
