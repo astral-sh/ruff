@@ -777,6 +777,35 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("comment.py"))]
+    #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
+    #[test_case(Path::new("docstring_only.py"))]
+    #[test_case(Path::new("docstring_with_continuation.py"))]
+    #[test_case(Path::new("docstring_with_semicolon.py"))]
+    #[test_case(Path::new("empty.py"))]
+    #[test_case(Path::new("existing_import.py"))]
+    #[test_case(Path::new("multiline_docstring.py"))]
+    #[test_case(Path::new("off.py"))]
+    fn required_import_with_alias(path: &Path) -> Result<()> {
+        let snapshot = format!("required_import_with_alias_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from([
+                        "from __future__ import annotations as _annotations".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::MissingRequiredImport)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]

@@ -35,7 +35,6 @@ use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
-use crate::rules::flake8_builtins::helpers::AnyShadowing;
 
 use crate::rules::{
     airflow, flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
@@ -614,7 +613,7 @@ where
                             self,
                             class_def,
                             name,
-                            AnyShadowing::from(stmt),
+                            name.range(),
                         );
                     }
                 } else {
@@ -622,7 +621,7 @@ where
                         flake8_builtins::rules::builtin_variable_shadowing(
                             self,
                             name,
-                            AnyShadowing::from(stmt),
+                            name.range(),
                         );
                     }
                 }
@@ -753,11 +752,7 @@ where
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 if self.enabled(Rule::BuiltinVariableShadowing) {
-                    flake8_builtins::rules::builtin_variable_shadowing(
-                        self,
-                        name,
-                        AnyShadowing::from(stmt),
-                    );
+                    flake8_builtins::rules::builtin_variable_shadowing(self, name, name.range());
                 }
                 if self.enabled(Rule::DuplicateBases) {
                     pylint::rules::duplicate_bases(self, name, bases);
@@ -837,7 +832,7 @@ where
                                 flake8_builtins::rules::builtin_variable_shadowing(
                                     self,
                                     asname,
-                                    AnyShadowing::from(stmt),
+                                    asname.range(),
                                 );
                             }
                         }
@@ -1091,7 +1086,7 @@ where
                                 flake8_builtins::rules::builtin_variable_shadowing(
                                     self,
                                     asname,
-                                    AnyShadowing::from(stmt),
+                                    asname.range(),
                                 );
                             }
                         }
@@ -1558,6 +1553,14 @@ where
                 finalbody,
                 range: _,
             }) => {
+                if self.enabled(Rule::JumpStatementInFinally) {
+                    flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
+                }
+                if self.enabled(Rule::ContinueInFinally) {
+                    if self.settings.target_version <= PythonVersion::Py38 {
+                        pylint::rules::continue_in_finally(self, finalbody);
+                    }
+                }
                 if self.enabled(Rule::DefaultExceptNotLast) {
                     if let Some(diagnostic) =
                         pyflakes::rules::default_except_not_last(handlers, self.locator)
@@ -1944,20 +1947,9 @@ where
                 }
 
                 self.semantic.handled_exceptions.push(handled_exceptions);
-
-                if self.enabled(Rule::JumpStatementInFinally) {
-                    flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
-                }
-                if self.enabled(Rule::ContinueInFinally) {
-                    if self.settings.target_version <= PythonVersion::Py38 {
-                        pylint::rules::continue_in_finally(self, finalbody);
-                    }
-                }
-
                 self.visit_body(body);
                 self.semantic.handled_exceptions.pop();
 
-                self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
                 for except_handler in handlers {
                     self.visit_except_handler(except_handler);
                 }
@@ -2268,7 +2260,7 @@ where
                     }
                 }
             }
-            Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
+            Expr::Name(ast::ExprName { id, ctx, range }) => {
                 match ctx {
                     ExprContext::Load => {
                         self.handle_node_load(expr);
@@ -2341,18 +2333,13 @@ where
                         if let ScopeKind::Class(class_def) = self.semantic.scope().kind {
                             if self.enabled(Rule::BuiltinAttributeShadowing) {
                                 flake8_builtins::rules::builtin_attribute_shadowing(
-                                    self,
-                                    class_def,
-                                    id,
-                                    AnyShadowing::from(expr),
+                                    self, class_def, id, *range,
                                 );
                             }
                         } else {
                             if self.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
-                                    self,
-                                    id,
-                                    AnyShadowing::from(expr),
+                                    self, id, *range,
                                 );
                             }
                         }
@@ -3769,7 +3756,6 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-
                         for arg in args {
                             self.visit_non_type_definition(arg);
                         }
@@ -3796,54 +3782,51 @@ where
                     self.semantic.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
+                    self.visit_expr(value);
+
                     match typing::match_annotated_subscript(
                         value,
                         &self.semantic,
                         self.settings.typing_modules.iter().map(String::as_str),
                         &self.settings.pyflakes.extend_generics,
                     ) {
-                        Some(subscript) => {
-                            match subscript {
-                                // Ex) Literal["Class"]
-                                typing::SubscriptKind::Literal => {
-                                    self.semantic.flags |= SemanticModelFlags::LITERAL;
-                                    self.visit_expr(value);
-                                    self.visit_type_definition(slice);
-                                    self.visit_expr_context(ctx);
-                                }
-                                // Ex) Optional[int]
-                                typing::SubscriptKind::Generic => {
-                                    self.visit_expr(value);
-                                    self.visit_type_definition(slice);
-                                    self.visit_expr_context(ctx);
-                                }
-                                // Ex) Annotated[int, "Hello, world!"]
-                                typing::SubscriptKind::PEP593Annotation => {
-                                    // First argument is a type (including forward references); the
-                                    // rest are arbitrary Python objects.
-                                    self.visit_expr(value);
-                                    if let Expr::Tuple(ast::ExprTuple {
-                                        elts,
-                                        ctx,
-                                        range: _,
-                                    }) = slice.as_ref()
-                                    {
-                                        if let Some(expr) = elts.first() {
-                                            self.visit_expr(expr);
-                                            for expr in elts.iter().skip(1) {
-                                                self.visit_non_type_definition(expr);
-                                            }
-                                            self.visit_expr_context(ctx);
-                                        }
-                                    } else {
-                                        error!(
-                                            "Found non-Expr::Tuple argument to PEP 593 Annotation."
-                                        );
+                        // Ex) Literal["Class"]
+                        Some(typing::SubscriptKind::Literal) => {
+                            self.semantic.flags |= SemanticModelFlags::LITERAL;
+
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Optional[int]
+                        Some(typing::SubscriptKind::Generic) => {
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Annotated[int, "Hello, world!"]
+                        Some(typing::SubscriptKind::PEP593Annotation) => {
+                            // First argument is a type (including forward references); the
+                            // rest are arbitrary Python objects.
+                            if let Expr::Tuple(ast::ExprTuple {
+                                elts,
+                                ctx,
+                                range: _,
+                            }) = slice.as_ref()
+                            {
+                                if let Some(expr) = elts.first() {
+                                    self.visit_expr(expr);
+                                    for expr in elts.iter().skip(1) {
+                                        self.visit_non_type_definition(expr);
                                     }
+                                    self.visit_expr_context(ctx);
                                 }
+                            } else {
+                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
-                        None => visitor::walk_expr(self, expr),
+                        None => {
+                            self.visit_expr(slice);
+                            self.visit_expr_context(ctx);
+                        }
                     }
                 }
             }
@@ -3876,6 +3859,9 @@ where
     }
 
     fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
+        let flags_snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
+
         match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
@@ -3883,7 +3869,6 @@ where
                 body,
                 range: _,
             }) => {
-                let name = name.as_deref();
                 if self.enabled(Rule::BareExcept) {
                     if let Some(diagnostic) = pycodestyle::rules::bare_except(
                         type_.as_deref(),
@@ -3895,17 +3880,25 @@ where
                     }
                 }
                 if self.enabled(Rule::RaiseWithoutFromInsideExcept) {
-                    flake8_bugbear::rules::raise_without_from_inside_except(self, name, body);
+                    flake8_bugbear::rules::raise_without_from_inside_except(
+                        self,
+                        name.as_deref(),
+                        body,
+                    );
                 }
                 if self.enabled(Rule::BlindExcept) {
-                    flake8_blind_except::rules::blind_except(self, type_.as_deref(), name, body);
+                    flake8_blind_except::rules::blind_except(
+                        self,
+                        type_.as_deref(),
+                        name.as_deref(),
+                        body,
+                    );
                 }
                 if self.enabled(Rule::TryExceptPass) {
                     flake8_bandit::rules::try_except_pass(
                         self,
                         except_handler,
                         type_.as_deref(),
-                        name,
                         body,
                         self.settings.flake8_bandit.check_typed_exception,
                     );
@@ -3915,7 +3908,6 @@ where
                         self,
                         except_handler,
                         type_.as_deref(),
-                        name,
                         body,
                         self.settings.flake8_bandit.check_typed_exception,
                     );
@@ -3932,69 +3924,71 @@ where
                 if self.enabled(Rule::BinaryOpException) {
                     pylint::rules::binary_op_exception(self, except_handler);
                 }
-                match name {
-                    Some(name) => {
-                        let range = except_handler.try_identifier().unwrap();
 
-                        if self.enabled(Rule::AmbiguousVariableName) {
-                            if let Some(diagnostic) =
-                                pycodestyle::rules::ambiguous_variable_name(name, range)
-                            {
-                                self.diagnostics.push(diagnostic);
-                            }
+                if let Some(name) = name {
+                    if self.enabled(Rule::AmbiguousVariableName) {
+                        if let Some(diagnostic) =
+                            pycodestyle::rules::ambiguous_variable_name(name.as_str(), name.range())
+                        {
+                            self.diagnostics.push(diagnostic);
                         }
-                        if self.enabled(Rule::BuiltinVariableShadowing) {
-                            flake8_builtins::rules::builtin_variable_shadowing(
-                                self,
-                                name,
-                                AnyShadowing::from(except_handler),
-                            );
-                        }
-
-                        // Store the existing binding, if any.
-                        let existing_id = self.semantic.lookup_symbol(name);
-
-                        // Add the bound exception name to the scope.
-                        let binding_id = self.add_binding(
+                    }
+                    if self.enabled(Rule::BuiltinVariableShadowing) {
+                        flake8_builtins::rules::builtin_variable_shadowing(
+                            self,
                             name,
-                            range,
-                            BindingKind::Assignment,
-                            BindingFlags::empty(),
-                        );
-
-                        walk_except_handler(self, except_handler);
-
-                        // If the exception name wasn't used in the scope, emit a diagnostic.
-                        if !self.semantic.is_used(binding_id) {
-                            if self.enabled(Rule::UnusedVariable) {
-                                let mut diagnostic = Diagnostic::new(
-                                    pyflakes::rules::UnusedVariable { name: name.into() },
-                                    range,
-                                );
-                                if self.patch(Rule::UnusedVariable) {
-                                    diagnostic.try_set_fix(|| {
-                                        pyflakes::fixes::remove_exception_handler_assignment(
-                                            except_handler,
-                                            self.locator,
-                                        )
-                                        .map(Fix::automatic)
-                                    });
-                                }
-                                self.diagnostics.push(diagnostic);
-                            }
-                        }
-
-                        self.add_binding(
-                            name,
-                            range,
-                            BindingKind::UnboundException(existing_id),
-                            BindingFlags::empty(),
+                            name.range(),
                         );
                     }
-                    None => walk_except_handler(self, except_handler),
+
+                    // Store the existing binding, if any.
+                    let existing_id = self.semantic.lookup_symbol(name.as_str());
+
+                    // Add the bound exception name to the scope.
+                    let binding_id = self.add_binding(
+                        name.as_str(),
+                        name.range(),
+                        BindingKind::Assignment,
+                        BindingFlags::empty(),
+                    );
+
+                    walk_except_handler(self, except_handler);
+
+                    // If the exception name wasn't used in the scope, emit a diagnostic.
+                    if !self.semantic.is_used(binding_id) {
+                        if self.enabled(Rule::UnusedVariable) {
+                            let mut diagnostic = Diagnostic::new(
+                                pyflakes::rules::UnusedVariable {
+                                    name: name.to_string(),
+                                },
+                                name.range(),
+                            );
+                            if self.patch(Rule::UnusedVariable) {
+                                diagnostic.try_set_fix(|| {
+                                    pyflakes::fixes::remove_exception_handler_assignment(
+                                        except_handler,
+                                        self.locator,
+                                    )
+                                    .map(Fix::automatic)
+                                });
+                            }
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
+
+                    self.add_binding(
+                        name.as_str(),
+                        name.range(),
+                        BindingKind::UnboundException(existing_id),
+                        BindingFlags::empty(),
+                    );
+                } else {
+                    walk_except_handler(self, except_handler);
                 }
             }
         }
+
+        self.semantic.flags = flags_snapshot;
     }
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
@@ -4584,7 +4578,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.future_annotations() {
+                    if self.semantic.in_typing_only_annotation() {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -5008,18 +5002,26 @@ impl<'a> Checker<'a> {
                         .collect()
                 };
 
-                flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                    self,
-                    scope,
-                    &mut diagnostics,
-                );
+                if self.enabled(Rule::RuntimeImportInTypeCheckingBlock) {
+                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                        self,
+                        scope,
+                        &mut diagnostics,
+                    );
+                }
 
-                flake8_type_checking::rules::typing_only_runtime_import(
-                    self,
-                    scope,
-                    &runtime_imports,
-                    &mut diagnostics,
-                );
+                if self.any_enabled(&[
+                    Rule::TypingOnlyFirstPartyImport,
+                    Rule::TypingOnlyThirdPartyImport,
+                    Rule::TypingOnlyStandardLibraryImport,
+                ]) {
+                    flake8_type_checking::rules::typing_only_runtime_import(
+                        self,
+                        scope,
+                        &runtime_imports,
+                        &mut diagnostics,
+                    );
+                }
             }
 
             if self.enabled(Rule::UnusedImport) {

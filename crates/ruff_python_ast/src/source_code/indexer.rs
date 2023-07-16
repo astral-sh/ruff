@@ -93,7 +93,7 @@ impl Indexer {
     }
 
     /// Returns the byte offset ranges of comments
-    pub fn comment_ranges(&self) -> &CommentRanges {
+    pub const fn comment_ranges(&self) -> &CommentRanges {
         &self.comment_ranges
     }
 

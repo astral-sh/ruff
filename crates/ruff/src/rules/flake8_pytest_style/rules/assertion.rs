@@ -11,7 +11,7 @@ use rustpython_parser::ast::{self, BoolOp, ExceptHandler, Expr, Keyword, Ranged,
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments_in, Truthiness};
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
@@ -197,7 +197,7 @@ pub(crate) fn unittest_assertion(
                     if checker.semantic().stmt().is_expr_stmt()
                         && checker.semantic().expr_parent().is_none()
                         && !checker.semantic().scope().kind.is_lambda()
-                        && !has_comments_in(expr.range(), checker.locator)
+                        && !checker.indexer.comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
@@ -483,7 +483,7 @@ pub(crate) fn composite_condition(
         if checker.patch(diagnostic.kind.rule()) {
             if matches!(composite, CompositionKind::Simple)
                 && msg.is_none()
-                && !has_comments_in(stmt.range(), checker.locator)
+                && !checker.indexer.comment_ranges().intersects(stmt.range())
             {
                 #[allow(deprecated)]
                 diagnostic.try_set_fix_from_edit(|| {

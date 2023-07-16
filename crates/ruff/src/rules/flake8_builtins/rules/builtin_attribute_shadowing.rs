@@ -1,12 +1,12 @@
+use ruff_text_size::TextRange;
+use rustpython_parser::ast;
+
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
-use rustpython_parser::ast;
 
 use crate::checkers::ast::Checker;
-
-use super::super::helpers::{shadows_builtin, AnyShadowing};
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
 /// Checks for any class attributes that use the same name as a builtin.
@@ -67,7 +67,7 @@ pub(crate) fn builtin_attribute_shadowing(
     checker: &mut Checker,
     class_def: &ast::StmtClassDef,
     name: &str,
-    shadowing: AnyShadowing,
+    range: TextRange,
 ) {
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         // Ignore shadowing within `TypedDict` definitions, since these are only accessible through
@@ -84,7 +84,7 @@ pub(crate) fn builtin_attribute_shadowing(
             BuiltinAttributeShadowing {
                 name: name.to_string(),
             },
-            shadowing.identifier(),
+            range,
         ));
     }
 }
