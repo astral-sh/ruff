@@ -121,22 +121,22 @@ def something():
  ):
      pass
  
-@@ -59,26 +53,14 @@
-     else "this one is a little shorter"
+@@ -60,11 +54,9 @@
  )
  
--generator_expression = (
+ generator_expression = (
 -    (
 -        some_long_value_name_foo_bar_baz
 -        if some_boolean_variable
 -        else some_fallback_value_foo_bar_baz
 -    )
--    for some_boolean_variable in some_iterable
--)
-+generator_expression = (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
++    some_long_value_name_foo_bar_baz
++    if some_boolean_variable
++    else some_fallback_value_foo_bar_baz
+     for some_boolean_variable in some_iterable
+ )
  
- 
- def limit_offset_sql(self, low_mark, high_mark):
+@@ -73,12 +65,14 @@
      """Return LIMIT/OFFSET SQL clause."""
      limit, offset = self._get_limit_offset_params(low_mark, high_mark)
      return " ".join(
@@ -144,9 +144,15 @@ def something():
 -        for sql in (
 -            "LIMIT %d" % limit if limit else None,
 -            ("OFFSET %d" % offset) if offset else None,
--        )
++        (
++            sql
++            for sql in (
++                "LIMIT %d" % limit if limit else None,
++                ("OFFSET %d" % offset) if offset else None,
++            )
++            if sql
+         )
 -        if sql
-+        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
      )
  
  
@@ -210,14 +216,26 @@ nested = (
     else "this one is a little shorter"
 )
 
-generator_expression = (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+generator_expression = (
+    some_long_value_name_foo_bar_baz
+    if some_boolean_variable
+    else some_fallback_value_foo_bar_baz
+    for some_boolean_variable in some_iterable
+)
 
 
 def limit_offset_sql(self, low_mark, high_mark):
     """Return LIMIT/OFFSET SQL clause."""
     limit, offset = self._get_limit_offset_params(low_mark, high_mark)
     return " ".join(
-        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+        (
+            sql
+            for sql in (
+                "LIMIT %d" % limit if limit else None,
+                ("OFFSET %d" % offset) if offset else None,
+            )
+            if sql
+        )
     )
 
 

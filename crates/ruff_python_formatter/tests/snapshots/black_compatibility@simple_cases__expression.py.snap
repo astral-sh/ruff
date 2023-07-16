@@ -363,21 +363,6 @@ last_call()
  numpy[np.newaxis, :]
  (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
  {"2.7": dead, "3.7": long_live or die_hard}
-@@ -181,10 +187,10 @@
- (SomeName)
- SomeName
- (Good, Bad, Ugly)
--(i for i in (1, 2, 3))
--((i**2) for i in (1, 2, 3))
--((i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c")))
--(((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3))
-+(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-+(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-+(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-+(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
- (*starred,)
- {
-     "id": "1",
 @@ -208,24 +214,14 @@
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
@@ -435,15 +420,6 @@ last_call()
  assert not Test, "Short message"
  assert this is ComplexTest and not requirements.fit_in_a_single_line(
      force=False
-@@ -259,7 +255,7 @@
-     ...
- for y in ():
-     ...
--for z in (i for i in (1, 2, 3)):
-+for z in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
-     ...
- for i in call():
-     ...
 @@ -328,13 +324,18 @@
  ):
      return True
@@ -670,10 +646,10 @@ numpy[np.newaxis, :]
 (SomeName)
 SomeName
 (Good, Bad, Ugly)
-(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+(i for i in (1, 2, 3))
+((i**2) for i in (1, 2, 3))
+((i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c")))
+(((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3))
 (*starred,)
 {
     "id": "1",
@@ -738,7 +714,7 @@ for (x,) in (1,), (2,), (3,):
     ...
 for y in ():
     ...
-for z in (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in []):
+for z in (i for i in (1, 2, 3)):
     ...
 for i in call():
     ...

@@ -1,7 +1,10 @@
 use crate::context::PyFormatContext;
+use crate::expression::parentheses::parenthesized;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
+use crate::prelude::*;
+use crate::AsFormat;
+use crate::{FormatNodeRule, PyFormatter};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::ExprGeneratorExp;
 
@@ -9,11 +12,29 @@ use rustpython_parser::ast::ExprGeneratorExp;
 pub struct FormatExprGeneratorExp;
 
 impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
-    fn fmt_fields(&self, _item: &ExprGeneratorExp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: &ExprGeneratorExp, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprGeneratorExp {
+            range: _,
+            elt,
+            generators,
+        } = item;
+
+        let joined = format_with(|f| {
+            f.join_with(soft_line_break_or_space())
+                .entries(generators.iter().formatted())
+                .finish()
+        });
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "(NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])"
+            [parenthesized(
+                "(",
+                &format_args!(
+                    group(&elt.format()),
+                    soft_line_break_or_space(),
+                    group(&joined)
+                ),
+                ")"
             )]
         )
     }

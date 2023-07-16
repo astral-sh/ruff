@@ -1,0 +1,28 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/generator_exp.py
+---
+## Input
+```py
+(a for b in c)
+
+# parens around generator expression not required
+len(a for b in c)
+
+# parens around generator expression required
+sum((a for b in c), start=0)
+```
+
+## Output
+```py
+(a for b in c)
+
+# parens around generator expression not required
+len((a for b in c))
+
+# parens around generator expression required
+sum((a for b in c), start=0)
+```
+
+
+
