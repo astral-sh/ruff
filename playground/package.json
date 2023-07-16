@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "build:wasm": "wasm-pack build ../crates/ruff_wasm --target web --out-dir ../../playground/src/pkg",
     "build": "tsc && vite build",
     "check": "npm run lint && npm run tsc",
     "dev": "vite",
