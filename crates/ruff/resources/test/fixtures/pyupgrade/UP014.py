@@ -8,7 +8,6 @@ MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
 MyType = NamedTuple(
     "MyType",
     [("a", int), ("b", str), ("c", list[bool])],
-    defaults=["foo", [True]],
 )
 
 # with namespace
@@ -18,7 +17,6 @@ MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
 MyType = NamedTuple(
     "MyType",
     [("a", int), ("b", str)],
-    defaults=[1, "bar", "baz"],
 )
 
 # invalid identifiers (OK)
@@ -29,3 +27,6 @@ MyType = typing.NamedTuple("MyType")
 
 # empty fields
 MyType = typing.NamedTuple("MyType", [])
+
+# keywords
+MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])
