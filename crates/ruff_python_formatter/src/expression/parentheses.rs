@@ -19,6 +19,12 @@ pub(crate) enum OptionalParentheses {
     Never,
 }
 
+impl OptionalParentheses {
+    pub(crate) const fn is_always(self) -> bool {
+        matches!(self, OptionalParentheses::Always)
+    }
+}
+
 pub(crate) trait NeedsParentheses {
     /// Determines if this object needs optional parentheses or if it is safe to omit the parentheses.
     fn needs_parentheses(
@@ -36,6 +42,17 @@ pub(crate) enum Parenthesize {
 
     /// Parenthesizes the expression only if it doesn't fit on a line.
     IfBreaks,
+
+    /// Only adds parentheses if absolutely necessary:
+    /// * The expression is not enclosed by another parenthesized expression and it expands over multiple lines
+    /// * The expression has leading or trailing comments. Adding parentheses is desired to prevent the comments from wandering.
+    IfRequired,
+}
+
+impl Parenthesize {
+    pub(crate) const fn is_optional(self) -> bool {
+        matches!(self, Parenthesize::Optional)
+    }
 }
 
 /// Whether it is necessary to add parentheses around an expression.

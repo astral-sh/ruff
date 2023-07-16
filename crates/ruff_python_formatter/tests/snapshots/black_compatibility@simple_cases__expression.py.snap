@@ -316,39 +316,19 @@ last_call()
  ()
  (1,)
  (1, 2)
-@@ -87,22 +90,19 @@
-     another,
-     *more,
- ]
--{i for i in (1, 2, 3)}
--{(i**2) for i in (1, 2, 3)}
--{(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))}
--{((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-+{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
- [i for i in (1, 2, 3)]
- [(i**2) for i in (1, 2, 3)]
- [(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
- [((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
--{i: 0 for i in (1, 2, 3)}
--{i: j for i, j in ((1, "a"), (2, "b"), (3, "c"))}
--{a: b * 2 for a, b in dictionary.items()}
--{a: b * -2 for a, b in dictionary.items()}
--{
--    k: v
+@@ -101,7 +104,10 @@
+ {a: b * -2 for a, b in dictionary.items()}
+ {
+     k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
--}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++    for (
++        k,
++        v,
++    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+ }
  Python3 > Python2 > COBOL
  Life is Life
- call()
-@@ -115,7 +115,7 @@
+@@ -115,7 +121,7 @@
      arg,
      another,
      kwarg="hey",
@@ -357,7 +337,7 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -152,13 +152,13 @@
+@@ -152,13 +158,13 @@
  slice[0:1]
  slice[0:1:2]
  slice[:]
@@ -374,7 +354,7 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -172,7 +172,7 @@
+@@ -172,7 +178,7 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
@@ -383,7 +363,7 @@ last_call()
  numpy[np.newaxis, :]
  (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
  {"2.7": dead, "3.7": long_live or die_hard}
-@@ -181,10 +181,10 @@
+@@ -181,10 +187,10 @@
  (SomeName)
  SomeName
  (Good, Bad, Ugly)
@@ -398,7 +378,7 @@ last_call()
  (*starred,)
  {
      "id": "1",
-@@ -208,24 +208,14 @@
+@@ -208,24 +214,14 @@
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
  )
@@ -431,7 +411,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,10 +227,10 @@
+@@ -237,10 +233,10 @@
  
  
  def gen():
@@ -446,22 +426,16 @@ last_call()
  
  
  async def f():
-@@ -248,8 +238,12 @@
- 
+@@ -249,7 +245,7 @@
  
  print(*[] or [1])
--print(**{1: 3} if False else {x: x for x in range(3)})
+ print(**{1: 3} if False else {x: x for x in range(3)})
 -print(*lambda x: x)
-+print(
-+    **{1: 3}
-+    if False
-+    else {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-+)
 +print(*lambda NOT_YET_IMPLEMENTED_lambda: True)
  assert not Test, "Short message"
  assert this is ComplexTest and not requirements.fit_in_a_single_line(
      force=False
-@@ -259,7 +253,7 @@
+@@ -259,7 +255,7 @@
      ...
  for y in ():
      ...
@@ -470,7 +444,7 @@ last_call()
      ...
  for i in call():
      ...
-@@ -328,13 +322,18 @@
+@@ -328,13 +324,18 @@
  ):
      return True
  if (
@@ -492,7 +466,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +341,8 @@
+@@ -342,7 +343,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -599,19 +573,25 @@ str or None if (1 if True else 2) else str or bytes or None
     another,
     *more,
 ]
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+{i for i in (1, 2, 3)}
+{(i**2) for i in (1, 2, 3)}
+{(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))}
+{((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)}
 [i for i in (1, 2, 3)]
 [(i**2) for i in (1, 2, 3)]
 [(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))]
 [((i**2) + j) for i in (1, 2, 3) for j in (1, 2, 3)]
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+{i: 0 for i in (1, 2, 3)}
+{i: j for i, j in ((1, "a"), (2, "b"), (3, "c"))}
+{a: b * 2 for a, b in dictionary.items()}
+{a: b * -2 for a, b in dictionary.items()}
+{
+    k: v
+    for (
+        k,
+        v,
+    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+}
 Python3 > Python2 > COBOL
 Life is Life
 call()
@@ -747,11 +727,7 @@ async def f():
 
 
 print(*[] or [1])
-print(
-    **{1: 3}
-    if False
-    else {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
-)
+print(**{1: 3} if False else {x: x for x in range(3)})
 print(*lambda NOT_YET_IMPLEMENTED_lambda: True)
 assert not Test, "Short message"
 assert this is ComplexTest and not requirements.fit_in_a_single_line(

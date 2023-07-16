@@ -84,15 +84,6 @@ return np.divide(
  f = f() ** 5
  g = a.b**c.d
  h = 5 ** funcs.f()
-@@ -26,7 +26,7 @@
- m = [([2**63], [1, 2**63])]
- n = count <= 10**5
- o = settings(max_examples=10**6)
--p = {(k, k**2): v**2 for k, v in pairs}
-+p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
- q = [10**i for i in range(6)]
- r = x**y
- 
 @@ -34,7 +34,7 @@
  b = 5.0 ** f()
  c = -(5.0**2.0)
@@ -102,15 +93,6 @@ return np.divide(
  f = f() ** 5.0
  g = a.b**c.d
  h = 5.0 ** funcs.f()
-@@ -45,7 +45,7 @@
- m = [([2.0**63.0], [1.0, 2**63.0])]
- n = count <= 10**5.0
- o = settings(max_examples=10**6.0)
--p = {(k, k**2): v**2.0 for k, v in pairs}
-+p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
- q = [10.5**i for i in range(6)]
- 
- 
 ```
 
 ## Ruff Output
@@ -144,7 +126,7 @@ l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
 m = [([2**63], [1, 2**63])]
 n = count <= 10**5
 o = settings(max_examples=10**6)
-p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+p = {(k, k**2): v**2 for k, v in pairs}
 q = [10**i for i in range(6)]
 r = x**y
 
@@ -163,7 +145,7 @@ l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
 m = [([2.0**63.0], [1.0, 2**63.0])]
 n = count <= 10**5.0
 o = settings(max_examples=10**6.0)
-p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+p = {(k, k**2): v**2.0 for k, v in pairs}
 q = [10.5**i for i in range(6)]
 
 
