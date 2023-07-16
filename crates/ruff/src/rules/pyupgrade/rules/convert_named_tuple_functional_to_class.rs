@@ -111,14 +111,8 @@ fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
     .into()
 }
 
-/// Create a list of property assignments from the `NamedTuple` arguments.
-fn create_properties_from_args(args: &[Expr]) -> Result<Vec<Stmt>> {
-    let Some(fields) = args.get(1) else {
-        let node = Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-        });
-        return Ok(vec![node]);
-    };
+/// Create a list of property assignments from the `NamedTuple` positional arguments.
+fn create_properties_from_fields_arg(fields: &Expr) -> Result<Vec<Stmt>> {
     let Expr::List(ast::ExprList { elts, .. }) = &fields else {
         bail!("Expected argument to be `Expr::List`");
     };
@@ -150,6 +144,20 @@ fn create_properties_from_args(args: &[Expr]) -> Result<Vec<Stmt>> {
                 bail!("Cannot use dunder property name: {}", property)
             }
             Ok(create_property_assignment_stmt(property, annotation))
+        })
+        .collect()
+}
+
+/// Create a list of property assignments from the `NamedTuple` keyword arguments.
+fn create_properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
+    keywords
+        .iter()
+        .map(|keyword| {
+            let Keyword { arg, value, .. } = keyword;
+            let Some(arg) = arg else {
+                    bail!("Expected `keyword` to have an `arg`")
+                };
+            Ok(create_property_assignment_stmt(arg.as_str(), value))
         })
         .collect()
 }
@@ -195,26 +203,31 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         return;
     };
 
-    // Ignore `NamedTuple` calls containing both a list of fields and keywords:
-    // ```
-    // NamedTuple(
-    //     "MyType",
-    //     [("a", int), ("b", str)],
-    //     defaults=[0, ""],
-    // )
-    // ```
-    if args.len() > 1 && !keywords.is_empty() {
-        return;
-    }
-
-    let properties = match create_properties_from_args(args) {
+    let properties = match (&args[1..], keywords) {
+        // Ex) NamedTuple("MyType")
+        ([], []) => {
+            let node = Stmt::Pass(ast::StmtPass {
+                range: TextRange::default(),
+            });
+            Ok(vec![node])
+        }
+        // Ex) NamedTuple("MyType", [("a", int), ("b", str)])
+        ([fields], []) => create_properties_from_fields_arg(fields),
+        // Ex) NamedTuple("MyType", a=int, b=str)
+        ([], keywords) => create_properties_from_keywords(keywords),
+        // Unfixable
+        _ => {
+            debug!("Skipping `NamedTuple` \"{typename}\": unfixable");
+            return;
+        }
+    };
+    let properties = match properties {
         Ok(properties) => properties,
         Err(err) => {
             debug!("Skipping `NamedTuple` \"{typename}\": {err}");
             return;
         }
     };
-
     let mut diagnostic = Diagnostic::new(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
