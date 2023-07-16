@@ -6,6 +6,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
 
 use crate::comments::dangling_comments;
+use crate::expression::expr_generator_exp::GeneratorExpParentheses;
 use crate::expression::parentheses::{
     parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -56,7 +57,15 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
                         } else {
                             Parentheses::Never
                         };
-                    joiner.entry(argument, &argument.format().with_options(parentheses));
+                    match argument {
+                        Expr::GeneratorExp(generator_exp) => joiner.entry(
+                            generator_exp,
+                            &generator_exp
+                                .format()
+                                .with_options(GeneratorExpParentheses::StripIfOnlyFunctionArg),
+                        ),
+                        other => joiner.entry(other, &other.format().with_options(parentheses)),
+                    };
                 }
                 arguments => {
                     joiner

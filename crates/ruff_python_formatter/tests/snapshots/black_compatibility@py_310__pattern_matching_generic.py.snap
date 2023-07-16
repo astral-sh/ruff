@@ -134,7 +134,7 @@ with match() as match:
  
  
  def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
-@@ -23,13 +23,9 @@
+@@ -23,11 +23,7 @@
              pygram.python_grammar,
          ]
  
@@ -145,11 +145,8 @@ with match() as match:
 -                    pass
 +    NOT_YET_IMPLEMENTED_StmtMatch
  
--    if all(version.is_python2() for version in target_versions):
-+    if all((version.is_python2() for version in target_versions)):
+     if all(version.is_python2() for version in target_versions):
          # Python 2-only code, so try Python 2 grammars.
-         return [
-             # Python 2.7 with future print_function import
 @@ -41,13 +37,11 @@
      re.match()
      match = a
@@ -229,7 +226,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
 
     NOT_YET_IMPLEMENTED_StmtMatch
 
-    if all((version.is_python2() for version in target_versions)):
+    if all(version.is_python2() for version in target_versions):
         # Python 2-only code, so try Python 2 grammars.
         return [
             # Python 2.7 with future print_function import

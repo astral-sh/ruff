@@ -4,12 +4,35 @@ use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatResult, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::ExprGeneratorExp;
 
+#[derive(Eq, PartialEq, Debug, Default)]
+pub enum GeneratorExpParentheses {
+    #[default]
+    Default,
+
+    // skip parens if the generator exp is the only argument to a function, e.g.
+    // ```python
+    //  all(x for y in z)`
+    //  ```
+    StripIfOnlyFunctionArg,
+}
+
+impl FormatRuleWithOptions<ExprGeneratorExp, PyFormatContext<'_>> for FormatExprGeneratorExp {
+    type Options = GeneratorExpParentheses;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.parentheses = options;
+        self
+    }
+}
+
 #[derive(Default)]
-pub struct FormatExprGeneratorExp;
+pub struct FormatExprGeneratorExp {
+    parentheses: GeneratorExpParentheses,
+}
 
 impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
     fn fmt_fields(&self, item: &ExprGeneratorExp, f: &mut PyFormatter) -> FormatResult<()> {
@@ -25,18 +48,29 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                 .finish()
         });
 
-        write!(
-            f,
-            [parenthesized(
-                "(",
-                &format_args!(
+        if self.parentheses == GeneratorExpParentheses::StripIfOnlyFunctionArg {
+            write!(
+                f,
+                [
                     group(&elt.format()),
                     soft_line_break_or_space(),
-                    group(&joined)
-                ),
-                ")"
-            )]
-        )
+                    group(&joined),
+                ]
+            )
+        } else {
+            write!(
+                f,
+                [parenthesized(
+                    "(",
+                    &format_args!(
+                        group(&elt.format()),
+                        soft_line_break_or_space(),
+                        group(&joined)
+                    ),
+                    ")"
+                )]
+            )
+        }
     }
 }
 
