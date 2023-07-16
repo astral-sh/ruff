@@ -6,6 +6,29 @@ use ruff_python_ast::helpers::SimpleCallArgs;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of SNMPv3 without encryption.
+///
+/// ## Why is this bad?
+/// Unencrypted SNMPv3 communication can be intercepted and read by
+/// unauthorized parties. Instead, consider using SNMPv3 with encryption.
+///
+/// ## Example
+/// ```python
+/// from pysnmp.hlapi import UsmUserData
+///
+/// UsmUserData("user")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from pysnmp.hlapi import UsmUserData
+///
+/// UsmUserData("user", "authkey", "privkey")
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[violation]
 pub struct SnmpWeakCryptography;
 

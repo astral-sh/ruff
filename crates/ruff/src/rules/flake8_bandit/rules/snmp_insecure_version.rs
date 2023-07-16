@@ -7,6 +7,30 @@ use ruff_python_ast::helpers::SimpleCallArgs;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for uses of SNMPv1 or SNMPv2.
+///
+/// ## Why is this bad?
+/// The use of SNMPv1 and SNMPv2 is insecure as they are unencrypted. Instead,
+/// consider using SNMPv3, which is encrypted.
+///
+/// ## Example
+/// ```python
+/// from pysnmp.hlapi import CommunityData
+///
+/// CommunityData("public", mpModel=0)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from pysnmp.hlapi import CommunityData
+///
+/// CommunityData("public", mpModel=2)
+/// ```
+///
+/// ## References
+/// - [Cybersecurity and Infrastructure Security Agency (CISA): Alert TA17-156A](https://www.cisa.gov/news-events/alerts/2017/06/05/reducing-risk-snmp-abuse)
+/// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[violation]
 pub struct SnmpInsecureVersion;
 

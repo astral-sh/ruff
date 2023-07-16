@@ -6,6 +6,30 @@ use ruff_python_ast::helpers::{is_const_false, SimpleCallArgs};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for HTTPS requests that disable SSL certificate checks.
+///
+/// ## Why is this bad?
+/// If certificates are not verified, an attacker could perform a "man in the
+/// middle" attack by intercepting and modifying traffic between the client and
+/// server.
+///
+/// ## Example
+/// ```python
+/// import requests
+///
+/// requests.get("https://www.example.com", verify=False)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import requests
+///
+/// requests.get("https://www.example.com")  # By default, `verify=True`.
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-295](https://cwe.mitre.org/data/definitions/295.html)
 #[violation]
 pub struct RequestWithNoCertValidation {
     string: String,
