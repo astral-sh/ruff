@@ -717,7 +717,7 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.
-pub fn has_comments<T>(node: &T, locator: &Locator) -> bool
+pub fn has_comments<T>(node: &T, locator: &Locator, indexer: &Indexer) -> bool
 where
     T: Ranged,
 {
@@ -732,26 +732,9 @@ where
         locator.line_end(node.end())
     };
 
-    has_comments_in(TextRange::new(start, end), locator)
-}
-
-/// Returns `true` if a [`TextRange`] includes at least one comment.
-pub fn has_comments_in(range: TextRange, locator: &Locator) -> bool {
-    let source = &locator.contents()[range];
-
-    for tok in lexer::lex_starts_at(source, Mode::Module, range.start()) {
-        match tok {
-            Ok((tok, _)) => {
-                if matches!(tok, Tok::Comment(..)) {
-                    return true;
-                }
-            }
-            Err(_) => {
-                return false;
-            }
-        }
-    }
-    false
+    indexer
+        .comment_ranges()
+        .intersects(TextRange::new(start, end))
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
