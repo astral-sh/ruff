@@ -40,7 +40,7 @@ pub struct PandasUseOfDotReadTable;
 impl Violation for PandasUseOfDotReadTable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `pandas.read_csv` instead of `pandas.read_table` to read CSV files")
+        format!("Use `.read_csv` instead of `.read_table` to read CSV files")
     }
 }
 

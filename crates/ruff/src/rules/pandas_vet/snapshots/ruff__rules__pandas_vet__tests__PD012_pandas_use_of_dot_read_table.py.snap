@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pandas_vet/mod.rs
 ---
-pandas_use_of_dot_read_table.py:5:6: PD012 Use `pandas.read_csv` instead of `pandas.read_table` to read CSV files
+pandas_use_of_dot_read_table.py:5:6: PD012 Use `.read_csv` instead of `.read_table` to read CSV files
   |
 3 | # Errors.
 4 | 
