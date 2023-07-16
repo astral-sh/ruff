@@ -1558,6 +1558,14 @@ where
                 finalbody,
                 range: _,
             }) => {
+                if self.enabled(Rule::JumpStatementInFinally) {
+                    flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
+                }
+                if self.enabled(Rule::ContinueInFinally) {
+                    if self.settings.target_version <= PythonVersion::Py38 {
+                        pylint::rules::continue_in_finally(self, finalbody);
+                    }
+                }
                 if self.enabled(Rule::DefaultExceptNotLast) {
                     if let Some(diagnostic) =
                         pyflakes::rules::default_except_not_last(handlers, self.locator)
@@ -1944,20 +1952,9 @@ where
                 }
 
                 self.semantic.handled_exceptions.push(handled_exceptions);
-
-                if self.enabled(Rule::JumpStatementInFinally) {
-                    flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
-                }
-                if self.enabled(Rule::ContinueInFinally) {
-                    if self.settings.target_version <= PythonVersion::Py38 {
-                        pylint::rules::continue_in_finally(self, finalbody);
-                    }
-                }
-
                 self.visit_body(body);
                 self.semantic.handled_exceptions.pop();
 
-                self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
                 for except_handler in handlers {
                     self.visit_except_handler(except_handler);
                 }
@@ -3873,6 +3870,9 @@ where
     }
 
     fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
+        let flags_snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
+
         match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
@@ -3992,6 +3992,8 @@ where
                 }
             }
         }
+
+        self.semantic.flags = flags_snapshot;
     }
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
