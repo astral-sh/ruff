@@ -37,14 +37,15 @@ impl<'a> AnyStatementFor<'a> {
         matches!(self, AnyStatementFor::AsyncFor(_))
     }
 
-    fn target(&self) -> &Box<Expr> {
+    fn target(&self) -> &Expr {
         match self {
             AnyStatementFor::For(stmt) => &stmt.target,
             AnyStatementFor::AsyncFor(stmt) => &stmt.target,
         }
     }
 
-    fn iter(&self) -> &Box<Expr> {
+    #[allow(clippy::iter_not_returning_iterator)]
+    fn iter(&self) -> &Expr {
         match self {
             AnyStatementFor::For(stmt) => &stmt.iter,
             AnyStatementFor::AsyncFor(stmt) => &stmt.iter,
@@ -119,7 +120,7 @@ impl Format<PyFormatContext<'_>> for AnyStatementFor<'_> {
                     .then_some(format_args![text("async"), space()]),
                 text("for"),
                 space(),
-                ExprTupleWithoutParentheses(target.as_ref()),
+                ExprTupleWithoutParentheses(target),
                 space(),
                 text("in"),
                 space(),
