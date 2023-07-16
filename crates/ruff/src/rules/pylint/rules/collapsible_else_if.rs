@@ -1,3 +1,4 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{ElifElseClause, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -47,14 +48,17 @@ impl Violation for CollapsibleElseIf {
 
 /// PLR5501
 pub(crate) fn collapsible_else_if(elif_else_clauses: &[ElifElseClause]) -> Option<Diagnostic> {
-    let [ElifElseClause {
-        body, test: None, ..
-    }] = elif_else_clauses
+    let Some(ElifElseClause {
+        body, test: None, range
+    }) = elif_else_clauses.last()
     else {
         return None;
     };
     if let [first @ Stmt::If(_)] = body.as_slice() {
-        return Some(Diagnostic::new(CollapsibleElseIf, first.range()));
+        return Some(Diagnostic::new(
+            CollapsibleElseIf,
+            TextRange::new(range.start(), first.start()),
+        ));
     }
     None
 }
