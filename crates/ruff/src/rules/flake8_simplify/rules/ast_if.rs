@@ -360,13 +360,6 @@ fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
 
 /// SIM102
 pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, parent: Option<&Stmt>) {
-    // If the parent could contain a nested if-statement, abort.
-    if let Some(Stmt::If(stmt_if)) = parent {
-        if nested_if_body(stmt_if).is_some() {
-            return;
-        }
-    }
-
     let Some((body, range)) = nested_if_body(stmt_if) else {
         return;
     };
@@ -380,6 +373,19 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
         TextRange::new(test.end(), first_stmt.start()),
         checker.locator,
     );
+
+    // Check if the parent is already emitting a larger diagnostic including this if statement
+    if let Some(Stmt::If(stmt_if)) = parent {
+        if let Some((body, _range)) = nested_if_body(stmt_if) {
+            // In addition to repeating the `nested_if_body` and `find_last_nested_if` check, we
+            // also need to be the first child in the parent
+            if matches!(&body[0], Stmt::If(inner) if inner == stmt_if)
+                && find_last_nested_if(body).is_some()
+            {
+                return;
+            }
+        }
+    }
 
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
