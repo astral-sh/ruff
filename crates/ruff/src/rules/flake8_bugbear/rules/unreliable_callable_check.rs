@@ -1,10 +1,10 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprCall, ExprName, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `hasattr` to test if an object is callable (e.g.,
@@ -41,7 +41,7 @@ impl Violation for UnreliableCallableCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use \
+            "Using `hasattr(x, \"__call__\")` to test if x is callable is unreliable. Use \
              `callable(x)` for consistent results."
         )
     }
@@ -61,41 +61,33 @@ pub(crate) fn unreliable_callable_check(
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if id != "getattr" && id != "hasattr" {
+    if !matches!(id.as_str(), "hasattr" | "getattr") {
         return;
     }
-    if args.len() < 2 {
+    let [obj, attr, ..] = args else {
         return;
     };
     let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(s),
+        value: Constant::Str(string),
         ..
-    }) = &args[1]
+    }) = attr
     else {
         return;
     };
-    if s != "__call__" {
+    if string != "__call__" {
         return;
     }
+
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
-
-    if id == "hasattr" {
-        let new_call = Expr::Call(ExprCall {
-            range: TextRange::default(),
-            func: Box::new(Expr::Name(ExprName {
-                range: TextRange::default(),
-                id: "callable".to_string(),
-                ctx: ast::ExprContext::Load,
-            })),
-            args: args[..1].into(),
-            keywords: vec![],
-        });
-
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-            checker.generator().expr(&new_call),
-            expr.range(),
-        )));
+    if checker.patch(diagnostic.kind.rule()) {
+        if id == "hasattr" {
+            if checker.semantic().is_builtin("callable") {
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    format!("callable({})", checker.locator.slice(obj.range())),
+                    expr.range(),
+                )));
+            }
+        }
     }
-
     checker.diagnostics.push(diagnostic);
 }
