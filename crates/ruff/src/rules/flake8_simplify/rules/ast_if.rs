@@ -6,9 +6,7 @@ use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Identifie
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
-use ruff_python_ast::helpers::{
-    any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
-};
+use ruff_python_ast::helpers::{any_over_expr, contains_effect, first_colon_range, has_comments};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
@@ -378,10 +376,11 @@ pub(crate) fn nested_if_statements(
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
         let nested_if = &body[0];
-        if !has_comments_in(
-            TextRange::new(stmt.start(), nested_if.start()),
-            checker.locator,
-        ) {
+        if !checker
+            .indexer
+            .comment_ranges()
+            .intersects(TextRange::new(stmt.start(), nested_if.start()))
+        {
             match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
                 Ok(edit) => {
                     if edit
@@ -420,10 +419,10 @@ impl From<bool> for Bool {
 }
 
 fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
-    if stmts.len() != 1 {
+    let [stmt] = stmts else {
         return None;
-    }
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &stmts[0] else {
+    };
+    let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt else {
         return None;
     };
     let Some(Expr::Constant(ast::ExprConstant { value, .. })) = value.as_deref() else {
@@ -464,7 +463,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
-            && !has_comments(stmt, checker.locator)
+            && !has_comments(stmt, checker.locator, checker.indexer)
             && (test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
             if test.is_compare_expr() {
@@ -650,7 +649,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator) {
+        if !has_comments(stmt, checker.locator, checker.indexer) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
@@ -859,15 +858,12 @@ pub(crate) fn manual_dict_lookup(
         let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
             return;
         };
-        if !(id == target && ops.len() == 1 && ops[0] == CmpOp::Eq) {
+        if !(id == target && matches!(ops.as_slice(), [CmpOp::Eq])) {
             return;
         }
-        if comparators.len() != 1 {
-            return;
-        }
-        let Expr::Constant(ast::ExprConstant {
+        let [Expr::Constant(ast::ExprConstant {
             value: constant, ..
-        }) = &comparators[0]
+        })] = comparators.as_slice()
         else {
             return;
         };
@@ -1053,7 +1049,7 @@ pub(crate) fn use_dict_get_with_default(
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator) {
+        if !has_comments(stmt, checker.locator, checker.indexer) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),

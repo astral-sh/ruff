@@ -125,18 +125,18 @@ with open("/path/to/file.txt", mode="r") as read_file:
  
  for i in range(5):
 -    print(f"{i}) The line above me should be removed!")
-+    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
++    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
  
  
  for i in range(5):
 -    print(f"{i}) The lines above me should be removed!")
-+    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
++    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
  
  
  for i in range(5):
      for j in range(7):
 -        print(f"{i}) The lines above me should be removed!")
-+        print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
++        print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
  
  
  if random.randint(0, 3) == 0:
@@ -174,16 +174,16 @@ class Foo:
 
 
 for i in range(5):
-    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
+    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 
 
 for i in range(5):
-    print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
+    print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 
 
 for i in range(5):
     for j in range(7):
-        print(NOT_YET_IMPLEMENTED_ExprJoinedStr)
+        print(f"NOT_YET_IMPLEMENTED_ExprJoinedStr")
 
 
 if random.randint(0, 3) == 0:

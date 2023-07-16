@@ -1,11 +1,15 @@
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Ranged, StmtAsyncWith, StmtWith, Suite, WithItem};
 
-use crate::builders::parenthesize_if_expands;
+use ruff_formatter::{format_args, write, FormatError};
+use ruff_python_ast::node::AnyNodeRef;
+
 use crate::comments::trailing_comments;
+use crate::expression::parentheses::{
+    in_parentheses_only_soft_line_break_or_space, optional_parentheses,
+};
 use crate::prelude::*;
+use crate::trivia::{SimpleTokenizer, TokenKind};
 use crate::FormatNodeRule;
 
 pub(super) enum AnyStatementWith<'a> {
@@ -68,24 +72,72 @@ impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling_comments(self);
 
-        let joined_items =
-            format_with(|f| f.join_comma_separated().nodes(self.items().iter()).finish());
+        write!(
+            f,
+            [
+                self.is_async()
+                    .then_some(format_args![text("async"), space()]),
+                text("with"),
+                space()
+            ]
+        )?;
 
-        if self.is_async() {
-            write!(f, [text("async"), space()])?;
+        if are_with_items_parenthesized(self, f.context())? {
+            optional_parentheses(&format_with(|f| {
+                let mut joiner = f.join_comma_separated(self.body().first().unwrap().start());
+
+                for item in self.items() {
+                    joiner.entry_with_line_separator(
+                        item,
+                        &item.format(),
+                        in_parentheses_only_soft_line_break_or_space(),
+                    );
+                }
+                joiner.finish()
+            }))
+            .fmt(f)?;
+        } else {
+            f.join_with(format_args![text(","), space()])
+                .entries(self.items().iter().formatted())
+                .finish()?;
         }
 
         write!(
             f,
             [
-                text("with"),
-                space(),
-                group(&parenthesize_if_expands(&joined_items)),
                 text(":"),
                 trailing_comments(dangling_comments),
                 block_indent(&self.body().format())
             ]
         )
+    }
+}
+
+fn are_with_items_parenthesized(
+    with: &AnyStatementWith,
+    context: &PyFormatContext,
+) -> FormatResult<bool> {
+    let first_with_item = with.items().first().ok_or(FormatError::SyntaxError)?;
+    let before_first_with_item = TextRange::new(with.start(), first_with_item.start());
+
+    let mut tokenizer = SimpleTokenizer::new(context.source(), before_first_with_item)
+        .skip_trivia()
+        .skip_while(|t| t.kind() == TokenKind::Async);
+
+    let with_keyword = tokenizer.next().ok_or(FormatError::SyntaxError)?;
+
+    debug_assert_eq!(
+        with_keyword.kind(),
+        TokenKind::With,
+        "Expected with keyword but at {with_keyword:?}"
+    );
+
+    match tokenizer.next() {
+        Some(left_paren) => {
+            debug_assert_eq!(left_paren.kind(), TokenKind::LParen);
+            Ok(true)
+        }
+        None => Ok(false),
     }
 }
 

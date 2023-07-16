@@ -1,41 +1,29 @@
-use crate::builders::parenthesize_if_expands;
-use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::Parentheses;
-use crate::prelude::*;
-use crate::QuoteStyle;
+use std::borrow::Cow;
+
 use bitflags::bitflags;
-use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{ExprConstant, Ranged};
 use rustpython_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use rustpython_parser::{Mode, Tok};
-use std::borrow::Cow;
 
-#[derive(Copy, Clone, Debug)]
-pub enum StringLayout {
-    Default(Option<Parentheses>),
+use ruff_formatter::{format_args, write, FormatError};
+use ruff_python_ast::str::is_implicit_concatenation;
 
-    /// Enforces that implicit continuation strings are printed on a single line even if they exceed
-    /// the configured line width.
-    Flat,
-}
-
-impl Default for StringLayout {
-    fn default() -> Self {
-        Self::Default(None)
-    }
-}
+use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::parentheses::{
+    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space,
+};
+use crate::prelude::*;
+use crate::QuoteStyle;
 
 pub(super) struct FormatString<'a> {
     constant: &'a ExprConstant,
-    layout: StringLayout,
 }
 
 impl<'a> FormatString<'a> {
-    pub(super) fn new(constant: &'a ExprConstant, layout: StringLayout) -> Self {
+    pub(super) fn new(constant: &'a ExprConstant) -> Self {
         debug_assert!(constant.value.is_str());
-        Self { constant, layout }
+        Self { constant }
     }
 }
 
@@ -45,13 +33,7 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
         let string_content = f.context().locator().slice(string_range);
 
         if is_implicit_concatenation(string_content) {
-            let format_continuation = FormatStringContinuation::new(self.constant, self.layout);
-
-            if let StringLayout::Default(Some(Parentheses::Custom)) = self.layout {
-                parenthesize_if_expands(&format_continuation).fmt(f)
-            } else {
-                format_continuation.fmt(f)
-            }
+            in_parentheses_only_group(&FormatStringContinuation::new(self.constant)).fmt(f)
         } else {
             FormatStringPart::new(string_range).fmt(f)
         }
@@ -60,13 +42,12 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
 
 struct FormatStringContinuation<'a> {
     constant: &'a ExprConstant,
-    layout: StringLayout,
 }
 
 impl<'a> FormatStringContinuation<'a> {
-    fn new(constant: &'a ExprConstant, layout: StringLayout) -> Self {
+    fn new(constant: &'a ExprConstant) -> Self {
         debug_assert!(constant.value.is_str());
-        Self { constant, layout }
+        Self { constant }
     }
 }
 
@@ -85,12 +66,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // because this is a black preview style.
         let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
 
-        let separator = format_with(|f| match self.layout {
-            StringLayout::Default(_) => soft_line_break_or_space().fmt(f),
-            StringLayout::Flat => space().fmt(f),
-        });
-
-        let mut joiner = f.join_with(separator);
+        let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for token in lexer {
             let (token, token_range) = match token {
@@ -220,7 +196,7 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
 
 bitflags! {
     #[derive(Copy, Clone, Debug)]
-    struct StringPrefix: u8 {
+    pub(super) struct StringPrefix: u8 {
         const UNICODE   = 0b0000_0001;
         /// `r"test"`
         const RAW       = 0b0000_0010;
@@ -232,7 +208,7 @@ bitflags! {
 }
 
 impl StringPrefix {
-    fn parse(input: &str) -> StringPrefix {
+    pub(super) fn parse(input: &str) -> StringPrefix {
         let chars = input.chars();
         let mut prefix = StringPrefix::empty();
 
@@ -257,7 +233,7 @@ impl StringPrefix {
         prefix
     }
 
-    const fn text_len(self) -> TextSize {
+    pub(super) const fn text_len(self) -> TextSize {
         TextSize::new(self.bits().count_ones())
     }
 }
@@ -383,13 +359,13 @@ fn preferred_quotes(
 }
 
 #[derive(Copy, Clone, Debug)]
-struct StringQuotes {
+pub(super) struct StringQuotes {
     triple: bool,
     style: QuoteStyle,
 }
 
 impl StringQuotes {
-    fn parse(input: &str) -> Option<StringQuotes> {
+    pub(super) fn parse(input: &str) -> Option<StringQuotes> {
         let mut chars = input.chars();
 
         let quote_char = chars.next()?;
@@ -398,6 +374,10 @@ impl StringQuotes {
         let triple = chars.next() == Some(quote_char) && chars.next() == Some(quote_char);
 
         Some(Self { triple, style })
+    }
+
+    pub(super) const fn is_triple(self) -> bool {
+        self.triple
     }
 
     const fn text_len(self) -> TextSize {

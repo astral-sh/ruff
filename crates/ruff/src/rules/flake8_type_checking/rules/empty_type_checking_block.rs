@@ -48,11 +48,9 @@ impl AlwaysAutofixableViolation for EmptyTypeCheckingBlock {
 
 /// TCH005
 pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtIf) {
-    if stmt.body.len() != 1 {
+    let [stmt] = stmt.body.as_slice() else {
         return;
-    }
-
-    let stmt = &stmt.body[0];
+    };
     if !stmt.is_pass_stmt() {
         return;
     }

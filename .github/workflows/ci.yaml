@@ -16,7 +16,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.7" # to build abi3 wheels
+  PYTHON_VERSION: "3.11" # to build abi3 wheels
 
 jobs:
   cargo-fmt:
@@ -142,7 +142,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/download-artifact@v3
         name: Download Ruff binary
@@ -226,7 +226,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2

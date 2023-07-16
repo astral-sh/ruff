@@ -18,7 +18,7 @@ use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
-use ruff_python_ast::{cast, helpers, identifier, str, visitor};
+use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
@@ -251,9 +251,8 @@ where
         // Pre-visit.
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
-                    for (name, range) in names.iter().zip(ranges.iter()) {
+                    for name in names {
                         if let Some(binding_id) = self.semantic.global_scope().get(name) {
                             // Mark the binding in the global scope as "rebound" in the current scope.
                             self.semantic
@@ -262,7 +261,7 @@ where
 
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
-                            *range,
+                            name.range(),
                             BindingKind::Global,
                             BindingFlags::GLOBAL,
                         );
@@ -272,21 +271,19 @@ where
                 }
 
                 if self.enabled(Rule::AmbiguousVariableName) {
-                    self.diagnostics
-                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            pycodestyle::rules::ambiguous_variable_name(name, *range)
-                        }));
+                    self.diagnostics.extend(names.iter().filter_map(|name| {
+                        pycodestyle::rules::ambiguous_variable_name(name, name.range())
+                    }));
                 }
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                let ranges: Vec<TextRange> = identifier::names(stmt, self.locator).collect();
                 if !self.semantic.scope_id.is_global() {
-                    for (name, range) in names.iter().zip(ranges.iter()) {
+                    for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
                             // Mark the binding as "used".
                             self.semantic.add_local_reference(
                                 binding_id,
-                                *range,
+                                name.range(),
                                 ExecutionContext::Runtime,
                             );
 
@@ -297,7 +294,7 @@ where
 
                             // Add a binding to the current scope.
                             let binding_id = self.semantic.push_binding(
-                                *range,
+                                name.range(),
                                 BindingKind::Nonlocal(scope_id),
                                 BindingFlags::NONLOCAL,
                             );
@@ -309,17 +306,16 @@ where
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
                                     },
-                                    *range,
+                                    name.range(),
                                 ));
                             }
                         }
                     }
                 }
                 if self.enabled(Rule::AmbiguousVariableName) {
-                    self.diagnostics
-                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            pycodestyle::rules::ambiguous_variable_name(name, *range)
-                        }));
+                    self.diagnostics.extend(names.iter().filter_map(|name| {
+                        pycodestyle::rules::ambiguous_variable_name(name, name.range())
+                    }));
                 }
             }
             Stmt::Break(_) => {
@@ -438,6 +434,17 @@ where
                     }
                     if self.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                         flake8_pyi::rules::no_return_argument_annotation(self, args);
+                    }
+                    if self.enabled(Rule::BadExitAnnotation) {
+                        flake8_pyi::rules::bad_exit_annotation(
+                            self,
+                            stmt.is_async_function_def_stmt(),
+                            name,
+                            args,
+                        );
+                    }
+                    if self.enabled(Rule::RedundantNumericUnion) {
+                        flake8_pyi::rules::redundant_numeric_union(self, args);
                     }
                 }
                 if self.enabled(Rule::DunderFunctionName) {
@@ -1490,7 +1497,8 @@ where
                 orelse,
                 ..
             }) => {
-                if self.enabled(Rule::UnusedLoopControlVariable) {
+                if self.any_enabled(&[Rule::UnusedLoopControlVariable, Rule::IncorrectDictIterator])
+                {
                     self.deferred.for_loops.push(self.semantic.snapshot());
                 }
                 if self.enabled(Rule::LoopVariableOverridesIterator) {
@@ -1525,9 +1533,6 @@ where
                     if self.enabled(Rule::TryExceptInLoop) {
                         perflint::rules::try_except_in_loop(self, body);
                     }
-                }
-                if self.enabled(Rule::IncorrectDictIterator) {
-                    perflint::rules::incorrect_dict_iterator(self, target, iter);
                 }
                 if self.enabled(Rule::ManualListComprehension) {
                     perflint::rules::manual_list_comprehension(self, target, body);
@@ -2217,9 +2222,6 @@ where
                     }
                 }
 
-                if self.semantic.match_typing_expr(value, "Literal") {
-                    self.semantic.flags |= SemanticModelFlags::LITERAL;
-                }
                 if self.any_enabled(&[
                     Rule::SysVersionSlice3,
                     Rule::SysVersion2,
@@ -2269,6 +2271,8 @@ where
             Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 match ctx {
                     ExprContext::Load => {
+                        self.handle_node_load(expr);
+
                         if self.enabled(Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
@@ -2322,10 +2326,10 @@ where
                                 }
                             }
                         }
-
-                        self.handle_node_load(expr);
                     }
                     ExprContext::Store => {
+                        self.handle_node_store(id, expr);
+
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
                                 pycodestyle::rules::ambiguous_variable_name(id, expr.range())
@@ -2352,8 +2356,6 @@ where
                                 );
                             }
                         }
-
-                        self.handle_node_store(id, expr);
                     }
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
@@ -2765,7 +2767,7 @@ where
                 }
                 if self.enabled(Rule::UnnecessaryDoubleCastOrProcess) {
                     flake8_comprehensions::rules::unnecessary_double_cast_or_process(
-                        self, expr, func, args,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.enabled(Rule::UnnecessarySubscriptReversal) {
@@ -3353,7 +3355,7 @@ where
             }
             Expr::Lambda(
                 lambda @ ast::ExprLambda {
-                    args,
+                    args: _,
                     body: _,
                     range: _,
                 },
@@ -3361,24 +3363,6 @@ where
                 if self.enabled(Rule::ReimplementedListBuiltin) {
                     flake8_pie::rules::reimplemented_list_builtin(self, lambda);
                 }
-
-                // Visit the default arguments, but avoid the body, which will be deferred.
-                for ArgWithDefault {
-                    default,
-                    def: _,
-                    range: _,
-                } in args
-                    .posonlyargs
-                    .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
-                {
-                    if let Some(expr) = &default {
-                        self.visit_expr(expr);
-                    }
-                }
-
-                self.semantic.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -3488,11 +3472,13 @@ where
                     }
                 }
             }
-            Expr::BoolOp(ast::ExprBoolOp {
-                op,
-                values,
-                range: _,
-            }) => {
+            Expr::BoolOp(
+                bool_op @ ast::ExprBoolOp {
+                    op,
+                    values,
+                    range: _,
+                },
+            ) => {
                 if self.enabled(Rule::RepeatedIsinstanceCalls) {
                     pylint::rules::repeated_isinstance_calls(self, expr, *op, values);
                 }
@@ -3516,6 +3502,9 @@ where
                 }
                 if self.enabled(Rule::ExprAndFalse) {
                     flake8_simplify::rules::expr_and_false(self, expr);
+                }
+                if self.enabled(Rule::RepeatedEqualityComparisonTarget) {
+                    pylint::rules::repeated_equality_comparison_target(self, bool_op);
                 }
             }
             _ => {}
@@ -3551,7 +3540,30 @@ where
                 self.visit_expr(key);
                 self.visit_expr(value);
             }
-            Expr::Lambda(_) => {
+            Expr::Lambda(
+                lambda @ ast::ExprLambda {
+                    args,
+                    body: _,
+                    range: _,
+                },
+            ) => {
+                // Visit the default arguments, but avoid the body, which will be deferred.
+                for ArgWithDefault {
+                    default,
+                    def: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &default {
+                        self.visit_expr(expr);
+                    }
+                }
+
+                self.semantic.push_scope(ScopeKind::Lambda(lambda));
                 self.deferred.lambdas.push((expr, self.semantic.snapshot()));
             }
             Expr::IfExp(ast::ExprIfExp {
@@ -3570,6 +3582,8 @@ where
                 keywords,
                 range: _,
             }) => {
+                self.visit_expr(func);
+
                 let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
                     if self.semantic.match_typing_call_path(&call_path, "cast") {
                         Some(typing::Callable::Cast)
@@ -3608,7 +3622,6 @@ where
                 });
                 match callable {
                     Some(typing::Callable::Bool) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
@@ -3618,7 +3631,6 @@ where
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
@@ -3628,7 +3640,6 @@ where
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
@@ -3638,7 +3649,6 @@ where
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
-                        self.visit_expr(func);
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
@@ -3662,8 +3672,6 @@ where
                         }
                     }
                     Some(typing::Callable::NamedTuple) => {
-                        self.visit_expr(func);
-
                         // Ex) NamedTuple("a", [("a", int)])
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3699,8 +3707,6 @@ where
                         }
                     }
                     Some(typing::Callable::TypedDict) => {
-                        self.visit_expr(func);
-
                         // Ex) TypedDict("a", {"a": int})
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
@@ -3731,8 +3737,6 @@ where
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
-                        self.visit_expr(func);
-
                         let mut args = args.iter();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
@@ -3765,7 +3769,7 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        self.visit_expr(func);
+
                         for arg in args {
                             self.visit_non_type_definition(arg);
                         }
@@ -3792,48 +3796,51 @@ where
                     self.semantic.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
+                    self.visit_expr(value);
+
                     match typing::match_annotated_subscript(
                         value,
                         &self.semantic,
                         self.settings.typing_modules.iter().map(String::as_str),
                         &self.settings.pyflakes.extend_generics,
                     ) {
-                        Some(subscript) => {
-                            match subscript {
-                                // Ex) Optional[int]
-                                typing::SubscriptKind::AnnotatedSubscript => {
-                                    self.visit_expr(value);
-                                    self.visit_type_definition(slice);
+                        // Ex) Literal["Class"]
+                        Some(typing::SubscriptKind::Literal) => {
+                            self.semantic.flags |= SemanticModelFlags::LITERAL;
+
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Optional[int]
+                        Some(typing::SubscriptKind::Generic) => {
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Annotated[int, "Hello, world!"]
+                        Some(typing::SubscriptKind::PEP593Annotation) => {
+                            // First argument is a type (including forward references); the
+                            // rest are arbitrary Python objects.
+                            if let Expr::Tuple(ast::ExprTuple {
+                                elts,
+                                ctx,
+                                range: _,
+                            }) = slice.as_ref()
+                            {
+                                if let Some(expr) = elts.first() {
+                                    self.visit_expr(expr);
+                                    for expr in elts.iter().skip(1) {
+                                        self.visit_non_type_definition(expr);
+                                    }
                                     self.visit_expr_context(ctx);
                                 }
-                                // Ex) Annotated[int, "Hello, world!"]
-                                typing::SubscriptKind::PEP593AnnotatedSubscript => {
-                                    // First argument is a type (including forward references); the
-                                    // rest are arbitrary Python objects.
-                                    self.visit_expr(value);
-                                    if let Expr::Tuple(ast::ExprTuple {
-                                        elts,
-                                        ctx,
-                                        range: _,
-                                    }) = slice.as_ref()
-                                    {
-                                        if let Some(expr) = elts.first() {
-                                            self.visit_expr(expr);
-                                            for expr in elts.iter().skip(1) {
-                                                self.visit_non_type_definition(expr);
-                                            }
-                                            self.visit_expr_context(ctx);
-                                        }
-                                    } else {
-                                        error!(
-                                            "Found non-Expr::Tuple argument to PEP 593 \
-                                             Annotation."
-                                        );
-                                    }
-                                }
+                            } else {
+                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
-                        None => visitor::walk_expr(self, expr),
+                        None => {
+                            self.visit_expr(slice);
+                            self.visit_expr_context(ctx);
+                        }
                     }
                 }
             }
@@ -3885,7 +3892,7 @@ where
                     }
                 }
                 if self.enabled(Rule::RaiseWithoutFromInsideExcept) {
-                    flake8_bugbear::rules::raise_without_from_inside_except(self, body);
+                    flake8_bugbear::rules::raise_without_from_inside_except(self, name, body);
                 }
                 if self.enabled(Rule::BlindExcept) {
                     flake8_blind_except::rules::blind_except(self, type_.as_deref(), name, body);
@@ -4253,7 +4260,7 @@ impl<'a> Checker<'a> {
             let shadowed = &self.semantic.bindings[shadowed_id];
             if !matches!(
                 shadowed.kind,
-                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_),
+                BindingKind::Builtin | BindingKind::Deletion | BindingKind::UnboundException(_)
             ) {
                 let references = shadowed.references.clone();
                 let is_global = shadowed.is_global();
@@ -4574,7 +4581,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.future_annotations() {
+                    if self.semantic.in_typing_only_annotation() {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -4693,11 +4700,18 @@ impl<'a> Checker<'a> {
             for snapshot in for_loops {
                 self.semantic.restore(snapshot);
 
-                if let Stmt::For(ast::StmtFor { target, body, .. })
-                | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) = &self.semantic.stmt()
+                if let Stmt::For(ast::StmtFor {
+                    target, iter, body, ..
+                })
+                | Stmt::AsyncFor(ast::StmtAsyncFor {
+                    target, iter, body, ..
+                }) = &self.semantic.stmt()
                 {
                     if self.enabled(Rule::UnusedLoopControlVariable) {
                         flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
+                    }
+                    if self.enabled(Rule::IncorrectDictIterator) {
+                        perflint::rules::incorrect_dict_iterator(self, target, iter);
                     }
                 } else {
                     unreachable!("Expected Expr::For | Expr::AsyncFor");
@@ -4991,18 +5005,26 @@ impl<'a> Checker<'a> {
                         .collect()
                 };
 
-                flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                    self,
-                    scope,
-                    &mut diagnostics,
-                );
+                if self.enabled(Rule::RuntimeImportInTypeCheckingBlock) {
+                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                        self,
+                        scope,
+                        &mut diagnostics,
+                    );
+                }
 
-                flake8_type_checking::rules::typing_only_runtime_import(
-                    self,
-                    scope,
-                    &runtime_imports,
-                    &mut diagnostics,
-                );
+                if self.any_enabled(&[
+                    Rule::TypingOnlyFirstPartyImport,
+                    Rule::TypingOnlyThirdPartyImport,
+                    Rule::TypingOnlyStandardLibraryImport,
+                ]) {
+                    flake8_type_checking::rules::typing_only_runtime_import(
+                        self,
+                        scope,
+                        &runtime_imports,
+                        &mut diagnostics,
+                    );
+                }
             }
 
             if self.enabled(Rule::UnusedImport) {

@@ -5,7 +5,7 @@ use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Ranged, Stmt};
-use smallvec::smallvec;
+use smallvec::SmallVec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
@@ -526,7 +526,7 @@ impl<'a> SemanticModel<'a> {
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
         let call_path = collect_call_path(value)?;
-        let head = call_path.first()?;
+        let (head, tail) = call_path.split_first()?;
         let binding = self.find_binding(head)?;
         match &binding.kind {
             BindingKind::Import(Import {
@@ -537,12 +537,12 @@ impl<'a> SemanticModel<'a> {
                     if source_path.is_empty() {
                         None
                     } else {
-                        source_path.extend(call_path.into_iter().skip(1));
+                        source_path.extend_from_slice(tail);
                         Some(source_path)
                     }
                 } else {
                     let mut source_path: CallPath = from_unqualified_name(name);
-                    source_path.extend(call_path.into_iter().skip(1));
+                    source_path.extend_from_slice(tail);
                     Some(source_path)
                 }
             }
@@ -551,7 +551,7 @@ impl<'a> SemanticModel<'a> {
             }) => {
                 let name = name.split('.').next().unwrap_or(name);
                 let mut source_path: CallPath = from_unqualified_name(name);
-                source_path.extend(call_path.into_iter().skip(1));
+                source_path.extend_from_slice(tail);
                 Some(source_path)
             }
             BindingKind::FromImport(FromImport {
@@ -562,19 +562,19 @@ impl<'a> SemanticModel<'a> {
                     if source_path.is_empty() {
                         None
                     } else {
-                        source_path.extend(call_path.into_iter().skip(1));
+                        source_path.extend_from_slice(tail);
                         Some(source_path)
                     }
                 } else {
                     let mut source_path: CallPath = from_unqualified_name(name);
-                    source_path.extend(call_path.into_iter().skip(1));
+                    source_path.extend_from_slice(tail);
                     Some(source_path)
                 }
             }
             BindingKind::Builtin => {
-                let mut source_path: CallPath = smallvec![];
+                let mut source_path: CallPath = SmallVec::with_capacity(1 + call_path.len());
                 source_path.push("");
-                source_path.extend(call_path);
+                source_path.extend_from_slice(call_path.as_slice());
                 Some(source_path)
             }
             _ => None,

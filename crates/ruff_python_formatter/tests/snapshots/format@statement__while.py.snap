@@ -51,9 +51,7 @@ else:  # trailing else comment
     # trailing else body comment
 
 
-while (
-    aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn
-):  # trailing comment
+while aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn:  # trailing comment
     pass
 
 else:

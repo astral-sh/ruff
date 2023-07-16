@@ -1,14 +1,16 @@
-use crate::builders::parenthesize_if_expands;
-use crate::comments::{dangling_comments, CommentLinePosition};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, parenthesized, NeedsParentheses, Parentheses,
-    Parenthesize,
-};
-use crate::prelude::*;
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::ExprTuple;
 use rustpython_parser::ast::{Expr, Ranged};
+
+use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
+
+use crate::builders::parenthesize_if_expands;
+use crate::comments::{dangling_comments, CommentLinePosition};
+use crate::expression::parentheses::{
+    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+};
+use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
@@ -108,14 +110,14 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             //
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
-            elts if is_parenthesized(*range, elts, f.context().source())
+            _ if is_parenthesized(*range, elts, f.context().source())
                 && self.parentheses != TupleParentheses::StripInsideForLoop =>
             {
-                parenthesized("(", &ExprSequence::new(elts), ")").fmt(f)
+                parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
-            elts => match self.parentheses {
-                TupleParentheses::Subscript => group(&ExprSequence::new(elts)).fmt(f),
-                _ => parenthesize_if_expands(&ExprSequence::new(elts)).fmt(f),
+            _ => match self.parentheses {
+                TupleParentheses::Subscript => group(&ExprSequence::new(item)).fmt(f),
+                _ => parenthesize_if_expands(&ExprSequence::new(item)).fmt(f),
             },
         }
     }
@@ -128,31 +130,30 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
 
 #[derive(Debug)]
 struct ExprSequence<'a> {
-    elts: &'a [Expr],
+    tuple: &'a ExprTuple,
 }
 
 impl<'a> ExprSequence<'a> {
-    const fn new(elts: &'a [Expr]) -> Self {
-        Self { elts }
+    const fn new(expr: &'a ExprTuple) -> Self {
+        Self { tuple: expr }
     }
 }
 
 impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        f.join_comma_separated().nodes(self.elts.iter()).finish()
+        f.join_comma_separated(self.tuple.end())
+            .nodes(&self.tuple.elts)
+            .finish()
     }
 }
 
 impl NeedsParentheses for ExprTuple {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }
 

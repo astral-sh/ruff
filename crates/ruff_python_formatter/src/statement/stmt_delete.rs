@@ -1,10 +1,11 @@
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
 use crate::comments::dangling_node_comments;
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{block_indent, format_with, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
-use rustpython_parser::ast::StmtDelete;
+use rustpython_parser::ast::{Ranged, StmtDelete};
 
 #[derive(Default)]
 pub struct FormatStmtDelete;
@@ -32,10 +33,21 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
                 )
             }
             [single] => {
-                write!(f, [single.format().with_options(Parenthesize::IfBreaks)])
+                write!(
+                    f,
+                    [maybe_parenthesize_expression(
+                        single,
+                        item,
+                        Parenthesize::IfBreaks
+                    )]
+                )
             }
             targets => {
-                let item = format_with(|f| f.join_comma_separated().nodes(targets.iter()).finish());
+                let item = format_with(|f| {
+                    f.join_comma_separated(item.end())
+                        .nodes(targets.iter())
+                        .finish()
+                });
                 parenthesize_if_expands(&item).fmt(f)
             }
         }

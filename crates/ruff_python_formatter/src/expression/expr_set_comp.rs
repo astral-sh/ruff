@@ -1,20 +1,39 @@
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
+use crate::AsFormat;
+use crate::{FormatNodeRule, PyFormatter};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::ExprSetComp;
 
 #[derive(Default)]
 pub struct FormatExprSetComp;
 
 impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
-    fn fmt_fields(&self, _item: &ExprSetComp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: &ExprSetComp, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprSetComp {
+            range: _,
+            elt,
+            generators,
+        } = item;
+
+        let joined = format_with(|f| {
+            f.join_with(soft_line_break_or_space())
+                .entries(generators.iter().formatted())
+                .finish()
+        });
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "{NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}"
+            [parenthesized(
+                "{",
+                &format_args!(
+                    group(&elt.format()),
+                    soft_line_break_or_space(),
+                    group(&joined)
+                ),
+                "}"
             )]
         )
     }
@@ -23,12 +42,9 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
 impl NeedsParentheses for ExprSetComp {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

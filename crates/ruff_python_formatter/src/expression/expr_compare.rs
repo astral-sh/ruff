@@ -1,11 +1,12 @@
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
-    Parenthesize,
+    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
+    OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::{CmpOp, ExprCompare};
 
 #[derive(Default)]
@@ -41,7 +42,7 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
             for (operator, comparator) in ops.iter().zip(comparators) {
                 let leading_comparator_comments = comments.leading_comments(comparator);
                 if leading_comparator_comments.is_empty() {
-                    write!(f, [soft_line_break_or_space()])?;
+                    write!(f, [in_parentheses_only_soft_line_break_or_space()])?;
                 } else {
                     // Format the expressions leading comments **before** the operator
                     write!(
@@ -73,10 +74,10 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 impl NeedsParentheses for ExprCompare {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, context)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }
 

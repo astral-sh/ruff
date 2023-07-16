@@ -1,29 +1,20 @@
 //! Extract [`TextRange`] information from AST nodes.
 //!
-//! In the `RustPython` AST, each node has a `range` field that contains the
-//! start and end byte offsets of the node. However, attributes on those
-//! nodes may not have their own ranges. In particular, identifiers are
-//! not given their own ranges, unless they're part of a name expression.
-//!
 //! For example, given:
 //! ```python
-//! def f():
+//! try:
+//!     ...
+//! except Exception as e:
 //!     ...
 //! ```
 //!
-//! The statement defining `f` has a range, but the identifier `f` does not.
-//!
-//! This module assists with extracting [`TextRange`] ranges from AST nodes
-//! via manual lexical analysis.
-
-use std::ops::{Add, Sub};
-use std::str::Chars;
+//! This module can be used to identify the [`TextRange`] of the `except` token.
 
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_ast::{Alias, Arg, ArgWithDefault, Pattern};
 use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_whitespace::{is_python_whitespace, Cursor};
 
 use crate::source_code::Locator;
 
@@ -163,20 +154,6 @@ impl TryIdentifier for ExceptHandler {
     }
 }
 
-/// Return the [`TextRange`] for every name in a [`Stmt`].
-///
-/// Intended to be used for `global` and `nonlocal` statements.
-///
-/// For example, return the ranges of `x` and `y` in:
-/// ```python
-/// global x, y
-/// ```
-pub fn names<'a>(stmt: &Stmt, locator: &'a Locator<'a>) -> impl Iterator<Item = TextRange> + 'a {
-    // Given `global x, y`, the first identifier is `global`, and the remaining identifiers are
-    // the names.
-    IdentifierTokenizer::new(locator.contents(), stmt.range()).skip(1)
-}
-
 /// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`].
 pub fn except(handler: &ExceptHandler, locator: &Locator) -> TextRange {
     IdentifierTokenizer::new(locator.contents(), handler.range())
@@ -248,13 +225,15 @@ impl<'a> IdentifierTokenizer<'a> {
     }
 
     fn next_token(&mut self) -> Option<TextRange> {
-        while let Some(c) = self.cursor.bump() {
+        while let Some(c) = {
+            self.offset += self.cursor.token_len();
+            self.cursor.start_token();
+            self.cursor.bump()
+        } {
             match c {
                 c if is_python_identifier_start(c) => {
-                    let start = self.offset.add(self.cursor.offset()).sub(c.text_len());
                     self.cursor.eat_while(is_python_identifier_continue);
-                    let end = self.offset.add(self.cursor.offset());
-                    return Some(TextRange::new(start, end));
+                    return Some(TextRange::at(self.offset, self.cursor.token_len()));
                 }
 
                 c if is_python_whitespace(c) => {
@@ -295,73 +274,15 @@ impl Iterator for IdentifierTokenizer<'_> {
     }
 }
 
-const EOF_CHAR: char = '\0';
-
-#[derive(Debug, Clone)]
-struct Cursor<'a> {
-    chars: Chars<'a>,
-    offset: TextSize,
-}
-
-impl<'a> Cursor<'a> {
-    fn new(source: &'a str) -> Self {
-        Self {
-            chars: source.chars(),
-            offset: TextSize::from(0),
-        }
-    }
-
-    const fn offset(&self) -> TextSize {
-        self.offset
-    }
-
-    /// Peeks the next character from the input stream without consuming it.
-    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
-    fn first(&self) -> char {
-        self.chars.clone().next().unwrap_or(EOF_CHAR)
-    }
-
-    /// Returns `true` if the file is at the end of the file.
-    fn is_eof(&self) -> bool {
-        self.chars.as_str().is_empty()
-    }
-
-    /// Consumes the next character.
-    fn bump(&mut self) -> Option<char> {
-        if let Some(char) = self.chars.next() {
-            self.offset += char.text_len();
-            Some(char)
-        } else {
-            None
-        }
-    }
-
-    /// Eats the next character if it matches the given character.
-    fn eat_char(&mut self, c: char) -> bool {
-        if self.first() == c {
-            self.bump();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Eats symbols while predicate returns true or until the end of file is reached.
-    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        while predicate(self.first()) && !self.is_eof() {
-            self.bump();
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
     use ruff_text_size::{TextRange, TextSize};
-    use rustpython_ast::Stmt;
+    use rustpython_ast::{Ranged, Stmt};
     use rustpython_parser::Parse;
 
     use crate::identifier;
+    use crate::identifier::IdentifierTokenizer;
     use crate::source_code::Locator;
 
     #[test]
@@ -380,6 +301,35 @@ else:
         assert_eq!(
             range,
             TextRange::new(TextSize::from(21), TextSize::from(25))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn extract_global_names() -> Result<()> {
+        let contents = r#"global X,Y, Z"#.trim();
+        let stmt = Stmt::parse(contents, "<filename>")?;
+        let locator = Locator::new(contents);
+
+        let mut names = IdentifierTokenizer::new(locator.contents(), stmt.range());
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "global");
+        assert_eq!(range, TextRange::new(TextSize::from(0), TextSize::from(6)));
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "X");
+        assert_eq!(range, TextRange::new(TextSize::from(7), TextSize::from(8)));
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "Y");
+        assert_eq!(range, TextRange::new(TextSize::from(9), TextSize::from(10)));
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "Z");
+        assert_eq!(
+            range,
+            TextRange::new(TextSize::from(12), TextSize::from(13))
         );
         Ok(())
     }

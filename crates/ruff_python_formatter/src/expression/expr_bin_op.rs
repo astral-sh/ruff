@@ -1,13 +1,14 @@
 use crate::comments::{trailing_comments, trailing_node_comments};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, in_parentheses_only_group, is_expression_parenthesized,
-    NeedsParentheses, Parenthesize,
+    in_parentheses_only_group, in_parentheses_only_soft_line_break,
+    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized, NeedsParentheses,
+    OptionalParentheses,
 };
 use crate::expression::Parentheses;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use rustpython_parser::ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
 };
@@ -65,9 +66,9 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                 let needs_space = !is_simple_power_expression(current);
 
                 let before_operator_space = if needs_space {
-                    soft_line_break_or_space()
+                    in_parentheses_only_soft_line_break_or_space()
                 } else {
-                    soft_line_break()
+                    in_parentheses_only_soft_line_break()
                 };
 
                 write!(
@@ -175,9 +176,13 @@ impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
 impl NeedsParentheses for ExprBinOp {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, context)
+        parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        if parent.is_expr_await() && !self.op.is_pow() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }

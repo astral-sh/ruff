@@ -109,7 +109,7 @@ def g():
          return DOUBLESPACE
  
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
      prev = leaf.prev_sibling
      if not prev:
@@ -126,7 +126,7 @@ def g():
  
      # Another comment because more comments
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    NOT_YET_IMPLEMENTED_StmtAssert
++    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  
      prev = leaf.prev_sibling
      if not prev:
@@ -153,7 +153,7 @@ def f():
     if t == token.COMMENT:  # another trailing comment
         return DOUBLESPACE
 
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
     prev = leaf.prev_sibling
     if not prev:
@@ -203,7 +203,7 @@ def g():
         return DOUBLESPACE
 
     # Another comment because more comments
-    NOT_YET_IMPLEMENTED_StmtAssert
+    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 
     prev = leaf.prev_sibling
     if not prev:

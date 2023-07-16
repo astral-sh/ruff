@@ -1,11 +1,12 @@
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{space, text};
-use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprAwait;
+
+use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
+
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprAwait;
@@ -13,16 +14,28 @@ pub struct FormatExprAwait;
 impl FormatNodeRule<ExprAwait> for FormatExprAwait {
     fn fmt_fields(&self, item: &ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprAwait { range: _, value } = item;
-        write!(f, [text("await"), space(), value.format()])
+
+        write!(
+            f,
+            [
+                text("await"),
+                space(),
+                maybe_parenthesize_expression(value, item, Parenthesize::IfRequired)
+            ]
+        )
     }
 }
 
 impl NeedsParentheses for ExprAwait {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, context)
+        parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }

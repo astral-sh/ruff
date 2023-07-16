@@ -93,22 +93,12 @@ a not in b
 
 a < b > c == d
 
-(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    < bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    > ccccccccccccccccccccccccccccc
-    == ddddddddddddddddddddd
-)
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa < bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb > ccccccccccccccccccccccccccccc == ddddddddddddddddddddd
 
-(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    < [
-        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
-        ff,
-    ]
-    < [ccccccccccccccccccccccccccccc, dddd]
-    < ddddddddddddddddddddddddddddddddddddddddddd
-)
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa < [
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+    ff,
+] < [ccccccccccccccccccccccccccccc, dddd] < ddddddddddddddddddddddddddddddddddddddddddd
 
 return 1 == 2 and (
     name,

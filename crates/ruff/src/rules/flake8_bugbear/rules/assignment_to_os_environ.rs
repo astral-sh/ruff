@@ -47,12 +47,12 @@ impl Violation for AssignmentToOsEnviron {
         format!("Assigning to `os.environ` doesn't clear the environment")
     }
 }
+
 /// B003
 pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = target else {
         return;
     };

@@ -1,8 +1,10 @@
-use crate::expression::parentheses::{is_expression_parenthesized, Parenthesize};
-use crate::expression::string::StringLayout;
+use rustpython_parser::ast;
+use rustpython_parser::ast::{Expr, Operator, StmtExpr};
+
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use rustpython_parser::ast::StmtExpr;
 
 #[derive(Default)]
 pub struct FormatStmtExpr;
@@ -11,14 +13,25 @@ impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
     fn fmt_fields(&self, item: &StmtExpr, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtExpr { value, .. } = item;
 
-        if let Some(constant) = value.as_constant_expr() {
-            if constant.value.is_str()
-                && !is_expression_parenthesized(value.as_ref().into(), f.context().source())
-            {
-                return constant.format().with_options(StringLayout::Flat).fmt(f);
-            }
+        if is_arithmetic_like(value) {
+            maybe_parenthesize_expression(value, item, Parenthesize::Optional).fmt(f)
+        } else {
+            value.format().fmt(f)
         }
-
-        value.format().with_options(Parenthesize::Optional).fmt(f)
     }
+}
+
+const fn is_arithmetic_like(expression: &Expr) -> bool {
+    matches!(
+        expression,
+        Expr::BinOp(ast::ExprBinOp {
+            op: Operator::BitOr
+                | Operator::BitXor
+                | Operator::LShift
+                | Operator::RShift
+                | Operator::Add
+                | Operator::Sub,
+            ..
+        })
+    )
 }

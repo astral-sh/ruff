@@ -1,16 +1,13 @@
 use rustpython_parser::ast::{Expr, ExprSubscript};
 
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 
 use crate::comments::trailing_comments;
 use crate::context::NodeLevel;
 use crate::context::PyFormatContext;
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, in_parentheses_only_group, NeedsParentheses, Parentheses,
-    Parenthesize,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -65,7 +62,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 
         write!(
             f,
-            [in_parentheses_only_group(&format_args![
+            [group(&format_args![
                 text("["),
                 trailing_comments(dangling_comments),
                 soft_block_indent(&format_slice),
@@ -87,12 +84,11 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 impl NeedsParentheses for ExprSubscript {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        context: &PyFormatContext,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, context) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        {
+            OptionalParentheses::Never
         }
     }
 }

@@ -1,10 +1,10 @@
-use rustpython_parser::ast::{self, Expr, Stmt};
+use rustpython_parser::ast;
+use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_stdlib::str::is_cased_lowercase;
 
 use crate::checkers::ast::Checker;
 
@@ -60,7 +60,11 @@ impl Violation for RaiseWithoutFromInsideExcept {
 }
 
 /// B904
-pub(crate) fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn raise_without_from_inside_except(
+    checker: &mut Checker,
+    name: Option<&str>,
+    body: &[Stmt],
+) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
         visitor.visit_body(body);
@@ -70,14 +74,28 @@ pub(crate) fn raise_without_from_inside_except(checker: &mut Checker, body: &[St
     for (range, exc, cause) in raises {
         if cause.is_none() {
             if let Some(exc) = exc {
-                match exc {
-                    Expr::Name(ast::ExprName { id, .. }) if is_cased_lowercase(id) => {}
-                    _ => {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(RaiseWithoutFromInsideExcept, range));
+                // If the raised object is bound to the same name, it's a re-raise, which is
+                // allowed (but may be flagged by other diagnostics).
+                //
+                // For example:
+                // ```python
+                // try:
+                //     ...
+                // except ValueError as exc:
+                //     raise exc
+                // ```
+                if let Some(name) = name {
+                    if exc
+                        .as_name_expr()
+                        .map_or(false, |ast::ExprName { id, .. }| name == id)
+                    {
+                        continue;
                     }
                 }
+
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(RaiseWithoutFromInsideExcept, range));
             }
         }
     }

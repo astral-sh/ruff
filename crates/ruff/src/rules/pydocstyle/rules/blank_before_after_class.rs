@@ -128,13 +128,13 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 /// ## Example
 /// ```python
 /// class PhotoMetadata:
+///
 ///     """Metadata about a photo."""
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class PhotoMetadata:
-///
 ///     """Metadata about a photo."""
 /// ```
 ///

@@ -285,7 +285,10 @@ aaaaaaaaaaaaaa + [
     aaaaaaaaaaaaaa
     + (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
 )
-aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+aaaaaaaaaaaaaa + {
+    a
+    for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+}
 
 # Wraps it in parentheses if it needs to break both left and right
 (
@@ -295,7 +298,10 @@ aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 
 
 # But only for expressions that have a statement parent.
-not (aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set})
+not (
+    aaaaaaaaaaaaaa
+    + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
+)
 [
     a
     + [
@@ -476,9 +482,7 @@ if (
 
 
 # Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
-for user_id in (
-    set(target_user_ids) - {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
-):
+for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     updates.append(UserPresenceState.default(user_id))
 
 # Keeps parenthesized left hand sides
