@@ -53,6 +53,11 @@ pub(super) fn is_overlong(
     task_tags: &[String],
     tab_size: TabSize,
 ) -> Option<Overlong> {
+    // Each character is between 1-4 bytes. If the number of bytes is smaller than the limit, it cannot be overlong.
+    if line.len() < limit.get() {
+        return None;
+    }
+
     let mut width = LineWidth::new(tab_size);
     width = width.add_str(line.as_str());
     if width <= limit {
