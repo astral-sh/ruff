@@ -11,7 +11,7 @@
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{Alias, Arg, ArgWithDefault, Pattern};
+use rustpython_ast::{Alias, Arg, ArgWithDefault};
 use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_python_whitespace::{is_python_whitespace, Cursor};
@@ -21,12 +21,6 @@ use crate::source_code::Locator;
 pub trait Identifier {
     /// Return the [`TextRange`] of the identifier in the given AST node.
     fn identifier(&self) -> TextRange;
-}
-
-pub trait TryIdentifier {
-    /// Return the [`TextRange`] of the identifier in the given AST node, or `None` if
-    /// the node does not have an identifier.
-    fn try_identifier(&self) -> Option<TextRange>;
 }
 
 impl Identifier for Stmt {
@@ -84,57 +78,6 @@ impl Identifier for Alias {
         self.asname
             .as_ref()
             .map_or_else(|| self.name.range(), Ranged::range)
-    }
-}
-
-impl TryIdentifier for Pattern {
-    /// Return the [`TextRange`] of the identifier in the given pattern.
-    ///
-    /// For example, return the range of `z` in:
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchAs
-    ///     case z:
-    ///         ...
-    /// ```
-    ///
-    /// Or:
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchAs
-    ///     case y as z:
-    ///         ...
-    /// ```
-    ///
-    /// Or :
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchMapping
-    ///     case {"a": 1, **z}
-    ///         ...
-    /// ```
-    ///
-    /// Or :
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchStar
-    ///     case *z:
-    ///         ...
-    /// ```
-    fn try_identifier(&self) -> Option<TextRange> {
-        let name = match self {
-            Pattern::MatchAs(ast::PatternMatchAs {
-                name: Some(name), ..
-            }) => Some(name),
-            Pattern::MatchMapping(ast::PatternMatchMapping {
-                rest: Some(rest), ..
-            }) => Some(rest),
-            Pattern::MatchStar(ast::PatternMatchStar {
-                name: Some(name), ..
-            }) => Some(name),
-            _ => None,
-        };
-        name.map(Ranged::range)
     }
 }
 
