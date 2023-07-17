@@ -7,15 +7,15 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of `.read_table` to read CSV files.
+/// Checks for uses of `pd.read_table` to read CSV files.
 ///
 /// ## Why is this bad?
-/// In the Pandas API, `.read_csv` and `.read_table` are equivalent apart from
-/// the default separator; `.read_csv` uses a comma (`,`) as the default
-/// separator, while `.read_table` uses a tab (`\t`) as the default separator.
+/// In the Pandas API, `pd.read_csv` and `pd.read_table` are equivalent apart
+/// from their default separator: `pd.read_csv` defaults to a comma (`,`),
+/// while `pd.read_table` defaults to a tab (`\t`) as the default separator.
 ///
-/// Prefer `.read_csv` over `.read_table` to read CSV files, since it is
-/// clearer and more idiomatic.
+/// Prefer `pd.read_csv` over `pd.read_table` when reading comma-separated
+/// data (like CSV files), as it is more idiomatic.
 ///
 /// ## Example
 /// ```python
@@ -53,7 +53,10 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, func: &Expr, keywords: &[
             matches!(call_path.as_slice(), ["pandas", "read_table"])
         })
     {
-        let Some(sep) = keywords
+        if let Some(Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(value),
+            ..
+        })) = keywords
             .iter()
             .find(|keyword| {
                 keyword
@@ -62,13 +65,6 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, func: &Expr, keywords: &[
                     .map_or(false, |keyword| keyword.as_str() == "sep")
             })
             .map(|keyword| &keyword.value)
-        else {
-            return;
-        };
-        if let Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(value),
-            ..
-        }) = &sep
         {
             if value.as_str() == "," {
                 checker
