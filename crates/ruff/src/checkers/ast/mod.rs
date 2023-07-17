@@ -290,6 +290,7 @@ where
                 returns,
                 args,
                 body,
+                range,
                 ..
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -298,8 +299,12 @@ where
                 returns,
                 args,
                 body,
+                range,
                 ..
             }) => {
+                if self.enabled(Rule::MutableArgumentDefault) {
+                    flake8_bugbear::rules::mutable_argument_default(self, args, body, *range);
+                }
                 if self.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                     flake8_django::rules::non_leading_receiver_decorator(self, decorator_list);
                 }
@@ -4119,9 +4124,6 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self.enabled(Rule::MutableArgumentDefault) {
-            flake8_bugbear::rules::mutable_argument_default(self, arguments);
-        }
         if self.enabled(Rule::FunctionCallInDefaultArgument) {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
