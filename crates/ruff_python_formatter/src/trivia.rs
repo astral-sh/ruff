@@ -274,8 +274,18 @@ impl<'a> SimpleTokenizer<'a> {
         Self::new(source, range)
     }
 
+    /// Creates a tokenizer that lexes tokens from the start of `source` up to `offset`.
     pub(crate) fn up_to(offset: TextSize, source: &'a str) -> Self {
         Self::new(source, TextRange::up_to(offset))
+    }
+
+    /// Creates a tokenizer that lexes tokens from the start of `source` up to `offset`, and informs
+    /// the lexer that the line at `offset` contains no comments. This can significantly speed up backwards lexing
+    /// because the lexer doesn't need to scan for comments.
+    pub(crate) fn up_to_without_back_comment(offset: TextSize, source: &'a str) -> Self {
+        let mut tokenizer = Self::up_to(offset, source);
+        tokenizer.back_line_has_no_comment = true;
+        tokenizer
     }
 
     fn to_keyword_or_other(&self, range: TextRange) -> TokenKind {
