@@ -57,9 +57,7 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             ..
         }) => {
             visitor.visit_body(body);
-            for clause in elif_else_clauses {
-                visitor.visit_body(&clause.body);
-            }
+            visitor.visit_elif_else_clause(clause);
         }
         Stmt::With(ast::StmtWith { body, .. }) => {
             visitor.visit_body(body);
